@@ -1,0 +1,46 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('form_answers', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+
+            $table->char('user_id', 36)->nullable();
+            $table->char('submission_id', 36);
+            $table->char('question_id', 36);
+            $table->char('option_id', 36)->nullable();
+
+            $table->text('answer_text')->nullable();
+
+            $table->enum('status', [
+                'active',
+                'inactive',
+            ])->default('active');
+
+            $table->timestamps();
+
+            $table->index('user_id');
+            $table->index('submission_id');
+            $table->index('question_id');
+            $table->index('option_id');
+            $table->index(['submission_id', 'question_id']);
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('form_answers');
+    }
+};

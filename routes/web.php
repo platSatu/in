@@ -1,0 +1,312 @@
+<?php
+
+use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\ProfileBussinesController;
+use App\Http\Controllers\TenantController;
+use App\Http\Controllers\PackageController;
+use App\Http\Controllers\Dashboard\PackageController as DashboardPackageController;
+use App\Http\Controllers\Dashboard\DepositController as DashboardDepositController;
+use App\Http\Controllers\Dashboard\HistoryUserController as DashboardHistoryUserController;
+use App\Http\Controllers\Dashboard\VoucherController as DashboardVoucherController;
+use App\Http\Controllers\CategoryApplicationController;
+use App\Http\Controllers\DepositController;
+use App\Http\Controllers\UserController;
+use App\Http\Controllers\TransactionController;
+use App\Http\Controllers\HistoryUserLoginController;
+use App\Http\Controllers\RoleController;
+use App\Http\Controllers\RoleUserController;
+use App\Http\Controllers\VoucherController;
+use App\Http\Controllers\Quiz\FormController;
+use App\Http\Controllers\Quiz\FormQuestionController;
+use App\Http\Controllers\Quiz\FormQuestionOptionController;
+use App\Http\Controllers\Quiz\FormSubmissionController;
+use App\Http\Controllers\Quiz\FormAnswerController;
+use App\Http\Controllers\Quiz\UniversityController;
+use App\Http\Controllers\Quiz\UniversityProfileController;
+use App\Http\Controllers\Pembayaran\PembayaranCategoriesController;
+use App\Http\Controllers\Pembayaran\PembayaranFormsController;
+use App\Http\Controllers\Pembayaran\PembayaranFormLinksController;
+use App\Http\Controllers\Absensi\AttendanceController;
+use App\Http\Controllers\Absensi\AttendanceSettingController;
+use App\Http\Controllers\Absensi\AttendanceUserQrCodeController;
+use App\Http\Controllers\Absensi\AcademicCalendarController;
+use App\Http\Controllers\FrontendController;
+use Illuminate\Support\Facades\Route;
+
+// Route::get('/', function () {
+//     return redirect()->route('login');
+// });
+
+
+Route::get('/', [FrontendController::class, 'index'])->name('home');
+
+// Frontend Form Wizard Routes
+Route::get('/form-wizard', [FrontendController::class, 'formWizard'])->name('frontend.form.wizard');
+Route::post('/form-wizard', [FrontendController::class, 'formWizardSubmit'])->name('frontend.form.wizard.submit');
+
+// University Profile Route (public)
+Route::get('/university/{id}', [FrontendController::class, 'universityProfile'])->name('frontend.university.profile');
+
+Route::get('/packages', [DashboardPackageController::class, 'index'])->name('public.packages.index');
+
+Route::middleware(['auth'])->group(function () {
+    Route::get('/packages/{id}/checkout', [DashboardPackageController::class, 'checkout'])->name('public.packages.checkout');
+    Route::post('/packages/{id}/pay', [DashboardPackageController::class, 'payWithDeposit'])->name('public.packages.pay');
+
+    Route::get('/dashboard/deposit/create', [DashboardDepositController::class, 'create'])->name('dashboard.deposit.create');
+    Route::post('/dashboard/deposit', [DashboardDepositController::class, 'store'])->name('dashboard.deposit.store');
+
+    Route::get('/dashboard/history-user', [DashboardHistoryUserController::class, 'index'])->name('dashboard.history-user.index');
+
+    Route::get('/dashboard/voucher/redeem', [DashboardVoucherController::class, 'redeemForm'])->name('dashboard.voucher.redeem');
+    Route::post('/dashboard/voucher/redeem', [DashboardVoucherController::class, 'redeem'])->name('dashboard.voucher.redeem.submit');
+});
+
+// Route::get('/dashboard', function () {
+//     return view('dashboard');
+// })->middleware(['auth', 'verified'])->name('dashboard');
+
+Route::get('/dashboard', [DashboardController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard');
+
+Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {
+
+    Route::get('/', [ProfileBussinesController::class, 'index'])->name('profile-bussines.index');
+    Route::get('/my-data', [ProfileBussinesController::class, 'myData'])->name('profile-bussines.myData');
+    Route::get('/create', [ProfileBussinesController::class, 'create'])->name('profile-bussines.create');
+    Route::post('/', [ProfileBussinesController::class, 'store'])->name('profile-bussines.store');
+    Route::get('/{id}', [ProfileBussinesController::class, 'show'])->name('profile-bussines.show');
+    Route::get('/{id}/edit', [ProfileBussinesController::class, 'edit'])->name('profile-bussines.edit');
+    Route::put('/{id}', [ProfileBussinesController::class, 'update'])->name('profile-bussines.update');
+    Route::delete('/{id}', [ProfileBussinesController::class, 'destroy'])->name('profile-bussines.destroy');
+
+});
+
+
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/tenant')->group(function () {
+    Route::get('/', [TenantController::class, 'index'])->name('tenant.index');
+    Route::get('/create', [TenantController::class, 'create'])->name('tenant.create');
+    Route::post('/', [TenantController::class, 'store'])->name('tenant.store');
+    Route::get('/{id}/edit', [TenantController::class, 'edit'])->name('tenant.edit');
+    Route::put('/{id}', [TenantController::class, 'update'])->name('tenant.update');
+    Route::delete('/{id}', [TenantController::class, 'destroy'])->name('tenant.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/package')->group(function () {
+    Route::get('/', [PackageController::class, 'index'])->name('package.index');
+    Route::get('/create', [PackageController::class, 'create'])->name('package.create');
+    Route::post('/', [PackageController::class, 'store'])->name('package.store');
+    Route::get('/{id}/edit', [PackageController::class, 'edit'])->name('package.edit');
+    Route::put('/{id}', [PackageController::class, 'update'])->name('package.update');
+    Route::delete('/{id}', [PackageController::class, 'destroy'])->name('package.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/category-application')->group(function () {
+    Route::get('/', [CategoryApplicationController::class, 'index'])->name('category-application.index');
+    Route::get('/create', [CategoryApplicationController::class, 'create'])->name('category-application.create');
+    Route::post('/', [CategoryApplicationController::class, 'store'])->name('category-application.store');
+    Route::get('/{id}/edit', [CategoryApplicationController::class, 'edit'])->name('category-application.edit');
+    Route::put('/{id}', [CategoryApplicationController::class, 'update'])->name('category-application.update');
+    Route::delete('/{id}', [CategoryApplicationController::class, 'destroy'])->name('category-application.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/deposit')->group(function () {
+    Route::get('/', [DepositController::class, 'index'])->name('deposit.index');
+    Route::get('/create', [DepositController::class, 'create'])->name('deposit.create');
+    Route::post('/', [DepositController::class, 'store'])->name('deposit.store');
+    Route::get('/{id}/edit', [DepositController::class, 'edit'])->name('deposit.edit');
+    Route::put('/{id}', [DepositController::class, 'update'])->name('deposit.update');
+    Route::delete('/{id}', [DepositController::class, 'destroy'])->name('deposit.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/user')->group(function () {
+    Route::get('/', [UserController::class, 'index'])->name('user.index');
+    Route::get('/create', [UserController::class, 'create'])->name('user.create');
+    Route::post('/', [UserController::class, 'store'])->name('user.store');
+    Route::get('/{id}/edit', [UserController::class, 'edit'])->name('user.edit');
+    Route::put('/{id}', [UserController::class, 'update'])->name('user.update');
+    Route::delete('/{id}', [UserController::class, 'destroy'])->name('user.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/transaction')->group(function () {
+    Route::get('/', [TransactionController::class, 'index'])->name('transaction.index');
+    Route::get('/create', [TransactionController::class, 'create'])->name('transaction.create');
+    Route::post('/', [TransactionController::class, 'store'])->name('transaction.store');
+    Route::get('/{id}/edit', [TransactionController::class, 'edit'])->name('transaction.edit');
+    Route::put('/{id}', [TransactionController::class, 'update'])->name('transaction.update');
+    Route::delete('/{id}', [TransactionController::class, 'destroy'])->name('transaction.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/historyuserlogin')->group(function () {
+    Route::get('/', [HistoryUserLoginController::class, 'index'])->name('historyuserlogin.index');
+    Route::get('/create', [HistoryUserLoginController::class, 'create'])->name('historyuserlogin.create');
+    Route::post('/', [HistoryUserLoginController::class, 'store'])->name('historyuserlogin.store');
+    Route::get('/{id}/edit', [HistoryUserLoginController::class, 'edit'])->name('historyuserlogin.edit');
+    Route::put('/{id}', [HistoryUserLoginController::class, 'update'])->name('historyuserlogin.update');
+    Route::delete('/{id}', [HistoryUserLoginController::class, 'destroy'])->name('historyuserlogin.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/roles')->group(function () {
+    Route::get('/', [RoleController::class, 'index'])->name('roles.index');
+    Route::get('/create', [RoleController::class, 'create'])->name('roles.create');
+    Route::post('/', [RoleController::class, 'store'])->name('roles.store');
+    Route::get('/{id}/edit', [RoleController::class, 'edit'])->name('roles.edit');
+    Route::put('/{id}', [RoleController::class, 'update'])->name('roles.update');
+    Route::delete('/{id}', [RoleController::class, 'destroy'])->name('roles.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/roleuser')->group(function () {
+    Route::get('/', [RoleUserController::class, 'index'])->name('roleuser.index');
+    Route::get('/create', [RoleUserController::class, 'create'])->name('roleuser.create');
+    Route::post('/', [RoleUserController::class, 'store'])->name('roleuser.store');
+    Route::get('/{id}/edit', [RoleUserController::class, 'edit'])->name('roleuser.edit');
+    Route::put('/{id}', [RoleUserController::class, 'update'])->name('roleuser.update');
+    Route::delete('/{id}', [RoleUserController::class, 'destroy'])->name('roleuser.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/vouchers')->group(function () {
+    Route::get('/', [VoucherController::class, 'index'])->name('vouchers.index');
+    Route::get('/create', [VoucherController::class, 'create'])->name('vouchers.create');
+    Route::post('/', [VoucherController::class, 'store'])->name('vouchers.store');
+    Route::get('/{id}/edit', [VoucherController::class, 'edit'])->name('vouchers.edit');
+    Route::put('/{id}', [VoucherController::class, 'update'])->name('vouchers.update');
+    Route::delete('/{id}', [VoucherController::class, 'destroy'])->name('vouchers.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/quiz/form')->group(function () {
+    Route::get('/', [FormController::class, 'index'])->name('quiz.form.index');
+    Route::get('/create', [FormController::class, 'create'])->name('quiz.form.create');
+    Route::post('/', [FormController::class, 'store'])->name('quiz.form.store');
+    Route::get('/{id}/edit', [FormController::class, 'edit'])->name('quiz.form.edit');
+    Route::put('/{id}', [FormController::class, 'update'])->name('quiz.form.update');
+    Route::delete('/{id}', [FormController::class, 'destroy'])->name('quiz.form.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/quiz/form-question')->group(function () {
+    Route::get('/', [FormQuestionController::class, 'index'])->name('quiz.form-question.index');
+    Route::get('/create', [FormQuestionController::class, 'create'])->name('quiz.form-question.create');
+    Route::post('/', [FormQuestionController::class, 'store'])->name('quiz.form-question.store');
+    Route::get('/{id}/edit', [FormQuestionController::class, 'edit'])->name('quiz.form-question.edit');
+    Route::put('/{id}', [FormQuestionController::class, 'update'])->name('quiz.form-question.update');
+    Route::delete('/{id}', [FormQuestionController::class, 'destroy'])->name('quiz.form-question.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/quiz/form-question-option')->group(function () {
+    Route::get('/', [FormQuestionOptionController::class, 'index'])->name('quiz.form-question-option.index');
+    Route::get('/create', [FormQuestionOptionController::class, 'create'])->name('quiz.form-question-option.create');
+    Route::post('/', [FormQuestionOptionController::class, 'store'])->name('quiz.form-question-option.store');
+    Route::get('/{id}/edit', [FormQuestionOptionController::class, 'edit'])->name('quiz.form-question-option.edit');
+    Route::put('/{id}', [FormQuestionOptionController::class, 'update'])->name('quiz.form-question-option.update');
+    Route::delete('/{id}', [FormQuestionOptionController::class, 'destroy'])->name('quiz.form-question-option.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/quiz/form-submission')->group(function () {
+    Route::get('/', [FormSubmissionController::class, 'index'])->name('quiz.form-submission.index');
+    Route::get('/create', [FormSubmissionController::class, 'create'])->name('quiz.form-submission.create');
+    Route::post('/', [FormSubmissionController::class, 'store'])->name('quiz.form-submission.store');
+    Route::get('/{id}/edit', [FormSubmissionController::class, 'edit'])->name('quiz.form-submission.edit');
+    Route::put('/{id}', [FormSubmissionController::class, 'update'])->name('quiz.form-submission.update');
+    Route::delete('/{id}', [FormSubmissionController::class, 'destroy'])->name('quiz.form-submission.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/quiz/form-answer')->group(function () {
+    Route::get('/', [FormAnswerController::class, 'index'])->name('quiz.form-answer.index');
+    Route::get('/create', [FormAnswerController::class, 'create'])->name('quiz.form-answer.create');
+    Route::post('/', [FormAnswerController::class, 'store'])->name('quiz.form-answer.store');
+    Route::get('/{id}/edit', [FormAnswerController::class, 'edit'])->name('quiz.form-answer.edit');
+    Route::put('/{id}', [FormAnswerController::class, 'update'])->name('quiz.form-answer.update');
+    Route::delete('/{id}', [FormAnswerController::class, 'destroy'])->name('quiz.form-answer.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/quiz/university')->group(function () {
+    Route::get('/', [UniversityController::class, 'index'])->name('quiz.university.index');
+    Route::get('/create', [UniversityController::class, 'create'])->name('quiz.university.create');
+    Route::post('/', [UniversityController::class, 'store'])->name('quiz.university.store');
+    Route::get('/{id}/edit', [UniversityController::class, 'edit'])->name('quiz.university.edit');
+    Route::put('/{id}', [UniversityController::class, 'update'])->name('quiz.university.update');
+    Route::delete('/{id}', [UniversityController::class, 'destroy'])->name('quiz.university.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/quiz/university-profile')->group(function () {
+    Route::get('/', [UniversityProfileController::class, 'index'])->name('quiz.university-profile.index');
+    Route::get('/create', [UniversityProfileController::class, 'create'])->name('quiz.university-profile.create');
+    Route::post('/', [UniversityProfileController::class, 'store'])->name('quiz.university-profile.store');
+    Route::get('/{id}/edit', [UniversityProfileController::class, 'edit'])->name('quiz.university-profile.edit');
+    Route::put('/{id}', [UniversityProfileController::class, 'update'])->name('quiz.university-profile.update');
+    Route::delete('/{id}', [UniversityProfileController::class, 'destroy'])->name('quiz.university-profile.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/pembayaran/category')->group(function () {
+    Route::get('/', [PembayaranCategoriesController::class, 'index'])->name('pembayaran.category.index');
+    Route::get('/create', [PembayaranCategoriesController::class, 'create'])->name('pembayaran.category.create');
+    Route::post('/', [PembayaranCategoriesController::class, 'store'])->name('pembayaran.category.store');
+    Route::get('/{id}/edit', [PembayaranCategoriesController::class, 'edit'])->name('pembayaran.category.edit');
+    Route::put('/{id}', [PembayaranCategoriesController::class, 'update'])->name('pembayaran.category.update');
+    Route::delete('/{id}', [PembayaranCategoriesController::class, 'destroy'])->name('pembayaran.category.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/pembayaran/form')->group(function () {
+    Route::get('/', [PembayaranFormsController::class, 'index'])->name('pembayaran.form.index');
+    Route::get('/create', [PembayaranFormsController::class, 'create'])->name('pembayaran.form.create');
+    Route::post('/', [PembayaranFormsController::class, 'store'])->name('pembayaran.form.store');
+    Route::get('/{id}/edit', [PembayaranFormsController::class, 'edit'])->name('pembayaran.form.edit');
+    Route::put('/{id}', [PembayaranFormsController::class, 'update'])->name('pembayaran.form.update');
+    Route::delete('/{id}', [PembayaranFormsController::class, 'destroy'])->name('pembayaran.form.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/pembayaran/form-link')->group(function () {
+    Route::get('/', [PembayaranFormLinksController::class, 'index'])->name('pembayaran.form-link.index');
+    Route::get('/create', [PembayaranFormLinksController::class, 'create'])->name('pembayaran.form-link.create');
+    Route::post('/', [PembayaranFormLinksController::class, 'store'])->name('pembayaran.form-link.store');
+    Route::get('/{id}/edit', [PembayaranFormLinksController::class, 'edit'])->name('pembayaran.form-link.edit');
+    Route::put('/{id}', [PembayaranFormLinksController::class, 'update'])->name('pembayaran.form-link.update');
+    Route::delete('/{id}', [PembayaranFormLinksController::class, 'destroy'])->name('pembayaran.form-link.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/absensi/attendance')->group(function () {
+    Route::get('/', [AttendanceController::class, 'index'])->name('absensi.attendance.index');
+    Route::get('/create', [AttendanceController::class, 'create'])->name('absensi.attendance.create');
+    Route::post('/', [AttendanceController::class, 'store'])->name('absensi.attendance.store');
+    Route::get('/{id}/edit', [AttendanceController::class, 'edit'])->name('absensi.attendance.edit');
+    Route::put('/{id}', [AttendanceController::class, 'update'])->name('absensi.attendance.update');
+    Route::delete('/{id}', [AttendanceController::class, 'destroy'])->name('absensi.attendance.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/absensi/attendance-setting')->group(function () {
+    Route::get('/', [AttendanceSettingController::class, 'index'])->name('absensi.attendance-setting.index');
+    Route::get('/create', [AttendanceSettingController::class, 'create'])->name('absensi.attendance-setting.create');
+    Route::post('/', [AttendanceSettingController::class, 'store'])->name('absensi.attendance-setting.store');
+    Route::get('/{id}/edit', [AttendanceSettingController::class, 'edit'])->name('absensi.attendance-setting.edit');
+    Route::put('/{id}', [AttendanceSettingController::class, 'update'])->name('absensi.attendance-setting.update');
+    Route::delete('/{id}', [AttendanceSettingController::class, 'destroy'])->name('absensi.attendance-setting.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/absensi/attendance-user-qr-code')->group(function () {
+    Route::get('/', [AttendanceUserQrCodeController::class, 'index'])->name('absensi.attendance-user-qr-code.index');
+    Route::get('/create', [AttendanceUserQrCodeController::class, 'create'])->name('absensi.attendance-user-qr-code.create');
+    Route::post('/', [AttendanceUserQrCodeController::class, 'store'])->name('absensi.attendance-user-qr-code.store');
+    Route::get('/{id}/edit', [AttendanceUserQrCodeController::class, 'edit'])->name('absensi.attendance-user-qr-code.edit');
+    Route::put('/{id}', [AttendanceUserQrCodeController::class, 'update'])->name('absensi.attendance-user-qr-code.update');
+    Route::delete('/{id}', [AttendanceUserQrCodeController::class, 'destroy'])->name('absensi.attendance-user-qr-code.destroy');
+    Route::post('/{id}/generate-qr', [AttendanceUserQrCodeController::class, 'generateQr'])->name('absensi.attendance-user-qr-code.generate-qr');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/absensi/academic-calendar')->group(function () {
+    Route::get('/', [AcademicCalendarController::class, 'index'])->name('absensi.academic-calendar.index');
+    Route::get('/create', [AcademicCalendarController::class, 'create'])->name('absensi.academic-calendar.create');
+    Route::post('/', [AcademicCalendarController::class, 'store'])->name('absensi.academic-calendar.store');
+    Route::get('/{id}/edit', [AcademicCalendarController::class, 'edit'])->name('absensi.academic-calendar.edit');
+    Route::put('/{id}', [AcademicCalendarController::class, 'update'])->name('absensi.academic-calendar.update');
+    Route::delete('/{id}', [AcademicCalendarController::class, 'destroy'])->name('absensi.academic-calendar.destroy');
+});
+
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+});
+
+require __DIR__ . '/auth.php';
