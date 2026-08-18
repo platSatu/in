@@ -26,6 +26,8 @@ class UniversityProfile extends Model
         'language',
         'scholarship_available',
         'status',
+        'degree',
+        'intake',
     ];
 
     /**

@@ -12,7 +12,7 @@
         </nav>
     </div>
 
-    <form action="{{ route('quiz.university.update', $data->id) }}" method="POST">
+    <form action="{{ route('quiz.university.update', $data->id) }}" method="POST" enctype="multipart/form-data">
         @csrf
         @method('PUT')
 
@@ -44,13 +44,27 @@
                     </div>
 
                     <div class="row mb-4">
-                        <div class="col-sm-12">
-                            <label for="city" class="mb-2">City</label>
-                            <input type="text" class="form-control @error('city') is-invalid @enderror" id="city"
-                                name="city" value="{{ old('city', $data->city) }}" placeholder="Enter city...">
-                            @error('city')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                       <div class="row mb-4">
+                            <div class="col-sm-12">
+                                <label for="city" class="mb-2">City</label>
+                                <select class="form-control @error('city') is-invalid @enderror"
+                                    id="city" name="city">
+
+                                    <option value="">Select city...</option>
+
+                                    @foreach($cities as $city)
+                                        <option value="{{ $city->id }}"
+                                            {{ old('city', $data->city_id) == $city->id ? 'selected' : '' }}>
+                                            {{ $city->name }}
+                                        </option>
+                                    @endforeach
+
+                                </select>
+
+                                @error('city')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
                         </div>
                     </div>
 
@@ -63,6 +77,76 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-4">
+                            <label for="logo" class="mb-2">Logo</label>
+
+                            @if($data->logo)
+                                <div class="mb-2">
+                                    <img src="{{ asset($data->logo) }}" alt="Logo" style="max-width: 120px; border-radius: 8px;">
+                                </div>
+                            @endif
+
+                            <input type="file" accept="image/*"
+                                class="form-control @error('logo') is-invalid @enderror" id="logo"
+                                name="logo">
+                            <div class="form-text">Kosongkan kalau tidak ingin mengganti logo.</div>
+                            @error('logo')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-sm-4">
+                            <label for="banner" class="mb-2">Banner</label>
+
+                            @if($data->banner)
+                                <div class="mb-2">
+                                    <img src="{{ asset($data->banner) }}" alt="Banner" style="max-width: 120px; border-radius: 8px;">
+                                </div>
+                            @endif
+
+                            <input type="file" accept="image/*"
+                                class="form-control @error('banner') is-invalid @enderror" id="banner"
+                                name="banner">
+                            <div class="form-text">Kosongkan kalau tidak ingin mengganti banner.</div>
+                            @error('banner')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-sm-4">
+                            <label for="attachment" class="mb-2">Attachment</label>
+
+                            @if($data->attachment)
+                                <div class="mb-2">
+                                    <a href="{{ asset($data->attachment) }}" target="_blank">Lihat attachment saat ini</a>
+                                </div>
+                            @endif
+
+                            <input type="file" accept=".jpg,.jpeg,.pdf"
+                                class="form-control @error('attachment') is-invalid @enderror" id="attachment"
+                                name="attachment">
+                            <div class="form-text">JPG atau PDF. Kosongkan kalau tidak ingin mengganti.</div>
+                            @error('attachment')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                         <div class="col-xxl-12 mb-4">
+                                    <label for="status">Status</label>
+                                    <select class="form-select @error('status') is-invalid @enderror" id="status" name="status">
+                                        <option value="">Choose...</option>
+                                        <option value="active"
+                                            {{ old('status', $data->status) === 'active' ? 'selected' : '' }}>Active</option>
+                                        <option value="inactive"
+                                            {{ old('status', $data->status) === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                                    </select>
+                                    @error('status')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
                     </div>
 
                 </div>

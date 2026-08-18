@@ -50,34 +50,67 @@ class FormQuestionController extends Controller
         return view('quiz.form-question.create', compact('forms'));
     }
 
+    // public function store(Request $request)
+    // {
+    //     $validated = $request->validate([
+    //         'form_id' => 'required|string|exists:forms,id',
+    //         'question_text' => 'required|string',
+    //         'type' => 'required|in:single_choice,multiple_choice,text,number,major',
+    //         'order' => 'required|integer|min:0',
+    //         'status' => 'required|in:active,inactive',
+    //     ]);
+
+    //     $userId = Auth::id();
+    //     if ($userId === null) {
+    //         abort(401);
+    //     }
+
+    //     $formOwned = Form::query()
+    //         ->where(['id' => $validated['form_id']])
+    //         ->where(['user_id' => (string) $userId])
+    //         ->exists();
+
+    //     if (!$formOwned) {
+    //         abort(403, 'Form tidak valid untuk user ini.');
+    //     }
+
+    //     $validated['user_id'] = (string) $userId;
+
+    //     AdminCrud::create(FormQuestion::class, $validated);
+
+    //     return redirect()
+    //         ->route('quiz.form-question.index')
+    //         ->with('success', 'Form Question berhasil dibuat.');
+    // }
     public function store(Request $request)
     {
         $validated = $request->validate([
             'form_id' => 'required|string|exists:forms,id',
             'question_text' => 'required|string',
-            'type' => 'required|in:single_choice,multiple_choice,text,number',
+            'type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major',
+            'required' => 'required|boolean',
             'order' => 'required|integer|min:0',
             'status' => 'required|in:active,inactive',
         ]);
-
+    
         $userId = Auth::id();
         if ($userId === null) {
             abort(401);
         }
-
+    
         $formOwned = Form::query()
             ->where(['id' => $validated['form_id']])
             ->where(['user_id' => (string) $userId])
             ->exists();
-
+    
         if (!$formOwned) {
             abort(403, 'Form tidak valid untuk user ini.');
         }
-
+    
         $validated['user_id'] = (string) $userId;
-
+    
         AdminCrud::create(FormQuestion::class, $validated);
-
+    
         return redirect()
             ->route('quiz.form-question.index')
             ->with('success', 'Form Question berhasil dibuat.');
@@ -102,34 +135,67 @@ class FormQuestionController extends Controller
         return view('quiz.form-question.edit', compact('data', 'forms'));
     }
 
+    // public function update(Request $request, string $id)
+    // {
+    //     $userId = Auth::id();
+    //     if ($userId === null) {
+    //         abort(401);
+    //     }
+
+    //     AdminCrud::findOrFail(FormQuestion::class, $id, (string) $userId);
+
+    //     $validated = $request->validate([
+    //         'form_id' => 'required|string|exists:forms,id',
+    //         'question_text' => 'required|string',
+    //         'type' => 'required|in:single_choice,multiple_choice,text,number,major',
+    //         'order' => 'required|integer|min:0',
+    //         'status' => 'required|in:active,inactive',
+    //     ]);
+
+    //     $formOwned = Form::query()
+    //         ->where(['id' => $validated['form_id']])
+    //         ->where(['user_id' => (string) $userId])
+    //         ->exists();
+
+    //     if (!$formOwned) {
+    //         abort(403, 'Form tidak valid untuk user ini.');
+    //     }
+
+    //     AdminCrud::update(FormQuestion::class, $id, $validated, (string) $userId);
+
+    //     return redirect()
+    //         ->route('quiz.form-question.index')
+    //         ->with('success', 'Form Question berhasil diupdate.');
+    // }
     public function update(Request $request, string $id)
     {
         $userId = Auth::id();
         if ($userId === null) {
             abort(401);
         }
-
+    
         AdminCrud::findOrFail(FormQuestion::class, $id, (string) $userId);
-
+    
         $validated = $request->validate([
             'form_id' => 'required|string|exists:forms,id',
             'question_text' => 'required|string',
-            'type' => 'required|in:single_choice,multiple_choice,text,number',
+            'type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major',
+            'required' => 'required|boolean',
             'order' => 'required|integer|min:0',
             'status' => 'required|in:active,inactive',
         ]);
-
+    
         $formOwned = Form::query()
             ->where(['id' => $validated['form_id']])
             ->where(['user_id' => (string) $userId])
             ->exists();
-
+    
         if (!$formOwned) {
             abort(403, 'Form tidak valid untuk user ini.');
         }
-
+    
         AdminCrud::update(FormQuestion::class, $id, $validated, (string) $userId);
-
+    
         return redirect()
             ->route('quiz.form-question.index')
             ->with('success', 'Form Question berhasil diupdate.');

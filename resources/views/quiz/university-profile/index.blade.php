@@ -104,6 +104,15 @@
                                                 <a class="dropdown-item"
                                                     href="{{ route('quiz.university-profile.edit', $item->id) }}">Edit</a>
 
+                                                <div class="dropdown-divider"></div>
+
+                                                <a class="dropdown-item"
+                                                    href="{{ route('quiz.university-album.index', ['university_id' => $item->university_id]) }}">
+                                                    + Add Album
+                                                </a>
+
+                                                <div class="dropdown-divider"></div>
+
                                                 <form action="{{ route('quiz.university-profile.destroy', $item->id) }}"
                                                     method="POST" onsubmit="return confirm('Hapus university profile ini?');">
                                                     @csrf
@@ -125,7 +134,7 @@
                 </div>
 
                 <div class="mt-4">
-                    {{ $data->links() }}
+                    {{ $data->links('pagination::bootstrap-5') }}
                 </div>
 
             </div>

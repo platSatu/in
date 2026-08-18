@@ -23,17 +23,32 @@
                     <div class="row mb-4">
                         <div class="col-sm-12">
                             <label for="university_id" class="mb-2">University</label>
-                            <select class="form-select @error('university_id') is-invalid @enderror" id="university_id" name="university_id">
-                                <option value="">Choose university...</option>
-                                @foreach ($universities as $university)
-                                    <option value="{{ $university->id }}" {{ old('university_id') == $university->id ? 'selected' : '' }}>
-                                        {{ $university->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('university_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+
+                            @php
+                                $lockedUniversityId = old('university_id', $selectedUniversityId ?? null);
+                                $lockedUniversity = $lockedUniversityId ? $universities->firstWhere('id', $lockedUniversityId) : null;
+                            @endphp
+
+                            @if($lockedUniversity && !$errors->has('university_id'))
+                                <input type="text" class="form-control" value="{{ $lockedUniversity->name }}" disabled readonly>
+                                <input type="hidden" name="university_id" value="{{ $lockedUniversity->id }}">
+                                <div class="form-text">
+                                    Profile ini akan dikaitkan ke university di atas.
+                                    <a href="{{ route('quiz.university-profile.create') }}">Ganti university</a>
+                                </div>
+                            @else
+                                <select class="form-select @error('university_id') is-invalid @enderror" id="university_id" name="university_id">
+                                    <option value="">Choose university...</option>
+                                    @foreach ($universities as $university)
+                                        <option value="{{ $university->id }}" {{ $lockedUniversityId == $university->id ? 'selected' : '' }}>
+                                            {{ $university->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('university_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            @endif
                         </div>
                     </div>
 
@@ -62,6 +77,25 @@
                             <input type="number" min="0" class="form-control @error('max_budget') is-invalid @enderror"
                                 id="max_budget" name="max_budget" value="{{ old('max_budget') }}" placeholder="0">
                             @error('max_budget')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <label for="degree" class="mb-2">Degree</label>
+                            <input type="text" min="0" class="form-control @error('degree') is-invalid @enderror"
+                                id="degree" name="degree" value="{{ old('degree') }}" placeholder="Degree">
+                            @error('degree')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-sm-6">
+                            <label for="intake" class="mb-2">Intake</label>
+                            <input type="text" min="0" class="form-control @error('intake') is-invalid @enderror"
+                                id="intake" name="intake" value="{{ old('intake') }}" placeholder="Intake">
+                            @error('intake')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>

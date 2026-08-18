@@ -58,9 +58,13 @@
                             @forelse ($data as $index => $item)
                                 <tr>
                                     <td>{{ $data->firstItem() + $index }}</td>
-                                    <td class="fw-bold">{{ $item->name }}</td>
+                                    <td class="fw-bold">
+                                      <img src="{{ asset($item->logo) }}" alt="{{ $item->name }}" width="50">
+                                    {{ $item->name }}
+
+                                    </td>
                                     <td>{{ $item->country }}</td>
-                                    <td>{{ $item->city }}</td>
+                                    <td>{{ $item->city ?? '-' }}</td>
                                     <td>{{ \Illuminate\Support\Str::limit($item->description, 60) ?? '-' }}</td>
                                     <td>{{ optional($item->created_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
@@ -81,6 +85,24 @@
                                             <div class="dropdown-menu" aria-labelledby="dropdownMenuLink{{ $item->id }}">
                                                 <a class="dropdown-item"
                                                     href="{{ route('quiz.university.edit', $item->id) }}">Edit</a>
+                                                <a class="dropdown-item"
+                                                    href="{{ route('frontend.university.profile', $item->id) }}"
+                                                    target="_blank">
+                                                        Detail
+                                                    </a>
+
+                                                <div class="dropdown-divider"></div>
+
+                                                <a class="dropdown-item"
+                                                    href="{{ route('quiz.university-profile.create', ['university_id' => $item->id]) }}">
+                                                    + Add Profile
+                                                </a>
+                                                <a class="dropdown-item"
+                                                    href="{{ route('quiz.university-album.create', ['university_id' => $item->id]) }}">
+                                                    + Add Album
+                                                </a>
+
+                                                <div class="dropdown-divider"></div>
 
                                                 <form action="{{ route('quiz.university.destroy', $item->id) }}"
                                                     method="POST" onsubmit="return confirm('Hapus university ini?');">
@@ -103,7 +125,7 @@
                 </div>
 
                 <div class="mt-4">
-                    {{ $data->links() }}
+                    {{ $data->links('pagination::bootstrap-5') }}
                 </div>
 
             </div>

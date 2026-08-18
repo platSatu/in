@@ -4,9 +4,9 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Register | Satora</title>
+    <title>INASTUDY | REGISTER | CHINA EDUCATION CONSULTANT</title>
     <!--favicon-->
-    <link rel="icon" href="assets/images/favicon-32x32.png" type="image/png">
+    <link rel="icon" type="image/png" href="{{ asset('frontend/img/Logo.png') }}">
 
     <!--plugins-->
     <link href="{{ asset('authLogin') }}/assets/plugins/perfect-scrollbar/css/perfect-scrollbar.css" rel="stylesheet">
@@ -48,7 +48,7 @@
                 <div class="col-12 col-xl-5 col-xxl-4 auth-cover-right align-items-center justify-content-center">
                     <div class="card rounded-0 m-3 border-0 shadow-none">
                         <div class="card-body p-sm-5">
-                            <img src="{{ asset('authLogin') }}/assets/images/logo1.png" class="mb-4" width="145"
+                           <img src="{{ asset('frontend') }}/img/Logo.png" class="mb-4" width="145"
                                 alt="">
                             <h4 class="fw-bold">Get Started Now</h4>
                             <p class="mb-0">Enter your credentials to create your account</p>

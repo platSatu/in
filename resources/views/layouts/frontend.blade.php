@@ -5,8 +5,8 @@
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, shrink-to-fit=no">
-    <title>Dashboard | Saturo </title>
-    <link rel="icon" type="image/x-icon" href="{{ asset('frontend') }}/src/assets/img/favicon.ico" />
+    <title>INASTUDY | DASHBOARD | CHINA EDUCATION CONSULTANT</title>
+    <link rel="icon" type="image/png" href="{{ asset('frontend/img/Logo.png') }}">
     <link href="{{ asset('frontend') }}/layouts/vertical-light-menu/css/light/loader.css" rel="stylesheet"
         type="text/css" />
     <link href="{{ asset('frontend') }}/layouts/vertical-light-menu/css/dark/loader.css" rel="stylesheet"
@@ -27,7 +27,7 @@
     <link rel="stylesheet" type="text/css" href="{{ asset('frontend') }}/src/assets/css/light/elements/alert.css">
     <link rel="stylesheet" type="text/css" href="{{ asset('frontend') }}/src/assets/css/dark/elements/alert.css">
     <!-- END PAGE LEVEL PLUGINS/CUSTOM STYLES -->
-
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
         body.dark .layout-px-spacing,
         .layout-px-spacing {

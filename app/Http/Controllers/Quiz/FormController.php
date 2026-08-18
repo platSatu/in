@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Quiz;
 use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
+use App\Models\WhatsappTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -32,7 +33,9 @@ class FormController extends Controller
 
     public function create()
     {
-        return view('quiz.form.create');
+        $templates = WhatsappTemplate::where('status', 'active')->get();
+
+        return view('quiz.form.create', compact('templates'));
     }
 
     public function store(Request $request)
@@ -40,6 +43,7 @@ class FormController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'whatsapp_template_id' => 'nullable|string|exists:whatsapp_templates,id',
         ]);
 
         $userId = Auth::id();
@@ -59,13 +63,27 @@ class FormController extends Controller
     public function edit(string $id)
     {
         $userId = Auth::id();
+
         if ($userId === null) {
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(Form::class, $id, (string) $userId);
 
-        return view('quiz.form.edit', compact('data'));
+        $data = AdminCrud::findOrFail(
+            Form::class,
+            $id,
+            (string) $userId
+        );
+
+
+        $templates = \App\Models\WhatsappTemplate::where('status', 'active')
+            ->get();
+
+
+        return view('quiz.form.edit', compact(
+            'data',
+            'templates'
+        ));
     }
 
     public function update(Request $request, string $id)
@@ -80,6 +98,7 @@ class FormController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'whatsapp_template_id' => 'nullable|string|exists:whatsapp_templates,id',
         ]);
 
         AdminCrud::update(Form::class, $id, $validated, (string) $userId);

@@ -3,6 +3,13 @@
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileBussinesController;
+use App\Http\Controllers\Quiz\CityController;
+use App\Http\Controllers\Quiz\MajorController;
+use App\Http\Controllers\Quiz\SettingUniversityController;
+use App\Http\Controllers\Quiz\UniversityAlbumController;
+use App\Http\Controllers\Quiz\UniversityAlbumPhotoController;
+use App\Http\Controllers\Quiz\WhatsappTemplateController;
+use App\Http\Controllers\Qrcode\LinkToQrcodeController;
 use App\Http\Controllers\TenantController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\Dashboard\PackageController as DashboardPackageController;
@@ -32,6 +39,9 @@ use App\Http\Controllers\Absensi\AttendanceSettingController;
 use App\Http\Controllers\Absensi\AttendanceUserQrCodeController;
 use App\Http\Controllers\Absensi\AcademicCalendarController;
 use App\Http\Controllers\FrontendController;
+use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\BackendInvitationController;
+use App\Http\Controllers\Student\StudentController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/', function () {
@@ -41,11 +51,21 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [FrontendController::class, 'index'])->name('home');
 
-// Frontend Form Wizard Routes
-Route::get('/form-wizard', [FrontendController::class, 'formWizard'])->name('frontend.form.wizard');
-Route::post('/form-wizard', [FrontendController::class, 'formWizardSubmit'])->name('frontend.form.wizard.submit');
+Route::get('/frontend/universities-by-city/{city}', [FrontendController::class, 'universitiesByCity'])
+    ->name('frontend.universities-by-city');
 
-// University Profile Route (public)
+// Frontend Form Wizard Routes
+Route::get('/quiz', [FrontendController::class, 'formWizard'])->name('frontend.form.wizard');
+Route::post('/quiz', [FrontendController::class, 'formWizardSubmit'])->name('frontend.form.wizard.submit');
+
+Route::get('/handbook', [FrontendController::class, 'handbook'])->name('frontend.handbook');
+Route::get('/handbook/{id}/download', [FrontendController::class, 'handbookDownload'])->name('frontend.handbook.download');
+
+Route::get('/invitation/form', [InvitationController::class, 'create'])->name('invitation.create');
+Route::post('/invitation/form', [InvitationController::class, 'store'])->name('invitation.store');
+Route::get('/invitation/{qrcode}', [InvitationController::class, 'show'])->name('invitation.show');
+
+Route::get('/universities', [FrontendController::class, 'universityCatalog'])->name('frontend.university.catalog');
 Route::get('/university/{id}', [FrontendController::class, 'universityProfile'])->name('frontend.university.profile');
 
 Route::get('/packages', [DashboardPackageController::class, 'index'])->name('public.packages.index');
@@ -83,8 +103,6 @@ Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(functio
     Route::delete('/{id}', [ProfileBussinesController::class, 'destroy'])->name('profile-bussines.destroy');
 
 });
-
-
 
 Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/tenant')->group(function () {
     Route::get('/', [TenantController::class, 'index'])->name('tenant.index');
@@ -183,6 +201,73 @@ Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/qui
     Route::get('/{id}/edit', [FormController::class, 'edit'])->name('quiz.form.edit');
     Route::put('/{id}', [FormController::class, 'update'])->name('quiz.form.update');
     Route::delete('/{id}', [FormController::class, 'destroy'])->name('quiz.form.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/city')->group(function () {
+    Route::get('/', [CityController::class, 'index'])->name('city.index');
+    Route::get('/create', [CityController::class, 'create'])->name('city.create');
+    Route::post('/', [CityController::class, 'store'])->name('city.store');
+    Route::get('/{id}/edit', [CityController::class, 'edit'])->name('city.edit');
+    Route::put('/{id}', [CityController::class, 'update'])->name('city.update');
+    Route::delete('/{id}', [CityController::class, 'destroy'])->name('city.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/major')->group(function () {
+    Route::get('/', [MajorController::class, 'index'])->name('quiz.major.index');
+    Route::get('/create', [MajorController::class, 'create'])->name('quiz.major.create');
+    Route::post('/', [MajorController::class, 'store'])->name('quiz.major.store');
+    Route::get('/{id}/edit', [MajorController::class, 'edit'])->name('quiz.major.edit');
+    Route::put('/{id}', [MajorController::class, 'update'])->name('quiz.major.update');
+    Route::delete('/{id}', [MajorController::class, 'destroy'])->name('quiz.major.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/setting-university')->group(function () {
+    Route::get('/', [SettingUniversityController::class, 'index'])->name('quiz.setting-university.index');
+    Route::get('/create', [SettingUniversityController::class, 'create'])->name('quiz.setting-university.create');
+    Route::post('/', [SettingUniversityController::class, 'store'])->name('quiz.setting-university.store');
+    Route::get('/{id}/edit', [SettingUniversityController::class, 'edit'])->name('quiz.setting-university.edit');
+    Route::put('/{id}', [SettingUniversityController::class, 'update'])->name('quiz.setting-university.update');
+    Route::delete('/{id}', [SettingUniversityController::class, 'destroy'])->name('quiz.setting-university.destroy');
+});
+
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/whatsapp-template')->group(function () {
+    Route::get('/', [WhatsappTemplateController::class, 'index'])->name('quiz.whatsapp-template.index');
+    Route::get('/create', [WhatsappTemplateController::class, 'create'])->name('quiz.whatsapp-template.create');
+    Route::post('/', [WhatsappTemplateController::class, 'store'])->name('quiz.whatsapp-template.store');
+    Route::get('/{id}/edit', [WhatsappTemplateController::class, 'edit'])->name('quiz.whatsapp-template.edit');
+    Route::put('/{id}', [WhatsappTemplateController::class, 'update'])->name('quiz.whatsapp-template.update');
+    Route::delete('/{id}', [WhatsappTemplateController::class, 'destroy'])->name('quiz.whatsapp-template.destroy');
+});
+
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/university-album')->group(function () {
+    Route::get('/', [UniversityAlbumController::class, 'index'])->name('quiz.university-album.index');
+    Route::get('/create', [UniversityAlbumController::class, 'create'])->name('quiz.university-album.create');
+    Route::post('/', [UniversityAlbumController::class, 'store'])->name('quiz.university-album.store');
+    Route::get('/{id}/edit', [UniversityAlbumController::class, 'edit'])->name('quiz.university-album.edit');
+    Route::put('/{id}', [UniversityAlbumController::class, 'update'])->name('quiz.university-album.update');
+    Route::delete('/{id}', [UniversityAlbumController::class, 'destroy'])->name('quiz.university-album.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/university-album-photo')->group(function () {
+    Route::get('/', [UniversityAlbumPhotoController::class, 'index'])->name('quiz.university-album-photo.index');
+    Route::get('/create', [UniversityAlbumPhotoController::class, 'create'])->name('quiz.university-album-photo.create');
+    Route::post('/', [UniversityAlbumPhotoController::class, 'store'])->name('quiz.university-album-photo.store');
+    Route::get('/{id}/edit', [UniversityAlbumPhotoController::class, 'edit'])->name('quiz.university-album-photo.edit');
+    Route::put('/{id}', [UniversityAlbumPhotoController::class, 'update'])->name('quiz.university-album-photo.update');
+    Route::delete('/{id}', [UniversityAlbumPhotoController::class, 'destroy'])->name('quiz.university-album-photo.destroy');
+});
+
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/generate-link-to-qrcode')->group(function () {
+    Route::get('/', [LinkToQrcodeController::class, 'index'])->name('qrcodes.index');
+    Route::get('/create', [LinkToQrcodeController::class, 'create'])->name('qrcodes.create');
+    Route::post('/', [LinkToQrcodeController::class, 'store'])->name('qrcodes.store');
+    Route::get('/{id}/edit', [LinkToQrcodeController::class, 'edit'])->name('qrcodes.edit');
+    Route::put('/{id}', [LinkToQrcodeController::class, 'update'])->name('qrcodes.update');
+    Route::delete('/{id}', [LinkToQrcodeController::class, 'destroy'])->name('qrcodes.destroy');
+    Route::get('/{id}', [LinkToQrcodeController::class, 'show'])->name('qrcodes.show');
 });
 
 Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/quiz/form-question')->group(function () {
@@ -303,10 +388,46 @@ Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/abs
     Route::delete('/{id}', [AcademicCalendarController::class, 'destroy'])->name('absensi.academic-calendar.destroy');
 });
 
-Route::middleware('auth')->group(function () {
-    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-    Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-    Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/student/student')->group(function () {
+    Route::get('/', [StudentController::class, 'index'])->name('student.student.index');
+    Route::get('/create', [StudentController::class, 'create'])->name('student.student.create');
+    Route::post('/', [StudentController::class, 'store'])->name('student.student.store');
+    Route::get('/{id}', [StudentController::class, 'show'])->name('student.student.show');
+    Route::get('/{id}/edit', [StudentController::class, 'edit'])->name('student.student.edit');
+    Route::put('/{id}', [StudentController::class, 'update'])->name('student.student.update');
+    Route::delete('/{id}', [StudentController::class, 'destroy'])->name('student.student.destroy');
+    Route::post('/{id}/add-user', [StudentController::class, 'addUser'])->name('student.student.add-user');
 });
+
+Route::get('/dashboard/invitation/register-ulang',  [BackendInvitationController::class, 'RegisterUlangScan'])->name('register-ulang.scan');
+Route::post('/dashboard/invitation/register-ulang', [BackendInvitationController::class, 'processScan'])->name('register-ulang.process');
+
+Route::middleware(['auth'])->prefix('dashboard')->name('dashboard.')->group(function () {
+    Route::prefix('invitation')->name('invitation.')->group(function () {
+        Route::get('/',               [BackendInvitationController::class, 'index'])->name('index');
+        Route::get('/create',         [BackendInvitationController::class, 'create'])->name('create');
+        Route::post('/',              [BackendInvitationController::class, 'store'])->name('store');
+        Route::get('/{invitation}',   [BackendInvitationController::class, 'show'])->name('show');
+        Route::get('/{invitation}/edit', [BackendInvitationController::class, 'edit'])->name('edit');
+        Route::put('/{invitation}',   [BackendInvitationController::class, 'update'])->name('update');
+        Route::delete('/{invitation}',[BackendInvitationController::class, 'destroy'])->name('destroy');
+        Route::post('/{invitation}/resend', [BackendInvitationController::class, 'resend'])->name('resend');
+
+        // ============================================================
+        // Tambahkan 2 route ini di dalam group dashboard
+        // ============================================================
+
+        // Letakkan SEBELUM route /{invitation} agar tidak konflik
+        // Route::get('/register-ulang',  [BackendInvitationController::class, 'RegisterUlangScan'])->name('register-ulang.scan');
+        // Route::post('/register-ulang', [BackendInvitationController::class, 'processScan'])->name('register-ulang.process');
+    });
+
+});
+// Route::middleware('auth')->group(function () {
+//     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+//     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
+//     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+// });
 
 require __DIR__ . '/auth.php';

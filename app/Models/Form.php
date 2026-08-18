@@ -22,5 +22,11 @@ class Form extends Model
         'name',
         'description',
         'status',
+        'whatsapp_template_id',
     ];
+
+    public function whatsappTemplate()
+    {
+        return $this->belongsTo(WhatsappTemplate::class, 'whatsapp_template_id');
+    }
 }

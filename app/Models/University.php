@@ -23,6 +23,9 @@ class University extends Model
         'country',
         'city',
         'description',
+        'logo',
+        'banner',
+        'attachment',
     ];
 
     /**
@@ -32,4 +35,14 @@ class University extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    public function city()
+    {
+        return $this->belongsTo(City::class , 'city');
+    }
+
+    // public function city()
+    // {
+    //     return $this->belongsTo(City::class, 'city');
+    // }
 }

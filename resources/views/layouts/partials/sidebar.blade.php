@@ -4,7 +4,7 @@
             <div class="nav-logo">
                 <div class="nav-item theme-logo">
                     <a href="{{ route('dashboard') }}">
-                        <img src="{{ asset('frontend') }}/assets/img/logo.svg" class="navbar-logo" alt="InaStudy">
+                        <img src="{{ asset('frontend/img/Logo.png') }}" class="navbar-logo" alt="InaStudy New Logo">
                     </a>
                 </div>
                 <div class="nav-item theme-text">
@@ -84,13 +84,16 @@
                 </a>
                 <ul class="collapse submenu list-unstyled" id="menuKursus" data-bs-parent="#accordionExample">
                     <li>
-                        <a href="{{ route('user.index') }}"> Data Student</a>
+                        <a href="{{ route('user.index') }}"> Data User Login</a>
                     </li>
                     <li>
                         <a href="{{ route('roles.index') }}"> Roles</a>
                     </li>
                     <li>
                         <a href="{{ route('roleuser.index') }}"> Role to user</a>
+                    </li>
+                     <li>
+                        <a href="{{ route('dashboard.invitation.index') }}"> Invitations</a>
                     </li>
                 </ul>
             </li>
@@ -172,7 +175,37 @@
 
 
             @if (auth()->check() && auth()->user()->hasRole('superadmin'))
-              
+              <li class="menu">
+                    <a href="#menuStudent" data-bs-toggle="collapse" aria-expanded="false" class="dropdown-toggle">
+                        <div class="">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="feather feather-list">
+                                <line x1="8" y1="6" x2="21" y2="6"></line>
+                                <line x1="8" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                            <span>Students</span>
+                        </div>
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
+                    <ul class="collapse submenu list-unstyled" id="menuStudent" data-bs-parent="#accordionExample">
+                        <li>
+                            <a href="{{ route('student.student.index') }}"> Data Student</a>
+                        </li>
+                      
+
+                    </ul>
+                </li>
                 <li class="menu">
                     <a href="#menuQuiz" data-bs-toggle="collapse" aria-expanded="false" class="dropdown-toggle">
                         <div class="">
@@ -186,7 +219,7 @@
                                 <line x1="3" y1="12" x2="3.01" y2="12"></line>
                                 <line x1="3" y1="18" x2="3.01" y2="18"></line>
                             </svg>
-                            <span>Quiz</span>
+                            <span>Quiz / University</span>
                         </div>
                         <div>
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
@@ -212,11 +245,33 @@
                         <li>
                             <a href="{{ route('quiz.form-answer.index') }}"> Form Answer </a>
                         </li>
+                       <li>
+                            <a href="{{ route('city.index') }}"> City </a>
+                        </li>
+                        <li>
+                            <a href="{{ route('quiz.major.index') }}"> Major </a>
+                        </li>
                         <li>
                             <a href="{{ route('quiz.university.index') }}"> University </a>
                         </li>
                         <li>
                             <a href="{{ route('quiz.university-profile.index') }}"> University Profile </a>
+                        </li>
+                       
+                        <li>
+                            <a href="{{ route('quiz.university-album.index') }}"> University Album</a>
+                        </li>
+                         <li>
+                            <a href="{{ route('quiz.university-album-photo.index') }}"> University Album Photo</a>
+                        </li>
+                        <li>
+                            <a href="{{ route('quiz.whatsapp-template.index') }}"> Whatsapp Template </a>
+                        </li>
+                         <li>
+                            <a href="{{ route('quiz.setting-university.index') }}"> Setting University </a>
+                        </li>
+                         <li>
+                            <a href="{{ route('qrcodes.index') }}"> Generate Link to Qrcode </a>
                         </li>
                     </ul>
                 </li>

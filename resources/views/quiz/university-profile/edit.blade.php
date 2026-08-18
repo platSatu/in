@@ -73,6 +73,27 @@
                     </div>
 
                     <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <label for="degree" class="mb-2">Degree</label>
+                            <input type="text" min="0" class="form-control @error('degree') is-invalid @enderror"
+                                id="degree" name="degree" value="{{ old('degree', $data->degree) }}"
+                                placeholder="0">
+                            @error('degree')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-sm-6">
+                            <label for="intake" class="mb-2">Intake</label>
+                            <input type="text" min="0" class="form-control @error('intake') is-invalid @enderror"
+                                id="intake" name="intake" value="{{ old('intake', $data->intake) }}"
+                                placeholder="0">
+                            @error('intake')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
                         <div class="col-sm-12">
                             <label for="language" class="mb-2">Language</label>
                             <input type="text" class="form-control @error('language') is-invalid @enderror" id="language"

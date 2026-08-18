@@ -62,16 +62,38 @@
                                     <label for="type">Type</label>
                                     <select class="form-select @error('type') is-invalid @enderror" id="type" name="type">
                                         <option value="">Choose...</option>
-                                        <option value="single_choice"
-                                            {{ old('type', $data->type) === 'single_choice' ? 'selected' : '' }}>Single Choice</option>
-                                        <option value="multiple_choice"
-                                            {{ old('type', $data->type) === 'multiple_choice' ? 'selected' : '' }}>Multiple Choice</option>
                                         <option value="text"
-                                            {{ old('type', $data->type) === 'text' ? 'selected' : '' }}>Text</option>
+                                            {{ old('type', $data->type) === 'text' ? 'selected' : '' }}>Text (single line)</option>
+                                        <option value="textarea"
+                                            {{ old('type', $data->type) === 'textarea' ? 'selected' : '' }}>Textarea (long text)</option>
                                         <option value="number"
                                             {{ old('type', $data->type) === 'number' ? 'selected' : '' }}>Number</option>
+                                        <option value="date"
+                                            {{ old('type', $data->type) === 'date' ? 'selected' : '' }}>Date</option>
+                                        <option value="single_choice"
+                                            {{ old('type', $data->type) === 'single_choice' ? 'selected' : '' }}>Single Choice (radio / checkbox-style)</option>
+                                        <option value="multiple_choice"
+                                            {{ old('type', $data->type) === 'multiple_choice' ? 'selected' : '' }}>Multiple Choice (checkbox)</option>
+                                        <option value="dropdown"
+                                            {{ old('type', $data->type) === 'dropdown' ? 'selected' : '' }}>Dropdown (select, ringkas untuk opsi banyak)</option>
+                                        <option value="major"
+                                            {{ old('type', $data->type) === 'major' ? 'selected' : '' }}>Major</option>
                                     </select>
+                                    <div class="form-text">
+                                        Single Choice, Multiple Choice, dan Dropdown ambil pilihan jawabannya dari menu "Options" di pertanyaan ini.
+                                    </div>
                                     @error('type')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="col-xxl-12 mb-4">
+                                    <label for="required">Required</label>
+                                    <select class="form-select @error('required') is-invalid @enderror" id="required" name="required">
+                                        <option value="1" {{ old('required', (string) (int) $data->required) === '1' ? 'selected' : '' }}>Yes, wajib diisi</option>
+                                        <option value="0" {{ old('required', (string) (int) $data->required) === '0' ? 'selected' : '' }}>No, boleh kosong</option>
+                                    </select>
+                                    @error('required')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
