@@ -2,15 +2,6 @@
 @section('content')
     <div class="middle-content container-xxl p-0">
 
-        <div class="page-meta">
-            <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ route('quiz.university.index') }}">University</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Create</li>
-                </ol>
-            </nav>
-        </div>
-
         <form action="{{ route('quiz.university.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
 

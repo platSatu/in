@@ -67,8 +67,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Form;
 use App\Models\FormAnswer;
+use App\Models\FormPayment;
 use App\Models\FormQuestion;
 use App\Models\FormQuestionOption;
+use App\Models\FormResult;
 use App\Models\FormSubmission;
 use App\Models\Major;
 use App\Models\Student;
@@ -77,6 +79,7 @@ use App\Models\User;
 use App\Models\University;
 use App\Models\UniversityProfile;
 use App\Models\UniversityAlbum;
+use App\Models\WhatsappGateway;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
@@ -210,10 +213,34 @@ class FrontendController extends Controller
      */
     public function formWizard(Request $request)
     {
-        $formId = $request->query('form_id');
+        return $this->buildFormWizardView($request->query('form_id'));
+    }
 
+    /**
+     * URL cantik untuk booth: /quiz/{branchSlug}/{boothSlug}
+     * Contoh: inagroup.asia/quiz/mall-of-indonesia/a1
+     */
+    public function formWizardBySlug(string $branchSlug, string $boothSlug)
+    {
+        // publiclyAccessible() = status 'active' DAN (kalau diisi) sekarang ada
+        // di antara start_date..end_date. Kalau tidak match sama sekali (baik
+        // karena inactive, belum mulai, atau sudah lewat), 404 seperti sebelumnya.
+        $selectedForm = Form::where('slug', $branchSlug)
+            ->where('booth_slug', $boothSlug)
+            ->publiclyAccessible()
+            ->firstOrFail();
+
+        return $this->buildFormWizardView($selectedForm->id);
+    }
+
+    /**
+     * Data & view yang dipakai bareng oleh formWizard() (?form_id=) dan
+     * formWizardBySlug() (/quiz/{branchSlug}/{boothSlug}).
+     */
+    private function buildFormWizardView(?string $formId)
+    {
         // Get all available forms
-        $forms = Form::where('status', 'active')
+        $forms = Form::publiclyAccessible()
             ->orderBy('created_at', 'desc')
             ->get();
 
@@ -223,20 +250,46 @@ class FrontendController extends Controller
 
         // If specific form selected, get its questions
         $selectedForm = null;
-        $questions = [];
+        $questions = collect();
+        $personalDataQuestions = collect();
+        $placementTestQuestions = collect();
 
         if ($formId) {
-            $selectedForm = Form::find($formId);
+            // Dulu ini Form::find($formId) tanpa cek status sama sekali, jadi form
+            // inactive tetap bisa diakses selama tahu ID-nya lewat ?form_id=. Sekarang
+            // ikut disaring publiclyAccessible() juga (status + jadwal start/end_date).
+            $selectedForm = Form::publiclyAccessible()->find($formId);
             if ($selectedForm) {
+                // Hit counter sederhana: +1 setiap form ini benar-benar ditampilkan ke publik.
+                $selectedForm->increment('view_count');
+
                 $questions = FormQuestion::where('form_id', $formId)
                     ->where('status', 'active')
                     ->with('options')
                     ->orderBy('order')
                     ->get();
+
+                // === STAGE "DATA PRIBADI" ===
+                // Dipisah dari daftar flat $questions berdasarkan stage_group, supaya
+                // wizard bisa render dua step terpisah (lihat frontend/form-wizard.blade.php).
+                // Kalau has_personal_data_stage nonaktif, $personalDataQuestions dibiarkan
+                // kosong (step-nya tidak dirender sama sekali di blade) meskipun ada
+                // pertanyaan lama yang kebetulan bertanda personal_data.
+                if ($selectedForm->has_personal_data_stage) {
+                    $personalDataQuestions = $questions->where('stage_group', 'personal_data')->values();
+                }
+                $placementTestQuestions = $questions->where('stage_group', 'placement_test')->values();
             }
         }
 
-        return view('frontend.form-wizard', compact('forms', 'selectedForm', 'questions', 'majors'));
+        return view('frontend.form-wizard', compact(
+            'forms',
+            'selectedForm',
+            'questions',
+            'personalDataQuestions',
+            'placementTestQuestions',
+            'majors'
+        ));
     }
 
     /**
@@ -419,6 +472,7 @@ class FrontendController extends Controller
                 'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s.\'-]+$/u'],
                 'email' => ['required', 'email', 'max:255'],
                 'handphone' => ['required', 'digits_between:9,16'],
+                'payment_order_id' => ['nullable', 'string', 'max:50'],
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
             // Kalau ini yang muncul di log, berarti request GAGAL validasi dan
@@ -431,6 +485,40 @@ class FrontendController extends Controller
         }
 
         Log::info('[FORM-WIZARD] Validasi lolos', ['validated' => $validated]);
+
+        $form = Form::find($validated['form_id']);
+
+        if (!$form) {
+            abort(404);
+        }
+
+        // === PAYMENT GATE ===
+        // Kalau form ini butuh pembayaran, placement test/pertanyaan HANYA boleh
+        // disimpan kalau ada FormPayment berstatus "paid" untuk form + order ini.
+        // Status "paid" itu sendiri HANYA pernah diset oleh webhook resmi gateway
+        // (lihat FormPaymentController::handleWebhook), tidak pernah oleh request
+        // browser biasa — jadi ini bukan sekadar validasi UI, tapi gerbang di server.
+        $payment = null;
+
+        if ($form->requires_payment) {
+            $payment = FormPayment::where('order_id', $validated['payment_order_id'] ?? null)
+                ->where('form_id', $form->id)
+                ->where('status', 'paid')
+                ->whereNull('form_submission_id')
+                ->first();
+
+            if (!$payment) {
+                Log::warning('[FORM-WIZARD] Submit ditolak, pembayaran belum terkonfirmasi', [
+                    'form_id' => $form->id,
+                    'payment_order_id' => $validated['payment_order_id'] ?? null,
+                ]);
+
+                return redirect()
+                    ->route('frontend.form.wizard', ['form_id' => $form->id])
+                    ->withErrors(['payment' => 'Pembayaran belum terkonfirmasi. Silakan selesaikan pembayaran terlebih dahulu.'])
+                    ->withInput();
+            }
+        }
 
         try {
             Log::info('[FORM-WIZARD] Cek DB connection aktif', [
@@ -503,12 +591,20 @@ class FrontendController extends Controller
             throw $e;
         }
 
+        // === STUDENT BRANCH/FORM TRACKING ===
+        // Simpan branch & form yang baru diisi student ini di tabel students, dipakai
+        // untuk filter di halaman admin Student (index). Ini "singgahan terakhir" saja
+        // (row students dipakai bareng lintas form via handphone) — history LENGKAP
+        // tiap submission (termasuk yang sebelum-sebelumnya) tetap utuh lewat relasi
+        // Student::formSubmissions(), lihat StudentController::show().
+        $student->update([
+            'branch_id' => $form->branch_id,
+            'form_id' => $form->id,
+        ]);
+
         Log::info('[FORM-WIZARD] Lanjut ke proses FormSubmission & FormAnswer', [
             'student_id' => $student->id,
         ]);
-
-        // Get form for message building
-        $form = Form::find($validated['form_id']);
 
         // Create submission record
         $submission = FormSubmission::create([
@@ -518,6 +614,12 @@ class FrontendController extends Controller
         ]);
 
         Log::info('[FORM-WIZARD] FormSubmission dibuat', ['submission_id' => $submission->id]);
+
+        // Kunci FormPayment ini ke submission yang baru dibuat, supaya order_id yang
+        // sama tidak bisa dipakai lagi untuk submit form kedua kalinya.
+        if ($payment) {
+            $payment->update(['form_submission_id' => $submission->id]);
+        }
 
         // Get form questions
         $questions = FormQuestion::where('form_id', $validated['form_id'])
@@ -529,6 +631,15 @@ class FrontendController extends Controller
         $answersSummary = [];
         $questionNumber = 1;
         $selectedMajorIds = [];
+
+        // === RESULT (auto mode) ===
+        // Kalau form ini result_mode='auto', skor dihitung dari kolom
+        // form_question_options.score milik opsi yang dipilih peserta — TAPI hanya
+        // untuk pertanyaan stage_group='placement_test' (bukan pertanyaan data
+        // pribadi). Kolom score sendiri sudah ada & bisa diisi admin sejak awal,
+        // cuma sebelumnya tidak pernah dipakai/dijumlahkan di mana pun.
+        $autoScore = 0;
+        $isAutoResultForm = $form->result_mode === 'auto';
 
         foreach ($questions as $question) {
             $questionKey = 'question_' . $question->id;
@@ -553,7 +664,8 @@ class FrontendController extends Controller
 
                 if ($optionId) {
                     $option = FormQuestionOption::find($optionId);
-                    $answerValue = $option ? $option->option_text : '-';
+                    // option_text bisa kosong kalau opsinya berupa gambar saja (mis. soal Listening).
+                    $answerValue = $option ? ($option->option_text ?: '[Gambar]') : '-';
 
                     FormAnswer::create([
                         'user_id' => $student->id,
@@ -563,6 +675,10 @@ class FrontendController extends Controller
                         'answer_text' => null,
                         'status' => 'active',
                     ]);
+
+                    if ($isAutoResultForm && $question->stage_group === 'placement_test' && $option) {
+                        $autoScore += (float) ($option->score ?? 0);
+                    }
                 } else {
                     $answerValue = '-';
                 }
@@ -573,7 +689,7 @@ class FrontendController extends Controller
                 foreach ($optionIds as $optionId) {
                     $option = FormQuestionOption::find($optionId);
                     if ($option) {
-                        $selectedOptions[] = $option->option_text;
+                        $selectedOptions[] = $option->option_text ?: '[Gambar]';
 
                         FormAnswer::create([
                             'user_id' => $student->id,
@@ -583,6 +699,10 @@ class FrontendController extends Controller
                             'answer_text' => null,
                             'status' => 'active',
                         ]);
+
+                        if ($isAutoResultForm && $question->stage_group === 'placement_test') {
+                            $autoScore += (float) ($option->score ?? 0);
+                        }
                     }
                 }
 
@@ -617,23 +737,88 @@ class FrontendController extends Controller
             $universitasMajorMessage = $this->buildMajorUniversitiesMessage(array_unique($selectedMajorIds));
         }
 
-        $message = $this->buildMessageFromTemplate($form, [
-            'name' => trim($student->first_name . ' ' . $student->last_name),
-            'form_name' => $form->name,
-            'ringkasan_jawaban' => $ringkasanJawaban,
-            'universitas_major' => $universitasMajorMessage,
-        ]);
+        // === RESULT (auto mode) ===
+        // Kalau result_mode='auto', hasil (skor) langsung dihitung & disimpan di sini,
+        // sesaat setelah submission tersimpan — tidak perlu tindakan admin apa pun.
+        // Untuk result_mode='manual', TIDAK ada FormResult yang dibuat di titik ini;
+        // baris form_results untuk submission ini baru akan ada setelah admin mengisi
+        // via FormController::saveResult(). result_mode='none' juga tidak membuat apa-apa.
+        // Fitur rekomendasi universitas/major ($universitasMajorMessage di atas) berjalan
+        // independen, tidak digabung ke sistem hasil ini.
+        $hasilMessage = '';
+        if ($isAutoResultForm) {
+            $formResult = FormResult::updateOrCreate(
+                ['form_submission_id' => $submission->id],
+                [
+                    'form_id' => $form->id,
+                    'mode' => 'auto',
+                    'score' => $autoScore,
+                ]
+            );
 
-        Log::info('[FORM-WIZARD] Sebelum kirim WhatsApp', ['handphone' => $student->handphone]);
+            $hasilMessage = "Skor Anda: {$autoScore}";
+        }
 
-        try {
-            $this->sendWhatsapp($student->handphone, $message);
-            Log::info('[FORM-WIZARD] sendWhatsapp selesai tanpa exception');
-        } catch (\Throwable $e) {
-            // Kalau sendWhatsapp gagal/lambat/timeout, JANGAN sampai bikin seluruh
-            // request dianggap gagal padahal data student/submission sudah tersimpan.
-            Log::error('[FORM-WIZARD] sendWhatsapp gagal (data DB tetap aman, ini cuma soal WA)', [
-                'message' => $e->getMessage(),
+        // === CALLBACK LINK ===
+        // Kalau form ini diaktifkan sebagai "callback" (is_callback_enabled) dan admin
+        // sudah mengisi link-nya, link itu BARU boleh disiapkan untuk peserta di titik
+        // INI — yaitu setelah FormSubmission di atas benar-benar tersimpan, dan (kalau
+        // form requires_payment) setelah $payment di atas sudah lolos gate "paid" yang
+        // sumbernya cuma webhook resmi gateway (bukan redirect/klik browser).
+        //
+        // Sengaja TIDAK ada query/lock tambahan di sini: $payment sudah diverifikasi di
+        // payment gate awal method ini (early-return kalau belum paid), jadi menghitung
+        // ulang di sini tidak menambah beban DB atau membuka celah race condition baru.
+        $callbackLink = null;
+
+        if ($form->is_callback_enabled && !empty($form->callback_link)) {
+            if ($form->requires_payment) {
+                // Form berbayar: link hanya disiapkan kalau $payment sudah lolos gate "paid".
+                if ($payment) {
+                    $callbackLink = $form->callback_link;
+                }
+            } else {
+                // Form gratis: FormSubmission yang berhasil tersimpan sampai titik ini sudah cukup.
+                $callbackLink = $form->callback_link;
+            }
+        }
+
+        // Kirim WhatsApp HANYA kalau admin mengaktifkan "use_whatsapp_notification" di
+        // form ini (lihat toggle di quiz/form/create & edit). Sebelum ini ditambahkan,
+        // WA selalu terkirim ke SEMUA form tanpa terkecuali — sekarang jadi opsional
+        // per form, sesuai pengaturan admin.
+        if ($form->use_whatsapp_notification) {
+            $message = $this->buildMessageFromTemplate($form, [
+                'name' => trim($student->first_name . ' ' . $student->last_name),
+                'form_name' => $form->name,
+                'ringkasan_jawaban' => $ringkasanJawaban,
+                'universitas_major' => $universitasMajorMessage,
+                'callback_link' => $callbackLink ?? '',
+                'hasil' => $hasilMessage,
+            ]);
+
+            Log::info('[FORM-WIZARD] Sebelum kirim WhatsApp', ['handphone' => $student->handphone]);
+
+            try {
+                $this->sendWhatsapp($student->handphone, $message, $form->user_id);
+                Log::info('[FORM-WIZARD] sendWhatsapp selesai tanpa exception');
+
+                // Tandai kapan hasil auto ini terkirim via WA (dipakai konsisten dengan
+                // FormController::saveResult() untuk mode manual, supaya kedua mode
+                // sama-sama punya jejak waktu pengiriman).
+                if ($isAutoResultForm && isset($formResult)) {
+                    $formResult->update(['whatsapp_sent_at' => now()]);
+                }
+            } catch (\Throwable $e) {
+                // Kalau sendWhatsapp gagal/lambat/timeout, JANGAN sampai bikin seluruh
+                // request dianggap gagal padahal data student/submission sudah tersimpan.
+                Log::error('[FORM-WIZARD] sendWhatsapp gagal (data DB tetap aman, ini cuma soal WA)', [
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        } else {
+            Log::info('[FORM-WIZARD] use_whatsapp_notification nonaktif, WA tidak dikirim', [
+                'form_id' => $form->id,
             ]);
         }
 
@@ -643,7 +828,8 @@ class FrontendController extends Controller
 
         return redirect()
             ->route('frontend.form.wizard')
-            ->with('success', 'Thank you! Your form has been submitted successfully.');
+            ->with('success', 'Thank you! Your form has been submitted successfully.')
+            ->with('callback_link', $callbackLink);
     }
 
     /**
@@ -699,72 +885,24 @@ class FrontendController extends Controller
      */
     private function buildMessageFromTemplate(Form $form, array $placeholders)
     {
-        $template = $form->whatsappTemplate ?? null;
-
-        if (!$template || empty($template->content)) {
-            // Fallback: format default (persis seperti sebelum ada sistem template)
-            $message = "Halo {$placeholders['name']},\n\n";
-            $message .= "Terima kasih telah mengisi formulir \"{$placeholders['form_name']}\".\n\n";
-            $message .= "*Ringkasan Jawaban:*\n";
-            $message .= $placeholders['ringkasan_jawaban'] . "\n\n";
-            $message .= "Hasil Anda sudah kami terima. Terima kasih! 😊";
-            $message .= $placeholders['universitas_major'];
-
-            return $message;
-        }
-
-        $content = $template->content;
-
-        foreach ($placeholders as $key => $value) {
-            $content = str_replace('{{' . $key . '}}', $value, $content);
-        }
-
-        return $content;
+        return (new \App\Services\Whatsapp\WhatsappMessenger())->buildMessageFromTemplate($form, $placeholders);
     }
 
     /**
-     * Send WhatsApp message using Wablas API
+     * === WHATSAPP GATEWAY ===
+     * Kirim pesan WhatsApp. Kredensial diambil dari gateway yang diaktifkan admin
+     * pemilik form ($userId) lewat menu Settings > WhatsApp Gateway (lihat
+     * App\Http\Controllers\Settings\WhatsappGatewayController). Kalau belum ada
+     * gateway yang diaktifkan untuk user itu, fallback ke kredensial lama di .env
+     * (WABLAS_TOKEN/WABLAS_SECRET) supaya form yang belum di-setting tetap jalan
+     * seperti sebelumnya.
+     *
+     * Prosedur pengiriman sengaja disamakan untuk semua provider (Wablas-compatible):
+     * POST {api_host}/api/v2/send-message, header Authorization: token.secret_key,
+     * body {"data":[{"phone":...,"message":...}]}.
      */
-    private function sendWhatsapp($phone, $message)
+    private function sendWhatsapp($phone, $message, ?string $userId = null)
     {
-        try {
-            // Clean phone number (remove all non-digits except +)
-            $phone = preg_replace('/[^0-9+]/', '', $phone);
-
-            // If phone starts with +62, replace with 62
-            if (str_starts_with($phone, '+62')) {
-                $phone = '62' . substr($phone, 3);
-            } elseif (str_starts_with($phone, '0')) {
-                $phone = '62' . substr($phone, 1);
-            }
-
-            $response = Http::withHeaders([
-                'Authorization' => env('WABLAS_TOKEN') . '.' . env('WABLAS_SECRET'),
-                'Content-Type' => 'application/json',
-            ])->post('https://smg.wablas.com/api/v2/send-message', [
-                        'data' => [
-                            [
-                                'phone' => $phone,
-                                'message' => $message,
-                            ]
-                        ]
-                    ]);
-
-            // Log response
-            Log::info('Wablas Response - Form Wizard', [
-                'phone' => $phone,
-                'body' => $response->json(),
-            ]);
-
-            return $response->json();
-
-        } catch (\Exception $e) {
-            Log::error('Wablas Error - Form Wizard', [
-                'phone' => $phone,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
+        return (new \App\Services\Whatsapp\WhatsappMessenger())->send((string) $phone, (string) $message, $userId);
     }
 }

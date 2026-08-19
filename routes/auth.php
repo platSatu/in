@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\ConfirmablePasswordController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\EmailVerificationPromptController;
+use App\Http\Controllers\Auth\GoogleAuthController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
@@ -33,6 +34,13 @@ Route::prefix('auth')->middleware('guest')->group(function () {
 
     Route::post('reset-password', [NewPasswordController::class, 'store'])
         ->name('password.store');
+
+    // Login / register pakai Google (Gmail). Facebook login sudah dihapus.
+    Route::get('google/redirect', [GoogleAuthController::class, 'redirect'])
+        ->name('google.redirect');
+
+    Route::get('google/callback', [GoogleAuthController::class, 'callback'])
+        ->name('google.callback');
 });
 
 Route::prefix('auth')->middleware('auth')->group(function () {

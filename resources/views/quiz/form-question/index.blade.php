@@ -3,19 +3,8 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <div class="row justify-content-between align-items-center">
-            <div class="col-md-6">
-                <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item active" aria-current="page">Form Question</li>
-                    </ol>
-                </nav>
-            </div>
-            <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                <a href="{{ route('quiz.form-question.create') }}" class="btn btn-primary">+ Add Question</a>
-            </div>
-        </div>
+    <div class="page-meta mb-3 text-end">
+        <a href="{{ route('quiz.form-question.create') }}" class="btn btn-primary">+ Add Question</a>
     </div>
 
     @if (session('success'))
@@ -56,10 +45,16 @@
                             </tr>
                         </thead>
                         <tbody>
+                            @php $lastFormId = null; @endphp
                             @forelse ($data as $index => $item)
                                 <tr>
                                     <td>{{ $data->firstItem() + $index }}</td>
-                                    <td class="fw-bold">{{ optional($item->form)->name ?? '-' }}</td>
+                                    <td class="fw-bold">
+                                        @if ($item->form_id !== $lastFormId)
+                                            {{ optional($item->form)->name ?? '-' }}
+                                            @php $lastFormId = $item->form_id; @endphp
+                                        @endif
+                                    </td>
                                     <td>{{ $item->question_text }}</td>
                                     <td>{{ str_replace('_', ' ', $item->type) }}</td>
                                     <td>{{ $item->order }}</td>
@@ -72,32 +67,20 @@
                                     </td>
                                     <td>{{ optional($item->created_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
-                                        <div class="dropdown">
-                                            <a class="dropdown-toggle" href="#" role="button"
-                                                id="dropdownMenuLink{{ $item->id }}" data-bs-toggle="dropdown"
-                                                aria-haspopup="true" aria-expanded="true">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                                    class="feather feather-more-horizontal">
-                                                    <circle cx="12" cy="12" r="1"></circle>
-                                                    <circle cx="19" cy="12" r="1"></circle>
-                                                    <circle cx="5" cy="12" r="1"></circle>
-                                                </svg>
-                                            </a>
+                                        <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                            <a href="{{ route('quiz.form-question.edit', $item->id) }}"
+                                                class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
 
-                                            <div class="dropdown-menu" aria-labelledby="dropdownMenuLink{{ $item->id }}">
-                                                <a class="dropdown-item"
-                                                    href="{{ route('quiz.form-question.edit', $item->id) }}">Edit</a>
+                                            <a href="{{ route('quiz.form-question-option.create', ['question_id' => $item->id]) }}"
+                                                class="btn btn-sm btn-outline-success text-nowrap">+ Add Options</a>
 
-                                                <form action="{{ route('quiz.form-question.destroy', $item->id) }}"
-                                                    method="POST" onsubmit="return confirm('Hapus question ini?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit"
-                                                        class="dropdown-item text-danger">Delete</button>
-                                                </form>
-                                            </div>
+                                            <form action="{{ route('quiz.form-question.destroy', $item->id) }}"
+                                                method="POST" onsubmit="return confirm('Hapus question ini?');" class="m-0">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger text-nowrap">Delete</button>
+                                            </form>
                                         </div>
                                     </td>
                                 </tr>

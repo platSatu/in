@@ -42,6 +42,12 @@ use App\Http\Controllers\FrontendController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\BackendInvitationController;
 use App\Http\Controllers\Student\StudentController;
+use App\Http\Controllers\Company\CompanyProfileController;
+use App\Http\Controllers\Company\CompanyBranchController;
+use App\Http\Controllers\Company\CompanyDivisionController;
+use App\Http\Controllers\Settings\PaymentGatewayController;
+use App\Http\Controllers\Settings\WhatsappGatewayController;
+use App\Http\Controllers\Payment\FormPaymentController;
 use Illuminate\Support\Facades\Route;
 
 // Route::get('/', function () {
@@ -57,6 +63,14 @@ Route::get('/frontend/universities-by-city/{city}', [FrontendController::class, 
 // Frontend Form Wizard Routes
 Route::get('/quiz', [FrontendController::class, 'formWizard'])->name('frontend.form.wizard');
 Route::post('/quiz', [FrontendController::class, 'formWizardSubmit'])->name('frontend.form.wizard.submit');
+Route::get('/quiz/{branchSlug}/{boothSlug}', [FrontendController::class, 'formWizardBySlug'])->name('frontend.form.wizard.slug');
+
+// Payment gateway routes untuk wizard publik (name/email/hp -> bayar -> placement test).
+// Ini dipanggil via fetch() dari resources/views/frontend/form-wizard.blade.php.
+Route::post('/quiz/payment/init', [FormPaymentController::class, 'init'])->name('frontend.payment.init');
+Route::post('/quiz/payment/duitku/select-method', [FormPaymentController::class, 'selectDuitkuMethod'])->name('frontend.payment.duitku.select-method');
+Route::get('/quiz/payment/{orderId}/status', [FormPaymentController::class, 'status'])->name('frontend.payment.status');
+Route::get('/quiz/payment/return', [FormPaymentController::class, 'return'])->name('frontend.payment.return');
 
 Route::get('/handbook', [FrontendController::class, 'handbook'])->name('frontend.handbook');
 Route::get('/handbook/{id}/download', [FrontendController::class, 'handbookDownload'])->name('frontend.handbook.download');
@@ -199,6 +213,8 @@ Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/qui
     Route::get('/create', [FormController::class, 'create'])->name('quiz.form.create');
     Route::post('/', [FormController::class, 'store'])->name('quiz.form.store');
     Route::get('/{id}/edit', [FormController::class, 'edit'])->name('quiz.form.edit');
+    Route::get('/{id}/submissions', [FormController::class, 'submissions'])->name('quiz.form.submissions');
+    Route::post('/submissions/{submissionId}/result', [FormController::class, 'saveResult'])->name('quiz.form.submissions.save-result');
     Route::put('/{id}', [FormController::class, 'update'])->name('quiz.form.update');
     Route::delete('/{id}', [FormController::class, 'destroy'])->name('quiz.form.destroy');
 });
@@ -324,6 +340,53 @@ Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/qui
     Route::delete('/{id}', [UniversityProfileController::class, 'destroy'])->name('quiz.university-profile.destroy');
 });
 
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/company/profile')->group(function () {
+    Route::get('/', [CompanyProfileController::class, 'index'])->name('company.profile.index');
+    Route::get('/create', [CompanyProfileController::class, 'create'])->name('company.profile.create');
+    Route::post('/', [CompanyProfileController::class, 'store'])->name('company.profile.store');
+    Route::get('/{id}/edit', [CompanyProfileController::class, 'edit'])->name('company.profile.edit');
+    Route::put('/{id}', [CompanyProfileController::class, 'update'])->name('company.profile.update');
+    Route::delete('/{id}', [CompanyProfileController::class, 'destroy'])->name('company.profile.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/company/branch')->group(function () {
+    Route::get('/', [CompanyBranchController::class, 'index'])->name('company.branch.index');
+    Route::get('/create', [CompanyBranchController::class, 'create'])->name('company.branch.create');
+    Route::post('/', [CompanyBranchController::class, 'store'])->name('company.branch.store');
+    Route::get('/{id}/edit', [CompanyBranchController::class, 'edit'])->name('company.branch.edit');
+    Route::put('/{id}', [CompanyBranchController::class, 'update'])->name('company.branch.update');
+    Route::delete('/{id}', [CompanyBranchController::class, 'destroy'])->name('company.branch.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/company/division')->group(function () {
+    Route::get('/', [CompanyDivisionController::class, 'index'])->name('company.division.index');
+    Route::get('/create', [CompanyDivisionController::class, 'create'])->name('company.division.create');
+    Route::post('/', [CompanyDivisionController::class, 'store'])->name('company.division.store');
+    Route::get('/{id}/edit', [CompanyDivisionController::class, 'edit'])->name('company.division.edit');
+    Route::put('/{id}', [CompanyDivisionController::class, 'update'])->name('company.division.update');
+    Route::delete('/{id}', [CompanyDivisionController::class, 'destroy'])->name('company.division.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/settings/payment-gateway')->group(function () {
+    Route::get('/', [PaymentGatewayController::class, 'index'])->name('settings.payment-gateway.index');
+    Route::get('/create', [PaymentGatewayController::class, 'create'])->name('settings.payment-gateway.create');
+    Route::post('/', [PaymentGatewayController::class, 'store'])->name('settings.payment-gateway.store');
+    Route::get('/{id}/edit', [PaymentGatewayController::class, 'edit'])->name('settings.payment-gateway.edit');
+    Route::put('/{id}', [PaymentGatewayController::class, 'update'])->name('settings.payment-gateway.update');
+    Route::put('/{id}/activate', [PaymentGatewayController::class, 'activate'])->name('settings.payment-gateway.activate');
+    Route::delete('/{id}', [PaymentGatewayController::class, 'destroy'])->name('settings.payment-gateway.destroy');
+});
+
+Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/settings/whatsapp-gateway')->group(function () {
+    Route::get('/', [WhatsappGatewayController::class, 'index'])->name('settings.whatsapp-gateway.index');
+    Route::get('/create', [WhatsappGatewayController::class, 'create'])->name('settings.whatsapp-gateway.create');
+    Route::post('/', [WhatsappGatewayController::class, 'store'])->name('settings.whatsapp-gateway.store');
+    Route::get('/{id}/edit', [WhatsappGatewayController::class, 'edit'])->name('settings.whatsapp-gateway.edit');
+    Route::put('/{id}', [WhatsappGatewayController::class, 'update'])->name('settings.whatsapp-gateway.update');
+    Route::put('/{id}/activate', [WhatsappGatewayController::class, 'activate'])->name('settings.whatsapp-gateway.activate');
+    Route::delete('/{id}', [WhatsappGatewayController::class, 'destroy'])->name('settings.whatsapp-gateway.destroy');
+});
+
 Route::middleware(['auth', 'role:superadmin'])->prefix('dashboard/superadmin/pembayaran/category')->group(function () {
     Route::get('/', [PembayaranCategoriesController::class, 'index'])->name('pembayaran.category.index');
     Route::get('/create', [PembayaranCategoriesController::class, 'create'])->name('pembayaran.category.create');
@@ -424,10 +487,13 @@ Route::middleware(['auth'])->prefix('dashboard')->name('dashboard.')->group(func
     });
 
 });
-// Route::middleware('auth')->group(function () {
-//     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
-//     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
-//     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
-// });
+// Halaman "Profile" yang dibuka dari dropdown avatar (header/sidebar). Sengaja
+// TIDAK ada parameter {id} di URL manapun di sini — ProfileController selalu
+// beroperasi terhadap Auth::user()/$request->user(), jadi tidak mungkin satu
+// user mengubah data user lain lewat form ini.
+Route::middleware('auth')->group(function () {
+    Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+    Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+});
 
 require __DIR__ . '/auth.php';

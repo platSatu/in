@@ -3,16 +3,7 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta">
-        <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ route('quiz.form-question-option.index') }}">Form Question Option</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Edit</li>
-            </ol>
-        </nav>
-    </div>
-
-    <form action="{{ route('quiz.form-question-option.update', $data->id) }}" method="POST">
+    <form action="{{ route('quiz.form-question-option.update', $data->id) }}" method="POST" enctype="multipart/form-data">
         @csrf
         @method('PUT')
 
@@ -39,13 +30,37 @@
                         </div>
                     </div>
 
+                    <div class="form-text mb-2">
+                        Opsi boleh teks saja, gambar saja, atau dua-duanya — minimal salah satu harus diisi.
+                    </div>
+
                     <div class="row mb-4">
                         <div class="col-sm-12">
-                            <label for="option_text" class="mb-2">Option Text</label>
+                            <label for="option_text" class="mb-2">Option Text <span class="text-muted">(opsional kalau sudah ada gambar)</span></label>
                             <input type="text" class="form-control @error('option_text') is-invalid @enderror"
                                 id="option_text" name="option_text" placeholder="Enter option text..."
                                 value="{{ old('option_text', $data->option_text) }}">
                             @error('option_text')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <label for="image" class="mb-2">Gambar Opsi <span class="text-muted">(opsional, maks 4MB)</span></label>
+                            @if ($data->image)
+                                <div class="mb-2">
+                                    <img src="{{ asset($data->image) }}" alt="" style="max-width:140px; max-height:140px; object-fit:cover; border-radius:8px;" class="d-block mb-1">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="remove_image" name="remove_image" value="1">
+                                        <label class="form-check-label small text-danger" for="remove_image">Hapus gambar ini</label>
+                                    </div>
+                                </div>
+                            @endif
+                            <input type="file" class="form-control @error('image') is-invalid @enderror"
+                                id="image" name="image" accept="image/*">
+                            @error('image')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
@@ -63,6 +78,9 @@
                                     <label for="score">Score (Optional)</label>
                                     <input type="number" class="form-control @error('score') is-invalid @enderror"
                                         id="score" name="score" value="{{ old('score', $data->score) }}">
+                                    <div class="form-text">
+                                        Dipakai kalau form ini mengaktifkan Mode Hasil "Otomatis" — skor opsi yang dipilih peserta akan dijumlahkan jadi hasil akhir. Kosongkan/biarkan 0 kalau opsi ini tidak berkontribusi ke skor.
+                                    </div>
                                     @error('score')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror

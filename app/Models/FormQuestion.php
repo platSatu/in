@@ -20,8 +20,13 @@ class FormQuestion extends Model
     protected $fillable = [
         'user_id',
         'form_id',
+        'stage_group',
         'question_text',
+        'description',
+        'image',
+        'audio',
         'type',
+        'required',
         'order',
         'status',
     ];
@@ -47,6 +52,9 @@ class FormQuestion extends Model
      */
     public function options()
     {
-        return $this->hasMany(FormQuestionOption::class, 'question_id')->where('status', 'active');
+        return $this->hasMany(FormQuestionOption::class, 'question_id')
+            ->where('status', 'active')
+            ->orderBy('order')
+            ->orderBy('created_at');
     }
 }

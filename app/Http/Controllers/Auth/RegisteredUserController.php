@@ -44,6 +44,10 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'handphone' => $request->handphone,
             'password' => Hash::make($request->password),
+            // Akun baru selalu dimulai inactive. Baru berubah menjadi active
+            // otomatis lewat VerifyEmailController setelah link verifikasi
+            // di email diklik.
+            'status' => User::STATUS_INACTIVE,
         ]);
 
         RoleUser::create([
@@ -58,11 +62,21 @@ class RegisteredUserController extends Controller
             "Halo {$user->name},\n\nTerima kasih telah mendaftar di aplikasi kami.\n\nSelamat bergabung 😊"
         );
 
+        // Event ini otomatis mengirimkan email verifikasi ke user (lewat
+        // listener bawaan Laravel), karena User sekarang implements
+        // MustVerifyEmail.
         event(new Registered($user));
 
+        // Tetap login-kan user supaya link verifikasi (yang route-nya
+        // butuh middleware 'auth') bisa langsung dibuka. Tapi selama status
+        // masih inactive, middleware 'verified' pada route dashboard akan
+        // otomatis mengarahkan user ke halaman "cek email Anda" sampai dia
+        // klik link verifikasi.
         Auth::login($user);
 
-        return redirect(route('dashboard', absolute: false));
+        return redirect()
+            ->route('verification.notice')
+            ->with('status', 'Registrasi berhasil! Kami sudah mengirimkan email verifikasi ke ' . $user->email . '. Silakan cek email Anda (termasuk folder spam) dan klik link verifikasi untuk mengaktifkan akun.');
     }
 
 

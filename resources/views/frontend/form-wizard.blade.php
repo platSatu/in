@@ -4,14 +4,28 @@
        dikasih data-required="1|0" dan tanda bintang merah di label kalau wajib.
     2. Tipe pertanyaan baru: textarea, date, dropdown (di luar text/number/single_choice/
        multiple_choice/major yang sudah ada).
-    3. Validasi "required" untuk step 2 (pertanyaan) sekarang dicek di JS sebelum boleh
-       lanjut ke step 3 / submit — karena input single_choice & multiple_choice pakai
+    3. Validasi "required" untuk step pertanyaan sekarang dicek di JS sebelum boleh
+       lanjut ke step review/submit — karena input single_choice & multiple_choice pakai
        radio/checkbox yang disembunyikan (d-none), jadi validasi HTML5 native `required`
        tidak bisa diandalkan untuk tipe itu.
-    4. Step 1 (Full Name, Email, WhatsApp phone number) sekarang divalidasi penuh di JS
-       sebelum boleh next: nama cuma huruf/spasi/titik/apostrof/strip, email harus format
-       standar, handphone harus angka saja 9-16 digit. Sebelumnya cuma dicek "tidak kosong".
+    4. Step "Info" (Full Name, Email, WhatsApp phone number) sekarang divalidasi penuh di
+       JS sebelum boleh next: nama cuma huruf/spasi/titik/apostrof/strip, email harus
+       format standar, handphone harus angka saja 9-16 digit. Sebelumnya cuma dicek
+       "tidak kosong".
     5. Background halaman pakai public/image/bg_quiz.png.
+    6. === PAYMENT GATE === Kalau form ini requires_payment, ada step baru "Payment" di
+       antara step Info dan step Pertanyaan. Step ini:
+         - Memanggil POST /quiz/payment/init begitu step ditampilkan (nama/email/hp dari
+           step Info dikirim ke server, transaksi dibuat ke gateway aktif).
+         - Untuk Midtrans/iPaymu: user diarahkan ke halaman pembayaran hosted mereka.
+         - Untuk Duitku: user pilih metode pembayaran dulu (VA/QRIS/dsb) baru diarahkan.
+         - Setelah user kembali dari gateway (atau tanpa redirect sama sekali), wizard
+           mem-poll GET /quiz/payment/{order_id}/status tiap beberapa detik. Step
+           Pertanyaan (placement test) BARU bisa diakses begitu status = "paid".
+         - Status "paid" itu sendiri HANYA diset oleh webhook resmi gateway di server
+           (bukan oleh redirect browser), dan submit akhir (formWizardSubmit) juga
+           memverifikasi ulang di server sebelum menyimpan jawaban. Jadi field
+           `payment_order_id` di bawah ini murni bantu UI, bukan satu-satunya penjagaan.
     CATATAN: ini validasi FRONTEND. Validasi yang sama (name, email, handphone) juga
     sudah dipasang di server pada formWizardSubmit() (regex nama, email, digits_between:9,16).
 -->
@@ -21,6 +35,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>QUIZ | INASTUDY | CHINA EDUCATION CONSULTANT</title>
     <link rel="icon" type="image/png" href="{{ asset('frontend/img/Logo.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -200,6 +215,22 @@
             gap: 10px;
         }
 
+        /* Opsi berbentuk gambar (mis. soal Listening) — kartu gambar + radio/checkbox di bawahnya. */
+        .option-item.option-item-image {
+            flex-direction: column;
+            align-items: stretch;
+            height: 100%;
+        }
+
+        .option-image {
+            width: 100%;
+            height: 150px;
+            object-fit: cover;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            background: #f1f2f6;
+        }
+
         .option-item:hover {
             border-color: var(--brand);
             background: var(--brand-light);
@@ -369,6 +400,62 @@
             font-weight: 600;
             color: #6b7186;
         }
+
+        /* === PAYMENT STEP === */
+        .payment-amount {
+            font-size: 28px;
+            font-weight: 800;
+            color: var(--brand-dark);
+        }
+
+        .payment-spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #eef0f5;
+            border-top-color: var(--brand);
+            border-radius: 50%;
+            margin: 10px auto;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .payment-method-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            background: #fff;
+            transition: all .2s;
+        }
+
+        .payment-method-item:hover {
+            border-color: var(--brand);
+            background: var(--brand-light);
+        }
+
+        .payment-method-item img {
+            height: 26px;
+            max-width: 60px;
+            object-fit: contain;
+        }
+
+        .payment-method-item .method-name {
+            font-weight: 600;
+            font-size: 14.5px;
+            color: #1d2333;
+        }
+
+        .payment-status-box {
+            text-align: center;
+            padding: 10px 0;
+        }
     </style>
 </head>
 
@@ -399,6 +486,25 @@
                 </div>
             @endif
 
+            {{-- === CALLBACK LINK ===
+                 Hanya terisi kalau form yang baru disubmit diaktifkan sebagai "callback"
+                 DAN (kalau requires_payment) pembayarannya sudah lolos verifikasi "paid"
+                 di server (lihat FrontendController::formWizardSubmit). Murni tampilan
+                 flash session sekali pakai, bukan sesuatu yang bisa diakses ulang lewat URL. --}}
+            @if(session('callback_link'))
+                <div class="alert alert-primary" style="border-left: 4px solid var(--brand);">
+                    <i class="bi bi-link-45deg"></i>
+                    <strong>Link Anda sudah siap:</strong><br>
+                    <a href="{{ session('callback_link') }}" target="_blank" rel="noopener noreferrer" class="fw-bold">
+                        {{ session('callback_link') }}
+                    </a>
+                </div>
+            @endif
+
+            @error('payment')
+                <div class="alert alert-danger">{{ $message }}</div>
+            @enderror
+
             <div class="progress mb-3">
                 <div class="progress-bar" id="progressBar" style="width: 25%"></div>
             </div>
@@ -411,9 +517,10 @@
                 @csrf
 
                 <input type="hidden" name="form_id" value="{{ $selectedForm->id ?? '' }}">
+                <input type="hidden" name="payment_order_id" id="paymentOrderIdInput" value="{{ request('order_id') }}">
 
-                {{-- STEP 1: Select Form or User Info --}}
-                <div class="step active" id="step1">
+                {{-- STEP: Select Form or User Info --}}
+                <div class="step active" id="step-info">
 
                     @if(!$selectedForm)
                         {{-- Form Selection --}}
@@ -461,6 +568,15 @@
                             @enderror
                         </div>
 
+                        @if($selectedForm->requires_payment)
+                            <div class="form-text mb-3">
+                                <i class="bi bi-info-circle"></i>
+                                Form ini membutuhkan pembayaran sebesar
+                                <strong>Rp {{ number_format((float) $selectedForm->payment_amount, 0, ',', '.') }}</strong>
+                                sebelum bisa melanjutkan ke placement test.
+                            </div>
+                        @endif
+
                         <div class="text-end">
                             <button type="button" class="btn btn-brand" onclick="nextStep()">
                                 Next <i class="bi bi-arrow-right"></i>
@@ -470,96 +586,63 @@
 
                 </div>
 
-                {{-- STEP 2: Questions --}}
-                <div class="step" id="step2">
+                {{-- STEP: Data Pribadi (hanya ada kalau form ini has_personal_data_stage) --}}
+                @if($selectedForm && $selectedForm->has_personal_data_stage)
+                    <div class="step" id="step-personal-data">
 
-                    @if($selectedForm && $questions->count() > 0)
-                        @foreach($questions as $index => $question)
-                            <div class="question-card" data-required="{{ $question->required ? '1' : '0' }}" data-question-id="{{ $question->id }}">
-                                <div class="mb-3 d-flex align-items-center">
-                                    <span class="question-number">{{ $index + 1 }}</span>
-                                    <strong>
-                                        {{ $question->question_text }}
-                                        @if($question->required)
-                                            <span class="required-mark">*</span>
-                                        @else
-                                            <span class="optional-tag">Opsional</span>
-                                        @endif
-                                    </strong>
-                                </div>
-
-                                @if($question->type === 'text')
-                                    <input type="text"
-                                        name="question_{{ $question->id }}"
-                                        class="form-control"
-                                        placeholder="Your Answer">
-                                @elseif($question->type === 'textarea')
-                                    <textarea
-                                        name="question_{{ $question->id }}"
-                                        class="form-control"
-                                        rows="4"
-                                        placeholder="Your Answer"></textarea>
-                                @elseif($question->type === 'number')
-                                    <input type="number"
-                                        name="question_{{ $question->id }}"
-                                        class="form-control"
-                                        placeholder="Enter a number">
-                                @elseif($question->type === 'date')
-                                    <input type="date"
-                                        name="question_{{ $question->id }}"
-                                        class="form-control">
-                                @elseif($question->type === 'single_choice')
-                                    @foreach($question->options as $option)
-                                        <div class="form-check option-item" onclick="toggleSingleOption(this, '{{ $question->id }}')">
-                                            <span class="option-check"></span>
-                                            <input type="radio"
-                                                name="question_{{ $question->id }}"
-                                                value="{{ $option->id }}"
-                                                class="form-check-input d-none"
-                                                id="option_{{ $option->id }}">
-                                            <label class="form-check-label" for="option_{{ $option->id }}">
-                                                {{ $option->option_text }}
-                                            </label>
-                                        </div>
-                                    @endforeach
-                                @elseif($question->type === 'multiple_choice')
-                                    @foreach($question->options as $option)
-                                        <div class="form-option-checkbox" onclick="toggleMultipleOption(this)">
-                                            <input type="checkbox"
-                                                name="question_{{ $question->id }}[]"
-                                                value="{{ $option->id }}"
-                                                class="form-check-input"
-                                                id="option_{{ $option->id }}">
-                                            <label class="form-check-label option-content" for="option_{{ $option->id }}">
-                                                {{ $option->option_text }}
-                                            </label>
-                                        </div>
-                                    @endforeach
-                                @elseif($question->type === 'dropdown')
-                                    <select class="form-select" name="question_{{ $question->id }}">
-                                        <option value="">-- Select an option --</option>
-                                        @foreach($question->options as $option)
-                                            <option value="{{ $option->id }}">{{ $option->option_text }}</option>
-                                        @endforeach
-                                    </select>
-                                @elseif($question->type === 'major')
-                                    {{-- Optionnya bukan dari form_question_options, tapi dari tabel majors --}}
-                                    <select class="form-select" name="question_{{ $question->id }}">
-                                        <option value="">-- Select a Major --</option>
-                                        @foreach($majors as $major)
-                                            <option value="{{ $major->id }}">{{ $major->name }}</option>
-                                        @endforeach
-                                    </select>
-                                    <div class="form-text mt-2">
-                                        <i class="bi bi-whatsapp"></i>
-                                        The list of universities for this major will be sent to your WhatsApp after you submit the form.
-                                    </div>
-                                @endif
-
-                                <div class="error-message">This question is required, please fill in your answer.</div>
+                        @if($personalDataQuestions->count() > 0)
+                            @foreach($personalDataQuestions as $index => $question)
+                                @include('frontend.partials.question-card', ['question' => $question, 'index' => $index])
+                            @endforeach
+                        @else
+                            <div class="alert alert-warning">
+                                This form does not have any personal data questions yet. Please contact the administrator.
                             </div>
+                        @endif
+
+                        <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-brand" onclick="prevStep()">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </button>
+                            <button type="button" class="btn btn-brand" onclick="nextStep()">
+                                Next <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+
+                    </div>
+                @endif
+
+                {{-- STEP: Payment (hanya ada kalau form ini requires_payment) --}}
+                @if($selectedForm && $selectedForm->requires_payment)
+                    <div class="step" id="step-payment">
+
+                        <div class="payment-status-box" id="paymentStatusBox">
+                            <div class="payment-spinner"></div>
+                            <p class="mt-2 mb-0">Menyiapkan pembayaran...</p>
+                        </div>
+
+                        <div id="paymentContent" class="mt-3"></div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-outline-brand" onclick="prevStep()">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </button>
+                            <button type="button" class="btn btn-outline-brand" id="btnCheckPaymentStatus" onclick="checkPaymentStatusNow()" style="display:none;">
+                                <i class="bi bi-arrow-clockwise"></i> Cek Status Pembayaran
+                            </button>
+                        </div>
+
+                    </div>
+                @endif
+
+                {{-- STEP: Questions (placement test) --}}
+                <div class="step" id="step-questions">
+
+                    @if($selectedForm && $placementTestQuestions->count() > 0)
+                        @foreach($placementTestQuestions as $index => $question)
+                            @include('frontend.partials.question-card', ['question' => $question, 'index' => $index])
                         @endforeach
-                    @elseif($selectedForm && $questions->count() == 0)
+                    @elseif($selectedForm && $placementTestQuestions->count() == 0)
                         <div class="alert alert-warning">
                             This form does not have any questions yet. Please contact the administrator.
                         </div>
@@ -576,8 +659,8 @@
 
                 </div>
 
-                {{-- STEP 3: Review & Submit --}}
-                <div class="step" id="step3">
+                {{-- STEP: Review & Submit --}}
+                <div class="step" id="step-review">
 
                     <div class="alert alert-info-brand">
                         <strong><i class="bi bi-info-circle me-1"></i> Instructions:</strong>
@@ -611,22 +694,59 @@
 </footer>
 
 <script>
-    let currentStep = 1;
-    const totalSteps = 3;
+    // Urutan step tergantung apakah form ini butuh pembayaran atau tidak, dan kalau
+    // butuh, di posisi mana (diatur admin lewat "Posisi Pembayaran" saat create/edit form)
+    // — dibaca sekali dari Blade, dipakai untuk semua navigasi step di bawah.
+    const requiresPayment = {{ $selectedForm && $selectedForm->requires_payment ? 'true' : 'false' }};
+    const paymentPosition = @json($selectedForm->payment_position ?? 'before_questions');
+    const hasPersonalDataStage = {{ $selectedForm && $selectedForm->has_personal_data_stage ? 'true' : 'false' }};
+
+    // Kalau form ini punya step "Data Pribadi", urutannya dikunci: info -> data
+    // pribadi -> (pembayaran) -> placement test -> review. Setting "Posisi
+    // Pembayaran" (before/after questions) sengaja DIABAIKAN di kasus ini —
+    // pembayaran selalu ditaruh di antara data pribadi dan placement test,
+    // sesuai alur yang sudah disepakati.
+    const stepOrder = hasPersonalDataStage
+        ? (requiresPayment
+            ? ['step-info', 'step-personal-data', 'step-payment', 'step-questions', 'step-review']
+            : ['step-info', 'step-personal-data', 'step-questions', 'step-review'])
+        : (requiresPayment
+            ? (paymentPosition === 'after_questions'
+                ? ['step-info', 'step-questions', 'step-payment', 'step-review']
+                : ['step-info', 'step-payment', 'step-questions', 'step-review'])
+            : ['step-info', 'step-questions', 'step-review']);
+
+    let currentStepIndex = 0;
+    let paymentInitiated = false;
+    let paymentPollTimer = null;
+    let currentOrderId = document.getElementById('paymentOrderIdInput').value || null;
+
+    const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
     function updateProgress() {
-        const progress = (currentStep / totalSteps) * 100;
+        document.getElementById('totalSteps').textContent = stepOrder.length;
+        const progress = ((currentStepIndex + 1) / stepOrder.length) * 100;
         document.getElementById('progressBar').style.width = progress + '%';
-        document.getElementById('currentStep').textContent = currentStep;
+        document.getElementById('currentStep').textContent = currentStepIndex + 1;
     }
 
-    function showStep(step) {
-        document.querySelectorAll('.step').forEach(function(el) {
+    function showStep(index) {
+        document.querySelectorAll('.step').forEach(function (el) {
             el.classList.remove('active');
         });
-        document.getElementById('step' + step).classList.add('active');
-        currentStep = step;
+
+        const stepId = stepOrder[index];
+        const stepEl = document.getElementById(stepId);
+        if (stepEl) {
+            stepEl.classList.add('active');
+        }
+
+        currentStepIndex = index;
         updateProgress();
+
+        if (stepId === 'step-payment' && !paymentInitiated) {
+            initPayment();
+        }
     }
 
     function isQuestionAnswered(card) {
@@ -653,11 +773,11 @@
         return true;
     }
 
-    function validateStep2() {
+    function validateQuestionsStep(containerId) {
         let isValid = true;
         let firstInvalidCard = null;
 
-        document.querySelectorAll('#step2 .question-card').forEach(function (card) {
+        document.querySelectorAll('#' + containerId + ' .question-card').forEach(function (card) {
             const errorEl = card.querySelector('.error-message');
             const required = card.getAttribute('data-required') === '1';
 
@@ -728,27 +848,49 @@
         return nameOk && emailOk && phoneOk;
     }
 
+    function isPaymentConfirmed() {
+        return !requiresPayment || document.getElementById('paymentOrderIdInput').value !== '';
+    }
+
     function nextStep() {
-        // Validate step 1 before proceeding
-        if (currentStep === 1 && !validateStep1()) {
+        const currentStepId = stepOrder[currentStepIndex];
+
+        if (currentStepId === 'step-info' && !validateStep1()) {
             return;
         }
 
-        // Validate step 2 (required questions) before proceeding to review/submit
-        if (currentStep === 2 && !validateStep2()) {
+        if (currentStepId === 'step-payment' && !isPaymentConfirmed()) {
+            // Belum dikonfirmasi paid, jangan biarkan lompat ke pertanyaan.
             return;
         }
 
-        if (currentStep < totalSteps) {
-            currentStep++;
-            showStep(currentStep);
+        if (currentStepId === 'step-personal-data' && !validateQuestionsStep('step-personal-data')) {
+            return;
+        }
+
+        if (currentStepId === 'step-questions' && !validateQuestionsStep('step-questions')) {
+            return;
+        }
+
+        if (currentStepIndex < stepOrder.length - 1) {
+            showStep(currentStepIndex + 1);
         }
     }
 
     function prevStep() {
-        if (currentStep > 1) {
-            currentStep--;
-            showStep(currentStep);
+        if (currentStepIndex > 0) {
+            const leavingPayment = stepOrder[currentStepIndex] === 'step-payment';
+
+            showStep(currentStepIndex - 1);
+
+            if (leavingPayment) {
+                // User balik dari step payment ke step sebelumnya: reset supaya transaksi
+                // baru dibuat lagi kalau dia lanjut ke payment sekali lagi.
+                stopPaymentPolling();
+                paymentInitiated = false;
+                currentOrderId = null;
+                document.getElementById('paymentOrderIdInput').value = '';
+            }
         }
     }
 
@@ -798,7 +940,10 @@
     }
 
     // Clear error state as soon as user starts answering text/number/date/select/dropdown
-    document.querySelectorAll('#step2 .question-card select, #step2 .question-card input[type="text"], #step2 .question-card input[type="number"], #step2 .question-card input[type="date"], #step2 .question-card textarea').forEach(function (el) {
+    // Selector di-scope ke class .question-card saja (bukan diprefix per-step lagi)
+    // supaya listener ini otomatis mencakup step-questions MAUPUN step-personal-data,
+    // karena keduanya sama-sama merender partial question-card yang sama.
+    document.querySelectorAll('.question-card select, .question-card input[type="text"], .question-card input[type="number"], .question-card input[type="date"], .question-card textarea').forEach(function (el) {
         el.addEventListener('input', function () {
             const card = el.closest('.question-card');
             card.classList.remove('has-error');
@@ -824,8 +969,199 @@
         });
     });
 
-    // Initialize
-    updateProgress();
+    // === PAYMENT ===============================================================
+
+    function paymentStatusBox(html) {
+        document.getElementById('paymentStatusBox').innerHTML = html;
+    }
+
+    function paymentContent(html) {
+        document.getElementById('paymentContent').innerHTML = html;
+    }
+
+    async function postJson(url, body) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': CSRF_TOKEN,
+            },
+            body: JSON.stringify(body),
+        });
+
+        const data = await response.json().catch(function () { return {}; });
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Terjadi kesalahan, silakan coba lagi.');
+        }
+
+        return data;
+    }
+
+    function initPayment() {
+        paymentInitiated = true;
+        paymentStatusBox(
+            '<div class="payment-spinner"></div><p class="mt-2 mb-0">Menyiapkan pembayaran...</p>'
+        );
+        paymentContent('');
+        document.getElementById('btnCheckPaymentStatus').style.display = 'none';
+
+        const payload = {
+            form_id: document.querySelector('input[name="form_id"]').value,
+            name: document.getElementById('wizard-name').value.trim(),
+            email: document.getElementById('wizard-email').value.trim(),
+            handphone: document.getElementById('wizard-handphone').value.trim(),
+        };
+
+        postJson('{{ route('frontend.payment.init') }}', payload)
+            .then(function (data) {
+                currentOrderId = data.order_id;
+
+                if (data.mode === 'select-method') {
+                    renderDuitkuMethods(data.methods || []);
+                    return;
+                }
+
+                if (data.mode === 'redirect' && data.redirect_url) {
+                    startRedirectCountdown(data.redirect_url);
+                    return;
+                }
+
+                paymentStatusBox('<p class="text-danger mb-0">Gagal menyiapkan pembayaran. Silakan coba lagi.</p>');
+            })
+            .catch(function (err) {
+                paymentInitiated = false;
+                paymentStatusBox('<p class="text-danger mb-0">' + err.message + '</p>');
+            });
+    }
+
+    function renderDuitkuMethods(methods) {
+        paymentStatusBox('<p class="mb-0"><i class="bi bi-credit-card"></i> Silakan pilih metode pembayaran:</p>');
+
+        if (!methods.length) {
+            paymentContent('<p class="text-danger">Tidak ada metode pembayaran yang tersedia saat ini.</p>');
+            return;
+        }
+
+        let html = '<div class="mt-3">';
+        methods.forEach(function (method) {
+            html += '<div class="payment-method-item" onclick="selectDuitkuMethod(\'' + method.code + '\', this)">';
+            if (method.image) {
+                html += '<img src="' + method.image + '" alt="">';
+            }
+            html += '<span class="method-name">' + method.name + '</span>';
+            html += '</div>';
+        });
+        html += '</div>';
+
+        paymentContent(html);
+    }
+
+    function selectDuitkuMethod(methodCode, el) {
+        document.querySelectorAll('.payment-method-item').forEach(function (item) {
+            item.style.pointerEvents = 'none';
+            item.style.opacity = '.6';
+        });
+
+        paymentStatusBox('<div class="payment-spinner"></div><p class="mt-2 mb-0">Menyiapkan pembayaran...</p>');
+
+        postJson('{{ route('frontend.payment.duitku.select-method') }}', {
+            order_id: currentOrderId,
+            payment_method: methodCode,
+        })
+            .then(function (data) {
+                if (data.redirect_url) {
+                    startRedirectCountdown(data.redirect_url);
+                } else {
+                    paymentStatusBox('<p class="text-danger mb-0">Gagal menyiapkan pembayaran. Silakan coba lagi.</p>');
+                }
+            })
+            .catch(function (err) {
+                paymentStatusBox('<p class="text-danger mb-0">' + err.message + '</p>');
+            });
+    }
+
+    function startRedirectCountdown(redirectUrl) {
+        paymentStatusBox(
+            '<p class="mb-2"><i class="bi bi-shield-check"></i> Anda akan diarahkan ke halaman pembayaran aman...</p>'
+        );
+        paymentContent(
+            '<div class="text-center">' +
+            '<a href="' + redirectUrl + '" class="btn btn-brand">Lanjut ke Pembayaran <i class="bi bi-arrow-right"></i></a>' +
+            '<p class="form-text mt-3">Setelah selesai membayar, halaman ini akan otomatis lanjut ke placement test.</p>' +
+            '</div>'
+        );
+
+        // Mulai polling status dari sekarang juga, supaya kalau user sudah bayar di
+        // tab lain / browser yang sama tanpa perlu balik ke halaman ini secara manual.
+        startPaymentPolling();
+
+        window.setTimeout(function () {
+            window.location.href = redirectUrl;
+        }, 1500);
+    }
+
+    function startPaymentPolling() {
+        stopPaymentPolling();
+        document.getElementById('btnCheckPaymentStatus').style.display = '';
+        paymentPollTimer = window.setInterval(checkPaymentStatus, 4000);
+    }
+
+    function stopPaymentPolling() {
+        if (paymentPollTimer) {
+            window.clearInterval(paymentPollTimer);
+            paymentPollTimer = null;
+        }
+    }
+
+    function checkPaymentStatusNow() {
+        checkPaymentStatus();
+    }
+
+    function checkPaymentStatus() {
+        if (!currentOrderId) return;
+
+        fetch('{{ url('/quiz/payment') }}/' + currentOrderId + '/status', {
+            headers: { 'Accept': 'application/json' },
+        })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+                if (data.status === 'paid') {
+                    stopPaymentPolling();
+                    document.getElementById('paymentOrderIdInput').value = currentOrderId;
+                    paymentStatusBox('<p class="text-success mb-0"><i class="bi bi-check-circle-fill"></i> Pembayaran berhasil dikonfirmasi!</p>');
+                    paymentContent('');
+                    window.setTimeout(function () { nextStep(); }, 800);
+                } else if (data.status === 'failed' || data.status === 'expired') {
+                    stopPaymentPolling();
+                    paymentStatusBox('<p class="text-danger mb-0"><i class="bi bi-x-circle-fill"></i> Pembayaran gagal/kedaluwarsa.</p>');
+                    paymentContent(
+                        '<div class="text-center"><button type="button" class="btn btn-outline-brand" onclick="paymentInitiated=false; initPayment();">Coba Lagi</button></div>'
+                    );
+                }
+                // status "pending" -> diam saja, terus polling.
+            })
+            .catch(function () {
+                // Diamkan error jaringan sesaat, coba lagi di interval berikutnya.
+            });
+    }
+
+    // Kalau halaman ini dibuka lagi dengan ?order_id=... (user baru kembali dari
+    // gateway pembayaran), langsung lompat ke step Payment dan lanjutkan polling
+    // tanpa membuat transaksi baru.
+    document.addEventListener('DOMContentLoaded', function () {
+        updateProgress();
+
+        if (requiresPayment && currentOrderId) {
+            paymentInitiated = true;
+            const paymentIndex = stepOrder.indexOf('step-payment');
+            showStep(paymentIndex);
+            paymentStatusBox('<div class="payment-spinner"></div><p class="mt-2 mb-0">Mengecek status pembayaran...</p>');
+            startPaymentPolling();
+            checkPaymentStatus();
+        }
+    });
 </script>
 
 </body>

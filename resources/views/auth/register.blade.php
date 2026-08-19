@@ -53,18 +53,23 @@
                             <h4 class="fw-bold">Get Started Now</h4>
                             <p class="mb-0">Enter your credentials to create your account</p>
 
-                            <div class="row g-3 my-4">
-                                <div class="col-12 col-lg-6">
-                                    <button
-                                        class="btn btn-filter py-2 font-text1 fw-bold d-flex align-items-center justify-content-center w-100"><img
-                                            src="{{ asset('authLogin') }}/assets/images/apps/05.png" width="20"
-                                            class="me-2" alt="">Google</button>
+                            @if ($errors->any())
+                                <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                                    <ul class="mb-0 ps-3">
+                                        @foreach ($errors->all() as $error)
+                                            <li>{{ $error }}</li>
+                                        @endforeach
+                                    </ul>
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
-                                <div class="col col-lg-6">
-                                    <button
-                                        class="btn btn-filter py-2 font-text1 fw-bold d-flex align-items-center justify-content-center w-100"><img
-                                            src="{{ asset('authLogin') }}/assets/images/apps/17.png" width="20"
-                                            class="me-2" alt="">Facebook</button>
+                            @endif
+
+                            <div class="row g-3 my-4">
+                                <div class="col-12">
+                                    <a href="{{ route('google.redirect') }}"
+                                        class="btn btn-filter py-2 font-text1 fw-bold d-flex align-items-center justify-content-center w-100">
+                                        <img src="{{ asset('authLogin') }}/assets/images/apps/05.png" width="20"
+                                            class="me-2" alt="">Daftar dengan Google</a>
                                 </div>
                             </div>
 

@@ -3,15 +3,6 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta">
-        <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ route('quiz.university-profile.index') }}">University Profile</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Create</li>
-            </ol>
-        </nav>
-    </div>
-
     <form action="{{ route('quiz.university-profile.store') }}" method="POST">
         @csrf
 

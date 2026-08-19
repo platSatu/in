@@ -3,19 +3,8 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <div class="row justify-content-between align-items-center">
-            <div class="col-md-6">
-                <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item active" aria-current="page">City</li>
-                    </ol>
-                </nav>
-            </div>
-            <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                <a href="{{ route('city.create') }}" class="btn btn-primary">+ Add City</a>
-            </div>
-        </div>
+    <div class="page-meta mb-3 text-end">
+        <a href="{{ route('city.create') }}" class="btn btn-primary">+ Add City</a>
     </div>
 
     @if(session('success'))

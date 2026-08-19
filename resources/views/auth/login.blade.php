@@ -53,18 +53,26 @@
                             <h4 class="fw-bold">Get Started Now</h4>
                             <p class="mb-0">Enter your credentials to login your account</p>
 
-                            <div class="row g-3 my-4">
-                                <div class="col-12 col-lg-6">
-                                    <button
-                                        class="btn btn-filter py-2 font-text1 fw-bold d-flex align-items-center justify-content-center w-100"><img
-                                            src="{{ asset('authLogin') }}/assets/images/apps/05.png" width="20"
-                                            class="me-2" alt="">Google</button>
+                            @if (session('status'))
+                                <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                                    {{ session('status') }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
-                                <div class="col col-lg-6">
-                                    <button
-                                        class="btn btn-filter py-2 font-text1 fw-bold d-flex align-items-center justify-content-center w-100"><img
-                                            src="{{ asset('authLogin') }}/assets/images/apps/17.png" width="20"
-                                            class="me-2" alt="">Facebook</button>
+                            @endif
+
+                            @if ($errors->any() && !$errors->has('email') && !$errors->has('password'))
+                                <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
+                                    {{ $errors->first() }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            @endif
+
+                            <div class="row g-3 my-4">
+                                <div class="col-12">
+                                    <a href="{{ route('google.redirect') }}"
+                                        class="btn btn-filter py-2 font-text1 fw-bold d-flex align-items-center justify-content-center w-100">
+                                        <img src="{{ asset('authLogin') }}/assets/images/apps/05.png" width="20"
+                                            class="me-2" alt="">Login dengan Google</a>
                                 </div>
                             </div>
 
@@ -81,9 +89,12 @@
                                     <!-- Email Address -->
                                     <div class="col-12">
                                         <label for="inputEmailAddress" class="form-label">Email</label>
-                                        <input type="email" class="form-control" id="inputEmailAddress" name="email"
-                                            value="{{ old('email') }}" placeholder="jhon@example.com" required
-                                            autofocus>
+                                        <input type="email" class="form-control @error('email') is-invalid @enderror"
+                                            id="inputEmailAddress" name="email" value="{{ old('email') }}"
+                                            placeholder="jhon@example.com" required autofocus>
+                                        @error('email')
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
                                     </div>
 
                                     <!-- Password -->

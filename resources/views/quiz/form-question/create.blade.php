@@ -3,134 +3,203 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta">
-        <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ route('quiz.form-question.index') }}">Form Question</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Create</li>
-            </ol>
-        </nav>
-    </div>
-
-    <form action="{{ route('quiz.form-question.store') }}" method="POST">
+    <form action="{{ route('quiz.form-question.store') }}" method="POST" id="formQuestionCreateForm" enctype="multipart/form-data">
         @csrf
 
         <div class="row mb-4 layout-spacing layout-top-spacing">
-
-            <div class="col-xxl-9 col-xl-12 col-lg-12 col-md-12 col-sm-12">
+            <div class="col-12">
                 <div class="widget-content widget-content-area ecommerce-create-section">
 
                     <div class="row mb-4">
-                        <div class="col-sm-12">
+                        <div class="col-sm-6">
                             <label for="form_id" class="mb-2">Form</label>
-                            <select class="form-select @error('form_id') is-invalid @enderror" id="form_id" name="form_id">
-                                <option value="">Choose form...</option>
-                                @foreach ($forms as $form)
-                                    <option value="{{ $form->id }}" {{ old('form_id') == $form->id ? 'selected' : '' }}>
-                                        {{ $form->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('form_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+
+                            @php
+                                $lockedFormId = old('form_id', $selectedFormId ?? null);
+                                $lockedForm = $lockedFormId ? $forms->firstWhere('id', $lockedFormId) : null;
+                            @endphp
+
+                            @if ($lockedForm && !$errors->has('form_id'))
+                                <input type="text" class="form-control" value="{{ $lockedForm->name }}" disabled readonly>
+                                <input type="hidden" name="form_id" value="{{ $lockedForm->id }}">
+                                <div class="form-text mb-2">
+                                    Semua pertanyaan di bawah ini akan dikaitkan ke form di atas.
+                                </div>
+                                <a href="{{ route('quiz.form-question.create') }}" class="btn btn-sm btn-outline-secondary">
+                                    Ganti form
+                                </a>
+                            @else
+                                <select class="form-select @error('form_id') is-invalid @enderror" id="form_id" name="form_id">
+                                    <option value="">Choose form...</option>
+                                    @foreach ($forms as $form)
+                                        <option value="{{ $form->id }}" {{ $lockedFormId == $form->id ? 'selected' : '' }}>
+                                            {{ $form->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('form_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            @endif
                         </div>
                     </div>
 
-                    <div class="row mb-4">
-                        <div class="col-sm-12">
-                            <label for="question_text" class="mb-2">Question Text</label>
-                            <textarea class="form-control @error('question_text') is-invalid @enderror" id="question_text" name="question_text"
-                                rows="4" placeholder="Enter question text...">{{ old('question_text') }}</textarea>
-                            @error('question_text')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                    <div class="form-text mb-3">
+                        Tambahkan satu atau beberapa pertanyaan sekaligus. Urutan pertanyaan yang ditampilkan nanti
+                        akan sama persis dengan urutan baris di bawah ini (dari atas ke bawah). Tiap pertanyaan boleh
+                        kombinasi bebas teks / audio / gambar (mis. soal Listening: audio + gambar tanpa teks sama
+                        sekali) — minimal salah satu dari ketiganya harus diisi.
+                    </div>
+
+                    @error('questions')
+                        <div class="alert alert-danger">{{ $message }}</div>
+                    @enderror
+
+                    <div id="questionRowsContainer"></div>
+
+                    <button type="button" id="addQuestionRowBtn" class="btn btn-outline-primary btn-sm mb-4">
+                        + Tambah Baris
+                    </button>
+
+                    <div class="row">
+                        <div class="col-sm-3 mb-3">
+                            <button type="submit" class="btn btn-success w-100">Simpan Semua Pertanyaan</button>
+                        </div>
+                        <div class="col-sm-3 mb-3">
+                            <a href="{{ route('quiz.form-question.index') }}" class="btn btn-outline-secondary w-100">Cancel</a>
                         </div>
                     </div>
 
                 </div>
             </div>
-
-            <div class="col-xxl-3 col-xl-12 col-lg-12 col-md-12 col-sm-12">
-                <div class="row">
-                    <div class="col-xxl-12 col-xl-8 col-lg-8 col-md-7 mt-xxl-0 mt-4">
-                        <div class="widget-content widget-content-area ecommerce-create-section">
-                            <div class="row">
-                                <div class="col-xxl-12 mb-4">
-                                    <label for="type">Type</label>
-                                    <select class="form-select @error('type') is-invalid @enderror" id="type" name="type">
-                                        <option value="">Choose...</option>
-                                        <option value="text" {{ old('type') === 'text' ? 'selected' : '' }}>Text (single line)</option>
-                                        <option value="textarea" {{ old('type') === 'textarea' ? 'selected' : '' }}>Textarea (long text)</option>
-                                        <option value="number" {{ old('type') === 'number' ? 'selected' : '' }}>Number</option>
-                                        <option value="date" {{ old('type') === 'date' ? 'selected' : '' }}>Date</option>
-                                        <option value="single_choice" {{ old('type') === 'single_choice' ? 'selected' : '' }}>Single Choice (radio / checkbox-style)</option>
-                                        <option value="multiple_choice" {{ old('type') === 'multiple_choice' ? 'selected' : '' }}>Multiple Choice (checkbox)</option>
-                                        <option value="dropdown" {{ old('type') === 'dropdown' ? 'selected' : '' }}>Dropdown (select, ringkas untuk opsi banyak)</option>
-                                        <option value="major" {{ old('type') === 'major' ? 'selected' : '' }}>Major</option>
-                                    </select>
-                                    <div class="form-text">
-                                        Single Choice, Multiple Choice, dan Dropdown ambil pilihan jawabannya dari menu "Options" di pertanyaan ini.
-                                    </div>
-                                    @error('type')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div class="col-xxl-12 mb-4">
-                                    <label for="required">Required</label>
-                                    <select class="form-select @error('required') is-invalid @enderror" id="required" name="required">
-                                        <option value="1" {{ old('required', '1') === '1' ? 'selected' : '' }}>Yes, wajib diisi</option>
-                                        <option value="0" {{ old('required') === '0' ? 'selected' : '' }}>No, boleh kosong</option>
-                                    </select>
-                                    @error('required')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div class="col-xxl-12 mb-4">
-                                    <label for="order">Order</label>
-                                    <input type="number" min="0" class="form-control @error('order') is-invalid @enderror"
-                                        id="order" name="order" value="{{ old('order', 0) }}">
-                                    @error('order')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-
-                                <div class="col-xxl-12 mb-4">
-                                    <label for="status">Status</label>
-                                    <select class="form-select @error('status') is-invalid @enderror" id="status" name="status">
-                                        <option value="">Choose...</option>
-                                        <option value="active" {{ old('status') === 'active' ? 'selected' : '' }}>Active</option>
-                                        <option value="inactive" {{ old('status') === 'inactive' ? 'selected' : '' }}>Inactive</option>
-                                    </select>
-                                    @error('status')
-                                        <div class="invalid-feedback">{{ $message }}</div>
-                                    @enderror
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="col-xxl-12 col-xl-4 col-lg-4 col-md-5 mt-4">
-                        <div class="widget-content widget-content-area ecommerce-create-section">
-                            <div class="row">
-                                <div class="col-sm-12 mb-3">
-                                    <button type="submit" class="btn btn-success w-100">Create Question</button>
-                                </div>
-                                <div class="col-sm-12">
-                                    <a href="{{ route('quiz.form-question.index') }}"
-                                        class="btn btn-outline-secondary w-100">Cancel</a>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
         </div>
     </form>
 
 </div>
+
+{{-- Template satu baris pertanyaan, di-clone lewat JS --}}
+<template id="questionRowTemplate">
+    <div class="question-row border rounded-3 p-3 mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <span class="fw-bold row-number">Pertanyaan #1</span>
+            <button type="button" class="btn btn-sm btn-outline-danger remove-row-btn" title="Hapus baris">
+                &times; Hapus
+            </button>
+        </div>
+
+        <div class="row g-3">
+            <div class="col-md-8">
+                <label class="form-label small">Question Text <span class="text-muted">(opsional kalau sudah ada audio/gambar)</span></label>
+                <textarea class="form-control" name="__NAME__[question_text]" rows="2" placeholder="Tulis pertanyaan..."></textarea>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Type</label>
+                <select class="form-select" name="__NAME__[type]" required>
+                    <option value="">Choose...</option>
+                    <option value="text">Text (single line)</option>
+                    <option value="textarea">Textarea (long text)</option>
+                    <option value="number">Number</option>
+                    <option value="date">Date</option>
+                    <option value="single_choice">Single Choice</option>
+                    <option value="multiple_choice">Multiple Choice</option>
+                    <option value="dropdown">Dropdown</option>
+                    <option value="major">Major</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-md-6">
+                <label class="form-label small">Termasuk Step <span class="text-muted">(dipakai kalau form ini mengaktifkan step "Data Pribadi")</span></label>
+                <select class="form-select" name="__NAME__[stage_group]">
+                    <option value="placement_test" selected>Placement Test</option>
+                    <option value="personal_data">Data Pribadi</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-md-12">
+                <label class="form-label small">Description <span class="text-muted">(opsional, instruksi tambahan mis. "Pilih yang sesuai:")</span></label>
+                <input type="text" class="form-control" name="__NAME__[description]" placeholder="Instruksi tambahan...">
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-md-6">
+                <label class="form-label small">Audio <span class="text-muted">(opsional, mp3/wav/ogg/m4a, maks 8MB)</span></label>
+                <input type="file" class="form-control form-control-sm" name="__NAME__[audio]" accept="audio/*">
+            </div>
+            <div class="col-md-6">
+                <label class="form-label small">Gambar Pertanyaan <span class="text-muted">(opsional, maks 4MB)</span></label>
+                <input type="file" class="form-control form-control-sm" name="__NAME__[image]" accept="image/*">
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1 align-items-center">
+            <div class="col-md-3">
+                <label class="form-label small d-block">Required</label>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" name="__NAME__[required]" value="1" checked>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Status</label>
+                <select class="form-select form-select-sm" name="__NAME__[status]">
+                    <option value="active" selected>Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+    (function () {
+        const container = document.getElementById('questionRowsContainer');
+        const template = document.getElementById('questionRowTemplate');
+        const addBtn = document.getElementById('addQuestionRowBtn');
+        let rowCounter = 0;
+
+        function renumberRows() {
+            const rows = container.querySelectorAll('.question-row');
+            rows.forEach(function (row, index) {
+                row.querySelector('.row-number').textContent = 'Pertanyaan #' + (index + 1);
+            });
+
+            // Tombol hapus dinonaktifkan kalau tinggal 1 baris (minimal harus ada 1 pertanyaan).
+            const removeButtons = container.querySelectorAll('.remove-row-btn');
+            removeButtons.forEach(function (btn) {
+                btn.disabled = rows.length <= 1;
+            });
+        }
+
+        function addRow() {
+            const fragment = template.content.cloneNode(true);
+            const name = 'questions[' + rowCounter + ']';
+            rowCounter++;
+
+            fragment.querySelectorAll('[name]').forEach(function (el) {
+                el.setAttribute('name', el.getAttribute('name').replace('__NAME__', name));
+            });
+
+            const row = fragment.querySelector('.question-row');
+            row.querySelector('.remove-row-btn').addEventListener('click', function () {
+                if (container.querySelectorAll('.question-row').length > 1) {
+                    row.remove();
+                    renumberRows();
+                }
+            });
+
+            container.appendChild(fragment);
+            renumberRows();
+        }
+
+        addBtn.addEventListener('click', addRow);
+
+        // Mulai dengan 1 baris kosong.
+        addRow();
+    })();
+</script>
 
 @endsection

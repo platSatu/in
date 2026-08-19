@@ -69,6 +69,12 @@
 
                 @enderror
 
+                <div class="form-text">
+                    Placeholder yang bisa dipakai: <code>{{ '{{name}}' }}</code>, <code>{{ '{{form_name}}' }}</code>,
+                    <code>{{ '{{ringkasan_jawaban}}' }}</code>, <code>{{ '{{universitas_major}}' }}</code>, dan
+                    <code>{{ '{{callback_link}}' }}</code> (link callback form, mis. link Zoom — hanya terisi kalau
+                    form-nya diaktifkan sebagai callback dan sudah lolos verifikasi pembayaran/submit).
+                </div>
 
             </div>
 

@@ -253,7 +253,8 @@
                 data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
                 <div class="avatar-container">
                     <div class="avatar avatar-sm avatar-indicators avatar-online">
-                        <img alt="avatar" src="{{ asset('frontend') }}/src/assets/img/profile-30.png"
+                        <img alt="avatar"
+                            src="{{ auth()->user()?->image ? asset(auth()->user()->image) : asset('frontend') . '/src/assets/img/profile-30.png' }}"
                             class="rounded-circle">
                     </div>
                 </div>
@@ -272,7 +273,7 @@
                     </div>
                 </div>
                 <div class="dropdown-item">
-                    <a href="user-profile.html">
+                    <a href="{{ route('profile.edit') }}">
                         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
                             fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                             stroke-linejoin="round" class="feather feather-user">

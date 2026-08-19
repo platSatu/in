@@ -20,7 +20,9 @@ class FormQuestionOption extends Model
     protected $fillable = [
         'user_id',
         'question_id',
+        'order',
         'option_text',
+        'image',
         'score',
         'status',
     ];

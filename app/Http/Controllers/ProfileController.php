@@ -2,17 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Http\Requests\ProfileUpdateRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Redirect;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rules\Password;
 use Illuminate\View\View;
 
 class ProfileController extends Controller
 {
     /**
-     * Display the user's profile form.
+     * Halaman "Profile" yang dibuka dari dropdown avatar (header/sidebar).
+     * Cuma menampilkan data milik user yang login ($request->user()) — Name &
+     * Email ditampilkan read-only di view, yang bisa diubah dari sini cuma
+     * Foto & Password.
      */
     public function edit(Request $request): View
     {
@@ -22,39 +24,78 @@ class ProfileController extends Controller
     }
 
     /**
-     * Update the user's profile information.
+     * Update foto dan/atau password milik user yang SEDANG LOGIN.
+     *
+     * Sengaja tidak menerima id user dari route/request sama sekali — semua
+     * operasi di sini terikat ke $request->user() (dari session auth yang
+     * sedang aktif), jadi seorang user tidak mungkin mengubah data user lain
+     * lewat form ini walaupun dia mencoba memanipulasi payload request.
+     * Name & Email juga sengaja TIDAK diambil dari request sama sekali (input-
+     * nya disabled di view, tapi ini dijaga juga di sisi server: field itu
+     * tidak pernah dibaca/divalidasi di sini) — jadi tetap aman meski ada yang
+     * mencoba mem-bypass atribut disabled di browser.
      */
-    public function update(ProfileUpdateRequest $request): RedirectResponse
+    public function update(Request $request): RedirectResponse
     {
-        $request->user()->fill($request->validated());
+        $user = $request->user();
 
-        if ($request->user()->isDirty('email')) {
-            $request->user()->email_verified_at = null;
+        $validated = $request->validate([
+            'image' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
+            'current_password' => ['nullable', 'required_with:new_password', 'current_password'],
+            'new_password' => ['nullable', 'confirmed', Password::defaults()],
+        ]);
+
+        $changes = [];
+
+        if ($request->hasFile('image')) {
+            if ($user->image) {
+                $this->deleteImage($user->image);
+            }
+
+            $changes['image'] = $this->storeImage($request->file('image'));
         }
 
-        $request->user()->save();
+        if (!empty($validated['new_password'])) {
+            $changes['password'] = Hash::make($validated['new_password']);
+        }
 
-        return Redirect::route('profile.edit')->with('status', 'profile-updated');
+        if (empty($changes)) {
+            return redirect()
+                ->route('profile.edit')
+                ->with('error', 'Tidak ada perubahan untuk disimpan. Isi foto baru dan/atau password baru terlebih dahulu.');
+        }
+
+        $user->update($changes);
+
+        return redirect()
+            ->route('profile.edit')
+            ->with('success', 'Profile berhasil diperbarui.');
     }
 
     /**
-     * Delete the user's account.
+     * Simpan file foto profil ke public/image/user, mengikuti pola yang sama
+     * dengan StudentController::storeImage().
      */
-    public function destroy(Request $request): RedirectResponse
+    private function storeImage($file): string
     {
-        $request->validateWithBag('userDeletion', [
-            'password' => ['required', 'current_password'],
-        ]);
+        $destination = public_path('image/user');
 
-        $user = $request->user();
+        if (!file_exists($destination)) {
+            mkdir($destination, 0755, true);
+        }
 
-        Auth::logout();
+        $filename = uniqid('user_') . '.' . $file->getClientOriginalExtension();
+        $file->move($destination, $filename);
 
-        $user->delete();
+        return 'image/user/' . $filename;
+    }
 
-        $request->session()->invalidate();
-        $request->session()->regenerateToken();
+    private function deleteImage(string $path): void
+    {
+        $fullPath = public_path($path);
 
-        return Redirect::to('/');
+        if (file_exists($fullPath)) {
+            @unlink($fullPath);
+        }
     }
 }

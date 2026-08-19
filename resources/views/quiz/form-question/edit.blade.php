@@ -3,16 +3,7 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta">
-        <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ route('quiz.form-question.index') }}">Form Question</a></li>
-                <li class="breadcrumb-item active" aria-current="page">Edit</li>
-            </ol>
-        </nav>
-    </div>
-
-    <form action="{{ route('quiz.form-question.update', $data->id) }}" method="POST">
+    <form action="{{ route('quiz.form-question.update', $data->id) }}" method="POST" enctype="multipart/form-data">
         @csrf
         @method('PUT')
 
@@ -39,12 +30,65 @@
                         </div>
                     </div>
 
+                    <div class="form-text mb-2">
+                        Pertanyaan boleh kombinasi bebas teks / audio / gambar — minimal salah satu harus diisi.
+                    </div>
+
                     <div class="row mb-4">
                         <div class="col-sm-12">
-                            <label for="question_text" class="mb-2">Question Text</label>
+                            <label for="question_text" class="mb-2">Question Text <span class="text-muted">(opsional kalau sudah ada audio/gambar)</span></label>
                             <textarea class="form-control @error('question_text') is-invalid @enderror" id="question_text" name="question_text"
                                 rows="4" placeholder="Enter question text...">{{ old('question_text', $data->question_text) }}</textarea>
                             @error('question_text')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <label for="description" class="mb-2">Description <span class="text-muted">(opsional, instruksi tambahan mis. "Pilih yang sesuai:")</span></label>
+                            <input type="text" class="form-control @error('description') is-invalid @enderror"
+                                id="description" name="description" placeholder="Instruksi tambahan..."
+                                value="{{ old('description', $data->description) }}">
+                            @error('description')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <label for="audio" class="mb-2">Audio <span class="text-muted">(opsional, mp3/wav/ogg/m4a, maks 8MB)</span></label>
+                            @if ($data->audio)
+                                <div class="mb-2">
+                                    <audio controls src="{{ asset($data->audio) }}" style="width:100%; max-width:280px;"></audio>
+                                    <div class="form-check mt-1">
+                                        <input class="form-check-input" type="checkbox" id="remove_audio" name="remove_audio" value="1">
+                                        <label class="form-check-label small text-danger" for="remove_audio">Hapus audio ini</label>
+                                    </div>
+                                </div>
+                            @endif
+                            <input type="file" class="form-control @error('audio') is-invalid @enderror"
+                                id="audio" name="audio" accept="audio/*">
+                            @error('audio')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-sm-6">
+                            <label for="image" class="mb-2">Gambar Pertanyaan <span class="text-muted">(opsional, maks 4MB)</span></label>
+                            @if ($data->image)
+                                <div class="mb-2">
+                                    <img src="{{ asset($data->image) }}" alt="" style="max-width:140px; max-height:140px; object-fit:cover; border-radius:8px;" class="d-block mb-1">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="remove_image" name="remove_image" value="1">
+                                        <label class="form-check-label small text-danger" for="remove_image">Hapus gambar ini</label>
+                                    </div>
+                                </div>
+                            @endif
+                            <input type="file" class="form-control @error('image') is-invalid @enderror"
+                                id="image" name="image" accept="image/*">
+                            @error('image')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
@@ -83,6 +127,22 @@
                                         Single Choice, Multiple Choice, dan Dropdown ambil pilihan jawabannya dari menu "Options" di pertanyaan ini.
                                     </div>
                                     @error('type')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="col-xxl-12 mb-4">
+                                    <label for="stage_group">Termasuk Step</label>
+                                    <select class="form-select @error('stage_group') is-invalid @enderror" id="stage_group" name="stage_group">
+                                        <option value="placement_test"
+                                            {{ old('stage_group', $data->stage_group) === 'placement_test' ? 'selected' : '' }}>Placement Test</option>
+                                        <option value="personal_data"
+                                            {{ old('stage_group', $data->stage_group) === 'personal_data' ? 'selected' : '' }}>Data Pribadi</option>
+                                    </select>
+                                    <div class="form-text">
+                                        Dipakai kalau form ini mengaktifkan step "Data Pribadi" (diatur di halaman Form). Pertanyaan dengan step "Data Pribadi" tidak akan tampil di placement test, begitu juga sebaliknya.
+                                    </div>
+                                    @error('stage_group')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
