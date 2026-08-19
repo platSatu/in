@@ -599,15 +599,71 @@ class FrontendController extends Controller
             $universitasMajorMessage = $this->buildMajorUniversitiesMessage(array_unique($selectedMajorIds));
         }
 
+        $callbackLink = $this->finalizeCompletedSubmission(
+            $form,
+            $student,
+            $submission,
+            $ringkasanJawaban,
+            $autoScore,
+            $universitasMajorMessage,
+            $isAutoResultForm,
+            $payment
+        );
+
+        Log::info('[FORM-WIZARD] === END formWizardSubmit, redirect sukses ===', [
+            'student_id' => $student->id,
+        ]);
+
+        return redirect($this->buildWizardRedirectRoute($form))
+            ->with('success', 'Thank you! Your form has been submitted successfully.')
+            ->with('callback_link', $callbackLink);
+    }
+
+    /**
+     * URL untuk balik ke wizard form yang sama setelah submit selesai — pakai URL
+     * cantik /quiz/{slug}/{boothSlug} kalau form-nya punya itu (sama seperti pola
+     * link Preview di quiz/form/index.blade.php), fallback ke ?form_id= kalau tidak.
+     * Dipakai bareng oleh formWizardSubmit() dan formWizardTimeoutSave() (timeout
+     * yang jadi percobaan terakhir, lihat docblock method itu).
+     */
+    private function buildWizardRedirectRoute(Form $form): string
+    {
+        return ($form->slug && $form->booth_slug)
+            ? route('frontend.form.wizard.slug', ['branchSlug' => $form->slug, 'boothSlug' => $form->booth_slug])
+            : route('frontend.form.wizard', ['form_id' => $form->id]);
+    }
+
+    /**
+     * Tahap akhir "penyelesaian resmi" satu submission: skor auto (kalau result_mode
+     * 'auto'), callback link (kalau diaktifkan & payment gate-nya lolos), dan kirim
+     * WhatsApp (kalau use_whatsapp_notification aktif). Dipakai bareng oleh
+     * formWizardSubmit() (submit manual lewat tombol) dan formWizardTimeoutSave()
+     * ketika timeout itu jadi percobaan TERAKHIR (timer_auto_restart mati) — di titik
+     * itu timeout diperlakukan identik dengan submit manual biasa.
+     *
+     * @return string|null  callback link yang siap ditampilkan/dikirim ke peserta
+     */
+    private function finalizeCompletedSubmission(
+        Form $form,
+        Student $student,
+        FormSubmission $submission,
+        string $ringkasanJawaban,
+        float $autoScore,
+        string $universitasMajorMessage,
+        bool $isAutoResultForm,
+        ?FormPayment $payment
+    ): ?string {
         // === RESULT (auto mode) ===
         // Kalau result_mode='auto', hasil (skor) langsung dihitung & disimpan di sini,
         // sesaat setelah submission tersimpan — tidak perlu tindakan admin apa pun.
         // Untuk result_mode='manual', TIDAK ada FormResult yang dibuat di titik ini;
         // baris form_results untuk submission ini baru akan ada setelah admin mengisi
         // via FormController::saveResult(). result_mode='none' juga tidak membuat apa-apa.
-        // Fitur rekomendasi universitas/major ($universitasMajorMessage di atas) berjalan
+        // Fitur rekomendasi universitas/major ($universitasMajorMessage) berjalan
         // independen, tidak digabung ke sistem hasil ini.
         $hasilMessage = '';
+        $formResult = null;
+
         if ($isAutoResultForm) {
             $formResult = FormResult::updateOrCreate(
                 ['form_submission_id' => $submission->id],
@@ -629,8 +685,9 @@ class FrontendController extends Controller
         // sumbernya cuma webhook resmi gateway (bukan redirect/klik browser).
         //
         // Sengaja TIDAK ada query/lock tambahan di sini: $payment sudah diverifikasi di
-        // payment gate awal method ini (early-return kalau belum paid), jadi menghitung
-        // ulang di sini tidak menambah beban DB atau membuka celah race condition baru.
+        // payment gate awal caller method ini (early-return kalau belum paid), jadi
+        // menghitung ulang di sini tidak menambah beban DB atau membuka celah race
+        // condition baru.
         $callbackLink = null;
 
         if ($form->is_callback_enabled && !empty($form->callback_link)) {
@@ -668,7 +725,7 @@ class FrontendController extends Controller
                 // Tandai kapan hasil auto ini terkirim via WA (dipakai konsisten dengan
                 // FormController::saveResult() untuk mode manual, supaya kedua mode
                 // sama-sama punya jejak waktu pengiriman).
-                if ($isAutoResultForm && isset($formResult)) {
+                if ($isAutoResultForm && $formResult) {
                     $formResult->update(['whatsapp_sent_at' => now()]);
                 }
             } catch (\Throwable $e) {
@@ -684,21 +741,7 @@ class FrontendController extends Controller
             ]);
         }
 
-        Log::info('[FORM-WIZARD] === END formWizardSubmit, redirect sukses ===', [
-            'student_id' => $student->id,
-        ]);
-
-        // Balik lagi ke URL form yang tadi dipakai user buat isi form ini (bukan ke
-        // halaman "pilih form" yang generic /quiz), sama seperti pola link Preview
-        // di quiz/form/index.blade.php — pakai URL cantik /quiz/{slug}/{boothSlug}
-        // kalau form-nya punya itu, fallback ke ?form_id= kalau tidak.
-        $redirectRoute = ($form->slug && $form->booth_slug)
-            ? route('frontend.form.wizard.slug', ['branchSlug' => $form->slug, 'boothSlug' => $form->booth_slug])
-            : route('frontend.form.wizard', ['form_id' => $form->id]);
-
-        return redirect($redirectRoute)
-            ->with('success', 'Thank you! Your form has been submitted successfully.')
-            ->with('callback_link', $callbackLink);
+        return $callbackLink;
     }
 
     /**
@@ -706,18 +749,27 @@ class FrontendController extends Controller
      * Dipanggil via fetch() dari form-wizard.blade.php begitu timer step Placement
      * Test habis DAN admin mengaktifkan toggle "Auto-Save" di form ini (timer_auto_save).
      * Menyimpan jawaban APAPUN/BERAPA PUN yang sempat terisi (server ini memang dari
-     * awal tidak pernah menegakkan "required" per pertanyaan, lihat saveQuestionAnswers()).
+     * awal tidak pernah menegakkan "required" per pertanyaan, lihat saveQuestionAnswers())
+     * — pengecualian ini SENGAJA dipicu oleh timer, bukan berlaku untuk submit manual biasa.
      *
-     * SENGAJA beda dari formWizardSubmit() dalam 3 hal, supaya peserta yang kena timeout
-     * di form berbayar TIDAK perlu bayar dua kali kalau admin juga mengaktifkan
-     * timer_auto_restart (lihat form-wizard.blade.php, timer direset ke soal pertama
-     * tanpa reload halaman):
-     *   1. FormPayment TIDAK di-lock (form_submission_id tetap NULL) — payment yang
-     *      sama masih bisa dipakai untuk submit "asli" berikutnya.
-     *   2. TIDAK menghitung skor auto/membuat FormResult, TIDAK mengirim WhatsApp,
-     *      TIDAK menyiapkan callback link — ini bukan penyelesaian resmi, cuma jaring
-     *      pengaman supaya jawaban yang sempat diisi tidak hilang percuma.
-     *   3. Response JSON (dipanggil via fetch, bukan navigasi browser biasa).
+     * Perilakunya bercabang berdasarkan $isFinal = !$form->timer_auto_restart:
+     *
+     *   - timer_auto_restart AKTIF (bukan percobaan terakhir, akan direset ke soal
+     *     pertama lagi oleh JS): perilaku LAMA dipertahankan —
+     *       1. FormPayment TIDAK di-lock (form_submission_id tetap NULL) — payment yang
+     *          sama masih bisa dipakai untuk percobaan berikutnya, supaya peserta form
+     *          berbayar tidak perlu bayar dua kali.
+     *       2. TIDAK menghitung skor auto/membuat FormResult, TIDAK mengirim WhatsApp,
+     *          TIDAK menyiapkan callback link — ini bukan penyelesaian resmi, cuma jaring
+     *          pengaman supaya jawaban yang sempat diisi tidak hilang percuma.
+     *       3. Response JSON ringan, JS akan reset semua isian ke kosong (lihat
+     *          resetQuestionsStepUI() di form-wizard.blade.php) lalu mulai timer baru.
+     *
+     *   - timer_auto_restart MATI (INI percobaan terakhir): diperlakukan IDENTIK dengan
+     *     submit manual (formWizardSubmit()) — payment di-lock, skor/FormResult/WA/callback
+     *     link disiapkan lewat finalizeCompletedSubmission(), dan response JSON membawa
+     *     redirect_url supaya JS menavigasi ke halaman "Thank you" yang sama persis
+     *     seperti submit manual (bukan berhenti di layar "Waktu habis!" begitu saja).
      */
     public function formWizardTimeoutSave(Request $request)
     {
@@ -745,10 +797,15 @@ class FrontendController extends Controller
             return response()->json(['message' => 'Fitur auto-save timer tidak aktif untuk form ini.'], 422);
         }
 
+        // Percobaan terakhir kalau admin TIDAK mengaktifkan auto-restart — lihat docblock.
+        $isFinal = !$form->timer_auto_restart;
+
         // === PAYMENT GATE ===
         // Sama seperti formWizardSubmit(): kalau form ini requires_payment, hanya boleh
-        // menyimpan jawaban kalau ada FormPayment "paid" untuk order ini — TAPI di sini
-        // TIDAK di-lock (form_submission_id dibiarkan NULL), lihat catatan di docblock atas.
+        // menyimpan jawaban kalau ada FormPayment "paid" untuk order ini. Payment ini
+        // baru di-lock di bawah kalau $isFinal (lihat catatan di docblock atas).
+        $payment = null;
+
         if ($form->requires_payment) {
             $payment = FormPayment::where('order_id', $validated['payment_order_id'] ?? null)
                 ->where('form_id', $form->id)
@@ -775,25 +832,72 @@ class FrontendController extends Controller
             'is_timeout_partial' => true,
         ]);
 
+        // Kunci FormPayment ke submission ini HANYA kalau ini percobaan terakhir — sama
+        // seperti formWizardSubmit(), supaya order_id yang sama tidak bisa dipakai lagi.
+        if ($isFinal && $payment) {
+            $payment->update(['form_submission_id' => $submission->id]);
+        }
+
         $questions = FormQuestion::where('form_id', $form->id)
             ->where('status', 'active')
             ->with('options')
             ->orderBy('order')
             ->get();
 
-        // isAutoResultForm sengaja selalu false di sini — lihat docblock method ini,
-        // ini bukan penyelesaian resmi jadi tidak menghasilkan skor/FormResult.
-        $this->saveQuestionAnswers($request, $submission, $student, $questions, false);
+        // isAutoResultForm hanya true kalau ini percobaan terakhir DAN form-nya
+        // result_mode='auto' — skor auto cuma dihitung sekali, saat penyelesaian resmi.
+        $isAutoResultForm = $isFinal && $form->result_mode === 'auto';
+
+        $answers = $this->saveQuestionAnswers($request, $submission, $student, $questions, $isAutoResultForm);
 
         Log::info('[FORM-WIZARD] Timeout auto-save tersimpan', [
             'form_id' => $form->id,
             'submission_id' => $submission->id,
             'student_id' => $student->id,
+            'is_final' => $isFinal,
+        ]);
+
+        if (!$isFinal) {
+            // Bukan percobaan terakhir — jawaban sudah aman tersimpan, JS akan reset
+            // tampilan ke kosong & mulai timer baru. Tidak ada skor/WA/callback di sini.
+            return response()->json([
+                'ok' => true,
+                'final' => false,
+                'submission_id' => $submission->id,
+            ]);
+        }
+
+        // === PERCOBAAN TERAKHIR — perlakukan identik dengan submit manual ===
+        $universitasMajorMessage = '';
+        if (!empty($answers['selectedMajorIds'])) {
+            $universitasMajorMessage = $this->buildMajorUniversitiesMessage(array_unique($answers['selectedMajorIds']));
+        }
+
+        $callbackLink = $this->finalizeCompletedSubmission(
+            $form,
+            $student,
+            $submission,
+            $answers['ringkasan'],
+            $answers['autoScore'],
+            $universitasMajorMessage,
+            $isAutoResultForm,
+            $payment
+        );
+
+        session()->flash('success', 'Waktu habis — jawaban Anda sudah otomatis tersimpan. Terima kasih!');
+        if ($callbackLink) {
+            session()->flash('callback_link', $callbackLink);
+        }
+
+        Log::info('[FORM-WIZARD] === END formWizardTimeoutSave (final), redirect sukses ===', [
+            'student_id' => $student->id,
         ]);
 
         return response()->json([
             'ok' => true,
+            'final' => true,
             'submission_id' => $submission->id,
+            'redirect_url' => $this->buildWizardRedirectRoute($form),
         ]);
     }
 

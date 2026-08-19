@@ -1128,10 +1128,13 @@
         return data;
     }
 
-    // Urutan begitu waktu habis: simpan dulu (kalau timer_auto_save aktif), BARU
-    // direset ke soal pertama (kalau timer_auto_restart aktif) — sesuai yang
-    // disepakati: jawaban yang sempat terisi tidak boleh hilang percuma sebelum
-    // soal direset.
+    // Urutan begitu waktu habis: simpan dulu (kalau timer_auto_save aktif). Kalau
+    // hasil simpan itu "final" (timer_auto_restart MATI, ini percobaan terakhir),
+    // server sudah memperlakukannya identik dengan submit manual — langsung navigasi
+    // ke redirect_url supaya peserta melihat layar "Thank you" yang sama, BUKAN
+    // berhenti macet di layar "Waktu habis!". Kalau bukan final (auto-restart AKTIF),
+    // baru reset ke soal pertama dan mulai timer baru — sesuai yang disepakati:
+    // jawaban yang sempat terisi tidak boleh hilang percuma sebelum soal direset.
     async function handleQuizTimeout() {
         const box = document.getElementById('quizTimerBox');
         if (box) {
@@ -1141,7 +1144,12 @@
 
         if (timerAutoSave) {
             try {
-                await postFormDataJson(timeoutSaveUrl, new FormData(document.getElementById('wizardForm')));
+                const result = await postFormDataJson(timeoutSaveUrl, new FormData(document.getElementById('wizardForm')));
+
+                if (result && result.final && result.redirect_url) {
+                    window.location.href = result.redirect_url;
+                    return;
+                }
             } catch (err) {
                 // Diamkan: kalau auto-save gagal (mis. jaringan), tetap lanjut ke
                 // auto-restart di bawah supaya peserta tidak macet di layar "waktu
