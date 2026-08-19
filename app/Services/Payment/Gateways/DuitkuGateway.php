@@ -121,7 +121,12 @@ class DuitkuGateway implements PaymentGatewayInterface
             'returnUrl' => route('frontend.payment.return', ['order_id' => $payment->order_id]),
             'callbackUrl' => route('payment.webhook.duitku'),
             'signature' => $signature,
-            'expiryPeriod' => 60,
+            // Dulu hardcode 60. Sekarang dipakaikan expiry_minutes milik gateway ini
+            // (Settings > Payment Gateway) supaya batas waktu di dashboard Duitku SAMA
+            // dengan batas waktu yang kita hitung sendiri untuk form_payments.expires_at
+            // (lihat FormPaymentController::init()) — begitu Duitku expire transaksi ini,
+            // kita juga sudah/segera menandainya expired di sisi kita.
+            'expiryPeriod' => (int) ($this->config->expiry_minutes ?? 60),
         ]);
 
         if ($response->failed()) {

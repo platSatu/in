@@ -97,6 +97,18 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
+
+                                <div class="col-xxl-12 mb-4">
+                                    <label for="expiry_minutes">Durasi Kedaluwarsa Pembayaran (menit)</label>
+                                    <input type="number" min="5" max="1440"
+                                        class="form-control @error('expiry_minutes') is-invalid @enderror"
+                                        id="expiry_minutes" name="expiry_minutes" placeholder="60"
+                                        value="{{ old('expiry_minutes', 60) }}">
+                                    <div class="form-text">Transaksi yang belum dibayar dalam durasi ini otomatis ditandai kedaluwarsa (default 60 menit).</div>
+                                    @error('expiry_minutes')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
                             </div>
                         </div>
                     </div>

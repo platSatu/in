@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -15,6 +16,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
         ]);
+    })
+    ->withSchedule(function (Schedule $schedule): void {
+        // Jaring pengaman timer pembayaran — lihat docblock
+        // App\Console\Commands\ExpireStalePayments. Butuh cron
+        // `* * * * * php artisan schedule:run` aktif di server supaya benar-benar jalan.
+        $schedule->command('payments:expire-stale')->everyFiveMinutes();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

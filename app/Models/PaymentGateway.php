@@ -24,11 +24,13 @@ class PaymentGateway extends Model
         'credentials',
         'is_active',
         'status',
+        'expiry_minutes',
     ];
 
     protected $casts = [
         'credentials' => 'array',
         'is_active' => 'boolean',
+        'expiry_minutes' => 'integer',
     ];
 
     /**

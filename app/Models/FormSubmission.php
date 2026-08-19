@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class FormSubmission extends Model
 {
@@ -21,6 +22,11 @@ class FormSubmission extends Model
         'user_id',
         'form_id',
         'status',
+        'is_timeout_partial',
+    ];
+
+    protected $casts = [
+        'is_timeout_partial' => 'boolean',
     ];
 
     /**
@@ -33,12 +39,6 @@ class FormSubmission extends Model
 
     /**
      * Relasi ke User
-     *
-     * Catatan: di alur submit publik (FrontendController::formWizardSubmit),
-     * kolom `user_id` di sini sebenarnya diisi ID dari tabel `students`, bukan
-     * `users`. Relasi ini dibiarkan seperti semula (di luar scope perubahan
-     * saat ini) supaya tidak mengubah perilaku yang sudah ada; pakai
-     * student() di bawah untuk mendapatkan data peserta yang submit.
      */
     public function user()
     {
@@ -46,31 +46,13 @@ class FormSubmission extends Model
     }
 
     /**
-     * Peserta (Student) yang mengisi form ini. `user_id` di tabel
-     * form_submissions sebenarnya berisi id dari tabel `students`.
+     * Relasi kebalikan dari FormPayment::formSubmission() — satu submission
+     * maksimal terhubung ke 1 payment (form_submission_id baru diisi setelah
+     * submit berhasil, lihat FrontendController). Dipakai di StudentController
+     * untuk menampilkan kolom "Pembayaran" tanpa N+1 query.
      */
-    public function student()
-    {
-        return $this->belongsTo(Student::class, 'user_id');
-    }
-
-    /**
-     * Transaksi pembayaran yang terhubung ke submission ini (kalau formnya
-     * requires_payment). Null berarti submission ini tidak/belum punya
-     * transaksi yang tertaut — dipakai di halaman pembanding submit vs bayar.
-     */
-    public function payment()
+    public function payment(): HasOne
     {
         return $this->hasOne(FormPayment::class, 'form_submission_id');
-    }
-
-    /**
-     * Hasil placement test submission ini (skor otomatis atau catatan manual
-     * dari admin). Null berarti belum ada hasil sama sekali — baik karena
-     * form-nya result_mode='none', atau (mode manual) admin belum sempat input.
-     */
-    public function result()
-    {
-        return $this->hasOne(FormResult::class, 'form_submission_id');
     }
 }

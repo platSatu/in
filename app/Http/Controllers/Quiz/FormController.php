@@ -223,6 +223,10 @@ class FormController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'has_personal_data_stage' => 'nullable|boolean',
             'result_mode' => 'nullable|in:none,auto,manual',
+            'timer_enabled' => 'nullable|boolean',
+            'timer_duration_minutes' => 'nullable|required_if:timer_enabled,1|integer|min:1|max:600',
+            'timer_auto_save' => 'nullable|boolean',
+            'timer_auto_restart' => 'nullable|boolean',
         ]);
 
         $validated['requires_payment'] = $request->boolean('requires_payment');
@@ -243,6 +247,8 @@ class FormController extends Controller
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
+
+        $validated = $this->applyTimerFields($request, $validated);
 
         $userId = Auth::id();
         if ($userId === null) {
@@ -318,6 +324,10 @@ class FormController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'has_personal_data_stage' => 'nullable|boolean',
             'result_mode' => 'nullable|in:none,auto,manual',
+            'timer_enabled' => 'nullable|boolean',
+            'timer_duration_minutes' => 'nullable|required_if:timer_enabled,1|integer|min:1|max:600',
+            'timer_auto_save' => 'nullable|boolean',
+            'timer_auto_restart' => 'nullable|boolean',
         ]);
 
         $validated['requires_payment'] = $request->boolean('requires_payment');
@@ -339,6 +349,8 @@ class FormController extends Controller
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
 
+        $validated = $this->applyTimerFields($request, $validated);
+
         // Slug (branch + booth) dibuat ulang kalau branch/no_booth berubah, atau form lama belum punya slug.
         $branch = CompanyBranch::find($validated['branch_id']);
         $newBranchSlug = Str::slug($branch?->name ?? 'branch') ?: 'branch';
@@ -357,6 +369,28 @@ class FormController extends Controller
         return redirect()
             ->route('quiz.form.index')
             ->with('success', 'Form berhasil diupdate.');
+    }
+
+    /**
+     * Normalisasi 4 field timer placement test (dipakai bareng oleh store() & update()).
+     * "Aktifkan Timer" (timer_enabled) adalah gerbang utama — begitu dimatikan, durasi
+     * dan kedua toggle auto-save/auto-restart ikut dipaksa kosong/false, supaya tidak ada
+     * nilai lama yang "nyangkut" nyala di database padahal timer-nya sendiri sudah off.
+     */
+    private function applyTimerFields(Request $request, array $validated): array
+    {
+        $validated['timer_enabled'] = $request->boolean('timer_enabled');
+
+        if (!$validated['timer_enabled']) {
+            $validated['timer_duration_minutes'] = null;
+            $validated['timer_auto_save'] = false;
+            $validated['timer_auto_restart'] = false;
+        } else {
+            $validated['timer_auto_save'] = $request->boolean('timer_auto_save');
+            $validated['timer_auto_restart'] = $request->boolean('timer_auto_restart');
+        }
+
+        return $validated;
     }
 
     /**

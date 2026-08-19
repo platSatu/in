@@ -30,7 +30,7 @@
                         <div class="col-sm-6">
                             <label for="name" class="mb-2">Nama / Label <span class="text-muted">(opsional)</span></label>
                             <input type="text" class="form-control @error('name') is-invalid @enderror"
-                                id="name" name="name" placeholder="Contoh: Wablas Utama" value="{{ old('name', $data->name) }}">
+                                id="name" name="name" placeholder="Contoh: Gateway Utama" value="{{ old('name', $data->name) }}">
                             @error('name')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -41,9 +41,9 @@
                         <div class="col-sm-12">
                             <label for="api_host" class="mb-2">API Host</label>
                             <input type="url" class="form-control @error('api_host') is-invalid @enderror"
-                                id="api_host" name="api_host" placeholder="https://smg.wablas.com" value="{{ old('api_host', $data->api_host) }}">
+                                id="api_host" name="api_host" placeholder="https://api.provider-anda.com" value="{{ old('api_host', $data->api_host) }}">
                             <div class="form-text">
-                                Alamat dasar API provider (tanpa path), contoh: <code>https://smg.wablas.com</code>.
+                                Alamat dasar API provider (tanpa path), contoh: <code>https://api.provider-anda.com</code>.
                                 Sistem akan memanggil <code>{api_host}/api/v2/send-message</code> untuk kirim pesan.
                             </div>
                             @error('api_host')

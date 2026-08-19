@@ -542,76 +542,7 @@ class FrontendController extends Controller
             }
         }
 
-        try {
-            Log::info('[FORM-WIZARD] Cek DB connection aktif', [
-                'connection' => config('database.default'),
-                'database' => DB::connection()->getDatabaseName(),
-            ]);
-
-            $existingStudent = Student::where('handphone', $validated['handphone'])->first();
-
-            Log::info('[FORM-WIZARD] Hasil cek Student existing', [
-                'found' => $existingStudent ? true : false,
-                'existing_student_id' => $existingStudent->id ?? null,
-            ]);
-
-            $student = $existingStudent;
-
-            if (!$student) {
-                $nameParts = preg_split('/\s+/', trim($validated['name']), 2);
-
-                $payload = [
-                    'first_name' => $nameParts[0],
-                    'last_name' => $nameParts[1] ?? '',
-                    'email' => $validated['email'],
-                    'handphone' => $validated['handphone'],
-                    'status' => 'active',
-                ];
-
-                Log::info('[FORM-WIZARD] Akan create Student baru dengan payload', $payload);
-
-                $student = Student::create($payload);
-
-                Log::info('[FORM-WIZARD] Student::create selesai dieksekusi', [
-                    'student_id' => $student->id ?? null,
-                    'student_exists_flag' => $student->exists,
-                    'was_recently_created' => $student->wasRecentlyCreated,
-                ]);
-
-                // Cek ulang langsung ke DB (bukan dari memory object) untuk memastikan
-                // baris ini SUNGGUH ada di tabel, bukan cuma ada di object PHP-nya.
-                $recheck = DB::table('students')->where('id', $student->id)->first();
-
-                Log::info('[FORM-WIZARD] Recheck langsung ke tabel students via query builder', [
-                    'ketemu_di_db' => $recheck ? true : false,
-                    'data' => $recheck,
-                ]);
-            } else {
-                Log::info('[FORM-WIZARD] Pakai Student yang sudah ada, tidak insert baru', [
-                    'student_id' => $student->id,
-                ]);
-            }
-        } catch (\Illuminate\Database\QueryException $e) {
-            // Ini bakal ke-catch kalau errornya soal SQL (constraint, kolom NOT NULL, dsb)
-            Log::error('[FORM-WIZARD] QueryException saat proses Student', [
-                'message' => $e->getMessage(),
-                'sql' => $e->getSql() ?? null,
-                'bindings' => $e->getBindings() ?? null,
-            ]);
-
-            throw $e;
-        } catch (\Throwable $e) {
-            // Tangkap SEMUA jenis error lain (termasuk yang biasanya bikin whoops page)
-            Log::error('[FORM-WIZARD] Exception tak terduga saat proses Student', [
-                'class' => get_class($e),
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            throw $e;
-        }
+        $student = $this->findOrCreateStudent($validated);
 
         // === STUDENT BRANCH/FORM TRACKING ===
         // Simpan branch & form yang baru diisi student ini di tabel students, dipakai
@@ -650,109 +581,18 @@ class FrontendController extends Controller
             ->orderBy('order')
             ->get();
 
-        $answersSummary = [];
-        $questionNumber = 1;
-        $selectedMajorIds = [];
-
         // === RESULT (auto mode) ===
         // Kalau form ini result_mode='auto', skor dihitung dari kolom
         // form_question_options.score milik opsi yang dipilih peserta — TAPI hanya
         // untuk pertanyaan stage_group='placement_test' (bukan pertanyaan data
         // pribadi). Kolom score sendiri sudah ada & bisa diisi admin sejak awal,
         // cuma sebelumnya tidak pernah dipakai/dijumlahkan di mana pun.
-        $autoScore = 0;
         $isAutoResultForm = $form->result_mode === 'auto';
 
-        foreach ($questions as $question) {
-            $questionKey = 'question_' . $question->id;
-            $answerValue = null;
-
-            if ($question->type === 'text' || $question->type === 'number') {
-                $answerText = $request->input($questionKey);
-                $answerValue = $answerText ?: '-';
-
-                if ($answerText) {
-                    FormAnswer::create([
-                        'user_id' => $student->id,
-                        'submission_id' => $submission->id,
-                        'question_id' => $question->id,
-                        'option_id' => null,
-                        'answer_text' => $answerText,
-                        'status' => 'active',
-                    ]);
-                }
-            } elseif ($question->type === 'single_choice') {
-                $optionId = $request->input($questionKey);
-
-                if ($optionId) {
-                    $option = FormQuestionOption::find($optionId);
-                    // option_text bisa kosong kalau opsinya berupa gambar saja (mis. soal Listening).
-                    $answerValue = $option ? ($option->option_text ?: '[Gambar]') : '-';
-
-                    FormAnswer::create([
-                        'user_id' => $student->id,
-                        'submission_id' => $submission->id,
-                        'question_id' => $question->id,
-                        'option_id' => $optionId,
-                        'answer_text' => null,
-                        'status' => 'active',
-                    ]);
-
-                    if ($isAutoResultForm && $question->stage_group === 'placement_test' && $option) {
-                        $autoScore += (float) ($option->score ?? 0);
-                    }
-                } else {
-                    $answerValue = '-';
-                }
-            } elseif ($question->type === 'multiple_choice') {
-                $optionIds = $request->input($questionKey, []);
-                $selectedOptions = [];
-
-                foreach ($optionIds as $optionId) {
-                    $option = FormQuestionOption::find($optionId);
-                    if ($option) {
-                        $selectedOptions[] = $option->option_text ?: '[Gambar]';
-
-                        FormAnswer::create([
-                            'user_id' => $student->id,
-                            'submission_id' => $submission->id,
-                            'question_id' => $question->id,
-                            'option_id' => $optionId,
-                            'answer_text' => null,
-                            'status' => 'active',
-                        ]);
-
-                        if ($isAutoResultForm && $question->stage_group === 'placement_test') {
-                            $autoScore += (float) ($option->score ?? 0);
-                        }
-                    }
-                }
-
-                $answerValue = !empty($selectedOptions) ? implode(', ', $selectedOptions) : '-';
-            } elseif ($question->type === 'major') {
-                $majorId = $request->input($questionKey);
-                $major = $majorId ? Major::find($majorId) : null;
-                $answerValue = $major ? $major->name : '-';
-
-                if ($majorId && $major) {
-                    FormAnswer::create([
-                        'user_id' => $student->id,
-                        'submission_id' => $submission->id,
-                        'question_id' => $question->id,
-                        'option_id' => null,
-                        'answer_text' => $majorId,
-                        'status' => 'active',
-                    ]);
-
-                    $selectedMajorIds[] = $majorId;
-                }
-            }
-
-            $answersSummary[] = "{$questionNumber}. {$question->question_text}\n   Jawaban: {$answerValue}";
-            $questionNumber++;
-        }
-
-        $ringkasanJawaban = implode("\n", $answersSummary);
+        $answers = $this->saveQuestionAnswers($request, $submission, $student, $questions, $isAutoResultForm);
+        $ringkasanJawaban = $answers['ringkasan'];
+        $autoScore = $answers['autoScore'];
+        $selectedMajorIds = $answers['selectedMajorIds'];
 
         $universitasMajorMessage = '';
         if (!empty($selectedMajorIds)) {
@@ -848,10 +688,312 @@ class FrontendController extends Controller
             'student_id' => $student->id,
         ]);
 
-        return redirect()
-            ->route('frontend.form.wizard')
+        // Balik lagi ke URL form yang tadi dipakai user buat isi form ini (bukan ke
+        // halaman "pilih form" yang generic /quiz), sama seperti pola link Preview
+        // di quiz/form/index.blade.php — pakai URL cantik /quiz/{slug}/{boothSlug}
+        // kalau form-nya punya itu, fallback ke ?form_id= kalau tidak.
+        $redirectRoute = ($form->slug && $form->booth_slug)
+            ? route('frontend.form.wizard.slug', ['branchSlug' => $form->slug, 'boothSlug' => $form->booth_slug])
+            : route('frontend.form.wizard', ['form_id' => $form->id]);
+
+        return redirect($redirectRoute)
             ->with('success', 'Thank you! Your form has been submitted successfully.')
             ->with('callback_link', $callbackLink);
+    }
+
+    /**
+     * === TIMER PLACEMENT TEST — AUTO-SAVE SAAT WAKTU HABIS ===
+     * Dipanggil via fetch() dari form-wizard.blade.php begitu timer step Placement
+     * Test habis DAN admin mengaktifkan toggle "Auto-Save" di form ini (timer_auto_save).
+     * Menyimpan jawaban APAPUN/BERAPA PUN yang sempat terisi (server ini memang dari
+     * awal tidak pernah menegakkan "required" per pertanyaan, lihat saveQuestionAnswers()).
+     *
+     * SENGAJA beda dari formWizardSubmit() dalam 3 hal, supaya peserta yang kena timeout
+     * di form berbayar TIDAK perlu bayar dua kali kalau admin juga mengaktifkan
+     * timer_auto_restart (lihat form-wizard.blade.php, timer direset ke soal pertama
+     * tanpa reload halaman):
+     *   1. FormPayment TIDAK di-lock (form_submission_id tetap NULL) — payment yang
+     *      sama masih bisa dipakai untuk submit "asli" berikutnya.
+     *   2. TIDAK menghitung skor auto/membuat FormResult, TIDAK mengirim WhatsApp,
+     *      TIDAK menyiapkan callback link — ini bukan penyelesaian resmi, cuma jaring
+     *      pengaman supaya jawaban yang sempat diisi tidak hilang percuma.
+     *   3. Response JSON (dipanggil via fetch, bukan navigasi browser biasa).
+     */
+    public function formWizardTimeoutSave(Request $request)
+    {
+        try {
+            $validated = $request->validate([
+                'form_id' => 'required|exists:forms,id',
+                'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s.\'-]+$/u'],
+                'email' => ['required', 'email', 'max:255'],
+                'handphone' => ['required', 'digits_between:9,16'],
+                'payment_order_id' => ['nullable', 'string', 'max:50'],
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            return response()->json(['message' => 'Data belum lengkap, jawaban tidak disimpan.', 'errors' => $e->errors()], 422);
+        }
+
+        $form = Form::find($validated['form_id']);
+
+        if (!$form) {
+            return response()->json(['message' => 'Form tidak ditemukan.'], 404);
+        }
+
+        if (!$form->timer_enabled || !$form->timer_auto_save) {
+            // Jaga-jaga kalau endpoint ini dipanggil langsung (bukan dari flow
+            // timer JS yang semestinya) padahal admin tidak mengaktifkan fitur ini.
+            return response()->json(['message' => 'Fitur auto-save timer tidak aktif untuk form ini.'], 422);
+        }
+
+        // === PAYMENT GATE ===
+        // Sama seperti formWizardSubmit(): kalau form ini requires_payment, hanya boleh
+        // menyimpan jawaban kalau ada FormPayment "paid" untuk order ini — TAPI di sini
+        // TIDAK di-lock (form_submission_id dibiarkan NULL), lihat catatan di docblock atas.
+        if ($form->requires_payment) {
+            $payment = FormPayment::where('order_id', $validated['payment_order_id'] ?? null)
+                ->where('form_id', $form->id)
+                ->where('status', 'paid')
+                ->whereNull('form_submission_id')
+                ->first();
+
+            if (!$payment) {
+                return response()->json(['message' => 'Pembayaran belum terkonfirmasi, jawaban tidak disimpan.'], 422);
+            }
+        }
+
+        $student = $this->findOrCreateStudent($validated);
+
+        $student->update([
+            'branch_id' => $form->branch_id,
+            'form_id' => $form->id,
+        ]);
+
+        $submission = FormSubmission::create([
+            'user_id' => $student->id,
+            'form_id' => $form->id,
+            'status' => 'active',
+            'is_timeout_partial' => true,
+        ]);
+
+        $questions = FormQuestion::where('form_id', $form->id)
+            ->where('status', 'active')
+            ->with('options')
+            ->orderBy('order')
+            ->get();
+
+        // isAutoResultForm sengaja selalu false di sini — lihat docblock method ini,
+        // ini bukan penyelesaian resmi jadi tidak menghasilkan skor/FormResult.
+        $this->saveQuestionAnswers($request, $submission, $student, $questions, false);
+
+        Log::info('[FORM-WIZARD] Timeout auto-save tersimpan', [
+            'form_id' => $form->id,
+            'submission_id' => $submission->id,
+            'student_id' => $student->id,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'submission_id' => $submission->id,
+        ]);
+    }
+
+    /**
+     * Cari Student berdasarkan handphone, atau buat baru kalau belum ada. Dipakai
+     * bareng oleh formWizardSubmit() (submit lengkap) dan formWizardTimeoutSave()
+     * (auto-save saat timer habis).
+     */
+    private function findOrCreateStudent(array $validated): Student
+    {
+        Log::info('[FORM-WIZARD] Cek DB connection aktif', [
+            'connection' => config('database.default'),
+            'database' => DB::connection()->getDatabaseName(),
+        ]);
+
+        try {
+            $existingStudent = Student::where('handphone', $validated['handphone'])->first();
+
+            Log::info('[FORM-WIZARD] Hasil cek Student existing', [
+                'found' => $existingStudent ? true : false,
+                'existing_student_id' => $existingStudent->id ?? null,
+            ]);
+
+            if ($existingStudent) {
+                Log::info('[FORM-WIZARD] Pakai Student yang sudah ada, tidak insert baru', [
+                    'student_id' => $existingStudent->id,
+                ]);
+
+                return $existingStudent;
+            }
+
+            $nameParts = preg_split('/\s+/', trim($validated['name']), 2);
+
+            $payload = [
+                'first_name' => $nameParts[0],
+                'last_name' => $nameParts[1] ?? '',
+                'email' => $validated['email'],
+                'handphone' => $validated['handphone'],
+                'status' => 'active',
+            ];
+
+            Log::info('[FORM-WIZARD] Akan create Student baru dengan payload', $payload);
+
+            $student = Student::create($payload);
+
+            Log::info('[FORM-WIZARD] Student::create selesai dieksekusi', [
+                'student_id' => $student->id ?? null,
+                'student_exists_flag' => $student->exists,
+                'was_recently_created' => $student->wasRecentlyCreated,
+            ]);
+
+            // Cek ulang langsung ke DB (bukan dari memory object) untuk memastikan
+            // baris ini SUNGGUH ada di tabel, bukan cuma ada di object PHP-nya.
+            $recheck = DB::table('students')->where('id', $student->id)->first();
+
+            Log::info('[FORM-WIZARD] Recheck langsung ke tabel students via query builder', [
+                'ketemu_di_db' => $recheck ? true : false,
+                'data' => $recheck,
+            ]);
+
+            return $student;
+        } catch (\Illuminate\Database\QueryException $e) {
+            // Ini bakal ke-catch kalau errornya soal SQL (constraint, kolom NOT NULL, dsb)
+            Log::error('[FORM-WIZARD] QueryException saat proses Student', [
+                'message' => $e->getMessage(),
+                'sql' => $e->getSql() ?? null,
+                'bindings' => $e->getBindings() ?? null,
+            ]);
+
+            throw $e;
+        } catch (\Throwable $e) {
+            // Tangkap SEMUA jenis error lain (termasuk yang biasanya bikin whoops page)
+            Log::error('[FORM-WIZARD] Exception tak terduga saat proses Student', [
+                'class' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            throw $e;
+        }
+    }
+
+    /**
+     * Loop seluruh pertanyaan form (sesuai urutan) dan simpan FormAnswer untuk
+     * apapun yang sudah terisi di $request. Tidak pernah menegakkan "required" di
+     * level ini (itu murni validasi JS di form-wizard.blade.php) — jawaban kosong
+     * cukup dilewati, bukan error. Dipakai bareng oleh formWizardSubmit() (submit
+     * lengkap) dan formWizardTimeoutSave() (auto-save saat timer placement test habis).
+     *
+     * @param  \Illuminate\Support\Collection<int, FormQuestion>  $questions
+     * @return array{ringkasan: string, autoScore: float, selectedMajorIds: array<int, string>}
+     */
+    private function saveQuestionAnswers(
+        Request $request,
+        FormSubmission $submission,
+        Student $student,
+        $questions,
+        bool $isAutoResultForm
+    ): array {
+        $answersSummary = [];
+        $questionNumber = 1;
+        $selectedMajorIds = [];
+        $autoScore = 0;
+
+        foreach ($questions as $question) {
+            $questionKey = 'question_' . $question->id;
+            $answerValue = null;
+
+            if ($question->type === 'text' || $question->type === 'number') {
+                $answerText = $request->input($questionKey);
+                $answerValue = $answerText ?: '-';
+
+                if ($answerText) {
+                    FormAnswer::create([
+                        'user_id' => $student->id,
+                        'submission_id' => $submission->id,
+                        'question_id' => $question->id,
+                        'option_id' => null,
+                        'answer_text' => $answerText,
+                        'status' => 'active',
+                    ]);
+                }
+            } elseif ($question->type === 'single_choice') {
+                $optionId = $request->input($questionKey);
+
+                if ($optionId) {
+                    $option = FormQuestionOption::find($optionId);
+                    // option_text bisa kosong kalau opsinya berupa gambar saja (mis. soal Listening).
+                    $answerValue = $option ? ($option->option_text ?: '[Gambar]') : '-';
+
+                    FormAnswer::create([
+                        'user_id' => $student->id,
+                        'submission_id' => $submission->id,
+                        'question_id' => $question->id,
+                        'option_id' => $optionId,
+                        'answer_text' => null,
+                        'status' => 'active',
+                    ]);
+
+                    if ($isAutoResultForm && $question->stage_group === 'placement_test' && $option) {
+                        $autoScore += (float) ($option->score ?? 0);
+                    }
+                } else {
+                    $answerValue = '-';
+                }
+            } elseif ($question->type === 'multiple_choice') {
+                $optionIds = $request->input($questionKey, []);
+                $selectedOptions = [];
+
+                foreach ($optionIds as $optionId) {
+                    $option = FormQuestionOption::find($optionId);
+                    if ($option) {
+                        $selectedOptions[] = $option->option_text ?: '[Gambar]';
+
+                        FormAnswer::create([
+                            'user_id' => $student->id,
+                            'submission_id' => $submission->id,
+                            'question_id' => $question->id,
+                            'option_id' => $optionId,
+                            'answer_text' => null,
+                            'status' => 'active',
+                        ]);
+
+                        if ($isAutoResultForm && $question->stage_group === 'placement_test') {
+                            $autoScore += (float) ($option->score ?? 0);
+                        }
+                    }
+                }
+
+                $answerValue = !empty($selectedOptions) ? implode(', ', $selectedOptions) : '-';
+            } elseif ($question->type === 'major') {
+                $majorId = $request->input($questionKey);
+                $major = $majorId ? Major::find($majorId) : null;
+                $answerValue = $major ? $major->name : '-';
+
+                if ($majorId && $major) {
+                    FormAnswer::create([
+                        'user_id' => $student->id,
+                        'submission_id' => $submission->id,
+                        'question_id' => $question->id,
+                        'option_id' => null,
+                        'answer_text' => $majorId,
+                        'status' => 'active',
+                    ]);
+
+                    $selectedMajorIds[] = $majorId;
+                }
+            }
+
+            $answersSummary[] = "{$questionNumber}. {$question->question_text}\n   Jawaban: {$answerValue}";
+            $questionNumber++;
+        }
+
+        return [
+            'ringkasan' => implode("\n", $answersSummary),
+            'autoScore' => $autoScore,
+            'selectedMajorIds' => $selectedMajorIds,
+        ];
     }
 
     /**

@@ -35,6 +35,7 @@ class FormPayment extends Model
         'raw_response',
         'raw_callback',
         'paid_at',
+        'expires_at',
     ];
 
     protected $casts = [
@@ -42,6 +43,7 @@ class FormPayment extends Model
         'raw_response' => 'array',
         'raw_callback' => 'array',
         'paid_at' => 'datetime',
+        'expires_at' => 'datetime',
     ];
 
     public function form(): BelongsTo
@@ -62,5 +64,10 @@ class FormPayment extends Model
     public function isPaid(): bool
     {
         return $this->status === 'paid';
+    }
+
+    public function isExpired(): bool
+    {
+        return $this->status === 'expired';
     }
 }

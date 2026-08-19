@@ -58,6 +58,12 @@ class FormPaymentController extends Controller
             ], 422);
         }
 
+        // === TIMER PEMBAYARAN ===
+        // expires_at dihitung sekali di sini dari expiry_minutes milik gateway yang
+        // sedang aktif (Settings > Payment Gateway, default 60 menit) — dipakai untuk
+        // countdown di wizard (lihat form-wizard.blade.php) dan penanda "expired" di
+        // status() di bawah, supaya berlaku SAMA untuk semua gateway (Duitku/Midtrans/
+        // iPaymu), bukan cuma Duitku.
         $payment = FormPayment::create([
             'form_id' => $form->id,
             'payment_gateway_id' => $gateway->id,
@@ -68,6 +74,7 @@ class FormPaymentController extends Controller
             'handphone' => $validated['handphone'],
             'amount' => $form->payment_amount ?? 0,
             'status' => 'pending',
+            'expires_at' => now()->addMinutes($gateway->expiry_minutes ?? 60),
         ]);
 
         try {
@@ -78,6 +85,8 @@ class FormPaymentController extends Controller
                     'mode' => 'select-method',
                     'order_id' => $payment->order_id,
                     'methods' => $driver->getPaymentMethods($payment),
+                    'expires_at' => optional($payment->expires_at)->toIso8601String(),
+                    'server_time' => now()->toIso8601String(),
                 ]);
             }
 
@@ -93,6 +102,8 @@ class FormPaymentController extends Controller
                 'mode' => 'redirect',
                 'order_id' => $payment->order_id,
                 'redirect_url' => $result['redirect_url'] ?? null,
+                'expires_at' => optional($payment->expires_at)->toIso8601String(),
+                'server_time' => now()->toIso8601String(),
             ]);
         } catch (Throwable $e) {
             Log::error('[PAYMENT] Gagal init transaksi', [
@@ -149,15 +160,40 @@ class FormPaymentController extends Controller
     /**
      * Dipoll oleh wizard tiap beberapa detik. Ini yang jadi dasar "placement
      * test baru muncul setelah callback pembayaran diterima" — statusnya
-     * hanya berubah lewat webhook, bukan dari halaman ini.
+     * hanya berubah jadi "paid" lewat webhook, bukan dari halaman ini.
+     *
+     * === TIMER PEMBAYARAN — SELF-HEAL EXPIRED ===
+     * Setiap kali di-poll, transaksi yang masih "pending" tapi sudah lewat
+     * expires_at langsung ditandai "expired" di sini juga (tidak perlu nunggu
+     * scheduled command payments:expire-stale) — supaya wizard yang masih
+     * terbuka langsung dapat status expired di polling berikutnya, biar sinkron
+     * dengan dashboard gateway aslinya (mis. Duitku yang punya expiryPeriod sendiri).
+     *
+     * UPDATE ber-syarat (WHERE status='pending') dipakai, BUKAN load-then-save,
+     * supaya atomik & race-safe terhadap webhook gateway yang mungkin baru saja
+     * menandai baris yang sama "paid" di saat hampir bersamaan — kalau itu terjadi,
+     * WHERE di bawah ini tidak akan match (status sudah bukan 'pending' lagi) jadi
+     * 0 baris ke-update, status "paid" yang sudah benar tidak akan tertimpa.
      */
     public function status(string $orderId): JsonResponse
     {
         $payment = FormPayment::where('order_id', $orderId)->firstOrFail();
 
+        if ($payment->status === 'pending' && $payment->expires_at && now()->greaterThanOrEqualTo($payment->expires_at)) {
+            $expired = FormPayment::where('id', $payment->id)
+                ->where('status', 'pending')
+                ->update(['status' => 'expired']);
+
+            if ($expired === 1) {
+                $payment->status = 'expired';
+            }
+        }
+
         return response()->json([
             'order_id' => $payment->order_id,
             'status' => $payment->status,
+            'expires_at' => optional($payment->expires_at)->toIso8601String(),
+            'server_time' => now()->toIso8601String(),
         ]);
     }
 

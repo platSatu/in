@@ -37,6 +37,10 @@ class Form extends Model
         'status',
         'start_date',
         'end_date',
+        'timer_enabled',
+        'timer_duration_minutes',
+        'timer_auto_save',
+        'timer_auto_restart',
     ];
 
     protected $casts = [
@@ -48,6 +52,10 @@ class Form extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'view_count' => 'integer',
+        'timer_enabled' => 'boolean',
+        'timer_duration_minutes' => 'integer',
+        'timer_auto_save' => 'boolean',
+        'timer_auto_restart' => 'boolean',
     ];
 
     public function whatsappTemplate()

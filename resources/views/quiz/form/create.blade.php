@@ -187,6 +187,50 @@
                         </div>
 
                         <div class="row mb-4">
+                            <div class="col-sm-4">
+                                <label class="mb-2 d-block">Timer Placement Test</label>
+                                <div class="form-check form-switch">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="timer_enabled"
+                                        name="timer_enabled" value="1" {{ old('timer_enabled') ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="timer_enabled">
+                                        Aktifkan batas waktu pengerjaan
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Batas waktu berlaku HANYA saat peserta mengerjakan step Placement Test (soal-soal). Step Data Pribadi & Pembayaran tidak kena batas waktu ini.
+                                </div>
+                            </div>
+                            <div class="col-sm-8" id="timerSettingsWrapper">
+                                <label for="timer_duration_minutes" class="mb-2">Durasi (menit)</label>
+                                <input type="number" min="1" max="600"
+                                    class="form-control @error('timer_duration_minutes') is-invalid @enderror"
+                                    id="timer_duration_minutes" name="timer_duration_minutes" placeholder="Contoh: 30"
+                                    value="{{ old('timer_duration_minutes') }}">
+                                @error('timer_duration_minutes')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+
+                                <div class="form-check form-switch mt-3">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="timer_auto_save"
+                                        name="timer_auto_save" value="1" {{ old('timer_auto_save') ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="timer_auto_save">
+                                        Auto-Save saat waktu habis (simpan jawaban apa adanya)
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch mt-2">
+                                    <input class="form-check-input" type="checkbox" role="switch" id="timer_auto_restart"
+                                        name="timer_auto_restart" value="1" {{ old('timer_auto_restart') ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="timer_auto_restart">
+                                        Auto-Refresh saat waktu habis (mulai lagi dari soal pertama)
+                                    </label>
+                                </div>
+                                <div class="form-text mt-2">
+                                    Kalau kedua toggle di atas aktif: jawaban yang sempat terisi disimpan dulu, baru soal direset ke soal pertama. Kalau keduanya nonaktif, timer tetap tampil & habis, tapi tidak ada aksi otomatis.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
                             <div class="col-sm-6">
                                 <label for="start_date" class="mb-2">Tanggal Mulai (Optional)</label>
                                 <input type="datetime-local" class="form-control @error('start_date') is-invalid @enderror"
@@ -309,6 +353,26 @@
             }
 
             waCheckbox.addEventListener('change', sync);
+            sync();
+        })();
+
+        (function () {
+            var checkbox = document.getElementById('timer_enabled');
+            var wrapper = document.getElementById('timerSettingsWrapper');
+            var durationInput = document.getElementById('timer_duration_minutes');
+            var autoSaveCheckbox = document.getElementById('timer_auto_save');
+            var autoRestartCheckbox = document.getElementById('timer_auto_restart');
+
+            function sync() {
+                wrapper.style.display = checkbox.checked ? '' : 'none';
+                if (!checkbox.checked) {
+                    durationInput.value = '';
+                    autoSaveCheckbox.checked = false;
+                    autoRestartCheckbox.checked = false;
+                }
+            }
+
+            checkbox.addEventListener('change', sync);
             sync();
         })();
     </script>

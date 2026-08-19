@@ -118,6 +118,7 @@
                                 <th class="text-nowrap">Branch</th>
                                 <th>Form</th>
                                 <th class="text-nowrap">Kode Sales</th>
+                                <th class="text-nowrap">Pembayaran</th>
                                 <th class="text-nowrap">Status</th>
                                 <th class="text-nowrap">Akun Login</th>
                                 <th class="no-content text-center">Action</th>
@@ -140,6 +141,28 @@
                                     <td class="text-nowrap">{{ $item->companyBranch->name ?? '-' }}</td>
                                     <td>{{ $item->form->name ?? '-' }}</td>
                                     <td class="text-nowrap">{{ $item->sales_id ?? '-' }}</td>
+                                    <td class="text-nowrap">
+                                        @php
+                                            // Ambil submission TERBARU student ini (sudah di-eager-load & diurutkan
+                                            // di StudentController::index()) beserta payment-nya kalau ada.
+                                            $latestSubmission = $item->formSubmissions->first();
+                                            $payment = $latestSubmission->payment ?? null;
+                                        @endphp
+                                        @if(!$item->form || !$item->form->requires_payment)
+                                            <span class="text-muted">Gratis</span>
+                                        @elseif($payment)
+                                            <span class="badge {{ $payment->status === 'paid' ? 'bg-success' : ($payment->status === 'pending' ? 'bg-warning text-dark' : 'bg-danger') }} mb-1">
+                                                {{ ucfirst($payment->status) }}
+                                            </span>
+                                            <div class="small text-muted">{{ $payment->order_id }}</div>
+                                            <div class="small">Rp {{ number_format((float) $payment->amount, 0, ',', '.') }}</div>
+                                            @if($payment->paid_at)
+                                                <div class="small text-muted">{{ $payment->paid_at->format('d M Y, H:i') }}</div>
+                                            @endif
+                                        @else
+                                            <span class="badge bg-secondary">Belum Bayar</span>
+                                        @endif
+                                    </td>
                                     <td class="text-nowrap">
                                         <span class="badge {{ $item->status === 'active' ? 'bg-success' : 'bg-secondary' }}">
                                             {{ ucfirst($item->status) }}
@@ -179,7 +202,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="11" class="text-center">Belum ada data.</td>
+                                    <td colspan="12" class="text-center">Belum ada data.</td>
                                 </tr>
                             @endforelse
                         </tbody>

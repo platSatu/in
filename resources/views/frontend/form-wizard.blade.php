@@ -456,6 +456,41 @@
             text-align: center;
             padding: 10px 0;
         }
+
+        /* === TIMER PLACEMENT TEST === */
+        .quiz-timer-box {
+            text-align: center;
+            font-weight: 700;
+            font-size: 15px;
+            color: var(--brand-dark);
+            background: var(--brand-light);
+            border-radius: 10px;
+            padding: 10px 14px;
+        }
+
+        .quiz-timer-box.quiz-timer-danger {
+            background: var(--brand);
+            color: #fff;
+            animation: pulseTimer 1s infinite;
+        }
+
+        @keyframes pulseTimer {
+            0%, 100% { opacity: 1; }
+            50% { opacity: .55; }
+        }
+
+        /* === TIMER PEMBAYARAN === */
+        .payment-countdown {
+            text-align: center;
+            font-size: 13.5px;
+            font-weight: 600;
+            color: #6b7186;
+            margin-bottom: 10px;
+        }
+
+        .payment-countdown.payment-countdown-danger {
+            color: var(--brand);
+        }
     </style>
 </head>
 
@@ -616,6 +651,10 @@
                 @if($selectedForm && $selectedForm->requires_payment)
                     <div class="step" id="step-payment">
 
+                        <div class="payment-countdown" id="paymentCountdownBox" style="display:none;">
+                            <i class="bi bi-hourglass-split"></i> Selesaikan pembayaran dalam <span id="paymentCountdownDisplay">--:--</span>
+                        </div>
+
                         <div class="payment-status-box" id="paymentStatusBox">
                             <div class="payment-spinner"></div>
                             <p class="mt-2 mb-0">Menyiapkan pembayaran...</p>
@@ -637,6 +676,12 @@
 
                 {{-- STEP: Questions (placement test) --}}
                 <div class="step" id="step-questions">
+
+                    @if($selectedForm && $selectedForm->timer_enabled && $selectedForm->timer_duration_minutes)
+                        <div class="quiz-timer-box mb-3" id="quizTimerBox">
+                            <i class="bi bi-stopwatch"></i> Sisa Waktu Pengerjaan: <span id="quizTimerDisplay">--:--</span>
+                        </div>
+                    @endif
 
                     @if($selectedForm && $placementTestQuestions->count() > 0)
                         @foreach($placementTestQuestions as $index => $question)
@@ -731,6 +776,16 @@
 
     const CSRF_TOKEN = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
 
+    // === TIMER PLACEMENT TEST ===
+    // "Aktifkan Timer" (timer_enabled) di form settings adalah gerbang utama —
+    // kalau mati, timerEnabled di sini false dan seluruh logic timer di bawah
+    // tidak pernah jalan, apapun isi timer_auto_save/timer_auto_restart di DB.
+    const timerEnabled = {{ $selectedForm && $selectedForm->timer_enabled && $selectedForm->timer_duration_minutes ? 'true' : 'false' }};
+    const timerDurationSeconds = {{ (int) (($selectedForm->timer_duration_minutes ?? 0) * 60) }};
+    const timerAutoSave = {{ $selectedForm && $selectedForm->timer_auto_save ? 'true' : 'false' }};
+    const timerAutoRestart = {{ $selectedForm && $selectedForm->timer_auto_restart ? 'true' : 'false' }};
+    const timeoutSaveUrl = @json(route('frontend.form.wizard.timeout-save'));
+
     function updateProgress() {
         document.getElementById('totalSteps').textContent = stepOrder.length;
         const progress = ((currentStepIndex + 1) / stepOrder.length) * 100;
@@ -754,6 +809,10 @@
 
         if (stepId === 'step-payment' && !paymentInitiated) {
             initPayment();
+        }
+
+        if (stepId === 'step-questions') {
+            startQuizTimer();
         }
     }
 
@@ -977,6 +1036,198 @@
         });
     });
 
+    // === TIMER PLACEMENT TEST ===================================================
+    // Satu hitungan mundur untuk SELURUH step Placement Test (bukan per soal),
+    // dimulai sekali begitu step-questions pertama kali ditampilkan (lihat
+    // showStep()). Tidak ikut di-reset kalau user pindah ke step-review lalu balik
+    // lagi ke step-questions — timer terus jalan sampai submit berhasil atau habis.
+
+    let quizTimerInterval = null;
+    let quizTimerDeadline = null;
+    let quizTimerStarted = false;
+
+    function formatMMSS(totalSeconds) {
+        const s = Math.max(0, Math.floor(totalSeconds));
+        const m = Math.floor(s / 60);
+        const sec = s % 60;
+        return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+    }
+
+    function startQuizTimer() {
+        if (!timerEnabled || quizTimerStarted) return;
+
+        quizTimerStarted = true;
+        quizTimerDeadline = Date.now() + (timerDurationSeconds * 1000);
+        tickQuizTimer();
+        quizTimerInterval = window.setInterval(tickQuizTimer, 1000);
+    }
+
+    function tickQuizTimer() {
+        const display = document.getElementById('quizTimerDisplay');
+        if (!display) return;
+
+        const remainingSeconds = Math.ceil((quizTimerDeadline - Date.now()) / 1000);
+        const box = document.getElementById('quizTimerBox');
+
+        if (remainingSeconds <= 0) {
+            display.textContent = '00:00';
+            window.clearInterval(quizTimerInterval);
+            quizTimerInterval = null;
+            handleQuizTimeout();
+            return;
+        }
+
+        display.textContent = formatMMSS(remainingSeconds);
+        if (box) box.classList.toggle('quiz-timer-danger', remainingSeconds <= 60);
+    }
+
+    // Kosongkan semua input di dalam step-questions (radio/checkbox/text/select),
+    // dipakai timer_auto_restart supaya soal benar-benar "mulai dari nol" lagi
+    // TANPA reload halaman penuh — reload penuh akan memicu ulang alur pembayaran/
+    // data pribadi dan menambah view_count form (lihat FrontendController::
+    // buildFormWizardView()), yang keduanya tidak diinginkan di sini.
+    function resetQuestionsStepUI() {
+        const container = document.getElementById('step-questions');
+        if (!container) return;
+
+        container.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(function (el) {
+            el.checked = false;
+        });
+        container.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], textarea').forEach(function (el) {
+            el.value = '';
+        });
+        container.querySelectorAll('select').forEach(function (el) {
+            el.value = '';
+        });
+        container.querySelectorAll('.option-item, .form-option-checkbox').forEach(function (el) {
+            el.classList.remove('selected');
+        });
+        container.querySelectorAll('.question-card').forEach(function (el) {
+            el.classList.remove('has-error');
+            const errorEl = el.querySelector('.error-message');
+            if (errorEl) errorEl.classList.remove('show');
+        });
+    }
+
+    async function postFormDataJson(url, formData) {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': CSRF_TOKEN,
+            },
+            body: formData,
+        });
+
+        const data = await response.json().catch(function () { return {}; });
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Gagal menyimpan jawaban.');
+        }
+
+        return data;
+    }
+
+    // Urutan begitu waktu habis: simpan dulu (kalau timer_auto_save aktif), BARU
+    // direset ke soal pertama (kalau timer_auto_restart aktif) — sesuai yang
+    // disepakati: jawaban yang sempat terisi tidak boleh hilang percuma sebelum
+    // soal direset.
+    async function handleQuizTimeout() {
+        const box = document.getElementById('quizTimerBox');
+        if (box) {
+            box.classList.add('quiz-timer-danger');
+            box.innerHTML = '<i class="bi bi-stopwatch"></i> Waktu habis!';
+        }
+
+        if (timerAutoSave) {
+            try {
+                await postFormDataJson(timeoutSaveUrl, new FormData(document.getElementById('wizardForm')));
+            } catch (err) {
+                // Diamkan: kalau auto-save gagal (mis. jaringan), tetap lanjut ke
+                // auto-restart di bawah supaya peserta tidak macet di layar "waktu
+                // habis" — konsekuensinya jawaban yang sempat terisi tidak
+                // tersimpan untuk percobaan yang baru saja habis waktunya itu saja.
+            }
+        }
+
+        if (timerAutoRestart) {
+            resetQuestionsStepUI();
+
+            const questionsIndex = stepOrder.indexOf('step-questions');
+            if (questionsIndex !== -1 && currentStepIndex !== questionsIndex) {
+                showStep(questionsIndex);
+            }
+
+            quizTimerDeadline = Date.now() + (timerDurationSeconds * 1000);
+            if (box) box.classList.remove('quiz-timer-danger');
+            tickQuizTimer();
+            quizTimerInterval = window.setInterval(tickQuizTimer, 1000);
+        }
+    }
+
+    // === TIMER PEMBAYARAN =======================================================
+    // expires_at didapat dari response init()/status() (lihat FormPaymentController),
+    // server_time dipakai untuk hitung offset supaya countdown tetap akurat walau
+    // jam device peserta meleset dari jam server.
+
+    let paymentCountdownInterval = null;
+    let paymentCountdownDeadline = null;
+    let paymentServerTimeOffsetMs = 0;
+
+    function setPaymentExpiry(expiresAtIso, serverTimeIso) {
+        if (!expiresAtIso) {
+            stopPaymentCountdown();
+            return;
+        }
+
+        if (serverTimeIso) {
+            paymentServerTimeOffsetMs = new Date(serverTimeIso).getTime() - Date.now();
+        }
+
+        paymentCountdownDeadline = new Date(expiresAtIso).getTime();
+        startPaymentCountdown();
+    }
+
+    function startPaymentCountdown() {
+        stopPaymentCountdown();
+        const box = document.getElementById('paymentCountdownBox');
+        if (box) box.style.display = '';
+        tickPaymentCountdown();
+        paymentCountdownInterval = window.setInterval(tickPaymentCountdown, 1000);
+    }
+
+    function stopPaymentCountdown() {
+        if (paymentCountdownInterval) {
+            window.clearInterval(paymentCountdownInterval);
+            paymentCountdownInterval = null;
+        }
+        const box = document.getElementById('paymentCountdownBox');
+        if (box) box.style.display = 'none';
+    }
+
+    function tickPaymentCountdown() {
+        const display = document.getElementById('paymentCountdownDisplay');
+        if (!display || !paymentCountdownDeadline) return;
+
+        const nowAdjusted = Date.now() + paymentServerTimeOffsetMs;
+        const remainingSeconds = Math.ceil((paymentCountdownDeadline - nowAdjusted) / 1000);
+        const box = document.getElementById('paymentCountdownBox');
+
+        if (remainingSeconds <= 0) {
+            display.textContent = '00:00';
+            stopPaymentCountdown();
+            // Server yang jadi sumber kebenaran status "expired" (self-heal di
+            // FormPaymentController::status()) — di sini cukup paksa 1x pengecekan
+            // status supaya UI expired langsung muncul, tidak nunggu interval
+            // polling 4 detik berikutnya.
+            checkPaymentStatus();
+            return;
+        }
+
+        display.textContent = formatMMSS(remainingSeconds);
+        if (box) box.classList.toggle('payment-countdown-danger', remainingSeconds <= 60);
+    }
+
     // === PAYMENT ===============================================================
 
     function paymentStatusBox(html) {
@@ -1025,6 +1276,7 @@
         postJson('{{ route('frontend.payment.init') }}', payload)
             .then(function (data) {
                 currentOrderId = data.order_id;
+                setPaymentExpiry(data.expires_at, data.server_time);
 
                 if (data.mode === 'select-method') {
                     renderDuitkuMethods(data.methods || []);
@@ -1137,18 +1389,24 @@
             .then(function (data) {
                 if (data.status === 'paid') {
                     stopPaymentPolling();
+                    stopPaymentCountdown();
                     document.getElementById('paymentOrderIdInput').value = currentOrderId;
                     paymentStatusBox('<p class="text-success mb-0"><i class="bi bi-check-circle-fill"></i> Pembayaran berhasil dikonfirmasi!</p>');
                     paymentContent('');
                     window.setTimeout(function () { nextStep(); }, 800);
                 } else if (data.status === 'failed' || data.status === 'expired') {
                     stopPaymentPolling();
+                    stopPaymentCountdown();
                     paymentStatusBox('<p class="text-danger mb-0"><i class="bi bi-x-circle-fill"></i> Pembayaran gagal/kedaluwarsa.</p>');
                     paymentContent(
                         '<div class="text-center"><button type="button" class="btn btn-outline-brand" onclick="paymentInitiated=false; initPayment();">Coba Lagi</button></div>'
                     );
+                } else {
+                    // status "pending" -> diam saja, terus polling. expires_at bisa saja
+                    // berubah/terisi belakangan (mis. dari null saat awal init non-Duitku
+                    // yang gagal, lalu retry) — resync di sini juga, bukan cuma saat init().
+                    setPaymentExpiry(data.expires_at, data.server_time);
                 }
-                // status "pending" -> diam saja, terus polling.
             })
             .catch(function () {
                 // Diamkan error jaringan sesaat, coba lagi di interval berikutnya.

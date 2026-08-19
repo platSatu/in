@@ -35,16 +35,15 @@ class WhatsappGateway extends Model
     /**
      * Daftar pilihan gateway yang tersedia di dropdown. Baru ada 1 opsi karena
      * semua provider yang didukung sekarang punya prosedur pengiriman yang sama
-     * (Wablas-compatible: POST {api_host}/api/v2/send-message, header
-     * Authorization: token.secret_key). Tambah key baru di sini kalau nanti ada
-     * provider dengan prosedur berbeda.
+     * (POST {api_host}/api/v2/send-message, header Authorization: token.secret_key).
+     * Tambah key baru di sini kalau nanti ada provider dengan prosedur berbeda.
      *
      * @return array<string, string>
      */
     public static function gatewayOptions(): array
     {
         return [
-            'whatsapp_gateway' => 'WhatsApp Gateway (Wablas-compatible)',
+            'whatsapp_gateway' => 'WhatsApp Gateway',
         ];
     }
 

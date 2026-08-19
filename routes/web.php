@@ -78,6 +78,11 @@ Route::post('/quiz/payment/duitku/select-method', [FormPaymentController::class,
 Route::get('/quiz/payment/{orderId}/status', [FormPaymentController::class, 'status'])->name('frontend.payment.status');
 Route::get('/quiz/payment/return', [FormPaymentController::class, 'return'])->name('frontend.payment.return');
 
+// Timer placement test (auto-save saat waktu habis) — dipanggil via fetch() dari
+// form-wizard.blade.php. POST jadi tidak beririsan dengan wildcard GET di bawah,
+// tapi tetap dikelompokkan di sini biar konsisten dengan route /quiz/payment/* lain.
+Route::post('/quiz/timeout-save', [FrontendController::class, 'formWizardTimeoutSave'])->name('frontend.form.wizard.timeout-save');
+
 Route::get('/quiz/{branchSlug}/{boothSlug}', [FrontendController::class, 'formWizardBySlug'])->name('frontend.form.wizard.slug');
 
 Route::get('/handbook', [FrontendController::class, 'handbook'])->name('frontend.handbook');

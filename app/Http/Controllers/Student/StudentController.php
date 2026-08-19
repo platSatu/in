@@ -38,7 +38,16 @@ class StudentController extends Controller
         $formId = $request->query('form_id');
 
         $data = Student::query()
-            ->with(['user', 'companyBranch', 'form'])
+            ->with([
+                'user',
+                'companyBranch',
+                'form',
+                // Dipakai di index.blade.php untuk kolom "Pembayaran": ambil submission
+                // TERBARU milik student ini beserta payment-nya (kalau ada), supaya tidak
+                // N+1 query per baris. Sama seperti pola $paymentsBySubmission di show(),
+                // tapi di sini cukup submission terbaru saja (bukan seluruh riwayat).
+                'formSubmissions' => fn ($query) => $query->latest('created_at')->with('payment'),
+            ])
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")

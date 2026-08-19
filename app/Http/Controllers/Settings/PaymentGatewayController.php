@@ -138,6 +138,7 @@ class PaymentGatewayController extends Controller
             'environment' => 'required|in:sandbox,production',
             'status' => 'nullable|in:active,inactive',
             'is_active' => 'nullable|boolean',
+            'expiry_minutes' => 'nullable|integer|min:5|max:1440',
         ]);
 
         $fields = PaymentGateway::credentialFields()[$validated['gateway']];
@@ -157,6 +158,10 @@ class PaymentGatewayController extends Controller
             'credentials' => $credentials,
             'is_active' => $request->boolean('is_active'),
             'status' => $validated['status'] ?? 'active',
+            // Dipakai untuk hitung form_payments.expires_at (lihat FormPaymentController::init())
+            // dan diteruskan ke Duitku sebagai expiryPeriod. Default 60 menit kalau admin
+            // mengosongkan field-nya, sama seperti nilai lama yang dulu hardcode di kode.
+            'expiry_minutes' => $validated['expiry_minutes'] ?? 60,
         ];
     }
 
