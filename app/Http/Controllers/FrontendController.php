@@ -254,6 +254,27 @@ class FrontendController extends Controller
         $personalDataQuestions = collect();
         $placementTestQuestions = collect();
 
+        // === PREFILL SETELAH KEMBALI DARI GATEWAY PEMBAYARAN ===
+        // Wizard ini satu <form> besar yang me-reload PENUH halaman waktu user
+        // kembali dari Midtrans/Duitku/iPaymu (?order_id=...) — semua input step
+        // sebelumnya (Full Name/Email/WhatsApp) otomatis KOSONG lagi kalau tidak
+        // di-prefill manual, padahal JS auto-lompat ke step Payment lalu langsung
+        // ke step Questions begitu status "paid" terdeteksi (lihat DOMContentLoaded
+        // di form-wizard.blade.php). Akibatnya submit akhir mengirim name/email/
+        // handphone KOSONG, gagal validasi required di formWizardSubmit(), dan
+        // karena JS itu juga tidak berhenti di step Info untuk menampilkan error-nya,
+        // dari sisi user kelihatannya "submit tidak ngapa-ngapain". Data name/email/
+        // handphone yang asli sebenarnya sudah tersimpan di form_payments (diisi
+        // waktu init pembayaran) — jadi dipakai lagi di sini untuk isi ulang field-nya.
+        $paymentPrefill = null;
+        $orderId = request()->query('order_id');
+
+        if ($orderId && $formId) {
+            $paymentPrefill = FormPayment::where('order_id', $orderId)
+                ->where('form_id', $formId)
+                ->first();
+        }
+
         if ($formId) {
             // Dulu ini Form::find($formId) tanpa cek status sama sekali, jadi form
             // inactive tetap bisa diakses selama tahu ID-nya lewat ?form_id=. Sekarang
@@ -288,7 +309,8 @@ class FrontendController extends Controller
             'questions',
             'personalDataQuestions',
             'placementTestQuestions',
-            'majors'
+            'majors',
+            'paymentPrefill'
         ));
     }
 

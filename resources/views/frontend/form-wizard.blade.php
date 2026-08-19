@@ -543,7 +543,7 @@
                         {{-- User Info --}}
                         <div class="mb-3">
                             <label class="form-label"><i class="bi bi-person me-1"></i> Full Name</label>
-                            <input type="text" name="name" id="wizard-name" class="form-control" placeholder="Please enter your name" required>
+                            <input type="text" name="name" id="wizard-name" class="form-control" placeholder="Please enter your name" value="{{ old('name', $paymentPrefill->name ?? '') }}" required>
                             <div class="error-message" id="wizard-name-error">Nama hanya boleh huruf, spasi, titik, apostrof, dan strip.</div>
                             @error('name')
                                 <div class="error-message show">{{ $message }}</div>
@@ -552,7 +552,7 @@
 
                         <div class="mb-3">
                             <label class="form-label"><i class="bi bi-envelope me-1"></i> Email</label>
-                            <input type="email" name="email" id="wizard-email" class="form-control" placeholder="nama@email.com" value="{{ old('email') }}" required>
+                            <input type="email" name="email" id="wizard-email" class="form-control" placeholder="nama@email.com" value="{{ old('email', $paymentPrefill->email ?? '') }}" required>
                             <div class="error-message" id="wizard-email-error">Format email tidak valid.</div>
                             @error('email')
                                 <div class="error-message show">{{ $message }}</div>
@@ -561,7 +561,7 @@
 
                         <div class="mb-3">
                             <label class="form-label"><i class="bi bi-whatsapp me-1"></i> WhatsApp phone number</label>
-                            <input type="text" name="handphone" id="wizard-handphone" class="form-control" placeholder="62812xxxxxxxx" required>
+                            <input type="text" name="handphone" id="wizard-handphone" class="form-control" placeholder="62812xxxxxxxx" value="{{ old('handphone', $paymentPrefill->handphone ?? '') }}" required>
                             <div class="error-message" id="wizard-handphone-error">Nomor HP harus angka saja, minimal 9 dan maksimal 16 digit.</div>
                             @error('handphone')
                                 <div class="error-message show">{{ $message }}</div>
@@ -700,6 +700,14 @@
     const requiresPayment = {{ $selectedForm && $selectedForm->requires_payment ? 'true' : 'false' }};
     const paymentPosition = @json($selectedForm->payment_position ?? 'before_questions');
     const hasPersonalDataStage = {{ $selectedForm && $selectedForm->has_personal_data_stage ? 'true' : 'false' }};
+
+    // True kalau redirect balik ke halaman ini itu HASIL dari submit akhir yang
+    // gagal validasi server (misalnya name/email/handphone kosong/tidak valid).
+    // Dulu tidak dicek sama sekali -> begitu ?order_id= masih ada di URL, JS di
+    // bawah selalu lompat balik ke step Payment/Questions, jadi error yang
+    // sebenarnya ada di step Info (dan pesan errornya) tidak pernah kelihatan
+    // oleh user -> submit kelihatan "diem aja" padahal sebenarnya ditolak server.
+    const hasValidationErrors = {{ $errors->any() ? 'true' : 'false' }};
 
     // Kalau form ini punya step "Data Pribadi", urutannya dikunci: info -> data
     // pribadi -> (pembayaran) -> placement test -> review. Setting "Posisi
@@ -1152,6 +1160,16 @@
     // tanpa membuat transaksi baru.
     document.addEventListener('DOMContentLoaded', function () {
         updateProgress();
+
+        // PENTING: kalau redirect ini sebenarnya hasil submit akhir yang gagal
+        // validasi (name/email/handphone kosong/tidak valid, dsb), JANGAN lompat
+        // ke step lain walau order_id masih nempel di URL — biarkan tetap di step
+        // Info (step aktif default dari server, lihat class="step active" di
+        // #step-info) supaya pesan error yang sudah dirender di step itu benar-benar
+        // kelihatan oleh user, bukan ketutup step Payment/Questions.
+        if (hasValidationErrors) {
+            return;
+        }
 
         if (requiresPayment && currentOrderId) {
             paymentInitiated = true;
