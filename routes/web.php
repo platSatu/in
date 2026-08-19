@@ -63,14 +63,22 @@ Route::get('/frontend/universities-by-city/{city}', [FrontendController::class, 
 // Frontend Form Wizard Routes
 Route::get('/quiz', [FrontendController::class, 'formWizard'])->name('frontend.form.wizard');
 Route::post('/quiz', [FrontendController::class, 'formWizardSubmit'])->name('frontend.form.wizard.submit');
-Route::get('/quiz/{branchSlug}/{boothSlug}', [FrontendController::class, 'formWizardBySlug'])->name('frontend.form.wizard.slug');
 
 // Payment gateway routes untuk wizard publik (name/email/hp -> bayar -> placement test).
 // Ini dipanggil via fetch() dari resources/views/frontend/form-wizard.blade.php.
+//
+// PENTING: route ini harus didaftarkan SEBELUM '/quiz/{branchSlug}/{boothSlug}' di
+// bawah. Laravel mencocokkan route sesuai urutan didaftarkan, dan '/quiz/payment/return'
+// (2 segment: "payment","return") secara struktur cocok juga dengan pola wildcard
+// {branchSlug}/{boothSlug} — kalau wildcard itu didaftarkan duluan, dia yang selalu
+// menang duluan dan payment return jadi ketutup (berakhir 404 karena Form dengan
+// slug "payment" tidak pernah ada).
 Route::post('/quiz/payment/init', [FormPaymentController::class, 'init'])->name('frontend.payment.init');
 Route::post('/quiz/payment/duitku/select-method', [FormPaymentController::class, 'selectDuitkuMethod'])->name('frontend.payment.duitku.select-method');
 Route::get('/quiz/payment/{orderId}/status', [FormPaymentController::class, 'status'])->name('frontend.payment.status');
 Route::get('/quiz/payment/return', [FormPaymentController::class, 'return'])->name('frontend.payment.return');
+
+Route::get('/quiz/{branchSlug}/{boothSlug}', [FrontendController::class, 'formWizardBySlug'])->name('frontend.form.wizard.slug');
 
 Route::get('/handbook', [FrontendController::class, 'handbook'])->name('frontend.handbook');
 Route::get('/handbook/{id}/download', [FrontendController::class, 'handbookDownload'])->name('frontend.handbook.download');
