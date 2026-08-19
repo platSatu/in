@@ -23,10 +23,15 @@
         </div>
     @endif
 
-    {{-- === RINGKASAN === --}}
-    <div class="row layout-top-spacing g-3 mb-1">
-        <div class="col-md-3 col-sm-6">
-            <div class="widget-content widget-content-area br-8 text-center py-3">
+    {{-- === RINGKASAN ===
+         Semua box dibuat tinggi sama rata (h-100 di kolom + di kartu, isinya
+         flex-column supaya angka & label center dan rapi walau panjang label
+         beda-beda), dengan overflow-y:auto + max-height sebagai jaga-jaga kalau
+         suatu saat labelnya jadi lebih panjang dari box-nya (scroll di dalam
+         box, bukan box-nya jadi lebih tinggi dan bikin baris lain miring). --}}
+    <div class="row layout-top-spacing g-3 mb-1 align-items-stretch">
+        <div class="col-md-3 col-sm-6 d-flex">
+            <div class="widget-content widget-content-area br-8 text-center py-3 w-100 h-100 d-flex flex-column justify-content-center align-items-center summary-box">
                 <div class="fs-4 fw-bold">{{ $submissions->count() }}</div>
                 <div class="text-muted small">Total Submission</div>
             </div>
@@ -41,20 +46,20 @@
                 $paidWithoutSubmission = $paidPayments->whereNull('form_submission_id')->count();
                 $submissionsWithoutPayment = $submissions->filter(fn ($s) => !$s->payment || $s->payment->status !== 'paid')->count();
             @endphp
-            <div class="col-md-3 col-sm-6">
-                <div class="widget-content widget-content-area br-8 text-center py-3">
+            <div class="col-md-3 col-sm-6 d-flex">
+                <div class="widget-content widget-content-area br-8 text-center py-3 w-100 h-100 d-flex flex-column justify-content-center align-items-center summary-box">
                     <div class="fs-4 fw-bold">Rp {{ number_format((float) $totalPaidAmount, 0, ',', '.') }}</div>
                     <div class="text-muted small">Total Terkumpul ({{ $paidPayments->count() }} transaksi paid)</div>
                 </div>
             </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="widget-content widget-content-area br-8 text-center py-3">
+            <div class="col-md-3 col-sm-6 d-flex">
+                <div class="widget-content widget-content-area br-8 text-center py-3 w-100 h-100 d-flex flex-column justify-content-center align-items-center summary-box">
                     <div class="fs-4 fw-bold">{{ $pendingCount }} / {{ $failedOrExpiredCount }}</div>
                     <div class="text-muted small">Pending / Gagal-Kadaluarsa</div>
                 </div>
             </div>
-            <div class="col-md-3 col-sm-6">
-                <div class="widget-content widget-content-area br-8 text-center py-3">
+            <div class="col-md-3 col-sm-6 d-flex">
+                <div class="widget-content widget-content-area br-8 text-center py-3 w-100 h-100 d-flex flex-column justify-content-center align-items-center summary-box">
                     <div class="fs-4 fw-bold {{ ($paidWithoutSubmission + $submissionsWithoutPayment) > 0 ? 'text-danger' : '' }}">
                         {{ $paidWithoutSubmission + $submissionsWithoutPayment }}
                     </div>
@@ -62,8 +67,8 @@
                 </div>
             </div>
         @else
-            <div class="col-md-9 col-sm-6">
-                <div class="widget-content widget-content-area br-8 text-center py-3 d-flex align-items-center justify-content-center">
+            <div class="col-md-9 col-sm-6 d-flex">
+                <div class="widget-content widget-content-area br-8 text-center py-3 w-100 h-100 d-flex align-items-center justify-content-center summary-box">
                     <span class="text-muted">Form ini gratis (tidak butuh pembayaran).</span>
                 </div>
             </div>
@@ -229,5 +234,18 @@
     @endif
 
 </div>
+
+<style>
+    /* Box ringkasan di atas: tinggi disamakan lewat h-100 + flexbox di HTML-nya.
+       min-height jaga supaya tetap terlihat rapi walau isinya pendek, max-height
+       + overflow-y:auto jaga-jaga kalau labelnya ternyata jadi lebih panjang dari
+       biasanya (scroll di dalam box itu sendiri, bukan bikin box jadi lebih
+       tinggi dan bikin box lain di baris yang sama jadi tidak sejajar). */
+    .summary-box {
+        min-height: 96px;
+        max-height: 130px;
+        overflow-y: auto;
+    }
+</style>
 
 @endsection

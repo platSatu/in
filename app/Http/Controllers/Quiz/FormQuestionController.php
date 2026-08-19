@@ -18,6 +18,7 @@ class FormQuestionController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search');
+        $formId = $request->query('form_id');
 
         $userId = Auth::id();
         if ($userId === null) {
@@ -28,6 +29,18 @@ class FormQuestionController extends Controller
             ->with('form')
             ->where('user_id', (string) $userId);
 
+        // Dipanggil dari tombol "Show Questions" di quiz/form/index.blade.php ->
+        // langsung terfilter cuma soal milik form itu saja.
+        $filterForm = null;
+
+        if (!empty($formId)) {
+            $filterForm = Form::where('id', $formId)
+                ->where('user_id', (string) $userId)
+                ->first();
+
+            $query->where('form_id', $formId);
+        }
+
         if (!empty($search)) {
             $query->where(function ($q) use ($search) {
                 $q->orWhere('question_text', 'like', "%{$search}%")
@@ -36,15 +49,24 @@ class FormQuestionController extends Controller
             });
         }
 
-        // Diurutkan per form (bukan per created_at) supaya soal dari form yang sama
-        // selalu bersebelahan — nama form di tabel jadi bisa ditampilkan sekali saja.
+        // Tetap dikelompokkan per form (bukan flat by created_at) supaya soal dari
+        // form yang sama selalu bersebelahan — nama form di tabel jadi bisa
+        // ditampilkan sekali saja (lihat pengecekan $item->form_id !== $lastFormId
+        // di quiz/form-question/index.blade.php). Kalau sudah terfilter form_id
+        // (cuma 1 form), pengelompokan ini otomatis tidak relevan lagi tapi tetap
+        // aman dipakai.
+        //
+        // Urutan antar-grup & di dalam grup sama-sama "terbaru dulu": grup form
+        // diurutkan dari form yang punya soal PALING BARU dibuat, dan di dalam
+        // satu grup soal yang paling baru diinput tampil paling atas (bukan lagi
+        // ikut urutan tampil placement test / kolom "order").
         $data = $query
-            ->orderBy('form_id')
-            ->orderBy('order')
+            ->orderByRaw('(select max(fq2.created_at) from form_questions as fq2 where fq2.form_id = form_questions.form_id) desc')
+            ->orderBy('created_at', 'desc')
             ->paginate(10)
             ->withQueryString();
 
-        return view('quiz.form-question.index', compact('data'));
+        return view('quiz.form-question.index', compact('data', 'filterForm'));
     }
 
     public function create(Request $request)

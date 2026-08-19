@@ -3,8 +3,15 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3 text-end">
-        <a href="{{ route('quiz.form-question.create') }}" class="btn btn-primary">+ Add Question</a>
+    <div class="page-meta mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            @if ($filterForm)
+                <h5 class="mb-0">Pertanyaan untuk form: {{ $filterForm->name }}</h5>
+                <a href="{{ route('quiz.form-question.index') }}" class="small">&larr; Lihat semua pertanyaan (semua form)</a>
+            @endif
+        </div>
+        <a href="{{ route('quiz.form-question.create', $filterForm ? ['form_id' => $filterForm->id] : []) }}"
+            class="btn btn-primary">+ Add Question</a>
     </div>
 
     @if (session('success'))
@@ -20,6 +27,9 @@
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('quiz.form-question.index') }}" class="row g-2">
+                        @if ($filterForm)
+                            <input type="hidden" name="form_id" value="{{ $filterForm->id }}">
+                        @endif
                         <div class="col-md-10">
                             <input type="text" name="search" class="form-control"
                                 placeholder="Search question/type/status..." value="{{ request('search') }}">

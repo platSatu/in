@@ -119,6 +119,9 @@
                                             <a href="{{ route('quiz.form-question.create', ['form_id' => $form->id]) }}"
                                                 class="btn btn-sm btn-outline-success text-nowrap">+ Add Questions</a>
 
+                                            <a href="{{ route('quiz.form-question.index', ['form_id' => $form->id]) }}"
+                                                class="btn btn-sm btn-outline-secondary text-nowrap">Show Questions</a>
+
                                             <a href="{{ ($form->slug && $form->booth_slug)
                                                     ? route('frontend.form.wizard.slug', ['branchSlug' => $form->slug, 'boothSlug' => $form->booth_slug])
                                                     : route('frontend.form.wizard', ['form_id' => $form->id]) }}"
