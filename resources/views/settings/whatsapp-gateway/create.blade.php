@@ -22,8 +22,8 @@
                                 @endforeach
                             </select>
                             <div class="form-text">
-                                Baru ada 1 pilihan karena semua provider yang didukung sekarang pakai prosedur
-                                pengiriman yang sama (API Host + Token + Secret Key).
+                                Baru ada 1 pilihan karena provider yang didukung sekarang adalah Konexa/Teleios
+                                (backend WhatsApp gateway kita sendiri), lewat API Host + Token + Secret Key.
                             </div>
                             @error('gateway')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -45,10 +45,10 @@
                         <div class="col-sm-12">
                             <label for="api_host" class="mb-2">API Host</label>
                             <input type="url" class="form-control @error('api_host') is-invalid @enderror"
-                                id="api_host" name="api_host" placeholder="https://api.provider-anda.com" value="{{ old('api_host') }}">
+                                id="api_host" name="api_host" placeholder="https://domain-konexa-anda.com" value="{{ old('api_host') }}">
                             <div class="form-text">
-                                Alamat dasar API provider (tanpa path), contoh: <code>https://api.provider-anda.com</code>.
-                                Sistem akan memanggil <code>{api_host}/api/v2/send-message</code> untuk kirim pesan.
+                                Alamat dasar (domain) Konexa/Teleios Anda, tanpa path, contoh: <code>https://domain-konexa-anda.com</code>.
+                                Sistem akan memanggil <code>{api_host}/api/wa-api/v1/send-message</code> untuk kirim pesan.
                             </div>
                             @error('api_host')
                                 <div class="invalid-feedback">{{ $message }}</div>
@@ -60,7 +60,8 @@
                         <div class="col-sm-6">
                             <label for="token" class="mb-2">Token</label>
                             <input type="text" class="form-control @error('token') is-invalid @enderror"
-                                id="token" name="token" placeholder="Token dari provider" value="{{ old('token') }}">
+                                id="token" name="token" placeholder="Token dari halaman Device Konexa/Teleios" value="{{ old('token') }}">
+                            <div class="form-text">Dikirim sebagai header <code>X-WA-Token</code>.</div>
                             @error('token')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -69,8 +70,12 @@
                         <div class="col-sm-6">
                             <label for="secret_key" class="mb-2">Secret Key</label>
                             <input type="text" class="form-control @error('secret_key') is-invalid @enderror"
-                                id="secret_key" name="secret_key" placeholder="Secret key dari provider" value="{{ old('secret_key') }}">
-                            <div class="form-text">Token dan Secret Key digabung sebagai header Authorization (token.secret_key).</div>
+                                id="secret_key" name="secret_key" placeholder="Secret key dari halaman Device Konexa/Teleios" value="{{ old('secret_key') }}">
+                            <div class="form-text">
+                                Dikirim sebagai header <code>X-WA-Secret</code>. Token & Secret Key ini didapat dari
+                                halaman Device di dashboard Konexa/Teleios — klik "API Key" pada device yang ingin
+                                dipakai, lalu "Generate Token & Secret Key".
+                            </div>
                             @error('secret_key')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

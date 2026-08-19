@@ -34,9 +34,11 @@ class WhatsappGateway extends Model
 
     /**
      * Daftar pilihan gateway yang tersedia di dropdown. Baru ada 1 opsi karena
-     * semua provider yang didukung sekarang punya prosedur pengiriman yang sama
-     * (POST {api_host}/api/v2/send-message, header Authorization: token.secret_key).
-     * Tambah key baru di sini kalau nanti ada provider dengan prosedur berbeda.
+     * provider yang didukung sekarang adalah Konexa/Teleios (backend WhatsApp
+     * gateway kita sendiri): POST {api_host}/api/wa-api/v1/send-message, header
+     * X-WA-Token + X-WA-Secret (lihat App\Services\Whatsapp\WhatsappMessenger::
+     * sendViaGateway()). Tambah key baru di sini kalau nanti ada provider lain
+     * dengan prosedur berbeda.
      *
      * @return array<string, string>
      */

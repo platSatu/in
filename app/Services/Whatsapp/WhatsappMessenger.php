@@ -64,14 +64,12 @@ class WhatsappMessenger
 
     /**
      * Kirim pesan WhatsApp. Kredensial diambil dari gateway yang diaktifkan admin
-     * pemilik form ($userId) lewat menu Settings > WhatsApp Gateway. Kalau belum
-     * ada gateway yang diaktifkan untuk user itu, fallback ke kredensial lama di
-     * .env (WABLAS_TOKEN/WABLAS_SECRET) supaya form yang belum di-setting tetap
-     * jalan seperti sebelumnya.
-     *
-     * Prosedur pengiriman sengaja disamakan untuk semua provider (Wablas-compatible):
-     * POST {api_host}/api/v2/send-message, header Authorization: token.secret_key,
-     * body {"data":[{"phone":...,"message":...}]}.
+     * pemilik form ($userId) lewat menu Settings > WhatsApp Gateway — sekarang
+     * selalu mengarah ke Konexa/Teleios (satu-satunya provider yang didukung,
+     * lihat WhatsappGateway::gatewayOptions()), lewat sendViaGateway() di bawah.
+     * Kalau belum ada gateway yang diaktifkan untuk user itu, fallback ke
+     * sendViaLegacyFallback() (kredensial Wablas lama di .env) supaya form yang
+     * belum di-setting tetap jalan seperti sebelumnya.
      *
      * @return array|false
      */
@@ -95,30 +93,13 @@ class WhatsappMessenger
                     ->first()
                 : null;
 
-            if ($gateway) {
-                $apiHost = rtrim($gateway->api_host, '/');
-                $authorization = $gateway->token . '.' . $gateway->secret_key;
-            } else {
-                $apiHost = 'https://smg.wablas.com';
-                $authorization = env('WABLAS_TOKEN') . '.' . env('WABLAS_SECRET');
-            }
-
-            $response = Http::withHeaders([
-                'Authorization' => $authorization,
-                'Content-Type' => 'application/json',
-            ])->post($apiHost . '/api/v2/send-message', [
-                        'data' => [
-                            [
-                                'phone' => $phone,
-                                'message' => $message,
-                            ]
-                        ]
-                    ]);
+            $response = $gateway
+                ? $this->sendViaGateway($gateway, $phone, $message)
+                : $this->sendViaLegacyFallback($phone, $message);
 
             Log::info('WhatsApp Gateway Response - WhatsappMessenger', [
                 'phone' => $phone,
                 'gateway_id' => $gateway->id ?? null,
-                'api_host' => $apiHost,
                 'body' => $response->json(),
             ]);
 
@@ -131,5 +112,56 @@ class WhatsappMessenger
 
             return false;
         }
+    }
+
+    /**
+     * Kirim lewat gateway yang di-setting admin di Settings > WhatsApp Gateway.
+     * Kontrak API-nya format Konexa/Teleios (BUKAN lagi format Wablas):
+     *   POST {api_host}/api/wa-api/v1/send-message
+     *   Header: X-WA-Token, X-WA-Secret (dua header terpisah, bukan digabung
+     *   jadi satu "Authorization: token.secret_key" seperti Wablas)
+     *   Body: {"to": "<nomor atau JID>", "message": "<teks>"}
+     * — lihat App\Http\Controllers\Api\WaApiSendMessageController &
+     * App\Http\Middleware\VerifyWaApiKey di project Konexa/Teleios (backend WA
+     * gateway-nya). $gateway->token / $gateway->secret_key diisi admin dari
+     * pasangan token/secret yang digenerate di halaman Device Konexa/Teleios.
+     */
+    private function sendViaGateway(WhatsappGateway $gateway, string $phone, string $message)
+    {
+        $apiHost = rtrim($gateway->api_host, '/');
+
+        return Http::withHeaders([
+            'X-WA-Token' => $gateway->token,
+            'X-WA-Secret' => $gateway->secret_key,
+            'Content-Type' => 'application/json',
+        ])->post($apiHost . '/api/wa-api/v1/send-message', [
+            'to' => $phone,
+            'message' => $message,
+        ]);
+    }
+
+    /**
+     * Fallback lama (format Wablas, kredensial dari .env) — HANYA dipakai kalau
+     * form belum diasosiasikan ke user manapun ($userId null) atau user itu
+     * belum men-setting gateway apa pun di Settings > WhatsApp Gateway. Sengaja
+     * TIDAK diubah ke format Konexa/Teleios: ini jalur legacy independen dari
+     * WhatsappGateway model, tetap menembak host Wablas asli seperti sebelumnya
+     * supaya form lama yang masih mengandalkannya tidak putus.
+     */
+    private function sendViaLegacyFallback(string $phone, string $message)
+    {
+        $authorization = env('WABLAS_TOKEN') . '.' . env('WABLAS_SECRET');
+
+        return Http::withHeaders([
+            'Authorization' => $authorization,
+            'Content-Type' => 'application/json',
+        ])->post('https://smg.wablas.com/api/v2/send-message', [
+            'data' => [
+                [
+                    'phone' => $phone,
+                    'message' => $message,
+                ]
+            ]
+        ]);
     }
 }
