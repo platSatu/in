@@ -180,6 +180,12 @@
 
         .nested-questions-group {
             margin-top: 12px;
+            /* Jarak ke opsi/elemen berikutnya di bawahnya (mis. opsi "University
+               Students" setelah cabang "School Name"/"Grade" milik "School
+               Students") — tanpa ini, kartu cabang terakhir nempel langsung ke
+               opsi berikutnya karena margin-bottom bawaannya di-nolkan (lihat
+               aturan :last-child di bawah). */
+            margin-bottom: 16px;
         }
 
         .nested-questions-group .question-card {
