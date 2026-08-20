@@ -641,7 +641,25 @@
                             <select class="form-select" id="formSelect" onchange="selectForm()">
                                 <option value="">-- Select a Form --</option>
                                 @foreach($forms as $form)
-                                    <option value="{{ $form->id }}">{{ $form->name }}</option>
+                                    {{--
+                                        data-wizard-url: URL cantik per-booth (/quiz/{slug}/{booth_slug}),
+                                        dirender server-side lewat route() supaya JS tidak perlu tebak-tebak
+                                        pola URL-nya sendiri. FormController::store()/update() SELALU
+                                        mengisi slug & booth_slug untuk form yang dibuat/diupdate lewat form
+                                        itu, TAPI form lama (dibuat sebelum kolom ini ada, mis. via seeder
+                                        atau data lama) bisa saja masih null — route() akan melempar error
+                                        "Missing required parameters" kalau salah satu kosong, jadi di sini
+                                        di-generate cuma kalau dua-duanya benar terisi. Kalau kosong, atribut
+                                        ini sengaja tidak dirender sama sekali; JS di selectForm() di bawah
+                                        otomatis fallback ke URL lama (?form_id=...) untuk form ini.
+                                    --}}
+                                    <option value="{{ $form->id }}"
+                                        @if($form->slug && $form->booth_slug)
+                                            data-wizard-url="{{ route('frontend.form.wizard.slug', ['branchSlug' => $form->slug, 'boothSlug' => $form->booth_slug]) }}"
+                                        @endif
+                                    >
+                                        {{ $form->name }}
+                                    </option>
                                 @endforeach
                             </select>
                         </div>
@@ -1225,8 +1243,13 @@
         if (formSelect.value) {
             btnSelectForm.disabled = false;
             btnSelectForm.onclick = function() {
-                // Redirect to form wizard with selected form
-                window.location.href = '{{ route("frontend.form.wizard") }}?form_id=' + formSelect.value;
+                // Redirect ke URL cantik per-booth (/quiz/{slug}/{booth_slug}), bukan
+                // lagi ke ?form_id=... — supaya begitu dipilih dari daftar quiz, hasil
+                // klik-nya konsisten sama dengan URL yang dibagikan (mis. WA/QR code
+                // yang mengarah ke inagroup.asia/quiz/pluit/boothviii26).
+                const selectedOption = formSelect.options[formSelect.selectedIndex];
+                const wizardUrl = selectedOption ? selectedOption.getAttribute('data-wizard-url') : null;
+                window.location.href = wizardUrl || ('{{ route("frontend.form.wizard") }}?form_id=' + formSelect.value);
             };
         } else {
             btnSelectForm.disabled = true;

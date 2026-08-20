@@ -59,7 +59,16 @@ class StudentController extends Controller
             })
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->when($formId, fn ($query) => $query->where('form_id', $formId))
+            // Urutkan data masuk TERBARU di paling atas. `created_at` saja kadang
+            // punya beberapa baris dengan detik yang sama persis (mis. input
+            // berturut-turut cepat / data lama yang di-import sekaligus), dan untuk
+            // baris yang "seri" itu urutannya jadi tidak konsisten kalau cuma andalkan
+            // created_at. Student pakai HasUuids (Str::orderedUuid() bawaan Laravel),
+            // yang uuid-nya sendiri sudah time-sortable, jadi id dipakai sebagai
+            // tie-breaker kedua supaya urutannya selalu deterministik & tetap
+            // terbaru-di-atas walau created_at-nya kembar.
             ->latest('created_at')
+            ->orderBy('id', 'desc')
             ->paginate(10)
             ->withQueryString();
 
