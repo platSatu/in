@@ -183,6 +183,21 @@
     </div>
 </template>
 
+@php
+    // Disiapkan sebagai variabel PLAIN (bukan langsung expression array literal di
+    // dalam @json() di bawah) — @json() Blade meng-explode(',', ...) argumennya
+    // secara naif buat pisahin $value/$options/$depth, jadi kalau array literalnya
+    // (yang punya koma antar key 'id' => ...,  'label' => ...) ditulis langsung di
+    // dalam @json(...), argumennya ikut ke-split di tengah dan bikin ParseError
+    // "Unclosed '[' ... does not match ')'" di file blade hasil compile. Aman kalau
+    // @json() cuma dikasih 1 variabel polos tanpa koma seperti ini.
+    $parentOptionChoicesForJs = $parentOptionChoices->map(fn ($opt) => [
+        'id' => $opt->id,
+        'label' => \Illuminate\Support\Str::limit(optional($opt->question)->question_text ?: 'Pertanyaan', 40)
+            . ' → ' . ($opt->option_text ?: '[Gambar]'),
+    ])->values();
+@endphp
+
 <script>
     (function () {
         const container = document.getElementById('questionRowsContainer');
@@ -198,13 +213,7 @@
         // sejak render pertama — tidak perlu AJAX. Kalau belum (masuk dari menu utama
         // Quiz > Form Question > Add), array ini kosong dulu, baru terisi begitu admin
         // memilih Form di dropdown lewat fetchParentOptionChoices() di bawah.
-        let currentParentOptionChoices = @json(
-            $parentOptionChoices->map(fn ($opt) => [
-                'id' => $opt->id,
-                'label' => \Illuminate\Support\Str::limit(optional($opt->question)->question_text ?: 'Pertanyaan', 40)
-                    . ' → ' . ($opt->option_text ?: '[Gambar]'),
-            ])
-        );
+        let currentParentOptionChoices = @json($parentOptionChoicesForJs);
 
         function renderParentOptionSelect(selectEl, choices) {
             const previousValue = selectEl.value;
