@@ -27,9 +27,27 @@ return new class extends Migration
      * tabelnya sudah benar duluan saat migration itu (yang gagal & otomatis
      * di-rollback sebelumnya, jadi belum tercatat selesai di tabel migrations)
      * dicoba lagi oleh `php artisan migrate`.
+     *
+     * === GUARD (ditambahkan belakangan) ===
+     * 2026_08_21_090300_create_role_permission_table SUDAH diperbaiki
+     * langsung di file-nya (sekarang bikin primary key komposit sejak awal,
+     * TANPA kolom 'id' & TANPA index 'role_permission_unique') — jadi di
+     * database yang baru sama sekali (mis. instalasi/deploy baru, database
+     * fresh migrate), migration create_role_permission_table di atas sudah
+     * bikin tabelnya benar sejak awal, dan migration "fix" ini tidak ada lagi
+     * yang perlu diperbaiki. Tanpa guard ini, up() di bawah akan gagal dengan
+     * "Can't DROP INDEX role_permission_unique; check that it exists" karena
+     * mencoba men-drop kolom/index yang memang tidak pernah dibuat.
+     * Migration ini TETAP dipertahankan (bukan dihapus) supaya environment
+     * LAMA yang tabelnya masih dalam kondisi buggy (kolom 'id' + index
+     * role_permission_unique) tetap bisa diperbaiki seperti semula.
      */
     public function up(): void
     {
+        if (!Schema::hasColumn('role_permission', 'id')) {
+            return;
+        }
+
         Schema::table('role_permission', function (Blueprint $table) {
             $table->dropUnique('role_permission_unique');
             $table->dropColumn('id');
@@ -42,6 +60,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasColumn('role_permission', 'id')) {
+            return;
+        }
+
         Schema::table('role_permission', function (Blueprint $table) {
             $table->dropPrimary(['role_id', 'permission_id']);
         });
