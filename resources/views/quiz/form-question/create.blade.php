@@ -104,6 +104,7 @@
                     <option value="multiple_choice">Multiple Choice</option>
                     <option value="dropdown">Dropdown</option>
                     <option value="major">Major</option>
+                    <option value="file">File Upload (jpg/jpeg/png/pdf)</option>
                 </select>
             </div>
         </div>

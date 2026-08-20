@@ -485,8 +485,13 @@
         $hasLogo = !empty($university->logo) && file_exists(public_path($university->logo));
         $hasAttachment = !empty($university->attachment);
         $fields = ($profile && !empty($profile->field)) ? array_filter(array_map('trim', explode(',', $profile->field))) : [];
-        $degrees = ($profile && !empty($profile->degree)) ? array_filter(array_map('trim', explode(',', $profile->degree))) : [];
-        $intakes = ($profile && !empty($profile->intake)) ? array_filter(array_map('trim', explode(',', $profile->intake))) : [];
+        // Degree/Intake TIDAK lagi datang dari kolom $profile->degree/$profile->intake
+        // (kolom itu tidak ada lagi di tabel university_profiles) — sekarang diambil
+        // dari relasi $profile->degrees (tabel anak university_profile_degrees, bisa
+        // lebih dari satu baris, diisi admin lewat fitur "add row" di halaman create).
+        $degreeIntakeRows = $profile ? $profile->degrees : collect();
+        $degrees = $degreeIntakeRows->pluck('degree')->filter()->map('trim')->unique()->values()->all();
+        $intakes = $degreeIntakeRows->pluck('intake')->filter()->map('trim')->unique()->values()->all();
         $albumsWithPhotos = isset($albums) ? $albums->filter(fn($a) => $a->photos && $a->photos->count() > 0) : collect();
     @endphp
 

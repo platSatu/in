@@ -65,6 +65,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ClassSchedule;
 use App\Models\Form;
 use App\Models\FormAnswer;
 use App\Models\FormPayment;
@@ -81,15 +82,24 @@ use App\Models\UniversityProfile;
 use App\Models\UniversityAlbum;
 use App\Models\WhatsappGateway;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
 
 class FrontendController extends Controller
 {
+    /**
+     * Batas & jenis file yang diizinkan untuk jawaban pertanyaan tipe 'file'
+     * (lihat cabang $question->type === 'file' di saveQuestionAnswers()).
+     */
+    private const QUESTION_FILE_ALLOWED_MIMES = 'jpg,jpeg,png,pdf';
+    private const QUESTION_FILE_MAX_KB = 5120; // 5MB
+
     public function index()
     {
         return view('frontend.index');
@@ -193,8 +203,13 @@ class FrontendController extends Controller
     {
         $university = University::findOrFail($id);
 
+        // Eager-load 'degrees' (tabel anak university_profile_degrees) supaya
+        // section Degree/Intake di halaman ini bisa tampil — profile itu
+        // sendiri TIDAK punya kolom degree/intake lagi (lihat catatan di
+        // UniversityProfile::degrees()), datanya sepenuhnya di tabel anak ini.
         $profile = UniversityProfile::where('university_id', $id)
             ->where('status', 'active')
+            ->with('degrees')
             ->first(); // pakai first(), bukan firstOrFail()
 
         $albums = UniversityAlbum::where('university_id', $id)
@@ -702,6 +717,17 @@ class FrontendController extends Controller
             }
         }
 
+        // === PILIH KELAS LINK ===
+        // Hanya disiapkan di titik INI kalau result_mode='auto' — hasilnya sudah
+        // pasti diketahui saat ini juga (skor barusan dihitung di atas). Untuk
+        // result_mode='manual', hasilnya BELUM ada di titik ini (baru ada nanti
+        // waktu admin isi lewat FormController::saveResult(), yang punya logic
+        // pilih_kelas_link sendiri) — sesuai keputusan awal fitur ini: link
+        // "Pilih Kelas" baru muncul "setelah hasil placement test keluar".
+        $pilihKelasLink = ($isAutoResultForm && ClassSchedule::existsActiveForBranch($form->branch_id))
+            ? route('frontend.class-selection.show', ['submissionId' => $submission->id])
+            : '';
+
         // Kirim WhatsApp HANYA kalau admin mengaktifkan "use_whatsapp_notification" di
         // form ini (lihat toggle di quiz/form/create & edit). Sebelum ini ditambahkan,
         // WA selalu terkirim ke SEMUA form tanpa terkecuali — sekarang jadi opsional
@@ -714,6 +740,7 @@ class FrontendController extends Controller
                 'universitas_major' => $universitasMajorMessage,
                 'callback_link' => $callbackLink ?? '',
                 'hasil' => $hasilMessage,
+                'pilih_kelas_link' => $pilihKelasLink,
             ]);
 
             Log::info('[FORM-WIZARD] Sebelum kirim WhatsApp', ['handphone' => $student->handphone]);
@@ -1052,14 +1079,23 @@ class FrontendController extends Controller
                 foreach ($optionIds as $optionId) {
                     $option = FormQuestionOption::find($optionId);
                     if ($option) {
-                        $selectedOptions[] = $option->option_text ?: '[Gambar]';
+                        // Opsi "Lainnya" (is_other): teks bebas yang diketik peserta datang
+                        // dari input terpisah question_{id}_other_text (lihat
+                        // frontend/partials/question-card.blade.php), disimpan ke
+                        // answer_text supaya jawabannya tidak hilang.
+                        $otherText = $option->is_other
+                            ? trim((string) $request->input($questionKey . '_other_text', ''))
+                            : null;
+                        $hasOtherText = $otherText !== null && $otherText !== '';
+
+                        $selectedOptions[] = $hasOtherText ? $otherText : ($option->option_text ?: '[Gambar]');
 
                         FormAnswer::create([
                             'user_id' => $student->id,
                             'submission_id' => $submission->id,
                             'question_id' => $question->id,
                             'option_id' => $optionId,
-                            'answer_text' => null,
+                            'answer_text' => $hasOtherText ? $otherText : null,
                             'status' => 'active',
                         ]);
 
@@ -1087,6 +1123,43 @@ class FrontendController extends Controller
 
                     $selectedMajorIds[] = $majorId;
                 }
+            } elseif ($question->type === 'file') {
+                // Upload jawaban (dokumen pendukung, dsb). Nama field-nya dinamis per
+                // pertanyaan (question_{id}) sama seperti tipe lain di loop ini, jadi
+                // divalidasi manual di sini — bukan lewat $request->validate() di awal
+                // formWizardSubmit() yang cuma menangani field tetap (name/email/dst).
+                // File yang tidak lolos (jenis/ukuran) diperlakukan seperti "belum
+                // dijawab" (tidak disimpan) — konsisten dengan tipe lain di loop ini
+                // yang memang tidak pernah menegakkan "required" di server, hanya di JS.
+                $uploadedFile = $request->file($questionKey);
+                $answerValue = '-';
+
+                if ($uploadedFile) {
+                    $fileValidator = Validator::make(
+                        [$questionKey => $uploadedFile],
+                        [$questionKey => 'file|mimes:' . self::QUESTION_FILE_ALLOWED_MIMES . '|max:' . self::QUESTION_FILE_MAX_KB]
+                    );
+
+                    if ($fileValidator->passes()) {
+                        $storedPath = $this->storeQuestionAnswerFile($uploadedFile);
+                        $answerValue = '[File: ' . $uploadedFile->getClientOriginalName() . ']';
+
+                        FormAnswer::create([
+                            'user_id' => $student->id,
+                            'submission_id' => $submission->id,
+                            'question_id' => $question->id,
+                            'option_id' => null,
+                            'answer_text' => $storedPath,
+                            'status' => 'active',
+                        ]);
+                    } else {
+                        Log::warning('[FORM-WIZARD] File jawaban ditolak (jenis/ukuran tidak valid)', [
+                            'question_id' => $question->id,
+                            'original_name' => $uploadedFile->getClientOriginalName(),
+                            'errors' => $fileValidator->errors()->all(),
+                        ]);
+                    }
+                }
             }
 
             $answersSummary[] = "{$questionNumber}. {$question->question_text}\n   Jawaban: {$answerValue}";
@@ -1098,6 +1171,25 @@ class FrontendController extends Controller
             'autoScore' => $autoScore,
             'selectedMajorIds' => $selectedMajorIds,
         ];
+    }
+
+    /**
+     * Simpan file jawaban pertanyaan tipe 'file' ke public/quiz/file-upload,
+     * kembalikan path relatifnya — pola yang sama dengan storeUniversityFile()
+     * di UniversityController / storeFormFile() di FormController.
+     */
+    private function storeQuestionAnswerFile(UploadedFile $file): string
+    {
+        $destination = public_path('quiz/file-upload');
+
+        if (!file_exists($destination)) {
+            mkdir($destination, 0755, true);
+        }
+
+        $filename = Str::uuid() . '.' . strtolower($file->getClientOriginalExtension());
+        $file->move($destination, $filename);
+
+        return 'quiz/file-upload/' . $filename;
     }
 
     /**

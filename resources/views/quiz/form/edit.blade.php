@@ -3,7 +3,7 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <form action="{{ route('quiz.form.update', $data->id) }}" method="POST">
+    <form action="{{ route('quiz.form.update', $data->id) }}" method="POST" enctype="multipart/form-data">
         @csrf
         @method('PUT')
 
@@ -262,6 +262,55 @@
                             <textarea class="form-control @error('description') is-invalid @enderror" id="description" name="description" rows="4"
                                 placeholder="Form Description">{{ old('description', $data->description) }}</textarea>
                             @error('description')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <label for="pre_test_notice" class="mb-2">Catatan Sebelum Test/Pembayaran (Optional)</label>
+                            <textarea class="form-control @error('pre_test_notice') is-invalid @enderror" id="pre_test_notice" name="pre_test_notice" rows="6"
+                                placeholder="Contoh: tata tertib, syarat, atau pengumuman sebelum peserta mulai mengisi form">{{ old('pre_test_notice', $data->pre_test_notice) }}</textarea>
+                            <div class="form-text">Boleh dikosongkan — kalau diisi, peserta akan melihat 1 halaman catatan ini sebelum lanjut ke pembayaran/pertanyaan.</div>
+                            @error('pre_test_notice')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <label for="background_image" class="mb-2">Background Image (Optional)</label>
+
+                            @if($data->background_image)
+                                <div class="mb-2">
+                                    <img src="{{ asset($data->background_image) }}" alt="Background Image" style="max-width: 160px; border-radius: 8px;">
+                                </div>
+                            @endif
+
+                            <input type="file" accept="image/*"
+                                class="form-control @error('background_image') is-invalid @enderror"
+                                id="background_image" name="background_image">
+                            <div class="form-text">Kosongkan kalau tidak ingin mengganti. Boleh dikosongkan sejak awal — kalau tidak pernah diisi, halaman quiz memakai background default.</div>
+                            @error('background_image')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-sm-6">
+                            <label for="logo" class="mb-2">Logo (Optional)</label>
+
+                            @if($data->logo)
+                                <div class="mb-2">
+                                    <img src="{{ asset($data->logo) }}" alt="Logo" style="max-width: 120px; border-radius: 8px;">
+                                </div>
+                            @endif
+
+                            <input type="file" accept="image/*"
+                                class="form-control @error('logo') is-invalid @enderror"
+                                id="logo" name="logo">
+                            <div class="form-text">Kosongkan kalau tidak ingin mengganti. Boleh dikosongkan sejak awal — kalau tidak pernah diisi, halaman quiz memakai logo default. Favicon browser tidak ikut berubah.</div>
+                            @error('logo')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>

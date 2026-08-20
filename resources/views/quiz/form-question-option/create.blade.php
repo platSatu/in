@@ -113,6 +113,22 @@
             </div>
         </div>
 
+        <div class="row g-3 mt-1">
+            <div class="col-md-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="__NAME__[is_other]" value="1">
+                    <label class="form-check-label small">
+                        Jadikan opsi "Lainnya" (isian bebas)
+                    </label>
+                </div>
+                <div class="form-text">
+                    Khusus pertanyaan tipe Multiple Choice — begitu opsi ini dicentang peserta, muncul kolom teks
+                    tambahan supaya mereka bisa isi jawaban sendiri. Isi Option Text di atas dengan label singkat,
+                    mis. "Lainnya".
+                </div>
+            </div>
+        </div>
+
         <div class="form-text mt-2">
             Score dipakai kalau form ini mengaktifkan Mode Hasil "Otomatis" — skor opsi yang dipilih peserta akan
             dijumlahkan jadi hasil akhir. Kosongkan/biarkan 0 kalau opsi ini tidak berkontribusi ke skor.

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Quiz;
 
 use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
+use App\Models\ClassSchedule;
 use App\Models\CompanyBranch;
 use App\Models\Form;
 use App\Models\FormPayment;
@@ -169,10 +170,20 @@ class FormController extends Controller
             if ($claimed === 1) {
                 $messenger = new WhatsappMessenger();
 
+                // === PILIH KELAS LINK ===
+                // result_mode='manual' -> titik INI (bukan submission awal) yang
+                // jadi saat hasil "keluar", jadi link "Pilih Kelas" disiapkan di
+                // sini. Sama pola & alasannya dengan mode auto di
+                // FrontendController::finalizeCompletedSubmission().
+                $pilihKelasLink = ClassSchedule::existsActiveForBranch($form->branch_id)
+                    ? route('frontend.class-selection.show', ['submissionId' => $submission->id])
+                    : '';
+
                 $message = $messenger->buildMessageFromTemplate($form, [
                     'name' => trim($submission->student->first_name . ' ' . $submission->student->last_name),
                     'form_name' => $form->name,
                     'hasil' => $validated['summary_text'],
+                    'pilih_kelas_link' => $pilihKelasLink,
                 ]);
 
                 $messenger->send($submission->student->handphone, $message, $form->user_id);
@@ -210,6 +221,9 @@ class FormController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'pre_test_notice' => 'nullable|string',
+            'background_image' => 'nullable|image|max:4096',
+            'logo' => 'nullable|image|max:2048',
             'use_whatsapp_notification' => 'nullable|boolean',
             'whatsapp_template_id' => 'nullable|string|required_if:use_whatsapp_notification,1|exists:whatsapp_templates,id',
             'branch_id' => 'required|exists:company_branch,id',
@@ -263,11 +277,65 @@ class FormController extends Controller
         $validated['slug'] = $branchSlug;
         $validated['booth_slug'] = $this->generateUniqueBoothSlug($branchSlug, $validated['no_booth']);
 
+        // Background image & logo opsional. Beda dengan logo/banner di tabel
+        // `universities` (NOT NULL tanpa default), kolom ini NULLABLE dengan
+        // default NULL — jadi kalau tidak diupload cukup dibiarkan tidak ada
+        // di $validated (tidak perlu di-default-kan ke string kosong). Kalau
+        // NULL, halaman quiz publik otomatis pakai background/logo default
+        // (lihat frontend/form-wizard.blade.php).
+        if ($request->hasFile('background_image')) {
+            $validated['background_image'] = $this->storeFormFile($request->file('background_image'), 'background');
+        } else {
+            unset($validated['background_image']);
+        }
+
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $this->storeFormFile($request->file('logo'), 'logo');
+        } else {
+            unset($validated['logo']);
+        }
+
         AdminCrud::create(Form::class, $validated);
 
         return redirect()
             ->route('quiz.form.index')
             ->with('success', 'Form berhasil dibuat.');
+    }
+
+    /**
+     * Simpan file (background_image/logo) ke public/form/{folder}, kembalikan
+     * path relatifnya. Sama polanya dengan storeUniversityFile() di
+     * UniversityController.
+     */
+    private function storeFormFile($file, string $folder): string
+    {
+        $destination = public_path('form/' . $folder);
+
+        if (!file_exists($destination)) {
+            mkdir($destination, 0755, true);
+        }
+
+        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
+        $file->move($destination, $filename);
+
+        return 'form/' . $folder . '/' . $filename;
+    }
+
+    /**
+     * Hapus file lama (background_image/logo) dari public/form/{folder}, kalau
+     * ada — dipanggil dari update() waktu admin upload file baru pengganti.
+     */
+    private function deleteFormFile(?string $relativePath): void
+    {
+        if (!$relativePath) {
+            return;
+        }
+
+        $fullPath = public_path($relativePath);
+
+        if (file_exists($fullPath)) {
+            @unlink($fullPath);
+        }
     }
 
     public function edit(string $id)
@@ -311,6 +379,9 @@ class FormController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'pre_test_notice' => 'nullable|string',
+            'background_image' => 'nullable|image|max:4096',
+            'logo' => 'nullable|image|max:2048',
             'use_whatsapp_notification' => 'nullable|boolean',
             'whatsapp_template_id' => 'nullable|string|required_if:use_whatsapp_notification,1|exists:whatsapp_templates,id',
             'branch_id' => 'required|exists:company_branch,id',
@@ -362,6 +433,25 @@ class FormController extends Controller
         ) {
             $validated['slug'] = $newBranchSlug;
             $validated['booth_slug'] = $this->generateUniqueBoothSlug($newBranchSlug, $validated['no_booth'], $existing->id);
+        }
+
+        // Ganti background/logo hanya kalau admin upload file baru (file lama
+        // dihapus dari disk supaya tidak menumpuk). Kalau tidak upload apa-apa,
+        // key-nya dibuang dari $validated supaya AdminCrud::update() tidak
+        // menimpa nilai lama dengan null — background/logo yang sudah ada
+        // (atau memang belum pernah diisi) tetap seperti semula.
+        if ($request->hasFile('background_image')) {
+            $validated['background_image'] = $this->storeFormFile($request->file('background_image'), 'background');
+            $this->deleteFormFile($existing->background_image);
+        } else {
+            unset($validated['background_image']);
+        }
+
+        if ($request->hasFile('logo')) {
+            $validated['logo'] = $this->storeFormFile($request->file('logo'), 'logo');
+            $this->deleteFormFile($existing->logo);
+        } else {
+            unset($validated['logo']);
         }
 
         AdminCrud::update(Form::class, $id, $validated, (string) $userId);

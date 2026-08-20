@@ -19,10 +19,12 @@ class University extends Model
 
     protected $fillable = [
         'user_id',
+        'major_id',
         'name',
         'country',
         'city',
         'description',
+        'status',
         'logo',
         'banner',
         'attachment',
@@ -38,11 +40,34 @@ class University extends Model
 
     public function city()
     {
-        return $this->belongsTo(City::class , 'city');
+        return $this->belongsTo(City::class, 'city');
     }
 
-    // public function city()
-    // {
-    //     return $this->belongsTo(City::class, 'city');
-    // }
+    /**
+     * Relasi ke Major (opsional — university bisa ditambahkan langsung dari
+     * index Major, tapi field ini tidak wajib supaya university lama/berdiri
+     * sendiri tetap valid).
+     */
+    public function major()
+    {
+        return $this->belongsTo(Major::class, 'major_id');
+    }
+
+    /**
+     * Relasi ke UniversityAlbum, dipakai di halaman detail (show) untuk
+     * menampilkan seluruh foto kampus (album -> photos).
+     */
+    public function albums()
+    {
+        return $this->hasMany(UniversityAlbum::class, 'university_id');
+    }
+
+    /**
+     * Relasi ke UniversityProfile, dipakai di halaman detail (show) untuk
+     * menampilkan field/budget/bahasa/beasiswa yang sudah diisi.
+     */
+    public function profiles()
+    {
+        return $this->hasMany(UniversityProfile::class, 'university_id');
+    }
 }

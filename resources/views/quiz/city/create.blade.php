@@ -14,6 +14,38 @@
 
             @csrf
 
+            @php
+                $lockedCountryId = old('country_id', $selectedCountryId ?? null);
+                $lockedCountry = $lockedCountryId ? $countries->firstWhere('id', $lockedCountryId) : null;
+            @endphp
+
+            <div class="mb-3">
+                <label for="country_id" class="form-label">Country</label>
+
+                @if($lockedCountry && !$errors->has('country_id'))
+                    <input type="text" class="form-control" value="{{ $lockedCountry->name }}" disabled readonly>
+                    <input type="hidden" name="country_id" value="{{ $lockedCountry->id }}">
+                    <div class="form-text">
+                        City ini akan dikaitkan ke country di atas.
+                        <a href="{{ route('city.create') }}">Ganti country</a>
+                    </div>
+                @else
+                    <select class="form-select @error('country_id') is-invalid @enderror" id="country_id" name="country_id">
+                        <option value="">Choose... (opsional)</option>
+                        @foreach($countries as $country)
+                            <option value="{{ $country->id }}" {{ $lockedCountryId == $country->id ? 'selected' : '' }}>
+                                {{ $country->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('country_id')
+                        <div class="invalid-feedback">
+                            {{ $message }}
+                        </div>
+                    @enderror
+                @endif
+            </div>
+
             <div class="mb-3">
                 <label class="form-label">City Name</label>
 

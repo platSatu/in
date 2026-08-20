@@ -14,6 +14,38 @@
 
             @csrf
 
+            @php
+                $lockedCityId = old('city_id', $selectedCityId ?? null);
+                $lockedCity = $lockedCityId ? $cities->firstWhere('id', $lockedCityId) : null;
+            @endphp
+
+            <div class="mb-3">
+                <label for="city_id" class="form-label">City</label>
+
+                @if($lockedCity && !$errors->has('city_id'))
+                    <input type="text" class="form-control" value="{{ $lockedCity->name }}" disabled readonly>
+                    <input type="hidden" name="city_id" value="{{ $lockedCity->id }}">
+                    <div class="form-text">
+                        Major ini akan dikaitkan ke city di atas.
+                        <a href="{{ route('quiz.major.create') }}">Ganti city</a>
+                    </div>
+                @else
+                    <select class="form-select @error('city_id') is-invalid @enderror" id="city_id" name="city_id">
+                        <option value="">Choose... (opsional)</option>
+                        @foreach($cities as $city)
+                            <option value="{{ $city->id }}" {{ $lockedCityId == $city->id ? 'selected' : '' }}>
+                                {{ $city->name }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('city_id')
+                        <div class="invalid-feedback">
+                            {{ $message }}
+                        </div>
+                    @enderror
+                @endif
+            </div>
+
             <div class="mb-3">
                 <label class="form-label">Major Name</label>
 

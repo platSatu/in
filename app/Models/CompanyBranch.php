@@ -60,4 +60,14 @@ class CompanyBranch extends Model
     {
         return $this->hasMany(Form::class, 'branch_id');
     }
+
+    /**
+     * Relasi ke jadwal kelas kursus milik branch ini (menu Quiz > Class
+     * Schedule) — dipakai peserta setelah hasil placement test keluar untuk
+     * memilih kelas, lihat App\Models\ClassSchedule.
+     */
+    public function classSchedules()
+    {
+        return $this->hasMany(ClassSchedule::class, 'branch_id');
+    }
 }

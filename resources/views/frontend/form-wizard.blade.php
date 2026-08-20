@@ -49,9 +49,23 @@
             --brand-light: #fde3e3;
         }
 
+        @php
+            // Background & logo per-Form (opsional, nullable). Kalau form yang
+            // sedang dibuka (selectedForm) punya background_image/logo sendiri
+            // dan filenya benar ada di disk, dipakai; kalau tidak (termasuk saat
+            // belum ada form yang dipilih -> halaman pilih form), fallback ke
+            // default lama. Favicon (lihat <link rel="icon"> di atas) SENGAJA
+            // tidak ikut berubah di sini, tetap Logo.png terus.
+            $wizardBackground = (isset($selectedForm) && $selectedForm && $selectedForm->background_image && file_exists(public_path($selectedForm->background_image)))
+                ? asset($selectedForm->background_image)
+                : asset('image/bg_quiz.jpeg');
+            $wizardLogo = (isset($selectedForm) && $selectedForm && $selectedForm->logo && file_exists(public_path($selectedForm->logo)))
+                ? asset($selectedForm->logo)
+                : asset('frontend/img/Logo.png');
+        @endphp
         body {
             background-color: #f5f7fb;
-            background-image: url('{{ asset('image/bg_quiz.jpeg') }}');
+            background-image: url('{{ $wizardBackground }}');
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -497,7 +511,7 @@
 <body>
 
 <div class="brand-header">
-    <img src="{{ asset('frontend/img/Logo.png') }}" alt="InaStudy Logo">
+    <img src="{{ $wizardLogo }}" alt="InaStudy Logo">
     <div class="brand-name">InaStudy · China Education Consultant</div>
 </div>
 
@@ -548,7 +562,7 @@
                Step <strong id="currentStep">1</strong> of <strong id="totalSteps">3</strong>
             </div>
 
-            <form action="{{ route('frontend.form.wizard.submit') }}" method="POST" id="wizardForm">
+            <form action="{{ route('frontend.form.wizard.submit') }}" method="POST" id="wizardForm" enctype="multipart/form-data">
                 @csrf
 
                 <input type="hidden" name="form_id" value="{{ $selectedForm->id ?? '' }}">
@@ -636,6 +650,29 @@
                         @endif
 
                         <div class="d-flex justify-content-between">
+                            <button type="button" class="btn btn-outline-brand" onclick="prevStep()">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </button>
+                            <button type="button" class="btn btn-brand" onclick="nextStep()">
+                                Next <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+
+                    </div>
+                @endif
+
+                {{-- STEP: Catatan (opsional per-Form, hanya ada kalau pre_test_notice diisi
+                     admin) — selalu ditaruh setelah Data Pribadi/Info dan sebelum
+                     Payment/Questions, lihat perhitungan stepOrder di bawah. --}}
+                @if($selectedForm && filled($selectedForm->pre_test_notice))
+                    <div class="step" id="step-notice">
+
+                        {{-- nl2br() sudah menyisipkan <br> literal untuk tiap baris baru,
+                             jadi TIDAK pakai white-space:pre-line di sini (kalau dipakai
+                             bareng nl2br, baris barunya bakal dobel). --}}
+                        <div class="pre-test-notice">{!! nl2br(e($selectedForm->pre_test_notice)) !!}</div>
+
+                        <div class="d-flex justify-content-between mt-4">
                             <button type="button" class="btn btn-outline-brand" onclick="prevStep()">
                                 <i class="bi bi-arrow-left"></i> Back
                             </button>
@@ -746,6 +783,11 @@
     const paymentPosition = @json($selectedForm->payment_position ?? 'before_questions');
     const hasPersonalDataStage = {{ $selectedForm && $selectedForm->has_personal_data_stage ? 'true' : 'false' }};
 
+    // True kalau form ini mengisi "Catatan Sebelum Test/Pembayaran" (opsional,
+    // per-Form) — kalau true, 1 step tambahan ("step-notice") disisipkan ke
+    // stepOrder di bawah. Kalau kosong, step ini otomatis di-skip sepenuhnya.
+    const hasPreTestNotice = {{ $selectedForm && filled($selectedForm->pre_test_notice) ? 'true' : 'false' }};
+
     // True kalau redirect balik ke halaman ini itu HASIL dari submit akhir yang
     // gagal validasi server (misalnya name/email/handphone kosong/tidak valid).
     // Dulu tidak dicek sama sekali -> begitu ?order_id= masih ada di URL, JS di
@@ -768,6 +810,16 @@
                 ? ['step-info', 'step-questions', 'step-payment', 'step-review']
                 : ['step-info', 'step-payment', 'step-questions', 'step-review'])
             : ['step-info', 'step-questions', 'step-review']);
+
+    // Step "Catatan" (kalau diisi admin) selalu disisipkan tepat setelah Data
+    // Pribadi (atau setelah Info kalau form tidak punya step Data Pribadi),
+    // dan selalu sebelum Payment/Questions — apapun pengaturan
+    // requires_payment/payment_position form ini (sesuai alur yang sudah
+    // disepakati, lihat migration add_pre_test_notice_to_forms_table).
+    if (hasPreTestNotice) {
+        const insertAfter = hasPersonalDataStage ? 'step-personal-data' : 'step-info';
+        stepOrder.splice(stepOrder.indexOf(insertAfter) + 1, 0, 'step-notice');
+    }
 
     let currentStepIndex = 0;
     let paymentInitiated = false;
@@ -824,7 +876,23 @@
 
         const checkboxes = card.querySelectorAll('input[type="checkbox"]');
         if (checkboxes.length) {
-            return Array.from(checkboxes).some(function (cb) { return cb.checked; });
+            if (!Array.from(checkboxes).some(function (cb) { return cb.checked; })) {
+                return false;
+            }
+
+            // Kalau opsi "Lainnya" yang dicentang, isian bebasnya juga wajib diisi —
+            // jawaban "Lainnya" tanpa teks dianggap belum benar-benar terjawab.
+            const checkedOther = card.querySelectorAll('input.option-other-checkbox:checked');
+            for (let i = 0; i < checkedOther.length; i++) {
+                const otherInput = card.querySelector(
+                    '.other-text-input[data-for-option="' + checkedOther[i].value + '"]'
+                );
+                if (otherInput && otherInput.value.trim() === '') {
+                    return false;
+                }
+            }
+
+            return true;
         }
 
         const select = card.querySelector('select');
@@ -835,6 +903,11 @@
         const textInput = card.querySelector('input[type="text"], input[type="number"], input[type="date"], textarea');
         if (textInput) {
             return textInput.value.trim() !== '';
+        }
+
+        const fileInput = card.querySelector('input[type="file"]');
+        if (fileInput) {
+            return fileInput.files && fileInput.files.length > 0;
         }
 
         return true;
@@ -1000,6 +1073,24 @@
         const checkbox = element.querySelector('input[type="checkbox"]');
         checkbox.checked = element.classList.contains('selected');
 
+        // Opsi "Lainnya" (is_other, lihat frontend/partials/question-card.blade.php):
+        // kolom isian bebasnya ada sebagai sibling di luar `element`, ditampilkan
+        // hanya selama checkbox-nya dicentang. Dikosongkan lagi begitu dicentang-off
+        // supaya tidak ada teks lama yang nyangkut ikut terkirim.
+        if (checkbox.classList.contains('option-other-checkbox')) {
+            const otherInput = element.parentElement.querySelector(
+                '.other-text-input[data-for-option="' + checkbox.value + '"]'
+            );
+            if (otherInput) {
+                otherInput.classList.toggle('d-none', !checkbox.checked);
+                if (checkbox.checked) {
+                    otherInput.focus();
+                } else {
+                    otherInput.value = '';
+                }
+            }
+        }
+
         const parent = element.closest('.question-card');
         parent.classList.remove('has-error');
         const errorEl = parent.querySelector('.error-message');
@@ -1010,7 +1101,7 @@
     // Selector di-scope ke class .question-card saja (bukan diprefix per-step lagi)
     // supaya listener ini otomatis mencakup step-questions MAUPUN step-personal-data,
     // karena keduanya sama-sama merender partial question-card yang sama.
-    document.querySelectorAll('.question-card select, .question-card input[type="text"], .question-card input[type="number"], .question-card input[type="date"], .question-card textarea').forEach(function (el) {
+    document.querySelectorAll('.question-card select, .question-card input[type="text"], .question-card input[type="number"], .question-card input[type="date"], .question-card input[type="file"], .question-card textarea').forEach(function (el) {
         el.addEventListener('input', function () {
             const card = el.closest('.question-card');
             card.classList.remove('has-error');

@@ -17,6 +17,7 @@ class Major extends Model
 
     protected $fillable = [
         'user_id',
+        'city_id',
         'name',
         'description',
         'status',
@@ -26,4 +27,12 @@ class Major extends Model
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
+
+    /**
+     * Relasi ke City.
+     */
+    public function city()
+    {
+        return $this->belongsTo(City::class, 'city_id');
+    }
 }

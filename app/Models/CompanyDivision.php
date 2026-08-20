@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class CompanyDivision extends Model
 {
@@ -39,5 +41,26 @@ class CompanyDivision extends Model
     public function companyBranch()
     {
         return $this->belongsTo(CompanyBranch::class, 'company_branch_id');
+    }
+
+    /**
+     * Baris pivot company_division_user milik divisi ini.
+     */
+    public function divisionUsers(): HasMany
+    {
+        return $this->hasMany(CompanyDivisionUser::class, 'company_division_id');
+    }
+
+    /**
+     * User-user yang tergabung dalam divisi ini.
+     */
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            User::class,
+            'company_division_user',
+            'company_division_id',
+            'user_id'
+        )->withPivot('id', 'status')->withTimestamps();
     }
 }

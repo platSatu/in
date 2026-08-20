@@ -66,6 +66,22 @@
                         </div>
                     </div>
 
+                    <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_other" name="is_other" value="1"
+                                    {{ old('is_other', $data->is_other) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="is_other">
+                                    Jadikan opsi "Lainnya" (isian bebas)
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Khusus pertanyaan tipe Multiple Choice — begitu opsi ini dicentang peserta, muncul kolom
+                                teks tambahan supaya mereka bisa isi jawaban sendiri.
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 

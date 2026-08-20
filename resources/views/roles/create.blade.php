@@ -52,7 +52,25 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+
+                        <div class="col-sm-6">
+                            <label for="scope_level" class="mb-2">Cakupan Data (Scope)</label>
+                            <select id="scope_level" name="scope_level" class="form-select @error('scope_level') is-invalid @enderror">
+                                <option value="company" {{ old('scope_level', 'company') === 'company' ? 'selected' : '' }}>Company — semua cabang &amp; divisi</option>
+                                <option value="branch" {{ old('scope_level') === 'branch' ? 'selected' : '' }}>Branch — hanya 1 cabang (dipilih saat assign ke user)</option>
+                                <option value="division" {{ old('scope_level') === 'division' ? 'selected' : '' }}>Division — hanya 1 divisi (dipilih saat assign ke user)</option>
+                                <option value="self" {{ old('scope_level') === 'self' ? 'selected' : '' }}>Self — hanya data yang ditangani sendiri</option>
+                            </select>
+                            @error('scope_level')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <small class="text-muted">
+                                Cabang/divisi spesifiknya ditentukan nanti di halaman "Role to User" saat role ini di-assign ke seorang user.
+                            </small>
+                        </div>
                     </div>
+
+                    @include('roles._permissions-checklist')
 
                 </div>
             </div>

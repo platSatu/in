@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Concerns\HasScopedAccess;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,7 @@ use Illuminate\Support\Str;
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use HasFactory, Notifiable, HasScopedAccess;
 
     public const STATUS_ACTIVE = 'active';
     public const STATUS_INACTIVE = 'inactive';
@@ -86,6 +87,16 @@ class User extends Authenticatable implements MustVerifyEmail
             ->where('slug', $slug)
             ->where('roles.status', Role::STATUS_ACTIVE)
             ->exists();
+    }
+
+    public function divisions(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            CompanyDivision::class,
+            'company_division_user',
+            'user_id',
+            'company_division_id'
+        )->withPivot('id', 'status')->withTimestamps();
     }
 
     public function isActive(): bool

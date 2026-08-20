@@ -26,8 +26,6 @@ class UniversityProfile extends Model
         'language',
         'scholarship_available',
         'status',
-        'degree',
-        'intake',
     ];
 
     /**
@@ -44,5 +42,18 @@ class UniversityProfile extends Model
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Daftar Degree + Intake (bisa lebih dari satu per profile, diisi lewat
+     * fitur "add row" di halaman create). Tabel `university_profiles` sendiri
+     * TIDAK punya kolom `degree`/`intake` (sempat dikira ada, ternyata tidak
+     * — lihat riwayat error 1054 "Unknown column 'degree'"), jadi seluruh
+     * data degree/intake memang cuma hidup di tabel anak ini.
+     */
+    public function degrees()
+    {
+        return $this->hasMany(UniversityProfileDegree::class, 'university_profile_id')
+            ->orderBy('sort_order');
     }
 }

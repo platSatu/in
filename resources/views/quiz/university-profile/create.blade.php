@@ -45,12 +45,26 @@
 
                     <div class="row mb-4">
                         <div class="col-sm-12">
-                            <label for="field" class="mb-2">Field</label>
-                            <input type="text" class="form-control @error('field') is-invalid @enderror" id="field"
-                                name="field" value="{{ old('field') }}" placeholder="Enter field (e.g. IT, Medicine, Business)...">
-                            @error('field')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            <label class="mb-2">Major</label>
+
+                            {{--
+                                Major diturunkan otomatis dari university yang dipilih di atas
+                                (University -> Major), bukan diketik manual lagi. Field ini
+                                sengaja tidak punya "name" — nilainya dihitung ulang di server
+                                dari university_id supaya tidak bisa dipalsukan lewat form.
+                            --}}
+                            @php
+                                $lockedMajor = $lockedUniversity->major ?? null;
+                            @endphp
+
+                            <input type="text" class="form-control" value="{{ $lockedMajor->name ?? '-' }}" disabled readonly>
+                            <div class="form-text">
+                                @if($lockedUniversity)
+                                    {{ $lockedMajor ? 'Diturunkan dari Major university ini.' : 'University ini belum punya Major.' }}
+                                @else
+                                    Pilih university dulu untuk melihat Major-nya.
+                                @endif
+                            </div>
                         </div>
                     </div>
 
@@ -73,24 +87,45 @@
                         </div>
                     </div>
 
-                    <div class="row mb-4">
-                        <div class="col-sm-6">
-                            <label for="degree" class="mb-2">Degree</label>
-                            <input type="text" min="0" class="form-control @error('degree') is-invalid @enderror"
-                                id="degree" name="degree" value="{{ old('degree') }}" placeholder="Degree">
-                            @error('degree')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-sm-6">
-                            <label for="intake" class="mb-2">Intake</label>
-                            <input type="text" min="0" class="form-control @error('intake') is-invalid @enderror"
-                                id="intake" name="intake" value="{{ old('intake') }}" placeholder="Intake">
-                            @error('intake')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                    <hr>
+                    <label class="form-label">Degree &amp; Intake</label>
+                    <div class="form-text mb-2">Boleh dikosongkan, atau isi lebih dari satu kombinasi (mis. Bachelor - September, Master - March).</div>
+
+                    <div id="degreeIntakeRows">
+
+                        {{-- Baris awal (index 0) --}}
+                        <div class="degree-intake-row border rounded p-3 mb-3">
+                            <div class="row g-3">
+                                <div class="col-md-5">
+                                    <label class="form-label">Degree</label>
+                                    <input type="text" name="degree_intakes[0][degree]"
+                                        class="form-control @error('degree_intakes.0.degree') is-invalid @enderror"
+                                        value="{{ old('degree_intakes.0.degree') }}" placeholder="Degree">
+                                    @error('degree_intakes.0.degree')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-5">
+                                    <label class="form-label">Intake</label>
+                                    <input type="text" name="degree_intakes[0][intake]"
+                                        class="form-control @error('degree_intakes.0.intake') is-invalid @enderror"
+                                        value="{{ old('degree_intakes.0.intake') }}" placeholder="Intake">
+                                    @error('degree_intakes.0.intake')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <button type="button" class="btn btn-outline-danger btn-remove-row w-100">
+                                        Hapus
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
+
+                    <button type="button" id="btnAddDegreeIntakeRow" class="btn btn-outline-primary mb-4">
+                        + Tambah Degree/Intake
+                    </button>
 
                     <div class="row mb-4">
                         <div class="col-sm-12">
@@ -159,5 +194,56 @@
     </form>
 
 </div>
+
+{{-- Template baris baru, dipakai JS saat klik "Tambah Degree/Intake" --}}
+<template id="degreeIntakeRowTemplate">
+    <div class="degree-intake-row border rounded p-3 mb-3">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label">Degree</label>
+                <input type="text" name="degree_intakes[__INDEX__][degree]" class="form-control">
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Intake</label>
+                <input type="text" name="degree_intakes[__INDEX__][intake]" class="form-control">
+            </div>
+            <div class="col-md-2 d-flex align-items-end">
+                <button type="button" class="btn btn-outline-danger btn-remove-row w-100">
+                    Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
+<script>
+    (function () {
+        var rowIndex = 1; // index 0 sudah dipakai baris pertama
+        var container = document.getElementById('degreeIntakeRows');
+        var template = document.getElementById('degreeIntakeRowTemplate');
+
+        document.getElementById('btnAddDegreeIntakeRow').addEventListener('click', function () {
+            var html = template.innerHTML.replaceAll('__INDEX__', rowIndex);
+            var wrapper = document.createElement('div');
+            wrapper.innerHTML = html.trim();
+            container.appendChild(wrapper.firstElementChild);
+            rowIndex++;
+        });
+
+        container.addEventListener('click', function (e) {
+            if (e.target && e.target.classList.contains('btn-remove-row')) {
+                var rows = container.querySelectorAll('.degree-intake-row');
+                if (rows.length > 1) {
+                    e.target.closest('.degree-intake-row').remove();
+                } else {
+                    // Baris terakhir tetap dibiarkan ada, tapi boleh kosong
+                    // (degree/intake nullable) — jadi cukup dikosongkan saja.
+                    var inputs = e.target.closest('.degree-intake-row').querySelectorAll('input');
+                    inputs.forEach(function (input) { input.value = ''; });
+                }
+            }
+        });
+    })();
+</script>
 
 @endsection

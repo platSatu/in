@@ -24,7 +24,12 @@ class FormQuestionOption extends Model
         'option_text',
         'image',
         'score',
+        'is_other',
         'status',
+    ];
+
+    protected $casts = [
+        'is_other' => 'boolean',
     ];
 
     /**

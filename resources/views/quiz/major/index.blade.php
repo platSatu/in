@@ -8,12 +8,12 @@
             <div class="col-md-6">
                 <nav class="breadcrumb-style-one" aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item active" aria-current="page">City</li>
+                        <li class="breadcrumb-item active" aria-current="page">Major</li>
                     </ol>
                 </nav>
             </div>
             <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                <a href="{{ route('quiz.major.create') }}" class="btn btn-primary">+ Add City</a>
+                <a href="{{ route('quiz.major.create') }}" class="btn btn-primary">+ Add Major</a>
             </div>
         </div>
     </div>
@@ -53,10 +53,11 @@
                         <thead>
                             <tr>
                                 <th>No</th>
+                                <th>Major</th>
                                 <th>City</th>
                                 <th>Description</th>
                                 <th>Created At</th>
-                                <th width="100" class="text-center">Action</th>
+                                <th width="220" class="text-center">Action</th>
                             </tr>
                         </thead>
 
@@ -72,6 +73,10 @@
                                 </td>
 
                                 <td>
+                                    {{ optional($major->city)->name ?? '-' }}
+                                </td>
+
+                                <td>
                                     {{ $major->description ?? '-' }}
                                 </td>
 
@@ -80,57 +85,23 @@
                                 </td>
 
                                 <td class="text-center">
-
-                                    <div class="dropdown">
-
-                                        <a
-                                            class="dropdown-toggle"
-                                            href="#"
-                                            data-bs-toggle="dropdown">
-
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                width="24"
-                                                height="24"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2">
-
-                                                <circle cx="12" cy="12" r="1"></circle>
-                                                <circle cx="19" cy="12" r="1"></circle>
-                                                <circle cx="5" cy="12" r="1"></circle>
-
-                                            </svg>
-
+                                    <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                        <a href="{{ route('quiz.university.create', ['major_id' => $major->id]) }}" class="btn btn-sm btn-outline-success text-nowrap">
+                                            + Add University
                                         </a>
 
-                                        <div class="dropdown-menu">
+                                        <a href="{{ route('quiz.major.edit',$major->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                                            Edit
+                                        </a>
 
-                                            <a
-                                                class="dropdown-item"
-                                                href="{{ route('quiz.major.edit',$major->id) }}">
-                                                Edit
-                                            </a>
-
-                                            <form
-                                                action="{{ route('quiz.major.destroy',$major->id) }}"
-                                                method="POST"
-                                                onsubmit="return confirm('Delete this Major?')">
-
-                                                @csrf
-                                                @method('DELETE')
-
-                                                <button
-                                                    class="dropdown-item text-danger">
-                                                    Delete
-                                                </button>
-
-                                            </form>
-
-                                        </div>
-
+                                        <form action="{{ route('quiz.major.destroy',$major->id) }}" method="POST" class="m-0" onsubmit="return confirm('Delete this Major?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger text-nowrap">
+                                                Delete
+                                            </button>
+                                        </form>
                                     </div>
-
                                 </td>
 
                             </tr>
@@ -138,7 +109,7 @@
                         @empty
 
                             <tr>
-                                <td colspan="5" class="text-center">
+                                <td colspan="6" class="text-center">
                                     No data.
                                 </td>
                             </tr>
@@ -151,7 +122,7 @@
 
                 <div class="mt-4">
                     {{ $data->links('pagination::bootstrap-5') }}
-                    
+
                 </div>
 
             </div>

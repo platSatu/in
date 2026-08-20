@@ -2,6 +2,25 @@
 @section('content')
     <div class="middle-content container-xxl p-0">
 
+        @if (session('error'))
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                {{ session('error') }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
+        @if ($errors->any())
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <strong>Ada input yang belum valid:</strong>
+                <ul class="mb-0">
+                    @foreach ($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        @endif
+
         <form action="{{ route('quiz.university.store') }}" method="POST" enctype="multipart/form-data">
             @csrf
 
@@ -9,6 +28,15 @@
 
                 <div class="col-xxl-9 col-xl-12 col-lg-12 col-md-12 col-sm-12">
                     <div class="widget-content widget-content-area ecommerce-create-section">
+
+                        @if(!empty($lockedMajor))
+                            <input type="hidden" name="major_id" value="{{ $lockedMajor->id }}">
+                            <div class="alert alert-info">
+                                University ini akan dikaitkan ke Major
+                                <strong>{{ $lockedMajor->name }}</strong>.
+                                <a href="{{ route('quiz.university.create') }}">Ganti major</a>
+                            </div>
+                        @endif
 
                         <div class="row mb-4">
                             <div class="col-sm-12">
@@ -25,9 +53,21 @@
                         <div class="row mb-4">
                             <div class="col-sm-12">
                                 <label for="country" class="mb-2">Country</label>
-                                <input type="text" class="form-control @error('country') is-invalid @enderror"
-                                    id="country" name="country" value="{{ old('country') }}"
-                                    placeholder="Enter country...">
+
+                                @php
+                                    $lockedCountryValue = old('country', $lockedCountryName ?? null);
+                                @endphp
+
+                                @if($lockedCountryValue && !$errors->has('country'))
+                                    <input type="text" class="form-control" value="{{ $lockedCountryValue }}" disabled readonly>
+                                    <input type="hidden" name="country" value="{{ $lockedCountryValue }}">
+                                    <div class="form-text">Country diturunkan dari City yang dipilih.</div>
+                                @else
+                                    <input type="text" class="form-control @error('country') is-invalid @enderror"
+                                        id="country" name="country" value="{{ old('country') }}"
+                                        placeholder="Enter country...">
+                                @endif
+
                                 @error('country')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -37,17 +77,28 @@
                        <div class="row mb-4">
                             <div class="col-sm-12">
                                 <label for="city" class="mb-2">City</label>
-                                <select class="form-control @error('city') is-invalid @enderror"
-                                    id="city" name="city">
-                                    <option value="">Select city...</option>
 
-                                    @foreach($cities as $city)
-                                        <option value="{{ $city->id }}"
-                                            {{ old('city') == $city->id ? 'selected' : '' }}>
-                                            {{ $city->name }}
-                                        </option>
-                                    @endforeach
-                                </select>
+                                @php
+                                    $lockedCity = !empty($lockedCityId) ? $cities->firstWhere('id', $lockedCityId) : null;
+                                @endphp
+
+                                @if($lockedCity && !$errors->has('city'))
+                                    <input type="text" class="form-control" value="{{ $lockedCity->name }}" disabled readonly>
+                                    <input type="hidden" name="city" value="{{ $lockedCity->id }}">
+                                    <div class="form-text">City diturunkan dari Major yang dipilih.</div>
+                                @else
+                                    <select class="form-control @error('city') is-invalid @enderror"
+                                        id="city" name="city">
+                                        <option value="">Select city...</option>
+
+                                        @foreach($cities as $city)
+                                            <option value="{{ $city->id }}"
+                                                {{ old('city') == $city->id ? 'selected' : '' }}>
+                                                {{ $city->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                @endif
 
                                 @error('city')
                                     <div class="invalid-feedback">{{ $message }}</div>

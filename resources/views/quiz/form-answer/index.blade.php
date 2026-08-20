@@ -62,7 +62,15 @@
                                     <td>{{ $item->submission_id }}</td>
                                     <td>{{ \Illuminate\Support\Str::limit(optional($item->question)->question_text, 40) ?? '-' }}</td>
                                     <td>{{ \Illuminate\Support\Str::limit(optional($item->option)->option_text, 30) ?? '-' }}</td>
-                                    <td>{{ \Illuminate\Support\Str::limit($item->answer_text, 40) ?? '-' }}</td>
+                                    <td>
+                                        @if ($item->answer_text && str_starts_with($item->answer_text, 'quiz/file-upload/'))
+                                            {{-- Jawaban pertanyaan tipe 'file' (lihat FrontendController::saveQuestionAnswers()) —
+                                                 answer_text-nya adalah path relatif ke public/, bukan teks bebas. --}}
+                                            <a href="{{ asset($item->answer_text) }}" target="_blank" rel="noopener">Lihat File</a>
+                                        @else
+                                            {{ \Illuminate\Support\Str::limit($item->answer_text, 40) ?? '-' }}
+                                        @endif
+                                    </td>
                                     <td>
                                         @if ($item->status === 'active')
                                             <span class="badge badge-success">Active</span>

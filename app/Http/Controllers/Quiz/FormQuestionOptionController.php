@@ -69,6 +69,7 @@ class FormQuestionOptionController extends Controller
             'options.*.option_text' => 'nullable|string|max:255',
             'options.*.image' => 'nullable|image|max:4096',
             'options.*.score' => 'nullable|integer',
+            'options.*.is_other' => 'nullable|boolean',
             'options.*.status' => 'nullable|in:active,inactive',
         ]);
 
@@ -124,6 +125,9 @@ class FormQuestionOptionController extends Controller
                 'option_text' => $row['option_text'] ?? null,
                 'image' => $imagePath,
                 'score' => $row['score'] ?? null,
+                // "Lainnya" (isian bebas) — dipakai di pertanyaan Multiple Choice,
+                // lihat frontend/partials/question-card.blade.php.
+                'is_other' => !empty($row['is_other']),
                 'status' => $row['status'] ?? 'active',
             ]);
 
@@ -170,6 +174,7 @@ class FormQuestionOptionController extends Controller
             'image' => 'nullable|image|max:4096',
             'remove_image' => 'nullable|boolean',
             'score' => 'nullable|integer',
+            'is_other' => 'nullable|boolean',
             'status' => 'required|in:active,inactive',
         ]);
 
@@ -184,6 +189,13 @@ class FormQuestionOptionController extends Controller
         });
 
         $validated = $validator->validate();
+
+        // Checkbox yang tidak dicentang tidak ikut terkirim sama sekali di request,
+        // jadi kalau tidak di-set eksplisit di sini, AdminCrud::update() cuma akan
+        // membiarkan nilai is_other lama tidak berubah (bukan jadi false) — beda
+        // dengan pola $validated['x'] = $request->boolean('x') yang sudah dipakai
+        // di FormController untuk toggle serupa.
+        $validated['is_other'] = $request->boolean('is_other');
 
         $questionOwned = FormQuestion::query()
             ->where(['id' => $validated['question_id']])

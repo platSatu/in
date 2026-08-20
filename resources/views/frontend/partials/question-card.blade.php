@@ -97,13 +97,28 @@
                             <input type="checkbox"
                                 name="question_{{ $question->id }}[]"
                                 value="{{ $option->id }}"
-                                class="form-check-input"
+                                class="form-check-input {{ $option->is_other ? 'option-other-checkbox' : '' }}"
                                 id="option_{{ $option->id }}">
                             <label class="form-check-label option-content mb-0" for="option_{{ $option->id }}">
                                 {{ $option->option_text ?: chr(65 + $loop->index) }}
                             </label>
                         </div>
                     </div>
+
+                    @if($option->is_other)
+                        {{--
+                            Kolom isian bebas untuk opsi "Lainnya". Ditaruh DI LUAR div
+                            .option-item di atas (bukan di dalamnya) supaya klik ke kolom
+                            teks ini tidak ikut memicu onclick="toggleMultipleOption(...)"
+                            pada pembungkusnya. Disembunyikan (d-none) sampai checkbox-nya
+                            dicentang, lihat toggleMultipleOption() di form-wizard.blade.php.
+                        --}}
+                        <input type="text"
+                            name="question_{{ $question->id }}_other_text"
+                            class="form-control form-control-sm mt-2 other-text-input d-none"
+                            data-for-option="{{ $option->id }}"
+                            placeholder="Tulis jawaban Anda...">
+                    @endif
                 </div>
             @endforeach
         </div>
@@ -125,6 +140,15 @@
         <div class="form-text mt-2">
             <i class="bi bi-whatsapp"></i>
             The list of universities for this major will be sent to your WhatsApp after you submit the form.
+        </div>
+    @elseif($question->type === 'file')
+        <input type="file"
+            name="question_{{ $question->id }}"
+            class="form-control"
+            accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf">
+        <div class="form-text mt-2">
+            <i class="bi bi-paperclip"></i>
+            Format yang didukung: JPG, JPEG, PNG, atau PDF. Ukuran maksimal 5MB.
         </div>
     @endif
 

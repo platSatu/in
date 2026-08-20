@@ -25,6 +25,8 @@ class RoleUser extends Model
         'user_id',
         'role_id',
         'status',
+        'company_branch_id',
+        'company_division_id',
     ];
 
     /**
@@ -49,6 +51,22 @@ class RoleUser extends Model
             'role_id',
             'id'
         );
+    }
+
+    /**
+     * Company branch scope assignment ini (diisi kalau role.scope_level = 'branch').
+     */
+    public function companyBranch(): BelongsTo
+    {
+        return $this->belongsTo(CompanyBranch::class, 'company_branch_id', 'id');
+    }
+
+    /**
+     * Company division scope assignment ini (diisi kalau role.scope_level = 'division').
+     */
+    public function companyDivision(): BelongsTo
+    {
+        return $this->belongsTo(CompanyDivision::class, 'company_division_id', 'id');
     }
 
     /**

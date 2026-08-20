@@ -59,6 +59,18 @@ class WhatsappMessenger
             $content .= "\n\n🔗 *Link Anda:*\n" . $callbackLink;
         }
 
+        // === PILIH KELAS LINK ===
+        // Sama pola & alasannya dengan CALLBACK LINK di atas — kalau ada link
+        // "Pilih Kelas" untuk dikirim (lihat ClassSchedule::existsActiveForBranch(),
+        // dipakai di FrontendController::finalizeCompletedSubmission() & di
+        // FormController::saveResult()) tapi template belum memuat placeholder
+        // {{pilih_kelas_link}} secara eksplisit, tambahkan section terpisah di
+        // akhir pesan.
+        $pilihKelasLink = $placeholders['pilih_kelas_link'] ?? '';
+        if (!empty($pilihKelasLink) && !str_contains($content, $pilihKelasLink)) {
+            $content .= "\n\n📚 *Pilih Kelas Anda:*\n" . $pilihKelasLink;
+        }
+
         return $content;
     }
 

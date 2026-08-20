@@ -43,9 +43,10 @@
                             <tr>
                                 <th>No</th>
                                 <th>City</th>
+                                <th>Country</th>
                                 <th>Description</th>
                                 <th>Created At</th>
-                                <th width="100" class="text-center">Action</th>
+                                <th width="220" class="text-center">Action</th>
                             </tr>
                         </thead>
 
@@ -61,6 +62,10 @@
                                 </td>
 
                                 <td>
+                                    {{ optional($city->country)->name ?? '-' }}
+                                </td>
+
+                                <td>
                                     {{ $city->description ?? '-' }}
                                 </td>
 
@@ -69,57 +74,27 @@
                                 </td>
 
                                 <td class="text-center">
-
-                                    <div class="dropdown">
-
-                                        <a
-                                            class="dropdown-toggle"
-                                            href="#"
-                                            data-bs-toggle="dropdown">
-
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                width="24"
-                                                height="24"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2">
-
-                                                <circle cx="12" cy="12" r="1"></circle>
-                                                <circle cx="19" cy="12" r="1"></circle>
-                                                <circle cx="5" cy="12" r="1"></circle>
-
-                                            </svg>
-
+                                    <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                        <a href="{{ route('city.show', $city->id) }}" class="btn btn-sm btn-outline-info text-nowrap">
+                                            Show
                                         </a>
 
-                                        <div class="dropdown-menu">
+                                        <a href="{{ route('quiz.major.create', ['city_id' => $city->id]) }}" class="btn btn-sm btn-outline-success text-nowrap">
+                                            + Add Major
+                                        </a>
 
-                                            <a
-                                                class="dropdown-item"
-                                                href="{{ route('city.edit',$city->id) }}">
-                                                Edit
-                                            </a>
+                                        <a href="{{ route('city.edit',$city->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                                            Edit
+                                        </a>
 
-                                            <form
-                                                action="{{ route('city.destroy',$city->id) }}"
-                                                method="POST"
-                                                onsubmit="return confirm('Delete this city?')">
-
-                                                @csrf
-                                                @method('DELETE')
-
-                                                <button
-                                                    class="dropdown-item text-danger">
-                                                    Delete
-                                                </button>
-
-                                            </form>
-
-                                        </div>
-
+                                        <form action="{{ route('city.destroy',$city->id) }}" method="POST" class="m-0" onsubmit="return confirm('Delete this city?')">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="btn btn-sm btn-outline-danger text-nowrap">
+                                                Delete
+                                            </button>
+                                        </form>
                                     </div>
-
                                 </td>
 
                             </tr>
@@ -127,7 +102,7 @@
                         @empty
 
                             <tr>
-                                <td colspan="5" class="text-center">
+                                <td colspan="6" class="text-center">
                                     No data.
                                 </td>
                             </tr>
@@ -140,7 +115,7 @@
 
                 <div class="mt-4">
                     {{ $data->links('pagination::bootstrap-5') }}
-                    
+
                 </div>
 
             </div>

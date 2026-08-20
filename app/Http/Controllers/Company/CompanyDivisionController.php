@@ -6,8 +6,11 @@ use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
 use App\Models\CompanyBranch;
 use App\Models\CompanyDivision;
+use App\Models\CompanyDivisionUser;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rules\Password;
 
 class CompanyDivisionController extends Controller
 {
@@ -61,6 +64,87 @@ class CompanyDivisionController extends Controller
         return redirect()
             ->route('company.division.index')
             ->with('success', 'Company division berhasil dibuat.');
+    }
+
+    public function show(string $id)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $data = AdminCrud::findOrFail(
+            CompanyDivision::class,
+            $id,
+            (string) $userId,
+            ['companyBranch', 'divisionUsers.user']
+        );
+
+        return view('company.division.show', compact('data'));
+    }
+
+    public function addUserForm(string $id)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $data = AdminCrud::findOrFail(CompanyDivision::class, $id, (string) $userId);
+
+        return view('company.division.add-user', compact('data'));
+    }
+
+    public function storeUser(Request $request, string $id)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $data = AdminCrud::findOrFail(CompanyDivision::class, $id, (string) $userId);
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'required|string|email|max:255|unique:users,email',
+            'password' => ['required', 'confirmed', Password::defaults()],
+            'handphone' => 'nullable|string|max:30',
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        $newUser = AdminCrud::create(User::class, [
+            'name' => $validated['name'],
+            'email' => $validated['email'],
+            'password' => $validated['password'],
+            'handphone' => $validated['handphone'] ?? null,
+            'status' => $validated['status'],
+        ]);
+
+        AdminCrud::create(CompanyDivisionUser::class, [
+            'company_division_id' => $data->id,
+            'user_id' => $newUser->id,
+            'status' => 'active',
+        ]);
+
+        return redirect()
+            ->route('company.division.show', $data->id)
+            ->with('success', 'User baru berhasil dibuat dan ditambahkan ke divisi.');
+    }
+
+    public function removeUser(string $id, string $pivotId)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $data = AdminCrud::findOrFail(CompanyDivision::class, $id, (string) $userId);
+
+        $data->divisionUsers()->where('id', $pivotId)->firstOrFail()->delete();
+
+        return redirect()
+            ->route('company.division.show', $data->id)
+            ->with('success', 'User berhasil dikeluarkan dari divisi.');
     }
 
     public function edit(string $id)

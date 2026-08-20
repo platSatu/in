@@ -75,41 +75,22 @@
                                     </td>
                                     <td>{{ optional($item->created_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
-                                        <div class="dropdown">
-                                            <a class="dropdown-toggle" href="#" role="button"
-                                                id="dropdownMenuLink{{ $item->id }}" data-bs-toggle="dropdown"
-                                                aria-haspopup="true" aria-expanded="true">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                                    class="feather feather-more-horizontal">
-                                                    <circle cx="12" cy="12" r="1"></circle>
-                                                    <circle cx="19" cy="12" r="1"></circle>
-                                                    <circle cx="5" cy="12" r="1"></circle>
-                                                </svg>
+                                        <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                            <a href="{{ route('quiz.university-profile.edit', $item->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                                                Edit
                                             </a>
 
-                                            <div class="dropdown-menu" aria-labelledby="dropdownMenuLink{{ $item->id }}">
-                                                <a class="dropdown-item"
-                                                    href="{{ route('quiz.university-profile.edit', $item->id) }}">Edit</a>
+                                            <a href="{{ route('quiz.university-album.create', ['university_id' => $item->university_id]) }}" class="btn btn-sm btn-outline-success text-nowrap">
+                                                + Add Category Album
+                                            </a>
 
-                                                <div class="dropdown-divider"></div>
-
-                                                <a class="dropdown-item"
-                                                    href="{{ route('quiz.university-album.index', ['university_id' => $item->university_id]) }}">
-                                                    + Add Album
-                                                </a>
-
-                                                <div class="dropdown-divider"></div>
-
-                                                <form action="{{ route('quiz.university-profile.destroy', $item->id) }}"
-                                                    method="POST" onsubmit="return confirm('Hapus university profile ini?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit"
-                                                        class="dropdown-item text-danger">Delete</button>
-                                                </form>
-                                            </div>
+                                            <form action="{{ route('quiz.university-profile.destroy', $item->id) }}" method="POST" class="m-0" onsubmit="return confirm('Hapus university profile ini?');">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button class="btn btn-sm btn-outline-danger text-nowrap">
+                                                    Delete
+                                                </button>
+                                            </form>
                                         </div>
                                     </td>
                                 </tr>

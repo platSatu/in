@@ -44,27 +44,48 @@
                     </div>
 
                     <div class="row mb-4">
-                       <div class="row mb-4">
-                            <div class="col-sm-12">
-                                <label for="city" class="mb-2">City</label>
-                                <select class="form-control @error('city') is-invalid @enderror"
-                                    id="city" name="city">
+                        <div class="col-sm-12">
+                            <label for="city" class="mb-2">City</label>
+                            <select class="form-control @error('city') is-invalid @enderror"
+                                id="city" name="city">
 
-                                    <option value="">Select city...</option>
+                                <option value="">Select city...</option>
 
-                                    @foreach($cities as $city)
-                                        <option value="{{ $city->id }}"
-                                            {{ old('city', $data->city_id) == $city->id ? 'selected' : '' }}>
-                                            {{ $city->name }}
-                                        </option>
-                                    @endforeach
+                                @foreach($cities as $city)
+                                    <option value="{{ $city->id }}"
+                                        {{ old('city', $data->city) == $city->id ? 'selected' : '' }}>
+                                        {{ $city->name }}
+                                    </option>
+                                @endforeach
 
-                                </select>
+                            </select>
 
-                                @error('city')
-                                    <div class="invalid-feedback">{{ $message }}</div>
-                                @enderror
-                            </div>
+                            @error('city')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <label for="major_id" class="mb-2">Major</label>
+                            <select class="form-control @error('major_id') is-invalid @enderror"
+                                id="major_id" name="major_id">
+
+                                <option value="">Select major... (opsional)</option>
+
+                                @foreach($majors as $major)
+                                    <option value="{{ $major->id }}"
+                                        {{ old('major_id', $data->major_id) == $major->id ? 'selected' : '' }}>
+                                        {{ $major->name }}
+                                    </option>
+                                @endforeach
+
+                            </select>
+
+                            @error('major_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
                         </div>
                     </div>
 

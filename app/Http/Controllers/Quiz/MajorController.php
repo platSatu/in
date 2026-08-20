@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Quiz;
 
 use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
+use App\Models\City;
 use App\Models\Major;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -24,20 +25,25 @@ class MajorController extends Controller
             (string) $userId,
             ['name', 'description'],
             $search,
-            10
+            10,
+            ['city']
         );
 
         return view('quiz.major.index', compact('data'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return view('quiz.major.create');
+        $cities = City::orderBy('name')->get();
+        $selectedCityId = $request->query('city_id');
+
+        return view('quiz.major.create', compact('cities', 'selectedCityId'));
     }
 
     public function store(Request $request)
     {
         $validated = $request->validate([
+            'city_id' => 'nullable|exists:cities,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);
@@ -63,9 +69,10 @@ class MajorController extends Controller
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(Major::class, $id, (string) $userId);
+        $data = AdminCrud::findOrFail(Major::class, $id, (string) $userId, ['city']);
+        $cities = City::orderBy('name')->get();
 
-        return view('quiz.major.edit', compact('data'));
+        return view('quiz.major.edit', compact('data', 'cities'));
     }
 
     public function update(Request $request, string $id)
@@ -78,6 +85,7 @@ class MajorController extends Controller
         AdminCrud::findOrFail(Major::class, $id, (string) $userId);
 
         $validated = $request->validate([
+            'city_id' => 'nullable|exists:cities,id',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
         ]);

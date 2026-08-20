@@ -20,6 +20,7 @@ class Form extends Model
     protected $fillable = [
         'user_id',
         'branch_id',
+        'company_division_id',
         'name',
         'slug',
         'booth_slug',
@@ -34,6 +35,9 @@ class Form extends Model
         'has_personal_data_stage',
         'result_mode',
         'description',
+        'pre_test_notice',
+        'background_image',
+        'logo',
         'status',
         'start_date',
         'end_date',
@@ -69,6 +73,14 @@ class Form extends Model
     public function companyBranch()
     {
         return $this->belongsTo(CompanyBranch::class, 'branch_id');
+    }
+
+    /**
+     * Divisi tempat form/booth ini terdaftar, dipakai utk filter scope 'division'.
+     */
+    public function division()
+    {
+        return $this->belongsTo(CompanyDivision::class, 'company_division_id');
     }
 
     /**

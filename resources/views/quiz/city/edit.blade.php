@@ -16,6 +16,25 @@
             @method('PUT')
 
             <div class="mb-3">
+                <label for="country_id" class="form-label">Country</label>
+
+                <select class="form-select @error('country_id') is-invalid @enderror" id="country_id" name="country_id">
+                    <option value="">Choose... (opsional)</option>
+                    @foreach($countries as $country)
+                        <option value="{{ $country->id }}" {{ old('country_id', $data->country_id) == $country->id ? 'selected' : '' }}>
+                            {{ $country->name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                @error('country_id')
+                    <div class="invalid-feedback">
+                        {{ $message }}
+                    </div>
+                @enderror
+            </div>
+
+            <div class="mb-3">
 
                 <label class="form-label">
                     City Name

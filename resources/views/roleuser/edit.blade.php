@@ -43,9 +43,9 @@
                             <select id="role_id" name="role_id" class="form-select @error('role_id') is-invalid @enderror">
                                 <option value="">-- Pilih Role --</option>
                                 @foreach ($roles as $role)
-                                    <option value="{{ $role->id }}"
+                                    <option value="{{ $role->id }}" data-scope="{{ $role->scope_level }}"
                                         {{ old('role_id', $data->role_id) === $role->id ? 'selected' : '' }}>
-                                        {{ $role->name }}
+                                        {{ $role->name }} ({{ ucfirst($role->scope_level) }})
                                     </option>
                                 @endforeach
                             </select>
@@ -65,6 +65,42 @@
                             @error('status')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-6" id="branchScopeField">
+                            <label for="company_branch_id" class="mb-2">Company Branch</label>
+                            <select id="company_branch_id" name="company_branch_id" class="form-select @error('company_branch_id') is-invalid @enderror">
+                                <option value="">-- Pilih Branch --</option>
+                                @foreach ($branches as $branch)
+                                    <option value="{{ $branch->id }}"
+                                        {{ old('company_branch_id', $data->company_branch_id) === $branch->id ? 'selected' : '' }}>
+                                        {{ $branch->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('company_branch_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <small class="text-muted">Wajib diisi kalau role di atas scope-nya Branch.</small>
+                        </div>
+
+                        <div class="col-sm-6" id="divisionScopeField">
+                            <label for="company_division_id" class="mb-2">Division / Unit</label>
+                            <select id="company_division_id" name="company_division_id" class="form-select @error('company_division_id') is-invalid @enderror">
+                                <option value="">-- Pilih Division --</option>
+                                @foreach ($divisions as $division)
+                                    <option value="{{ $division->id }}"
+                                        {{ old('company_division_id', $data->company_division_id) === $division->id ? 'selected' : '' }}>
+                                        {{ $division->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('company_division_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <small class="text-muted">Wajib diisi kalau role di atas scope-nya Division.</small>
                         </div>
                     </div>
 
@@ -88,5 +124,32 @@
     </form>
 
 </div>
+
+<script>
+    // Progressive enhancement saja — validasi sebenarnya tetap di server
+    // (lihat RoleUserController::assertScopeSelected).
+    document.addEventListener('DOMContentLoaded', function () {
+        var roleSelect = document.getElementById('role_id');
+        var branchField = document.getElementById('branchScopeField');
+        var divisionField = document.getElementById('divisionScopeField');
+
+        function syncScopeFields() {
+            var selected = roleSelect.options[roleSelect.selectedIndex];
+            var scope = selected ? selected.dataset.scope : null;
+
+            if (branchField) {
+                branchField.style.display = scope === 'branch' ? '' : 'none';
+            }
+            if (divisionField) {
+                divisionField.style.display = scope === 'division' ? '' : 'none';
+            }
+        }
+
+        if (roleSelect) {
+            roleSelect.addEventListener('change', syncScopeFields);
+            syncScopeFields();
+        }
+    });
+</script>
 
 @endsection

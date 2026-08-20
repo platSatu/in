@@ -48,6 +48,7 @@
                                 <th>No</th>
                                 <th>Name</th>
                                 <th>Slug</th>
+                                <th>Scope</th>
                                 <th>Status</th>
                                 <th class="text-center">Action</th>
                             </tr>
@@ -58,43 +59,33 @@
                                     <td>{{ $data->firstItem() + $index }}</td>
                                     <td>{{ $role->name }}</td>
                                     <td>{{ $role->slug }}</td>
+                                    <td><span class="badge badge-secondary">{{ ucfirst($role->scope_level) }}</span></td>
                                     <td>
                                         <span class="badge {{ $role->status === 'active' ? 'badge-success' : 'badge-danger' }}">
                                             {{ ucfirst($role->status) }}
                                         </span>
                                     </td>
                                     <td class="text-center">
-                                        <div class="dropdown">
-                                            <a class="dropdown-toggle" href="#" role="button"
-                                               id="dropdownMenuLink{{ $role->id }}"
-                                               data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="true">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                     viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                     stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                                     class="feather feather-more-horizontal">
-                                                    <circle cx="12" cy="12" r="1"></circle>
-                                                    <circle cx="19" cy="12" r="1"></circle>
-                                                    <circle cx="5" cy="12" r="1"></circle>
-                                                </svg>
-                                            </a>
+                                        <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                            <a href="{{ route('roles.show', $role->id) }}"
+                                                class="btn btn-sm btn-outline-info text-nowrap">Show</a>
 
-                                            <div class="dropdown-menu" aria-labelledby="dropdownMenuLink{{ $role->id }}">
-                                                <a class="dropdown-item" href="{{ route('roles.edit', $role->id) }}">Edit</a>
+                                            <a href="{{ route('roles.edit', $role->id) }}"
+                                                class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
 
-                                                <form action="{{ route('roles.destroy', $role->id) }}"
-                                                      method="POST"
-                                                      onsubmit="return confirm('Hapus data role ini?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="dropdown-item text-danger">Delete</button>
-                                                </form>
-                                            </div>
+                                            <form action="{{ route('roles.destroy', $role->id) }}"
+                                                method="POST" onsubmit="return confirm('Hapus data role ini?');" class="m-0">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit"
+                                                    class="btn btn-sm btn-outline-danger text-nowrap">Delete</button>
+                                            </form>
                                         </div>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="5" class="text-center">Belum ada data role.</td>
+                                    <td colspan="6" class="text-center">Belum ada data role.</td>
                                 </tr>
                             @endforelse
                         </tbody>

@@ -16,6 +16,25 @@
             @method('PUT')
 
             <div class="mb-3">
+                <label for="city_id" class="form-label">City</label>
+
+                <select class="form-select @error('city_id') is-invalid @enderror" id="city_id" name="city_id">
+                    <option value="">Choose... (opsional)</option>
+                    @foreach($cities as $city)
+                        <option value="{{ $city->id }}" {{ old('city_id', $data->city_id) == $city->id ? 'selected' : '' }}>
+                            {{ $city->name }}
+                        </option>
+                    @endforeach
+                </select>
+
+                @error('city_id')
+                    <div class="invalid-feedback">
+                        {{ $message }}
+                    </div>
+                @enderror
+            </div>
+
+            <div class="mb-3">
 
                 <label class="form-label">
                     Major Name

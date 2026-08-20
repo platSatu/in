@@ -122,9 +122,12 @@
                                             {{ old('type', $data->type) === 'dropdown' ? 'selected' : '' }}>Dropdown (select, ringkas untuk opsi banyak)</option>
                                         <option value="major"
                                             {{ old('type', $data->type) === 'major' ? 'selected' : '' }}>Major</option>
+                                        <option value="file"
+                                            {{ old('type', $data->type) === 'file' ? 'selected' : '' }}>File Upload (jpg/jpeg/png/pdf)</option>
                                     </select>
                                     <div class="form-text">
                                         Single Choice, Multiple Choice, dan Dropdown ambil pilihan jawabannya dari menu "Options" di pertanyaan ini.
+                                        File Upload membatasi peserta hanya boleh unggah jpg/jpeg/png/pdf, maksimal 5MB.
                                     </div>
                                     @error('type')
                                         <div class="invalid-feedback">{{ $message }}</div>

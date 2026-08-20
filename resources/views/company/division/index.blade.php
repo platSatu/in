@@ -71,6 +71,12 @@
                                     <td>{{ optional($item->created_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
                                         <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                            <a href="{{ route('company.division.show', $item->id) }}"
+                                                class="btn btn-sm btn-outline-secondary text-nowrap">Show</a>
+
+                                            <a href="{{ route('company.division.addUser', $item->id) }}"
+                                                class="btn btn-sm btn-outline-success text-nowrap">+ Add User</a>
+
                                             <a href="{{ route('company.division.edit', $item->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
 
