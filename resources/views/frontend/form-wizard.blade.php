@@ -175,6 +175,39 @@
             border-left: 3px solid var(--brand);
         }
 
+        /* Catatan sebelum test (pre_test_notice) — dibungkus jadi "card body"
+           tersendiri (header + body terpisah) supaya teks bebas yang diisi admin
+           tidak tampil sebagai tumpukan teks polos begitu saja. */
+        .notice-box {
+            background: #f8f9fc;
+            border: 1px solid #eef0f5;
+            border-radius: 14px;
+            overflow: hidden;
+        }
+
+        .notice-box-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--brand-light);
+            color: var(--brand-dark);
+            font-weight: 700;
+            font-size: 14.5px;
+            padding: 16px 24px;
+            border-bottom: 1px solid #f6d3d3;
+        }
+
+        .notice-box-header i {
+            font-size: 18px;
+        }
+
+        .notice-box-body {
+            padding: 24px;
+            font-size: 14.5px;
+            line-height: 1.85;
+            color: #333a4d;
+        }
+
         .question-number {
             background: var(--brand);
             color: white;
@@ -676,10 +709,16 @@
                 @if($selectedForm && filled($selectedForm->pre_test_notice))
                     <div class="step" id="step-notice">
 
-                        {{-- nl2br() sudah menyisipkan <br> literal untuk tiap baris baru,
-                             jadi TIDAK pakai white-space:pre-line di sini (kalau dipakai
-                             bareng nl2br, baris barunya bakal dobel). --}}
-                        <div class="pre-test-notice">{!! nl2br(e($selectedForm->pre_test_notice)) !!}</div>
+                        <div class="notice-box">
+                            <div class="notice-box-header">
+                                <i class="bi bi-info-circle-fill"></i>
+                                <span>Catatan Sebelum Placement Test</span>
+                            </div>
+                            {{-- nl2br() sudah menyisipkan <br> literal untuk tiap baris baru,
+                                 jadi TIDAK pakai white-space:pre-line di sini (kalau dipakai
+                                 bareng nl2br, baris barunya bakal dobel). --}}
+                            <div class="notice-box-body">{!! nl2br(e($selectedForm->pre_test_notice)) !!}</div>
+                        </div>
 
                         <div class="d-flex justify-content-between mt-4">
                             <button type="button" class="btn btn-outline-brand" onclick="prevStep()">
