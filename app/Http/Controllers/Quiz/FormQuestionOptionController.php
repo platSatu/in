@@ -18,22 +18,41 @@ class FormQuestionOptionController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search');
+        $questionId = $request->query('question_id');
 
         $userId = Auth::id();
         if ($userId === null) {
             abort(401);
         }
 
-        $data = AdminCrud::paginate(
-            FormQuestionOption::class,
-            (string) $userId,
-            ['option_text', 'status'],
-            $search,
-            10,
-            ['question']
-        );
+        $query = FormQuestionOption::query()
+            ->with('question')
+            ->where('user_id', (string) $userId);
 
-        return view('quiz.form-question-option.index', compact('data'));
+        // Dipanggil dari tombol "Show" di quiz/form-question/index.blade.php ->
+        // langsung terfilter cuma jawaban/opsi milik pertanyaan itu saja. Ini yang
+        // dipakai supaya alur "cari pertanyaan -> lihat jawabannya -> tambah/edit
+        // jawaban" bisa langsung dari 1 halaman ini, tanpa reset filter question_id.
+        $filterQuestion = null;
+
+        if (!empty($questionId)) {
+            $filterQuestion = FormQuestion::where('id', $questionId)
+                ->where('user_id', (string) $userId)
+                ->first();
+
+            $query->where('question_id', $questionId);
+        }
+
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->orWhere('option_text', 'like', "%{$search}%")
+                    ->orWhere('status', 'like', "%{$search}%");
+            });
+        }
+
+        $data = $query->latest('created_at')->paginate(10)->withQueryString();
+
+        return view('quiz.form-question-option.index', compact('data', 'filterQuestion'));
     }
 
     public function create(Request $request)

@@ -87,24 +87,85 @@ class FormQuestionController extends Controller
         $selectedFormId = $request->query('form_id');
 
         // Pertanyaan bercabang (conditional/nested questions): daftar opsi yang
-        // sudah tersimpan di form ini, dipakai untuk dropdown "Tampilkan hanya
-        // jika opsi ini dipilih" di tiap baris. Cuma bisa ditentukan kalau form-nya
-        // sudah pasti (lock via ?form_id=) — sebelum itu belum ada konteks form
-        // yang jelas untuk tahu opsi mana saja yang relevan.
-        $parentOptionChoices = collect();
-        if (!empty($selectedFormId)) {
-            $parentOptionChoices = FormQuestionOption::query()
-                ->with('question')
-                ->where('status', 'active')
-                ->whereHas('question', function ($q) use ($selectedFormId, $userId) {
-                    $q->where('form_id', $selectedFormId)->where('user_id', (string) $userId);
-                })
-                ->orderBy('question_id')
-                ->orderBy('order')
-                ->get();
-        }
+        // sudah tersimpan di form ini, dipakai untuk isi awal dropdown "Tampilkan
+        // hanya jika opsi ini dipilih" di tiap baris. Kalau form-nya belum pasti
+        // (belum masuk lewat ?form_id=, mis. dari menu utama Quiz > Form Question
+        // > Add), dropdown-nya tetap dirender tapi kosong dulu — begitu admin
+        // memilih form di halaman itu, JS mengisi ulang lewat AJAX ke
+        // parentOptionChoices() di bawah, tanpa reload halaman.
+        $parentOptionChoices = !empty($selectedFormId)
+            ? $this->queryParentOptionChoices($selectedFormId, (string) $userId)
+            : collect();
 
         return view('quiz.form-question.create', compact('forms', 'selectedFormId', 'parentOptionChoices'));
+    }
+
+    /**
+     * Endpoint AJAX: daftar opsi pemicu (pertanyaan bercabang) untuk sebuah form,
+     * dipanggil dari halaman "Add Question" begitu admin memilih Form di dropdown
+     * (dipakai waktu form belum terkunci lewat ?form_id=, mis. masuk dari menu
+     * utama Quiz > Form Question > Add, bukan dari tombol "Show Questions" di
+     * Branch/Form). Hasilnya JSON [{id, label}, ...] — dipakai JS di
+     * quiz/form-question/create.blade.php untuk mengisi ulang dropdown
+     * "Tampilkan hanya jika opsi ini dipilih" tanpa reload halaman.
+     */
+    public function parentOptionChoices(Request $request)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $formId = $request->query('form_id');
+        if (empty($formId)) {
+            return response()->json([]);
+        }
+
+        $formOwned = Form::query()
+            ->where(['id' => $formId])
+            ->where(['user_id' => (string) $userId])
+            ->exists();
+
+        if (!$formOwned) {
+            // Form tidak valid/bukan milik user ini — jangan bocorkan info apa pun,
+            // cukup balikin daftar kosong (sama seperti kalau belum pilih form).
+            return response()->json([]);
+        }
+
+        $choices = $this->queryParentOptionChoices($formId, (string) $userId)
+            ->map(function (FormQuestionOption $option) {
+                return [
+                    'id' => $option->id,
+                    'label' => Str::limit(optional($option->question)->question_text ?: 'Pertanyaan', 40)
+                        . ' → ' . ($option->option_text ?: '[Gambar]'),
+                ];
+            })
+            ->values();
+
+        return response()->json($choices);
+    }
+
+    /**
+     * Query bersama untuk daftar opsi yang bisa dijadikan pemicu pertanyaan
+     * bercabang pada sebuah form — dipakai oleh create(), edit(), dan endpoint
+     * AJAX parentOptionChoices() di atas supaya query-nya konsisten di ketiganya.
+     *
+     * @return \Illuminate\Support\Collection<int, FormQuestionOption>
+     */
+    private function queryParentOptionChoices(string $formId, string $userId, ?string $excludeQuestionId = null)
+    {
+        return FormQuestionOption::query()
+            ->with('question')
+            ->where('status', 'active')
+            ->when($excludeQuestionId, function ($q) use ($excludeQuestionId) {
+                $q->where('question_id', '!=', $excludeQuestionId);
+            })
+            ->whereHas('question', function ($q) use ($formId, $userId) {
+                $q->where('form_id', $formId)->where('user_id', $userId);
+            })
+            ->orderBy('question_id')
+            ->orderBy('order')
+            ->get();
     }
 
     // public function store(Request $request)
@@ -296,16 +357,7 @@ class FormQuestionController extends Controller
         // ini sendiri dikecualikan (tidak masuk akal jadi anak dari opsinya
         // sendiri; cycle yang lebih dalam tetap dijaga lewat wouldCreateCycle()
         // di update() di bawah).
-        $parentOptionChoices = FormQuestionOption::query()
-            ->with('question')
-            ->where('status', 'active')
-            ->where('question_id', '!=', $data->id)
-            ->whereHas('question', function ($q) use ($data, $userId) {
-                $q->where('form_id', $data->form_id)->where('user_id', (string) $userId);
-            })
-            ->orderBy('question_id')
-            ->orderBy('order')
-            ->get();
+        $parentOptionChoices = $this->queryParentOptionChoices($data->form_id, (string) $userId, $data->id);
 
         return view('quiz.form-question.edit', compact('data', 'forms', 'parentOptionChoices'));
     }

@@ -21,7 +21,7 @@
 
                             @if ($lockedForm && !$errors->has('form_id'))
                                 <input type="text" class="form-control" value="{{ $lockedForm->name }}" disabled readonly>
-                                <input type="hidden" name="form_id" value="{{ $lockedForm->id }}">
+                                <input type="hidden" id="form_id" name="form_id" value="{{ $lockedForm->id }}">
                                 <div class="form-text mb-2">
                                     Semua pertanyaan di bawah ini akan dikaitkan ke form di atas.
                                 </div>
@@ -117,30 +117,34 @@
                     <option value="personal_data">Data Pribadi</option>
                 </select>
             </div>
-            @if ($lockedForm)
-                <div class="col-md-6">
-                    <label class="form-label small">
-                        Tampilkan hanya jika opsi ini dipilih
-                        <span class="text-muted">(opsional — pertanyaan bercabang)</span>
-                    </label>
-                    <select class="form-select" name="__NAME__[parent_option_id]">
-                        <option value="">-- Tidak ada (pertanyaan utama) --</option>
-                        @foreach ($parentOptionChoices as $opt)
-                            <option value="{{ $opt->id }}">
-                                {{ \Illuminate\Support\Str::limit(optional($opt->question)->question_text ?: 'Pertanyaan', 40) }}
-                                &rarr; {{ $opt->option_text ?: '[Gambar]' }}
-                            </option>
-                        @endforeach
-                    </select>
-                    @if ($parentOptionChoices->isEmpty())
-                        <div class="form-text">
-                            Belum ada opsi tersimpan di form ini. Simpan dulu pertanyaan single/multiple
-                            choice beserta opsinya, baru pertanyaan berikutnya bisa dijadikan cabang dari
-                            salah satu opsi tersebut.
-                        </div>
-                    @endif
+            <div class="col-md-6">
+                <label class="form-label small">
+                    Tampilkan hanya jika opsi ini dipilih
+                    <span class="text-muted">(opsional — pertanyaan bercabang)</span>
+                </label>
+                {{--
+                    Isi awal dropdown ini dirender server-side dari $parentOptionChoices
+                    (kosong kalau form belum terkunci lewat ?form_id=). Begitu admin
+                    memilih Form di dropdown atas (jalur menu utama, form belum
+                    terkunci), JS di bawah mengisi ulang SEMUA .parent-option-select
+                    yang ada di halaman lewat AJAX ke route('quiz.form-question.parent-options')
+                    — termasuk baris yang ditambah belakangan lewat "+ Tambah Baris".
+                --}}
+                <select class="form-select parent-option-select" name="__NAME__[parent_option_id]">
+                    <option value="">-- Tidak ada (pertanyaan utama) --</option>
+                    @foreach ($parentOptionChoices as $opt)
+                        <option value="{{ $opt->id }}">
+                            {{ \Illuminate\Support\Str::limit(optional($opt->question)->question_text ?: 'Pertanyaan', 40) }}
+                            &rarr; {{ $opt->option_text ?: '[Gambar]' }}
+                        </option>
+                    @endforeach
+                </select>
+                <div class="form-text parent-option-empty-hint" style="{{ $parentOptionChoices->isEmpty() ? '' : 'display:none;' }}">
+                    Belum ada opsi tersimpan di form ini (atau form belum dipilih). Simpan dulu
+                    pertanyaan single/multiple choice beserta opsinya, baru pertanyaan berikutnya
+                    bisa dijadikan cabang dari salah satu opsi tersebut.
                 </div>
-            @endif
+            </div>
         </div>
 
         <div class="row g-3 mt-1">
@@ -184,7 +188,102 @@
         const container = document.getElementById('questionRowsContainer');
         const template = document.getElementById('questionRowTemplate');
         const addBtn = document.getElementById('addQuestionRowBtn');
+        const formIdEl = document.getElementById('form_id');
         let rowCounter = 0;
+
+        // === PERTANYAAN BERCABANG (conditional/nested questions) — dropdown pemicu
+        // dinamis =====================================================================
+        // Seed awal dari server: kalau form sudah terkunci (?form_id=, lewat tombol
+        // "Show Questions" di Branch/Form), $parentOptionChoices sudah terisi benar
+        // sejak render pertama — tidak perlu AJAX. Kalau belum (masuk dari menu utama
+        // Quiz > Form Question > Add), array ini kosong dulu, baru terisi begitu admin
+        // memilih Form di dropdown lewat fetchParentOptionChoices() di bawah.
+        let currentParentOptionChoices = @json(
+            $parentOptionChoices->map(fn ($opt) => [
+                'id' => $opt->id,
+                'label' => \Illuminate\Support\Str::limit(optional($opt->question)->question_text ?: 'Pertanyaan', 40)
+                    . ' → ' . ($opt->option_text ?: '[Gambar]'),
+            ])
+        );
+
+        function renderParentOptionSelect(selectEl, choices) {
+            const previousValue = selectEl.value;
+            selectEl.innerHTML = '';
+
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = '-- Tidak ada (pertanyaan utama) --';
+            selectEl.appendChild(placeholder);
+
+            choices.forEach(function (choice) {
+                const opt = document.createElement('option');
+                opt.value = choice.id;
+                opt.textContent = choice.label;
+                selectEl.appendChild(opt);
+            });
+
+            // Pertahankan pilihan sebelumnya kalau opsinya masih ada di daftar baru
+            // (mis. daftar di-refresh ulang tapi form-nya sama).
+            if (choices.some(function (c) { return String(c.id) === previousValue; })) {
+                selectEl.value = previousValue;
+            }
+        }
+
+        // Terapkan currentParentOptionChoices ke SEMUA baris yang sedang ada di
+        // halaman (dipanggil setelah fetch AJAX selesai, atau setelah baris baru
+        // ditambahkan lewat "+ Tambah Baris").
+        function applyParentOptionChoicesToRow(row) {
+            const select = row.querySelector('.parent-option-select');
+            if (select) {
+                renderParentOptionSelect(select, currentParentOptionChoices);
+            }
+
+            const hint = row.querySelector('.parent-option-empty-hint');
+            if (hint) {
+                hint.style.display = currentParentOptionChoices.length ? 'none' : '';
+            }
+        }
+
+        function applyParentOptionChoicesToAllRows() {
+            container.querySelectorAll('.question-row').forEach(applyParentOptionChoicesToRow);
+        }
+
+        async function fetchParentOptionChoices(formId) {
+            if (!formId) {
+                currentParentOptionChoices = [];
+                applyParentOptionChoicesToAllRows();
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    '{{ route('quiz.form-question.parent-options') }}?form_id=' + encodeURIComponent(formId),
+                    { headers: { 'Accept': 'application/json' } }
+                );
+
+                if (!response.ok) {
+                    throw new Error('Gagal memuat daftar opsi pemicu.');
+                }
+
+                currentParentOptionChoices = await response.json();
+            } catch (err) {
+                // Diamkan errornya di sini — dropdown pemicu cukup kosong (pertanyaan
+                // biasa/non-cabang tetap bisa disimpan seperti biasa), tidak perlu
+                // mengganggu alur isi form cuma karena AJAX ini gagal.
+                currentParentOptionChoices = [];
+            }
+
+            applyParentOptionChoicesToAllRows();
+        }
+
+        // Cuma form_id berupa <select> (form BELUM terkunci lewat ?form_id=) yang
+        // butuh listener ini — kalau sudah terkunci, form_id-nya <input type="hidden">
+        // dan $parentOptionChoices dari server sudah benar sejak awal.
+        if (formIdEl && formIdEl.tagName === 'SELECT') {
+            formIdEl.addEventListener('change', function () {
+                fetchParentOptionChoices(formIdEl.value);
+            });
+        }
 
         function renumberRows() {
             const rows = container.querySelectorAll('.question-row');
@@ -215,6 +314,11 @@
                     renumberRows();
                 }
             });
+
+            // Baris baru langsung diisi daftar pemicu yang sudah diketahui sejauh ini
+            // (dari seed server atau hasil AJAX terakhir), supaya tidak perlu pilih
+            // ulang Form untuk baris-baris berikutnya.
+            applyParentOptionChoicesToRow(row);
 
             container.appendChild(fragment);
             renumberRows();

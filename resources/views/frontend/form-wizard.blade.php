@@ -169,10 +169,25 @@
         /* Pertanyaan bercabang (conditional/nested questions): kartu anak diberi
            aksen garis kiri + latar putih supaya kelihatan "masuk" dari kartu
            induknya, selain indentasi margin-left yang dihitung per-depth lewat
-           inline style di question-card.blade.php. */
+           inline style di question-card.blade.php. Kartu anak ini di-render
+           BENAR-BENAR NESTED tepat di bawah opsi pemicunya (lihat
+           question-card.blade.php), jadi .nested-questions-group cuma pembungkus
+           tipis untuk kasih jarak dari opsi di atasnya — bukan wrapper visual. */
         .question-card-nested {
             background: #fff;
             border-left: 3px solid var(--brand);
+        }
+
+        .nested-questions-group {
+            margin-top: 12px;
+        }
+
+        .nested-questions-group .question-card {
+            margin-bottom: 12px;
+        }
+
+        .nested-questions-group .question-card:last-child {
+            margin-bottom: 0;
         }
 
         /* Catatan sebelum test (pre_test_notice) — dibungkus jadi "card body"
@@ -916,13 +931,24 @@
         }
     }
 
+    // Pertanyaan bercabang: kartu anak sekarang di-render BENAR-BENAR NESTED di
+    // dalam markup opsi pemicunya (lihat frontend/partials/question-card.blade.php),
+    // jadi sebuah .question-card bisa punya kartu anak sebagai DESCENDANT-nya
+    // sendiri di DOM. Karena itu, semua pencarian input di sini WAJIB di-scope
+    // lewat name="question_{questionId}" milik kartu ini sendiri (data-question-id)
+    // — bukan sekadar "input pertama yang ketemu di dalam kartu" seperti sebelum
+    // ada nesting, supaya tidak salah membaca input milik kartu ANAK sebagai
+    // jawaban kartu INDUK (atau sebaliknya).
     function isQuestionAnswered(card) {
-        const singleRadio = card.querySelector('input[type="radio"]');
+        const questionId = card.getAttribute('data-question-id');
+        const baseName = 'question_' + questionId;
+
+        const singleRadio = card.querySelector('input[type="radio"][name="' + baseName + '"]');
         if (singleRadio) {
-            return !!card.querySelector('input[type="radio"]:checked');
+            return !!card.querySelector('input[type="radio"][name="' + baseName + '"]:checked');
         }
 
-        const checkboxes = card.querySelectorAll('input[type="checkbox"]');
+        const checkboxes = card.querySelectorAll('input[type="checkbox"][name="' + baseName + '[]"]');
         if (checkboxes.length) {
             if (!Array.from(checkboxes).some(function (cb) { return cb.checked; })) {
                 return false;
@@ -930,7 +956,9 @@
 
             // Kalau opsi "Lainnya" yang dicentang, isian bebasnya juga wajib diisi —
             // jawaban "Lainnya" tanpa teks dianggap belum benar-benar terjawab.
-            const checkedOther = card.querySelectorAll('input.option-other-checkbox:checked');
+            const checkedOther = Array.from(checkboxes).filter(function (cb) {
+                return cb.checked && cb.classList.contains('option-other-checkbox');
+            });
             for (let i = 0; i < checkedOther.length; i++) {
                 const otherInput = card.querySelector(
                     '.other-text-input[data-for-option="' + checkedOther[i].value + '"]'
@@ -943,19 +971,24 @@
             return true;
         }
 
-        const select = card.querySelector('select');
+        const select = card.querySelector('select[name="' + baseName + '"]');
         if (select) {
             return select.value !== '';
         }
 
-        const textInput = card.querySelector('input[type="text"], input[type="number"], input[type="date"], textarea');
-        if (textInput) {
-            return textInput.value.trim() !== '';
-        }
-
-        const fileInput = card.querySelector('input[type="file"]');
+        const fileInput = card.querySelector('input[type="file"][name="' + baseName + '"]');
         if (fileInput) {
             return fileInput.files && fileInput.files.length > 0;
+        }
+
+        const textInput = card.querySelector(
+            'input[type="text"][name="' + baseName + '"], ' +
+            'input[type="number"][name="' + baseName + '"], ' +
+            'input[type="date"][name="' + baseName + '"], ' +
+            'textarea[name="' + baseName + '"]'
+        );
+        if (textInput) {
+            return textInput.value.trim() !== '';
         }
 
         return true;
@@ -971,12 +1004,15 @@
             // "required" di cabang yang sedang tidak relevan tidak memblokir submit.
             if (card.classList.contains('d-none')) {
                 card.classList.remove('has-error');
-                const hiddenErrorEl = card.querySelector('.error-message');
+                // :scope > .error-message: kartu anak sekarang nested di dalam kartu
+                // ini sendiri (lihat isQuestionAnswered()), jadi querySelector biasa
+                // bisa salah ambil punya kartu anak/cucu alih-alih punya kartu ini.
+                const hiddenErrorEl = card.querySelector(':scope > .error-message');
                 if (hiddenErrorEl) hiddenErrorEl.classList.remove('show');
                 return;
             }
 
-            const errorEl = card.querySelector('.error-message');
+            const errorEl = card.querySelector(':scope > .error-message');
             const required = card.getAttribute('data-required') === '1';
 
             if (required && !isQuestionAnswered(card)) {
@@ -1018,14 +1054,26 @@
             el.classList.add('d-none');
             el.value = '';
         });
+
+        // Bersihkan status error di kartu ini SENDIRI, plus di semua kartu anak yang
+        // ikut nested & ikut tersembunyi di dalamnya (cascading) — kartu anak sekarang
+        // benar-benar nested secara fisik di DOM (lihat question-card.blade.php),
+        // jadi ada kemungkinan beberapa lapis kartu anak/cucu sekaligus perlu direset.
         card.classList.remove('has-error');
-        const errorEl = card.querySelector('.error-message');
-        if (errorEl) errorEl.classList.remove('show');
+        const ownErrorEl = card.querySelector(':scope > .error-message');
+        if (ownErrorEl) ownErrorEl.classList.remove('show');
+
+        card.querySelectorAll('.question-card').forEach(function (nested) {
+            nested.classList.remove('has-error');
+            const nestedErrorEl = nested.querySelector(':scope > .error-message');
+            if (nestedErrorEl) nestedErrorEl.classList.remove('show');
+        });
     }
 
-    // Setiap kartu pertanyaan cabang (.question-card[data-parent-option-id]) dirender
-    // sebagai flat sibling (lihat frontend/partials/question-card.blade.php), dengan
-    // atribut data-parent-option-id menunjuk ke id radio/checkbox opsi pemicunya
+    // Setiap kartu pertanyaan cabang (.question-card[data-parent-option-id]) di-render
+    // BENAR-BENAR NESTED tepat di bawah opsi pemicunya di DOM (lihat
+    // frontend/partials/question-card.blade.php), dengan atribut
+    // data-parent-option-id menunjuk ke id radio/checkbox opsi pemicunya
     // (id="option_{id}"). Karena id opsi itu UUID yang unik secara GLOBAL (bukan
     // cuma unik per-pertanyaan), visibilitas tiap kartu bisa dihitung tanpa perlu
     // tahu struktur/kedalaman hierarkinya sama sekali — cukup diulang beberapa kali
@@ -1181,9 +1229,14 @@
 
     // Single choice toggle
     function toggleSingleOption(element, questionId) {
-        // Remove selected class from all options in this group
+        // Remove selected class from all options in this group. Di-scope supaya
+        // CUMA opsi milik kartu `parent` sendiri yang ke-uncheck — kartu anak
+        // (pertanyaan bercabang) sekarang nested fisik di dalam salah satu opsi di
+        // sini, jadi .option-item miliknya sendiri (kalau tipe anaknya juga single/
+        // multiple choice) TIDAK boleh ikut kena reset "selected" dari toggle induk.
         const parent = element.closest('.question-card');
         parent.querySelectorAll('.option-item').forEach(function(opt) {
+            if (opt.closest('.question-card') !== parent) return;
             opt.classList.remove('selected');
         });
         // Add selected class to clicked option
@@ -1193,7 +1246,7 @@
         radio.checked = true;
 
         parent.classList.remove('has-error');
-        const errorEl = parent.querySelector('.error-message');
+        const errorEl = parent.querySelector(':scope > .error-message');
         if (errorEl) errorEl.classList.remove('show');
 
         // Pertanyaan bercabang: opsi ini bisa jadi pemicu pertanyaan anak.
@@ -1226,7 +1279,7 @@
 
         const parent = element.closest('.question-card');
         parent.classList.remove('has-error');
-        const errorEl = parent.querySelector('.error-message');
+        const errorEl = parent.querySelector(':scope > .error-message');
         if (errorEl) errorEl.classList.remove('show');
 
         // Pertanyaan bercabang: opsi ini bisa jadi pemicu pertanyaan anak.
@@ -1241,13 +1294,13 @@
         el.addEventListener('input', function () {
             const card = el.closest('.question-card');
             card.classList.remove('has-error');
-            const errorEl = card.querySelector('.error-message');
+            const errorEl = card.querySelector(':scope > .error-message');
             if (errorEl) errorEl.classList.remove('show');
         });
         el.addEventListener('change', function () {
             const card = el.closest('.question-card');
             card.classList.remove('has-error');
-            const errorEl = card.querySelector('.error-message');
+            const errorEl = card.querySelector(':scope > .error-message');
             if (errorEl) errorEl.classList.remove('show');
         });
     });
@@ -1331,7 +1384,7 @@
         });
         container.querySelectorAll('.question-card').forEach(function (el) {
             el.classList.remove('has-error');
-            const errorEl = el.querySelector('.error-message');
+            const errorEl = el.querySelector(':scope > .error-message');
             if (errorEl) errorEl.classList.remove('show');
         });
 

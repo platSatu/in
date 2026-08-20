@@ -410,6 +410,12 @@ Route::middleware(['auth', 'permission:quiz.form-question'])->prefix('dashboard/
 });
 Route::middleware(['auth', 'permission:quiz.form-question,edit'])->prefix('dashboard/superadmin/quiz/form-question')->group(function () {
     Route::get('/create', [FormQuestionController::class, 'create'])->name('quiz.form-question.create');
+    // Pertanyaan bercabang: endpoint AJAX untuk mengisi ulang dropdown "Tampilkan
+    // hanya jika opsi ini dipilih" begitu Form dipilih di halaman create (jalur
+    // menu utama, form belum terkunci lewat ?form_id=). Segmen literal ini WAJIB
+    // didaftarkan sebelum /{id}/edit di bawah (sama-sama GET) supaya tidak ketelan
+    // wildcard {id}.
+    Route::get('/parent-options', [FormQuestionController::class, 'parentOptionChoices'])->name('quiz.form-question.parent-options');
     Route::post('/', [FormQuestionController::class, 'store'])->name('quiz.form-question.store');
     Route::get('/{id}/edit', [FormQuestionController::class, 'edit'])->name('quiz.form-question.edit');
     Route::put('/{id}', [FormQuestionController::class, 'update'])->name('quiz.form-question.update');

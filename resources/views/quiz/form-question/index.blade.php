@@ -78,6 +78,13 @@
                                     <td>{{ optional($item->created_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
                                         <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                            {{-- Show: lihat semua jawaban/opsi pertanyaan ini (pakai kembali halaman
+                                                 index Form Question Option, difilter question_id) — dari situ juga
+                                                 ada tombol Add Jawaban (question_id sudah terisi) dan Edit per baris,
+                                                 supaya tidak perlu bolak-balik buka menu Form Question Option dari awal. --}}
+                                            <a href="{{ route('quiz.form-question-option.index', ['question_id' => $item->id]) }}"
+                                                class="btn btn-sm btn-outline-secondary text-nowrap">Show</a>
+
                                             <a href="{{ route('quiz.form-question.edit', $item->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
 
