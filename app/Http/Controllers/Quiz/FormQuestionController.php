@@ -6,6 +6,7 @@ use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\FormQuestion;
+use App\Models\FormQuestionOption;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
@@ -85,7 +86,25 @@ class FormQuestionController extends Controller
 
         $selectedFormId = $request->query('form_id');
 
-        return view('quiz.form-question.create', compact('forms', 'selectedFormId'));
+        // Pertanyaan bercabang (conditional/nested questions): daftar opsi yang
+        // sudah tersimpan di form ini, dipakai untuk dropdown "Tampilkan hanya
+        // jika opsi ini dipilih" di tiap baris. Cuma bisa ditentukan kalau form-nya
+        // sudah pasti (lock via ?form_id=) — sebelum itu belum ada konteks form
+        // yang jelas untuk tahu opsi mana saja yang relevan.
+        $parentOptionChoices = collect();
+        if (!empty($selectedFormId)) {
+            $parentOptionChoices = FormQuestionOption::query()
+                ->with('question')
+                ->where('status', 'active')
+                ->whereHas('question', function ($q) use ($selectedFormId, $userId) {
+                    $q->where('form_id', $selectedFormId)->where('user_id', (string) $userId);
+                })
+                ->orderBy('question_id')
+                ->orderBy('order')
+                ->get();
+        }
+
+        return view('quiz.form-question.create', compact('forms', 'selectedFormId', 'parentOptionChoices'));
     }
 
     // public function store(Request $request)
@@ -132,6 +151,20 @@ class FormQuestionController extends Controller
      */
     public function store(Request $request)
     {
+        // Normalisasi dulu: <select> "-- Tidak ada --" pada dropdown parent_option_id
+        // (lihat template baris di quiz/form-question/create.blade.php) mengirim
+        // string kosong "", BUKAN null — kalau dibiarkan, rule 'nullable' tidak akan
+        // menganggapnya kosong (string "" tetap lolos rule 'string' lalu gagal di
+        // rule 'exists'). Disamakan jadi null di sini supaya validasi & penyimpanan
+        // konsisten dengan pertanyaan root (tanpa pemicu).
+        $normalizedQuestions = (array) $request->input('questions', []);
+        foreach ($normalizedQuestions as $key => $row) {
+            if (($row['parent_option_id'] ?? null) === '') {
+                $normalizedQuestions[$key]['parent_option_id'] = null;
+            }
+        }
+        $request->merge(['questions' => $normalizedQuestions]);
+
         $validator = Validator::make($request->all(), [
             'form_id' => 'required|string|exists:forms,id',
             'questions' => 'required|array|min:1',
@@ -139,6 +172,7 @@ class FormQuestionController extends Controller
             'questions.*.description' => 'nullable|string',
             'questions.*.type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file',
             'questions.*.stage_group' => 'nullable|in:personal_data,placement_test',
+            'questions.*.parent_option_id' => 'nullable|string|exists:form_question_options,id',
             'questions.*.required' => 'nullable|boolean',
             'questions.*.status' => 'nullable|in:active,inactive',
             'questions.*.image' => 'nullable|image|max:4096',
@@ -176,6 +210,29 @@ class FormQuestionController extends Controller
             abort(403, 'Form tidak valid untuk user ini.');
         }
 
+        // Pertanyaan bercabang: parent_option_id (kalau diisi) HARUS menunjuk ke
+        // opsi milik pertanyaan yang ada di form YANG SAMA — mencegah satu form
+        // "meminjam" opsi milik form lain sebagai pemicu (cross-form reference).
+        // Cycle-prevention TIDAK perlu di sini: pertanyaan yang baru dibuat lewat
+        // store() ini belum punya opsi apa pun, jadi mustahil jadi leluhur dirinya
+        // sendiri — beda dengan update() yang bisa mengedit pertanyaan yang sudah
+        // punya opsi & anak.
+        $parentOptionIds = collect($validated['questions'])->pluck('parent_option_id')->filter()->unique();
+        if ($parentOptionIds->isNotEmpty()) {
+            $validParentOptionIds = FormQuestionOption::query()
+                ->whereIn('id', $parentOptionIds)
+                ->whereHas('question', function ($q) use ($validated) {
+                    $q->where('form_id', $validated['form_id']);
+                })
+                ->pluck('id');
+
+            foreach ($validated['questions'] as $row) {
+                if (!empty($row['parent_option_id']) && !$validParentOptionIds->contains($row['parent_option_id'])) {
+                    abort(422, 'Opsi pemicu ("Tampilkan hanya jika opsi ini dipilih") tidak valid untuk form ini.');
+                }
+            }
+        }
+
         $existingCount = FormQuestion::where('form_id', $validated['form_id'])->count();
         $nextOrder = $existingCount > 0
             ? ((int) FormQuestion::where('form_id', $validated['form_id'])->max('order')) + 1
@@ -198,6 +255,7 @@ class FormQuestionController extends Controller
             FormQuestion::create([
                 'user_id' => (string) $userId,
                 'form_id' => $validated['form_id'],
+                'parent_option_id' => $row['parent_option_id'] ?? null,
                 'stage_group' => $row['stage_group'] ?? 'placement_test',
                 'question_text' => $row['question_text'] ?? null,
                 'description' => $row['description'] ?? null,
@@ -233,7 +291,23 @@ class FormQuestionController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('quiz.form-question.edit', compact('data', 'forms'));
+        // Pertanyaan bercabang: opsi-opsi yang bisa dijadikan pemicu untuk
+        // pertanyaan ini — dibatasi ke form yang sama, dan opsi milik pertanyaan
+        // ini sendiri dikecualikan (tidak masuk akal jadi anak dari opsinya
+        // sendiri; cycle yang lebih dalam tetap dijaga lewat wouldCreateCycle()
+        // di update() di bawah).
+        $parentOptionChoices = FormQuestionOption::query()
+            ->with('question')
+            ->where('status', 'active')
+            ->where('question_id', '!=', $data->id)
+            ->whereHas('question', function ($q) use ($data, $userId) {
+                $q->where('form_id', $data->form_id)->where('user_id', (string) $userId);
+            })
+            ->orderBy('question_id')
+            ->orderBy('order')
+            ->get();
+
+        return view('quiz.form-question.edit', compact('data', 'forms', 'parentOptionChoices'));
     }
 
     // public function update(Request $request, string $id)
@@ -278,12 +352,20 @@ class FormQuestionController extends Controller
         /** @var FormQuestion $existing */
         $existing = AdminCrud::findOrFail(FormQuestion::class, $id, (string) $userId);
 
+        // Sama seperti store(): "-- Tidak ada --" pada dropdown parent_option_id
+        // mengirim string kosong, disamakan ke null di sini supaya rule 'nullable'
+        // benar-benar berlaku.
+        if ($request->input('parent_option_id') === '') {
+            $request->merge(['parent_option_id' => null]);
+        }
+
         $validator = Validator::make($request->all(), [
             'form_id' => 'required|string|exists:forms,id',
             'question_text' => 'nullable|string',
             'description' => 'nullable|string',
             'type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file',
             'stage_group' => 'nullable|in:personal_data,placement_test',
+            'parent_option_id' => 'nullable|string|exists:form_question_options,id',
             'required' => 'required|boolean',
             'order' => 'required|integer|min:0',
             'status' => 'required|in:active,inactive',
@@ -302,6 +384,22 @@ class FormQuestionController extends Controller
 
             if (!$hasText && !$willHaveImage && !$willHaveAudio) {
                 $validator->errors()->add('question_text', 'Isi minimal salah satu dari teks, audio, atau gambar.');
+            }
+
+            // Pertanyaan bercabang: cegah referensi lintas-form dan cegah cycle
+            // (mis. pertanyaan ini dijadikan anak dari salah satu opsi turunannya
+            // sendiri, langsung ataupun berlapis).
+            $parentOptionId = $request->input('parent_option_id');
+            if (!empty($parentOptionId)) {
+                $option = FormQuestionOption::with('question')->find($parentOptionId);
+
+                if (!$option || !$option->question || $option->question->form_id !== $request->input('form_id')) {
+                    $validator->errors()->add('parent_option_id', 'Opsi pemicu tidak valid untuk form ini.');
+                } elseif ($option->question_id === $existing->id) {
+                    $validator->errors()->add('parent_option_id', 'Pertanyaan tidak boleh dijadikan anak dari opsinya sendiri.');
+                } elseif ($this->wouldCreateCycle($existing->id, $parentOptionId)) {
+                    $validator->errors()->add('parent_option_id', 'Opsi pemicu ini akan membuat perulangan (cycle) pada struktur pertanyaan.');
+                }
             }
         });
 
@@ -400,5 +498,41 @@ class FormQuestionController extends Controller
         if (file_exists($fullPath)) {
             unlink($fullPath);
         }
+    }
+
+    /**
+     * Pertanyaan bercabang: cek apakah menjadikan $candidateParentOptionId sebagai
+     * parent_option_id untuk pertanyaan $questionId akan membuat perulangan (cycle)
+     * — baik langsung (opsi milik pertanyaan itu sendiri) maupun berlapis (opsi
+     * milik salah satu keturunannya). Ditelusuri ke ATAS dari opsi kandidat lewat
+     * rantai question -> parent_option -> question -> ... Batas 50 langkah cukup
+     * jauh melebihi kedalaman nesting wajar mana pun, sekaligus jadi pengaman
+     * kalau ada data lama yang somehow sudah cyclic.
+     */
+    private function wouldCreateCycle(string $questionId, ?string $candidateParentOptionId): bool
+    {
+        if (empty($candidateParentOptionId)) {
+            return false;
+        }
+
+        $optionId = $candidateParentOptionId;
+        $depth = 0;
+
+        while ($optionId && $depth < 50) {
+            $option = FormQuestionOption::find($optionId);
+            if (!$option) {
+                return false;
+            }
+
+            if ($option->question_id === $questionId) {
+                return true;
+            }
+
+            $parentQuestion = FormQuestion::find($option->question_id);
+            $optionId = $parentQuestion ? $parentQuestion->parent_option_id : null;
+            $depth++;
+        }
+
+        return $depth >= 50;
     }
 }

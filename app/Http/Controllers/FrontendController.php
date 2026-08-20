@@ -311,10 +311,20 @@ class FrontendController extends Controller
                 // Kalau has_personal_data_stage nonaktif, $personalDataQuestions dibiarkan
                 // kosong (step-nya tidak dirender sama sekali di blade) meskipun ada
                 // pertanyaan lama yang kebetulan bertanda personal_data.
+                //
+                // === PERTANYAAN BERCABANG (conditional/nested questions) ===
+                // $questions di atas masih FLAT berisi SEMUA pertanyaan aktif form ini,
+                // termasuk pertanyaan "anak" (parent_option_id terisi). Loop render
+                // top-level di form-wizard.blade.php cuma boleh menampilkan pertanyaan
+                // ROOT (parent_option_id kosong) — pertanyaan anak dirender belakangan,
+                // secara rekursif, lewat @include di dalam question-card.blade.php
+                // sendiri begitu opsi pemicunya muncul di antara $question->options.
+                $rootQuestions = $questions->filter(fn ($q) => $q->parent_option_id === null);
+
                 if ($selectedForm->has_personal_data_stage) {
-                    $personalDataQuestions = $questions->where('stage_group', 'personal_data')->values();
+                    $personalDataQuestions = $rootQuestions->where('stage_group', 'personal_data')->values();
                 }
-                $placementTestQuestions = $questions->where('stage_group', 'placement_test')->values();
+                $placementTestQuestions = $rootQuestions->where('stage_group', 'placement_test')->values();
             }
         }
 
@@ -1010,11 +1020,22 @@ class FrontendController extends Controller
     }
 
     /**
-     * Loop seluruh pertanyaan form (sesuai urutan) dan simpan FormAnswer untuk
-     * apapun yang sudah terisi di $request. Tidak pernah menegakkan "required" di
-     * level ini (itu murni validasi JS di form-wizard.blade.php) — jawaban kosong
-     * cukup dilewati, bukan error. Dipakai bareng oleh formWizardSubmit() (submit
-     * lengkap) dan formWizardTimeoutSave() (auto-save saat timer placement test habis).
+     * Loop pertanyaan ROOT form ini (sesuai urutan) dan simpan FormAnswer untuk
+     * apapun yang sudah terisi di $request — termasuk, secara rekursif, pertanyaan
+     * "anak" (bercabang/nested) dari opsi yang benar-benar dipilih peserta. Tidak
+     * pernah menegakkan "required" di level ini (itu murni validasi JS di
+     * form-wizard.blade.php) — jawaban kosong cukup dilewati, bukan error. Dipakai
+     * bareng oleh formWizardSubmit() (submit lengkap) dan formWizardTimeoutSave()
+     * (auto-save saat timer placement test habis).
+     *
+     * === PERTANYAAN BERCABANG (conditional/nested questions) ===
+     * $questions yang masuk ke sini masih FLAT (root + semua anak berlapis, lihat
+     * pemanggilnya) — sengaja TIDAK difilter parent_option_id di sini, supaya bisa
+     * dikelompokkan sekali via groupBy('parent_option_id') lalu ditelusuri mulai
+     * dari root, turun HANYA ke anak dari opsi yang memang benar-benar dipilih di
+     * $request (bukan cuma percaya pada state tersembunyi/d-none di client). Ini
+     * satu-satunya "sumber kebenaran" untuk pertanyaan cabang mana yang boleh
+     * tersimpan jawabannya — client-side hanya mengatur tampilan, bukan keamanan.
      *
      * @param  \Illuminate\Support\Collection<int, FormQuestion>  $questions
      * @return array{ringkasan: string, autoScore: float, selectedMajorIds: array<int, string>}
@@ -1031,145 +1052,260 @@ class FrontendController extends Controller
         $selectedMajorIds = [];
         $autoScore = 0;
 
-        foreach ($questions as $question) {
-            $questionKey = 'question_' . $question->id;
-            $answerValue = null;
+        $childrenByParentOption = $questions->groupBy('parent_option_id');
+        $rootQuestions = $questions->filter(fn ($q) => $q->parent_option_id === null);
 
-            if ($question->type === 'text' || $question->type === 'number') {
-                $answerText = $request->input($questionKey);
-                $answerValue = $answerText ?: '-';
-
-                if ($answerText) {
-                    FormAnswer::create([
-                        'user_id' => $student->id,
-                        'submission_id' => $submission->id,
-                        'question_id' => $question->id,
-                        'option_id' => null,
-                        'answer_text' => $answerText,
-                        'status' => 'active',
-                    ]);
-                }
-            } elseif ($question->type === 'single_choice') {
-                $optionId = $request->input($questionKey);
-
-                if ($optionId) {
-                    $option = FormQuestionOption::find($optionId);
-                    // option_text bisa kosong kalau opsinya berupa gambar saja (mis. soal Listening).
-                    $answerValue = $option ? ($option->option_text ?: '[Gambar]') : '-';
-
-                    FormAnswer::create([
-                        'user_id' => $student->id,
-                        'submission_id' => $submission->id,
-                        'question_id' => $question->id,
-                        'option_id' => $optionId,
-                        'answer_text' => null,
-                        'status' => 'active',
-                    ]);
-
-                    if ($isAutoResultForm && $question->stage_group === 'placement_test' && $option) {
-                        $autoScore += (float) ($option->score ?? 0);
-                    }
-                } else {
-                    $answerValue = '-';
-                }
-            } elseif ($question->type === 'multiple_choice') {
-                $optionIds = $request->input($questionKey, []);
-                $selectedOptions = [];
-
-                foreach ($optionIds as $optionId) {
-                    $option = FormQuestionOption::find($optionId);
-                    if ($option) {
-                        // Opsi "Lainnya" (is_other): teks bebas yang diketik peserta datang
-                        // dari input terpisah question_{id}_other_text (lihat
-                        // frontend/partials/question-card.blade.php), disimpan ke
-                        // answer_text supaya jawabannya tidak hilang.
-                        $otherText = $option->is_other
-                            ? trim((string) $request->input($questionKey . '_other_text', ''))
-                            : null;
-                        $hasOtherText = $otherText !== null && $otherText !== '';
-
-                        $selectedOptions[] = $hasOtherText ? $otherText : ($option->option_text ?: '[Gambar]');
-
-                        FormAnswer::create([
-                            'user_id' => $student->id,
-                            'submission_id' => $submission->id,
-                            'question_id' => $question->id,
-                            'option_id' => $optionId,
-                            'answer_text' => $hasOtherText ? $otherText : null,
-                            'status' => 'active',
-                        ]);
-
-                        if ($isAutoResultForm && $question->stage_group === 'placement_test') {
-                            $autoScore += (float) ($option->score ?? 0);
-                        }
-                    }
-                }
-
-                $answerValue = !empty($selectedOptions) ? implode(', ', $selectedOptions) : '-';
-            } elseif ($question->type === 'major') {
-                $majorId = $request->input($questionKey);
-                $major = $majorId ? Major::find($majorId) : null;
-                $answerValue = $major ? $major->name : '-';
-
-                if ($majorId && $major) {
-                    FormAnswer::create([
-                        'user_id' => $student->id,
-                        'submission_id' => $submission->id,
-                        'question_id' => $question->id,
-                        'option_id' => null,
-                        'answer_text' => $majorId,
-                        'status' => 'active',
-                    ]);
-
-                    $selectedMajorIds[] = $majorId;
-                }
-            } elseif ($question->type === 'file') {
-                // Upload jawaban (dokumen pendukung, dsb). Nama field-nya dinamis per
-                // pertanyaan (question_{id}) sama seperti tipe lain di loop ini, jadi
-                // divalidasi manual di sini — bukan lewat $request->validate() di awal
-                // formWizardSubmit() yang cuma menangani field tetap (name/email/dst).
-                // File yang tidak lolos (jenis/ukuran) diperlakukan seperti "belum
-                // dijawab" (tidak disimpan) — konsisten dengan tipe lain di loop ini
-                // yang memang tidak pernah menegakkan "required" di server, hanya di JS.
-                $uploadedFile = $request->file($questionKey);
-                $answerValue = '-';
-
-                if ($uploadedFile) {
-                    $fileValidator = Validator::make(
-                        [$questionKey => $uploadedFile],
-                        [$questionKey => 'file|mimes:' . self::QUESTION_FILE_ALLOWED_MIMES . '|max:' . self::QUESTION_FILE_MAX_KB]
-                    );
-
-                    if ($fileValidator->passes()) {
-                        $storedPath = $this->storeQuestionAnswerFile($uploadedFile);
-                        $answerValue = '[File: ' . $uploadedFile->getClientOriginalName() . ']';
-
-                        FormAnswer::create([
-                            'user_id' => $student->id,
-                            'submission_id' => $submission->id,
-                            'question_id' => $question->id,
-                            'option_id' => null,
-                            'answer_text' => $storedPath,
-                            'status' => 'active',
-                        ]);
-                    } else {
-                        Log::warning('[FORM-WIZARD] File jawaban ditolak (jenis/ukuran tidak valid)', [
-                            'question_id' => $question->id,
-                            'original_name' => $uploadedFile->getClientOriginalName(),
-                            'errors' => $fileValidator->errors()->all(),
-                        ]);
-                    }
-                }
-            }
-
-            $answersSummary[] = "{$questionNumber}. {$question->question_text}\n   Jawaban: {$answerValue}";
-            $questionNumber++;
+        foreach ($rootQuestions as $question) {
+            $this->processQuestionBranch(
+                $request,
+                $submission,
+                $student,
+                $question,
+                $childrenByParentOption,
+                $isAutoResultForm,
+                0,
+                $answersSummary,
+                $questionNumber,
+                $autoScore,
+                $selectedMajorIds
+            );
         }
 
         return [
             'ringkasan' => implode("\n", $answersSummary),
             'autoScore' => $autoScore,
             'selectedMajorIds' => $selectedMajorIds,
+        ];
+    }
+
+    /**
+     * Simpan jawaban SATU pertanyaan (lewat saveSingleQuestionAnswer()), lalu
+     * turun secara rekursif ke pertanyaan anak dari opsi yang benar-benar terpilih
+     * di jawaban itu. $depth dipakai untuk indentasi ringkasan teks ("↳") supaya
+     * laporan WhatsApp juga kelihatan bercabang, sama seperti tampilan form-nya.
+     *
+     * Parameter penghitung ($answersSummary, $questionNumber, $autoScore,
+     * $selectedMajorIds) dilewatkan by-reference supaya terus terakumulasi
+     * sepanjang seluruh pohon pertanyaan, termasuk lintas rekursi.
+     */
+    private function processQuestionBranch(
+        Request $request,
+        FormSubmission $submission,
+        Student $student,
+        FormQuestion $question,
+        $childrenByParentOption,
+        bool $isAutoResultForm,
+        int $depth,
+        array &$answersSummary,
+        int &$questionNumber,
+        float &$autoScore,
+        array &$selectedMajorIds
+    ): void {
+        // Pengaman kalau ada data lama yang somehow membentuk cycle (harusnya
+        // sudah dicegah saat admin menyimpan pertanyaan, lihat
+        // FormQuestionController::wouldCreateCycle()) — supaya tidak pernah sampai
+        // infinite recursion di sini.
+        if ($depth > 12) {
+            return;
+        }
+
+        $result = $this->saveSingleQuestionAnswer($request, $submission, $student, $question, $isAutoResultForm);
+
+        $indent = $depth > 0 ? str_repeat('   ', $depth) . '↳ ' : '';
+        $answersSummary[] = "{$indent}{$questionNumber}. {$question->question_text}\n{$indent}   Jawaban: {$result['answerValue']}";
+        $questionNumber++;
+        $autoScore += $result['scoreDelta'];
+
+        if ($result['majorId']) {
+            $selectedMajorIds[] = $result['majorId'];
+        }
+
+        foreach ($result['selectedOptionIds'] as $optionId) {
+            $children = $childrenByParentOption->get($optionId);
+            if (!$children) {
+                continue;
+            }
+
+            foreach ($children as $childQuestion) {
+                $this->processQuestionBranch(
+                    $request,
+                    $submission,
+                    $student,
+                    $childQuestion,
+                    $childrenByParentOption,
+                    $isAutoResultForm,
+                    $depth + 1,
+                    $answersSummary,
+                    $questionNumber,
+                    $autoScore,
+                    $selectedMajorIds
+                );
+            }
+        }
+    }
+
+    /**
+     * Simpan FormAnswer untuk SATU pertanyaan sesuai tipenya — logika per-tipe
+     * sama persis dengan sebelum refactor pertanyaan bercabang, cuma sekarang
+     * mengembalikan hasilnya (bukan langsung menumpuk ke variabel di luar) supaya
+     * processQuestionBranch() bisa tahu opsi mana yang terpilih (untuk menentukan
+     * pertanyaan anak mana yang perlu direkursi).
+     *
+     * @return array{answerValue: string, selectedOptionIds: array<int, string>, majorId: ?string, scoreDelta: float}
+     */
+    private function saveSingleQuestionAnswer(
+        Request $request,
+        FormSubmission $submission,
+        Student $student,
+        FormQuestion $question,
+        bool $isAutoResultForm
+    ): array {
+        $questionKey = 'question_' . $question->id;
+        $answerValue = null;
+        $selectedOptionIds = [];
+        $majorId = null;
+        $scoreDelta = 0;
+
+        if ($question->type === 'text' || $question->type === 'number') {
+            $answerText = $request->input($questionKey);
+            $answerValue = $answerText ?: '-';
+
+            if ($answerText) {
+                FormAnswer::create([
+                    'user_id' => $student->id,
+                    'submission_id' => $submission->id,
+                    'question_id' => $question->id,
+                    'option_id' => null,
+                    'answer_text' => $answerText,
+                    'status' => 'active',
+                ]);
+            }
+        } elseif ($question->type === 'single_choice') {
+            $optionId = $request->input($questionKey);
+
+            if ($optionId) {
+                $option = FormQuestionOption::find($optionId);
+                // option_text bisa kosong kalau opsinya berupa gambar saja (mis. soal Listening).
+                $answerValue = $option ? ($option->option_text ?: '[Gambar]') : '-';
+
+                FormAnswer::create([
+                    'user_id' => $student->id,
+                    'submission_id' => $submission->id,
+                    'question_id' => $question->id,
+                    'option_id' => $optionId,
+                    'answer_text' => null,
+                    'status' => 'active',
+                ]);
+
+                // Dicatat sebagai "terpilih" walau $option null (opsi tidak/tidak lagi
+                // ada) — childrenByParentOption->get() untuk id semacam itu memang
+                // tidak akan menemukan apa-apa, jadi aman, dan tetap konsisten dengan
+                // FormAnswer yang sudah terlanjur dibuat di atas.
+                $selectedOptionIds[] = $optionId;
+
+                if ($isAutoResultForm && $question->stage_group === 'placement_test' && $option) {
+                    $scoreDelta += (float) ($option->score ?? 0);
+                }
+            } else {
+                $answerValue = '-';
+            }
+        } elseif ($question->type === 'multiple_choice') {
+            $optionIds = $request->input($questionKey, []);
+            $selectedOptions = [];
+
+            foreach ($optionIds as $optionId) {
+                $option = FormQuestionOption::find($optionId);
+                if ($option) {
+                    // Opsi "Lainnya" (is_other): teks bebas yang diketik peserta datang
+                    // dari input terpisah question_{id}_other_text (lihat
+                    // frontend/partials/question-card.blade.php), disimpan ke
+                    // answer_text supaya jawabannya tidak hilang.
+                    $otherText = $option->is_other
+                        ? trim((string) $request->input($questionKey . '_other_text', ''))
+                        : null;
+                    $hasOtherText = $otherText !== null && $otherText !== '';
+
+                    $selectedOptions[] = $hasOtherText ? $otherText : ($option->option_text ?: '[Gambar]');
+
+                    FormAnswer::create([
+                        'user_id' => $student->id,
+                        'submission_id' => $submission->id,
+                        'question_id' => $question->id,
+                        'option_id' => $optionId,
+                        'answer_text' => $hasOtherText ? $otherText : null,
+                        'status' => 'active',
+                    ]);
+
+                    $selectedOptionIds[] = $optionId;
+
+                    if ($isAutoResultForm && $question->stage_group === 'placement_test') {
+                        $scoreDelta += (float) ($option->score ?? 0);
+                    }
+                }
+            }
+
+            $answerValue = !empty($selectedOptions) ? implode(', ', $selectedOptions) : '-';
+        } elseif ($question->type === 'major') {
+            $majorIdInput = $request->input($questionKey);
+            $major = $majorIdInput ? Major::find($majorIdInput) : null;
+            $answerValue = $major ? $major->name : '-';
+
+            if ($majorIdInput && $major) {
+                FormAnswer::create([
+                    'user_id' => $student->id,
+                    'submission_id' => $submission->id,
+                    'question_id' => $question->id,
+                    'option_id' => null,
+                    'answer_text' => $majorIdInput,
+                    'status' => 'active',
+                ]);
+
+                $majorId = $majorIdInput;
+            }
+        } elseif ($question->type === 'file') {
+            // Upload jawaban (dokumen pendukung, dsb). Nama field-nya dinamis per
+            // pertanyaan (question_{id}) sama seperti tipe lain di sini, jadi
+            // divalidasi manual di sini — bukan lewat $request->validate() di awal
+            // formWizardSubmit() yang cuma menangani field tetap (name/email/dst).
+            // File yang tidak lolos (jenis/ukuran) diperlakukan seperti "belum
+            // dijawab" (tidak disimpan) — konsisten dengan tipe lain di sini yang
+            // memang tidak pernah menegakkan "required" di server, hanya di JS.
+            $uploadedFile = $request->file($questionKey);
+            $answerValue = '-';
+
+            if ($uploadedFile) {
+                $fileValidator = Validator::make(
+                    [$questionKey => $uploadedFile],
+                    [$questionKey => 'file|mimes:' . self::QUESTION_FILE_ALLOWED_MIMES . '|max:' . self::QUESTION_FILE_MAX_KB]
+                );
+
+                if ($fileValidator->passes()) {
+                    $storedPath = $this->storeQuestionAnswerFile($uploadedFile);
+                    $answerValue = '[File: ' . $uploadedFile->getClientOriginalName() . ']';
+
+                    FormAnswer::create([
+                        'user_id' => $student->id,
+                        'submission_id' => $submission->id,
+                        'question_id' => $question->id,
+                        'option_id' => null,
+                        'answer_text' => $storedPath,
+                        'status' => 'active',
+                    ]);
+                } else {
+                    Log::warning('[FORM-WIZARD] File jawaban ditolak (jenis/ukuran tidak valid)', [
+                        'question_id' => $question->id,
+                        'original_name' => $uploadedFile->getClientOriginalName(),
+                        'errors' => $fileValidator->errors()->all(),
+                    ]);
+                }
+            }
+        }
+
+        return [
+            'answerValue' => $answerValue,
+            'selectedOptionIds' => $selectedOptionIds,
+            'majorId' => $majorId,
+            'scoreDelta' => $scoreDelta,
         ];
     }
 

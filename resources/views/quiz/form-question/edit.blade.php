@@ -135,6 +135,28 @@
                                 </div>
 
                                 <div class="col-xxl-12 mb-4">
+                                    <label for="parent_option_id">Tampilkan hanya jika opsi ini dipilih <span class="text-muted">(opsional)</span></label>
+                                    <select class="form-select @error('parent_option_id') is-invalid @enderror" id="parent_option_id" name="parent_option_id">
+                                        <option value="">-- Tidak ada (pertanyaan utama) --</option>
+                                        @foreach ($parentOptionChoices as $opt)
+                                            <option value="{{ $opt->id }}"
+                                                {{ old('parent_option_id', $data->parent_option_id) == $opt->id ? 'selected' : '' }}>
+                                                {{ \Illuminate\Support\Str::limit(optional($opt->question)->question_text ?: 'Pertanyaan', 40) }}
+                                                &rarr; {{ $opt->option_text ?: '[Gambar]' }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div class="form-text">
+                                        Kalau dipilih, pertanyaan ini hanya akan muncul di form kalau peserta
+                                        memilih opsi tersebut (mendukung cabang berlapis — opsi milik
+                                        pertanyaan anak juga bisa dijadikan pemicu untuk pertanyaan berikutnya).
+                                    </div>
+                                    @error('parent_option_id')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="col-xxl-12 mb-4">
                                     <label for="stage_group">Termasuk Step</label>
                                     <select class="form-select @error('stage_group') is-invalid @enderror" id="stage_group" name="stage_group">
                                         <option value="placement_test"

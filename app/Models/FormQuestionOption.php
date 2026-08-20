@@ -47,4 +47,18 @@ class FormQuestionOption extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
+
+    /**
+     * Pertanyaan bercabang (conditional/nested question): daftar pertanyaan
+     * "anak" yang hanya ditampilkan ke peserta kalau opsi ini yang dipilih.
+     * Bisa berlapis tak terbatas — opsi milik pertanyaan anak di sini juga
+     * bisa punya childQuestions()-nya sendiri.
+     */
+    public function childQuestions()
+    {
+        return $this->hasMany(FormQuestion::class, 'parent_option_id')
+            ->where('status', 'active')
+            ->orderBy('order')
+            ->orderBy('created_at');
+    }
 }

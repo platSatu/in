@@ -60,7 +60,15 @@
                                 <tr>
                                     <td>{{ $data->firstItem() + $index }}</td>
                                     <td>{{ $item->submission_id }}</td>
-                                    <td>{{ \Illuminate\Support\Str::limit(optional($item->question)->question_text, 40) ?? '-' }}</td>
+                                    <td>
+                                        {{-- Pertanyaan bercabang (conditional/nested questions): tandai pertanyaan
+                                             "anak" (parent_option_id terisi) supaya kelihatan di laporan ini kalau
+                                             suatu jawaban itu berasal dari cabang, bukan pertanyaan utama. --}}
+                                        @if (optional($item->question)->parent_option_id)
+                                            <span class="text-muted" title="Pertanyaan cabang">↳</span>
+                                        @endif
+                                        {{ \Illuminate\Support\Str::limit(optional($item->question)->question_text, 40) ?? '-' }}
+                                    </td>
                                     <td>{{ \Illuminate\Support\Str::limit(optional($item->option)->option_text, 30) ?? '-' }}</td>
                                     <td>
                                         @if ($item->answer_text && str_starts_with($item->answer_text, 'quiz/file-upload/'))

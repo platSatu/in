@@ -235,6 +235,21 @@ class FormQuestionOptionController extends Controller
         /** @var FormQuestionOption $existing */
         $existing = AdminCrud::findOrFail(FormQuestionOption::class, $id, (string) $userId);
 
+        // Pertanyaan bercabang: opsi ini bisa saja jadi pemicu pertanyaan anak
+        // (parent_option_id). Kalau dihapus begitu saja, pertanyaan anaknya akan
+        // jadi "yatim" (tidak pernah bisa muncul lagi, tapi datanya masih ada) —
+        // diblokir dulu di sini, sama seperti pola ClassScheduleController::destroy()
+        // yang memblokir hapus jadwal kalau masih ada peserta terdaftar.
+        $hasChildQuestions = FormQuestion::where('parent_option_id', $id)
+            ->where('status', 'active')
+            ->exists();
+
+        if ($hasChildQuestions) {
+            return redirect()
+                ->route('quiz.form-question-option.index')
+                ->withErrors(['delete' => 'Option ini masih memiliki pertanyaan cabang (anak). Hapus atau alihkan dulu pertanyaan cabangnya sebelum menghapus option ini.']);
+        }
+
         $this->deleteOptionFile($existing->image);
 
         AdminCrud::delete(FormQuestionOption::class, $id, (string) $userId);

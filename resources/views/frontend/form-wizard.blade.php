@@ -166,6 +166,15 @@
             background: var(--brand-light);
         }
 
+        /* Pertanyaan bercabang (conditional/nested questions): kartu anak diberi
+           aksen garis kiri + latar putih supaya kelihatan "masuk" dari kartu
+           induknya, selain indentasi margin-left yang dihitung per-depth lewat
+           inline style di question-card.blade.php. */
+        .question-card-nested {
+            background: #fff;
+            border-left: 3px solid var(--brand);
+        }
+
         .question-number {
             background: var(--brand);
             color: white;
@@ -918,6 +927,16 @@
         let firstInvalidCard = null;
 
         document.querySelectorAll('#' + containerId + ' .question-card').forEach(function (card) {
+            // Pertanyaan cabang yang sedang disembunyikan (opsi pemicunya belum/
+            // tidak dipilih) tidak ikut divalidasi sama sekali — PENTING supaya
+            // "required" di cabang yang sedang tidak relevan tidak memblokir submit.
+            if (card.classList.contains('d-none')) {
+                card.classList.remove('has-error');
+                const hiddenErrorEl = card.querySelector('.error-message');
+                if (hiddenErrorEl) hiddenErrorEl.classList.remove('show');
+                return;
+            }
+
             const errorEl = card.querySelector('.error-message');
             const required = card.getAttribute('data-required') === '1';
 
@@ -937,6 +956,78 @@
         }
 
         return isValid;
+    }
+
+    // === PERTANYAAN BERCABANG (conditional/nested questions) ===================
+    // Kosongkan semua input di dalam satu kartu pertanyaan, dipakai saat kartu itu
+    // baru saja disembunyikan (opsi pemicunya di-uncheck/diganti) supaya jawaban
+    // lama yang sudah tidak relevan tidak ikut nyangkut & tidak ikut tersubmit.
+    function resetCardInputs(card) {
+        card.querySelectorAll('input[type="radio"], input[type="checkbox"]').forEach(function (el) {
+            el.checked = false;
+        });
+        card.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], textarea').forEach(function (el) {
+            el.value = '';
+        });
+        card.querySelectorAll('select').forEach(function (el) {
+            el.value = '';
+        });
+        card.querySelectorAll('.option-item, .form-option-checkbox').forEach(function (el) {
+            el.classList.remove('selected');
+        });
+        card.querySelectorAll('.other-text-input').forEach(function (el) {
+            el.classList.add('d-none');
+            el.value = '';
+        });
+        card.classList.remove('has-error');
+        const errorEl = card.querySelector('.error-message');
+        if (errorEl) errorEl.classList.remove('show');
+    }
+
+    // Setiap kartu pertanyaan cabang (.question-card[data-parent-option-id]) dirender
+    // sebagai flat sibling (lihat frontend/partials/question-card.blade.php), dengan
+    // atribut data-parent-option-id menunjuk ke id radio/checkbox opsi pemicunya
+    // (id="option_{id}"). Karena id opsi itu UUID yang unik secara GLOBAL (bukan
+    // cuma unik per-pertanyaan), visibilitas tiap kartu bisa dihitung tanpa perlu
+    // tahu struktur/kedalaman hierarkinya sama sekali — cukup diulang beberapa kali
+    // sampai tidak ada perubahan lagi (fixed point), supaya cabang berlapis (anak
+    // dari anak) ikut ke-resolve dengan benar dalam satu pemanggilan.
+    function refreshNestedQuestionVisibility() {
+        const nestedCards = document.querySelectorAll('.question-card[data-parent-option-id]');
+        if (!nestedCards.length) return;
+
+        let changed = true;
+        let iterations = 0;
+
+        while (changed && iterations < 20) {
+            changed = false;
+            iterations++;
+
+            nestedCards.forEach(function (card) {
+                const parentOptionId = card.getAttribute('data-parent-option-id');
+                const trigger = document.getElementById('option_' + parentOptionId);
+                const isTriggered = !!(trigger && trigger.checked);
+
+                // Kartu ini baru benar-benar dianggap "aktif" kalau opsi pemicunya
+                // sendiri berada di kartu yang sedang tampil (bukan tertutup oleh
+                // leluhurnya sendiri) — supaya cabang di dalam cabang yang sedang
+                // tersembunyi tidak ikut muncul duluan.
+                const triggerCard = trigger ? trigger.closest('.question-card') : null;
+                const parentVisible = !triggerCard || !triggerCard.classList.contains('d-none');
+
+                const shouldShow = isTriggered && parentVisible;
+                const isHidden = card.classList.contains('d-none');
+
+                if (shouldShow && isHidden) {
+                    card.classList.remove('d-none');
+                    changed = true;
+                } else if (!shouldShow && !isHidden) {
+                    card.classList.add('d-none');
+                    resetCardInputs(card);
+                    changed = true;
+                }
+            });
+        }
     }
 
     // Pola yang sama dengan validasi server (formWizardSubmit):
@@ -1065,6 +1156,9 @@
         parent.classList.remove('has-error');
         const errorEl = parent.querySelector('.error-message');
         if (errorEl) errorEl.classList.remove('show');
+
+        // Pertanyaan bercabang: opsi ini bisa jadi pemicu pertanyaan anak.
+        refreshNestedQuestionVisibility();
     }
 
     // Multiple choice toggle
@@ -1095,6 +1189,9 @@
         parent.classList.remove('has-error');
         const errorEl = parent.querySelector('.error-message');
         if (errorEl) errorEl.classList.remove('show');
+
+        // Pertanyaan bercabang: opsi ini bisa jadi pemicu pertanyaan anak.
+        refreshNestedQuestionVisibility();
     }
 
     // Clear error state as soon as user starts answering text/number/date/select/dropdown
@@ -1198,6 +1295,10 @@
             const errorEl = el.querySelector('.error-message');
             if (errorEl) errorEl.classList.remove('show');
         });
+
+        // Semua radio/checkbox baru saja di-uncheck di atas, jadi seluruh kartu
+        // pertanyaan cabang (kalau ada) harus ikut kembali tersembunyi.
+        refreshNestedQuestionVisibility();
     }
 
     async function postFormDataJson(url, formData) {
@@ -1517,6 +1618,11 @@
     // tanpa membuat transaksi baru.
     document.addEventListener('DOMContentLoaded', function () {
         updateProgress();
+
+        // Pertanyaan bercabang: hitung status tampil/sembunyi awal begitu halaman
+        // dimuat (jaga-jaga kalau suatu saat ada opsi yang sudah ter-checked lewat
+        // server, mis. prefill) — aman dipanggil walau belum ada yang tercentang.
+        refreshNestedQuestionVisibility();
 
         // PENTING: kalau redirect ini sebenarnya hasil submit akhir yang gagal
         // validasi (name/email/handphone kosong/tidak valid, dsb), JANGAN lompat

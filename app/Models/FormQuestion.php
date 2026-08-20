@@ -20,6 +20,7 @@ class FormQuestion extends Model
     protected $fillable = [
         'user_id',
         'form_id',
+        'parent_option_id',
         'stage_group',
         'question_text',
         'description',
@@ -56,5 +57,15 @@ class FormQuestion extends Model
             ->where('status', 'active')
             ->orderBy('order')
             ->orderBy('created_at');
+    }
+
+    /**
+     * Opsi (milik pertanyaan LAIN) yang jadi "pemicu" pertanyaan ini — kalau
+     * kosong, pertanyaan ini adalah pertanyaan utama (root), lihat migration
+     * add_parent_option_id_to_form_questions_table.
+     */
+    public function parentOption()
+    {
+        return $this->belongsTo(FormQuestionOption::class, 'parent_option_id');
     }
 }

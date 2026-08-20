@@ -117,6 +117,30 @@
                     <option value="personal_data">Data Pribadi</option>
                 </select>
             </div>
+            @if ($lockedForm)
+                <div class="col-md-6">
+                    <label class="form-label small">
+                        Tampilkan hanya jika opsi ini dipilih
+                        <span class="text-muted">(opsional — pertanyaan bercabang)</span>
+                    </label>
+                    <select class="form-select" name="__NAME__[parent_option_id]">
+                        <option value="">-- Tidak ada (pertanyaan utama) --</option>
+                        @foreach ($parentOptionChoices as $opt)
+                            <option value="{{ $opt->id }}">
+                                {{ \Illuminate\Support\Str::limit(optional($opt->question)->question_text ?: 'Pertanyaan', 40) }}
+                                &rarr; {{ $opt->option_text ?: '[Gambar]' }}
+                            </option>
+                        @endforeach
+                    </select>
+                    @if ($parentOptionChoices->isEmpty())
+                        <div class="form-text">
+                            Belum ada opsi tersimpan di form ini. Simpan dulu pertanyaan single/multiple
+                            choice beserta opsinya, baru pertanyaan berikutnya bisa dijadikan cabang dari
+                            salah satu opsi tersebut.
+                        </div>
+                    @endif
+                </div>
+            @endif
         </div>
 
         <div class="row g-3 mt-1">

@@ -5,8 +5,34 @@
     - $question : App\Models\FormQuestion (with('options'))
     - $index    : int, index dalam loop (dipakai untuk nomor urut & huruf opsi)
     - $majors   : Illuminate\Support\Collection, hanya dipakai untuk type 'major'
+
+    Variabel opsional (pertanyaan bercabang / conditional-nested questions):
+    - $depth          : int, seberapa dalam nesting-nya (0 = pertanyaan utama)
+    - $parentOptionId : string|null, id opsi (form_question_options.id) yang
+                        jadi pemicu kartu ini. Kartu dengan $depth > 0 dirender
+                        SEBAGAI SIBLING (bukan di-nest secara fisik di dalam
+                        div opsi pemicunya) supaya JS visibilitas (lihat
+                        refreshNestedQuestionVisibility() di form-wizard.blade.php)
+                        bisa menghitung status tampil/sembunyi tiap kartu tanpa
+                        perlu tahu struktur DOM-nya — cukup lewat atribut
+                        data-parent-option-id yang menunjuk ke id radio/checkbox
+                        opsi pemicunya. Disembunyikan (class d-none) secara
+                        default, baru ditampilkan begitu opsi pemicunya dipilih.
 --}}
-<div class="question-card" data-required="{{ $question->required ? '1' : '0' }}" data-question-id="{{ $question->id }}">
+@php
+    $depth = $depth ?? 0;
+    $parentOptionId = $parentOptionId ?? null;
+    $nestedIndent = min($depth, 6) * 28;
+@endphp
+
+@if ($depth <= 12)
+<div class="question-card {{ $depth > 0 ? 'question-card-nested d-none' : '' }}"
+    data-required="{{ $question->required ? '1' : '0' }}"
+    data-question-id="{{ $question->id }}"
+    data-depth="{{ $depth }}"
+    @if($parentOptionId) data-parent-option-id="{{ $parentOptionId }}" @endif
+    @if($depth > 0) style="margin-left: {{ $nestedIndent }}px;" @endif
+>
     <div class="mb-3 d-flex align-items-start">
         <span class="question-number">{{ $index + 1 }}</span>
         <div class="flex-grow-1">
@@ -154,3 +180,28 @@
 
     <div class="error-message">This question is required, please fill in your answer.</div>
 </div>
+
+    {{--
+        Pertanyaan bercabang: kalau salah satu opsi pertanyaan ini punya
+        pertanyaan anak (childQuestions), render sebagai kartu tambahan tepat
+        setelah kartu ini — flat sibling, bukan di-nest secara fisik, lihat
+        catatan variabel opsional di atas. Cuma single_choice & multiple_choice
+        yang bisa jadi pemicu (opsi dropdown/major tidak punya id per-<option>
+        yang bisa dicocokkan JS-nya).
+    --}}
+    @if (in_array($question->type, ['single_choice', 'multiple_choice']))
+        @foreach ($question->options as $option)
+            @if ($option->childQuestions->isNotEmpty())
+                @foreach ($option->childQuestions as $childIndex => $childQuestion)
+                    @include('frontend.partials.question-card', [
+                        'question' => $childQuestion,
+                        'index' => $childIndex,
+                        'majors' => $majors ?? collect(),
+                        'depth' => $depth + 1,
+                        'parentOptionId' => $option->id,
+                    ])
+                @endforeach
+            @endif
+        @endforeach
+    @endif
+@endif
