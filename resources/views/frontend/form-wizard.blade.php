@@ -197,29 +197,17 @@
         }
 
         /* Catatan sebelum test (pre_test_notice) — dibungkus jadi "card body"
-           tersendiri (header + body terpisah) supaya teks bebas yang diisi admin
-           tidak tampil sebagai tumpukan teks polos begitu saja. */
+           tersendiri supaya teks bebas yang diisi admin tidak tampil sebagai
+           tumpukan teks polos begitu saja. Header judul ("Catatan Sebelum
+           Placement Test") sudah dihapus sesuai permintaan, jadi box-nya
+           sekarang cuma satu body saja — box-shadow tipis ditambahkan biar
+           kelihatan sedikit 3D/terangkat dari background. */
         .notice-box {
             background: #f8f9fc;
             border: 1px solid #eef0f5;
             border-radius: 14px;
             overflow: hidden;
-        }
-
-        .notice-box-header {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            background: var(--brand-light);
-            color: var(--brand-dark);
-            font-weight: 700;
-            font-size: 14.5px;
-            padding: 16px 24px;
-            border-bottom: 1px solid #f6d3d3;
-        }
-
-        .notice-box-header i {
-            font-size: 18px;
+            box-shadow: 0 4px 14px rgba(20, 20, 43, 0.07);
         }
 
         .notice-box-body {
@@ -749,10 +737,6 @@
                     <div class="step" id="step-notice">
 
                         <div class="notice-box">
-                            <div class="notice-box-header">
-                                <i class="bi bi-info-circle-fill"></i>
-                                <span>Catatan Sebelum Placement Test</span>
-                            </div>
                             {{-- nl2br() sudah menyisipkan <br> literal untuk tiap baris baru,
                                  jadi TIDAK pakai white-space:pre-line di sini (kalau dipakai
                                  bareng nl2br, baris barunya bakal dobel). --}}
