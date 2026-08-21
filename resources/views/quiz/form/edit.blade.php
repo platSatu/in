@@ -1,6 +1,28 @@
 @extends('layouts.frontend')
 @section('content')
 
+<style>
+    /* Toolbar + kotak "Catatan Sebelum Test/Pembayaran" — kotaknya bukan
+       <textarea> lagi tapi <div contenteditable> supaya sebagian teks
+       (bukan semuanya) bisa diformat tebal/lebih besar/merah lewat
+       toolbar di atasnya. */
+    .notice-editor-toolbar {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 8px;
+    }
+
+    .notice-editor {
+        min-height: 150px;
+        overflow-y: auto;
+    }
+
+    .notice-editor:empty::before {
+        content: attr(data-placeholder);
+        color: #98a3b3;
+    }
+</style>
+
 <div class="middle-content container-xxl p-0">
 
     <form action="{{ route('quiz.form.update', $data->id) }}" method="POST" enctype="multipart/form-data">
@@ -269,12 +291,57 @@
 
                     <div class="row mb-4">
                         <div class="col-sm-12">
-                            <label for="pre_test_notice" class="mb-2">Catatan Sebelum Test/Pembayaran (Optional)</label>
-                            <textarea class="form-control @error('pre_test_notice') is-invalid @enderror" id="pre_test_notice" name="pre_test_notice" rows="6"
-                                placeholder="Contoh: tata tertib, syarat, atau pengumuman sebelum peserta mulai mengisi form">{{ old('pre_test_notice', $data->pre_test_notice) }}</textarea>
-                            <div class="form-text">Boleh dikosongkan — kalau diisi, peserta akan melihat 1 halaman catatan ini sebelum lanjut ke pembayaran/pertanyaan.</div>
+                            <label for="pre_test_notice_editor" class="mb-2 fw-bold text-danger">Catatan Sebelum Test/Pembayaran (Optional)</label>
+
+                            @php
+                                // Form lama (dibuat sebelum toolbar format ini ada) nyimpen
+                                // pre_test_notice sebagai PLAIN TEXT biasa (bisa ada karakter
+                                // <, >, & yang diketik apa adanya). Form baru nyimpennya
+                                // sebagai HTML terbatas (cuma span/strong/br, lihat
+                                // FormController::sanitizeNoticeHtml()). Dua-duanya perlu
+                                // ditampilkan beda cara di kotak contenteditable di bawah:
+                                // yang HTML langsung ditaruh apa adanya, yang plain text
+                                // di-escape dulu + newline-nya diubah jadi <br> (biar baris
+                                // barunya kebawa, soalnya <div contenteditable> — beda dengan
+                                // <textarea> — tidak otomatis nampilin karakter "\n" sebagai
+                                // baris baru).
+                                $noticeRaw = old('pre_test_notice', $data->pre_test_notice ?? '');
+                                $noticeIsRichText = $noticeRaw !== '' && preg_match('/<(span|strong|b|br)\b/i', $noticeRaw) === 1;
+                                $noticeInitialHtml = $noticeIsRichText ? $noticeRaw : nl2br(e($noticeRaw));
+                            @endphp
+
+                            {{-- Toolbar kecil buat format SEBAGIAN teks yang diblok user (bukan
+                                 semua teks sekaligus) — Bold, Perbesar, Merah. Format-nya
+                                 diterapkan ke teks yang lagi di-select di kotak catatan
+                                 (#pre_test_notice_editor) di bawah ini, bukan ke tombolnya. --}}
+                            <div class="notice-editor-toolbar" role="toolbar" aria-label="Format teks catatan">
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-notice-format="bold" title="Tebal">
+                                    <strong>B</strong>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-notice-format="enlarge" title="Perbesar">
+                                    A<span style="font-size:0.7em;">+</span>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" data-notice-format="red" title="Warna merah">
+                                    <span style="color:#dc3545; font-weight:700;">A</span>
+                                </button>
+                            </div>
+
+                            <div id="pre_test_notice_editor"
+                                class="form-control notice-editor @error('pre_test_notice') is-invalid @enderror"
+                                contenteditable="true"
+                                data-placeholder="Contoh: tata tertib, syarat, atau pengumuman sebelum peserta mulai mengisi form">{!! $noticeInitialHtml !!}</div>
+
+                            {{-- Hidden input inilah yang beneran ikut ter-submit ke server —
+                                 isinya di-sync dari innerHTML kotak contenteditable di atas
+                                 lewat script paling bawah. Server tetap menyaring ulang HTML
+                                 yang masuk (lihat FormController::sanitizeNoticeHtml()), jadi
+                                 walaupun ada yang coba submit HTML sembarangan langsung ke
+                                 endpoint ini (tanpa lewat toolbar), tetap aman. --}}
+                            <input type="hidden" id="pre_test_notice" name="pre_test_notice" value="{{ $noticeRaw }}">
+
+                            <div class="form-text">Boleh dikosongkan — kalau diisi, peserta akan melihat 1 halaman catatan ini sebelum lanjut ke pembayaran/pertanyaan. Blok sebagian teks lalu klik tombol di atas kalau mau bagian tertentu saja yang tebal/lebih besar/merah.</div>
                             @error('pre_test_notice')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
                         </div>
                     </div>
@@ -419,6 +486,75 @@
 
         checkbox.addEventListener('change', sync);
         sync();
+    })();
+
+    (function () {
+        var editor = document.getElementById('pre_test_notice_editor');
+        var hidden = document.getElementById('pre_test_notice');
+        if (!editor || !hidden) return;
+
+        function syncHidden() {
+            hidden.value = editor.innerHTML;
+        }
+
+        // Contenteditable yang baru dikosongkan total suka nyisain "<br>"
+        // doang (bukan string kosong beneran) — dianggap kosong juga di
+        // sini biar tidak ke-submit sebagai notice yang "keisi" 1 baris kosong.
+        function isEditorEmpty() {
+            return editor.textContent.replace(/\u200B/g, '').trim() === '';
+        }
+
+        // Bungkus teks yang lagi diblok user dengan <span style="..."> —
+        // pakai Range.extractContents() (bukan surroundContents()) karena
+        // ini tetap jalan biarpun selection-nya motong beberapa node
+        // sekaligus (mis. teks yang sebagian sudah di-bold sebelumnya).
+        function wrapSelectionWithStyle(styleText) {
+            var sel = window.getSelection();
+            if (!sel || !sel.rangeCount) return;
+
+            var range = sel.getRangeAt(0);
+            if (range.collapsed) return; // tidak ada teks yang diblok
+            if (!editor.contains(range.commonAncestorContainer)) return; // selection di luar kotak catatan
+
+            var wrapper = document.createElement('span');
+            wrapper.setAttribute('style', styleText);
+            wrapper.appendChild(range.extractContents());
+            range.insertNode(wrapper);
+
+            sel.removeAllRanges();
+            var newRange = document.createRange();
+            newRange.selectNodeContents(wrapper);
+            sel.addRange(newRange);
+
+            syncHidden();
+        }
+
+        document.querySelectorAll('[data-notice-format]').forEach(function (button) {
+            button.addEventListener('click', function () {
+                editor.focus();
+                var format = button.getAttribute('data-notice-format');
+                if (format === 'bold') {
+                    wrapSelectionWithStyle('font-weight:700');
+                } else if (format === 'enlarge') {
+                    wrapSelectionWithStyle('font-size:1.3em');
+                } else if (format === 'red') {
+                    wrapSelectionWithStyle('color:#dc3545');
+                }
+            });
+        });
+
+        editor.addEventListener('input', syncHidden);
+        syncHidden();
+
+        var form = editor.closest('form');
+        if (form) {
+            form.addEventListener('submit', function () {
+                if (isEditorEmpty()) {
+                    editor.innerHTML = '';
+                }
+                syncHidden();
+            });
+        }
     })();
 </script>
 

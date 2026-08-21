@@ -212,8 +212,9 @@
 
         .notice-box-body {
             padding: 24px;
-            font-size: 14.5px;
-            line-height: 1.85;
+            font-size: 16.5px;
+            font-weight: 700;
+            line-height: 1.8;
             color: #333a4d;
         }
 
@@ -736,11 +737,23 @@
                 @if($selectedForm && filled($selectedForm->pre_test_notice))
                     <div class="step" id="step-notice">
 
+                        @php
+                            // Form lama nyimpen pre_test_notice sebagai plain text biasa,
+                            // form baru (lewat toolbar Bold/Perbesar/Merah di form
+                            // create/edit) nyimpennya sebagai HTML terbatas (span/strong/br,
+                            // sudah disaring di server lewat FormController::
+                            // sanitizeNoticeHtml() pas disimpan) — jadi aman ditampilkan
+                            // apa adanya di sini. Yang plain text tetap di-escape + nl2br()
+                            // seperti sebelumnya (nl2br() sudah menyisipkan <br> literal,
+                            // jadi TIDAK pakai white-space:pre-line, nanti baris barunya dobel).
+                            $noticeIsRichText = preg_match('/<(span|strong|b|br)\b/i', $selectedForm->pre_test_notice) === 1;
+                            $noticeDisplayHtml = $noticeIsRichText
+                                ? $selectedForm->pre_test_notice
+                                : nl2br(e($selectedForm->pre_test_notice));
+                        @endphp
+
                         <div class="notice-box">
-                            {{-- nl2br() sudah menyisipkan <br> literal untuk tiap baris baru,
-                                 jadi TIDAK pakai white-space:pre-line di sini (kalau dipakai
-                                 bareng nl2br, baris barunya bakal dobel). --}}
-                            <div class="notice-box-body">{!! nl2br(e($selectedForm->pre_test_notice)) !!}</div>
+                            <div class="notice-box-body">{!! $noticeDisplayHtml !!}</div>
                         </div>
 
                         <div class="d-flex justify-content-between mt-4">

@@ -306,6 +306,57 @@ class FormController extends Controller
         return (int) ($e->errorInfo[1] ?? 0) === 1062;
     }
 
+    /**
+     * pre_test_notice sekarang boleh berisi HTML sederhana (bukan cuma plain
+     * text lagi), karena di quiz/form/create & edit.blade.php ada toolbar
+     * kecil (Bold/Perbesar/Merah) yang nge-wrap teks yang diblok user pakai
+     * <span style="..."> atau <strong>. Request POST ke endpoint ini TIDAK
+     * harus lewat toolbar itu (bisa saja user kirim HTML sembarangan
+     * langsung), jadi sebelum disimpan ke DB HTML-nya harus disaring dulu di
+     * server, bukan cuma dipercaya dari sisi client:
+     *
+     * 1) strip_tags() cuma sisain tag yang benar-benar dipakai toolbar
+     *    (span/strong/b/br) — tag lain (script, img, a, div, dst) full dibuang.
+     * 2) Tiap tag yang lolos itu DIBANGUN ULANG dari nol tanpa atribut
+     *    aslinya sama sekali, lalu (khusus <span>) atribut "style"-nya
+     *    dipasang lagi tapi cuma boleh berisi property color/font-weight/
+     *    font-size dengan value yang aman — supaya onerror=/onclick=/
+     *    javascript:/expression() tidak bisa nyelip lewat atribut atau CSS.
+     */
+    private function sanitizeNoticeHtml(?string $html): ?string
+    {
+        if ($html === null || trim(strip_tags($html)) === '') {
+            return null;
+        }
+
+        $clean = strip_tags($html, '<span><strong><b><br>');
+
+        $clean = preg_replace_callback('/<(span|strong|b|br)\b([^>]*)>/i', function (array $match) {
+            $tag = strtolower($match[1]);
+
+            if ($tag !== 'span') {
+                return '<' . $tag . '>';
+            }
+
+            if (!preg_match('/style\s*=\s*"([^"]*)"/i', $match[2], $styleMatch)) {
+                return '<span>';
+            }
+
+            $safeDeclarations = [];
+            foreach (explode(';', $styleMatch[1]) as $declaration) {
+                if (preg_match('/^\s*(color|font-weight|font-size)\s*:\s*([#a-zA-Z0-9.%\s]+)\s*$/', $declaration, $declarationMatch)) {
+                    $safeDeclarations[] = trim($declarationMatch[1]) . ':' . trim($declarationMatch[2]);
+                }
+            }
+
+            return $safeDeclarations
+                ? '<span style="' . implode(';', $safeDeclarations) . '">'
+                : '<span>';
+        }, $clean);
+
+        return trim($clean);
+    }
+
     public function create(Request $request)
     {
         $templates = WhatsappTemplate::where('status', 'active')->get();
@@ -341,6 +392,8 @@ class FormController extends Controller
             'timer_auto_save' => 'nullable|boolean',
             'timer_auto_restart' => 'nullable|boolean',
         ]);
+
+        $validated['pre_test_notice'] = $this->sanitizeNoticeHtml($validated['pre_test_notice'] ?? null);
 
         $validated['requires_payment'] = $request->boolean('requires_payment');
         if (!$validated['requires_payment']) {
@@ -499,6 +552,8 @@ class FormController extends Controller
             'timer_auto_save' => 'nullable|boolean',
             'timer_auto_restart' => 'nullable|boolean',
         ]);
+
+        $validated['pre_test_notice'] = $this->sanitizeNoticeHtml($validated['pre_test_notice'] ?? null);
 
         $validated['requires_payment'] = $request->boolean('requires_payment');
         if (!$validated['requires_payment']) {
