@@ -211,9 +211,13 @@
         }
 
         .notice-box-body {
+            /* font-weight sengaja TIDAK di-bold di sini (dulu sempat 700 di
+               sini, tapi jadinya SEMUA teks keliatan bold, bukan cuma yang
+               diformat lewat toolbar Bold di form Add/Edit) — biar tombol
+               Bold di toolbar itu kelihatan bedanya, base text-nya harus
+               normal weight dulu. */
             padding: 24px;
             font-size: 16.5px;
-            font-weight: 700;
             line-height: 1.8;
             color: #333a4d;
         }
