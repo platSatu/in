@@ -70,9 +70,12 @@
                 @enderror
 
                 <div class="form-text">
-                    Placeholder yang bisa dipakai: <code>{{ '{{name}}' }}</code>, <code>{{ '{{form_name}}' }}</code>,
-                    <code>{{ '{{ringkasan_jawaban}}' }}</code>, <code>{{ '{{universitas_major}}' }}</code>, dan
-                    <code>{{ '{{callback_link}}' }}</code> (link callback form, mis. link Zoom — hanya terisi kalau
+                    {{-- Sama seperti bug di edit.blade.php: pakai @{{ nama }} (Blade raw-echo
+                         escape), BUKAN {{ 'dua kurung kurawal' }} — kalau tidak, halaman Add
+                         Template ini juga akan ParseError begitu dibuka. --}}
+                    Placeholder yang bisa dipakai: <code>@{{name}}</code>, <code>@{{form_name}}</code>,
+                    <code>@{{ringkasan_jawaban}}</code>, <code>@{{universitas_major}}</code>, dan
+                    <code>@{{callback_link}}</code> (link callback form, mis. link Zoom — hanya terisi kalau
                     form-nya diaktifkan sebagai callback dan sudah lolos verifikasi pembayaran/submit).
                 </div>
 

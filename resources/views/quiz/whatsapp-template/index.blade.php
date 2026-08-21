@@ -144,7 +144,7 @@
                                     Created At
                                 </th>
 
-                                <th width="100" class="text-center">
+                                <th width="180" class="text-center">
                                     Action
                                 </th>
 
@@ -231,86 +231,40 @@
 
                                 <td class="text-center">
 
-
-
-                                    <div class="dropdown">
-
+                                    {{-- Sebelumnya Edit/Delete disembunyikan di belakang dropdown
+                                         titik-tiga, beda sendiri dari list page lain (mis. Major)
+                                         yang tombol aksinya sejajar langsung kelihatan. Disamakan
+                                         di sini biar konsisten. --}}
+                                    <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
 
                                         <a
-                                            class="dropdown-toggle"
-                                            href="#"
-                                            data-bs-toggle="dropdown">
+                                            href="{{ route('quiz.whatsapp-template.edit',$template->id) }}"
+                                            class="btn btn-sm btn-outline-primary text-nowrap">
 
-
-                                            <svg xmlns="http://www.w3.org/2000/svg"
-                                                width="24"
-                                                height="24"
-                                                viewBox="0 0 24 24"
-                                                fill="none"
-                                                stroke="currentColor"
-                                                stroke-width="2">
-
-
-                                                <circle cx="12" cy="12" r="1"></circle>
-                                                <circle cx="19" cy="12" r="1"></circle>
-                                                <circle cx="5" cy="12" r="1"></circle>
-
-
-                                            </svg>
-
+                                            Edit
 
                                         </a>
 
+                                        <form
+                                            action="{{ route('quiz.whatsapp-template.destroy',$template->id) }}"
+                                            method="POST"
+                                            class="m-0"
+                                            onsubmit="return confirm('Delete this whatsapp template?')">
 
+                                            @csrf
 
+                                            @method('DELETE')
 
-                                        <div class="dropdown-menu">
+                                            <button
+                                                class="btn btn-sm btn-outline-danger text-nowrap">
 
+                                                Delete
 
+                                            </button>
 
-                                            <a
-                                                class="dropdown-item"
-                                                href="{{ route('quiz.whatsapp-template.edit',$template->id) }}">
-
-                                                Edit
-
-                                            </a>
-
-
-
-
-
-                                            <form
-                                                action="{{ route('quiz.whatsapp-template.destroy',$template->id) }}"
-                                                method="POST"
-                                                onsubmit="return confirm('Delete this whatsapp template?')">
-
-
-                                                @csrf
-
-                                                @method('DELETE')
-
-
-
-                                                <button
-                                                    class="dropdown-item text-danger">
-
-                                                    Delete
-
-                                                </button>
-
-
-                                            </form>
-
-
-
-                                        </div>
-
-
+                                        </form>
 
                                     </div>
-
-
 
                                 </td>
 

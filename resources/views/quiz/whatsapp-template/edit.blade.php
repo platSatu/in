@@ -71,9 +71,15 @@
                 @enderror
 
                 <div class="form-text">
-                    Placeholder yang bisa dipakai: <code>{{ '{{name}}' }}</code>, <code>{{ '{{form_name}}' }}</code>,
-                    <code>{{ '{{ringkasan_jawaban}}' }}</code>, <code>{{ '{{universitas_major}}' }}</code>, dan
-                    <code>{{ '{{callback_link}}' }}</code> (link callback form, mis. link Zoom — hanya terisi kalau
+                    {{-- Pakai @{{ nama }} (Blade raw-echo escape), BUKAN {{ 'dua kurung kurawal' }} --}}
+                    {{-- Sebelumnya ditulis {{ '{{name}}' }} dan bikin Blade compiler bingung, karena
+                         dia cari tanda penutup "}}" PERTAMA untuk nutup echo-nya, dan itu jatuhnya
+                         di TENGAH string tsb (bukan di akhir) — hasil compile jadi PHP yang rusak
+                         (unclosed quote), makanya muncul ParseError "Unclosed '(' does not match
+                         '}'" begitu halaman ini dibuka. --}}
+                    Placeholder yang bisa dipakai: <code>@{{name}}</code>, <code>@{{form_name}}</code>,
+                    <code>@{{ringkasan_jawaban}}</code>, <code>@{{universitas_major}}</code>, dan
+                    <code>@{{callback_link}}</code> (link callback form, mis. link Zoom — hanya terisi kalau
                     form-nya diaktifkan sebagai callback dan sudah lolos verifikasi pembayaran/submit).
                 </div>
 
