@@ -7,7 +7,10 @@
         <div>
             @if ($filterForm)
                 <h5 class="mb-0">Pertanyaan untuk form: {{ $filterForm->name }}</h5>
-                <a href="{{ route('quiz.form-question.index') }}" class="small">&larr; Lihat semua pertanyaan (semua form)</a>
+                {{-- Sebelumnya link ini ke daftar SEMUA pertanyaan lintas form (bisa
+                     ratusan baris, menyulitkan) — sekarang balik ke daftar Form saja,
+                     supaya alurnya form -> pertanyaan form itu -> (balik ke form lagi). --}}
+                <a href="{{ route('quiz.form.index') }}" class="small">&larr; Kembali ke daftar Form</a>
             @endif
         </div>
         <a href="{{ route('quiz.form-question.create', $filterForm ? ['form_id' => $filterForm->id] : []) }}"
@@ -83,7 +86,7 @@
                                                  ada tombol Add Jawaban (question_id sudah terisi) dan Edit per baris,
                                                  supaya tidak perlu bolak-balik buka menu Form Question Option dari awal. --}}
                                             <a href="{{ route('quiz.form-question-option.index', ['question_id' => $item->id]) }}"
-                                                class="btn btn-sm btn-outline-secondary text-nowrap">Show</a>
+                                                class="btn btn-sm btn-outline-secondary text-nowrap">Show Options</a>
 
                                             <a href="{{ route('quiz.form-question.edit', $item->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>

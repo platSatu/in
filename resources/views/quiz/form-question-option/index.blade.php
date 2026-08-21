@@ -7,7 +7,11 @@
         <div>
             @if ($filterQuestion)
                 <h5 class="mb-0">Jawaban untuk pertanyaan: {{ \Illuminate\Support\Str::limit($filterQuestion->question_text, 60) }}</h5>
-                <a href="{{ route('quiz.form-question-option.index') }}" class="small">&larr; Lihat semua jawaban (semua pertanyaan)</a>
+                {{-- Sebelumnya link ini ke daftar SEMUA opsi lintas pertanyaan (juga bisa
+                     sangat banyak) — sekarang balik ke daftar pertanyaan form pemilik
+                     pertanyaan ini saja, konsisten dengan alur "form -> pertanyaan -> opsi
+                     -> (balik ke pertanyaan lagi)". --}}
+                <a href="{{ route('quiz.form-question.index', ['form_id' => $filterQuestion->form_id]) }}" class="small">&larr; Kembali ke daftar Pertanyaan</a>
             @endif
         </div>
         <a href="{{ route('quiz.form-question-option.create', $filterQuestion ? ['question_id' => $filterQuestion->id] : []) }}"

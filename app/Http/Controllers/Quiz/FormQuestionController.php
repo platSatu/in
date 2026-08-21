@@ -331,8 +331,11 @@ class FormQuestionController extends Controller
             $position++;
         }
 
+        // Balik ke halaman daftar pertanyaan form INI SAJA (bukan daftar semua
+        // pertanyaan lintas form) — konsisten dengan halaman yang tadi dibuka user
+        // sebelum klik "+ Add Question"/"+ Add Questions".
         return redirect()
-            ->route('quiz.form-question.index')
+            ->route('quiz.form-question.index', ['form_id' => $validated['form_id']])
             ->with('success', count($validated['questions']) . ' pertanyaan berhasil dibuat.');
     }
 

@@ -91,14 +91,18 @@
                         </div>
 
                         <div class="col-md-2 d-flex gap-2">
+                            {{-- Padding vertikal disamakan manual dengan .form-control/.form-select
+                                 (padding: 0.75rem 1.25rem di main.css) karena style .btn bawaan tema
+                                 cuma punya padding 0.4375rem, jadi tanpa ini tombolnya kelihatan lebih
+                                 pendek/kecil dibanding input & select di sebelahnya. --}}
                             <div class="w-100">
-                                <button class="btn btn-outline-primary w-100" type="submit">
+                                <button class="btn btn-outline-primary w-100" type="submit" style="padding-top: 0.75rem; padding-bottom: 0.75rem;">
                                     Filter
                                 </button>
                             </div>
 
                             @if(request('search') || request('branch_id') || request('form_id'))
-                                <a href="{{ route('student.student.index') }}" class="btn btn-outline-danger" title="Reset filter">
+                                <a href="{{ route('student.student.index') }}" class="btn btn-outline-danger" title="Reset filter" style="padding-top: 0.75rem; padding-bottom: 0.75rem;">
                                     &times;
                                 </a>
                             @endif
@@ -178,21 +182,21 @@
                                     <td class="text-center">
                                         <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
                                             <a href="{{ route('student.student.show', $item->id) }}"
-                                                class="btn btn-sm btn-outline-secondary text-nowrap">Detail</a>
+                                                class="btn btn-sm btn-outline-secondary text-nowrap flex-shrink-0">Detail</a>
 
                                             <a href="{{ route('student.student.edit', $item->id) }}"
-                                                class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
+                                                class="btn btn-sm btn-outline-primary text-nowrap flex-shrink-0">Edit</a>
 
                                             @unless($item->user_id)
                                                 <form action="{{ route('student.student.add-user', $item->id) }}"
-                                                    method="POST" onsubmit="return confirm('Buat akun login untuk {{ $item->first_name }}?');" class="m-0">
+                                                    method="POST" onsubmit="return confirm('Buat akun login untuk {{ $item->first_name }}?');" class="m-0 flex-shrink-0">
                                                     @csrf
                                                     <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">+ User</button>
                                                 </form>
                                             @endunless
 
                                             <form action="{{ route('student.student.destroy', $item->id) }}"
-                                                method="POST" onsubmit="return confirm('Hapus data student ini?');" class="m-0">
+                                                method="POST" onsubmit="return confirm('Hapus data student ini?');" class="m-0 flex-shrink-0">
                                                 @csrf
                                                 @method('DELETE')
                                                 <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">Delete</button>

@@ -283,6 +283,17 @@ Route::middleware(['auth', 'permission:quiz.form,edit'])->prefix('dashboard/supe
 });
 Route::middleware(['auth', 'permission:quiz.form'])->prefix('dashboard/superadmin/quiz/form')->group(function () {
     Route::get('/{id}/submissions', [FormController::class, 'submissions'])->name('quiz.form.submissions');
+    // Konten modal "Detail" di halaman index (lihat quiz/form/index.blade.php) —
+    // dipanggil lewat fetch() begitu tombol "Detail" diklik, balikin fragment
+    // HTML (bukan JSON) buat langsung disuntik ke modal-body. Read-only murni,
+    // makanya cukup di-grup permission view-only ini (bukan ,edit).
+    Route::get('/{id}/detail', [FormController::class, 'detail'])->name('quiz.form.detail');
+    // Konten modal "Jawaban" di halaman quiz.form.submissions — dipanggil lewat
+    // fetch() begitu tombol "Lihat Jawaban" per baris peserta diklik. Prefix-nya
+    // "submissions/..." (literal, bukan wildcard) di posisi pertama, beda dari
+    // "/{id}/submissions" di atas yang wildcard-nya di posisi pertama — jumlah
+    // segment juga beda (3 vs 2), jadi tidak ada risiko tabrakan route.
+    Route::get('/submissions/{submissionId}/answers', [FormController::class, 'submissionAnswers'])->name('quiz.form.submissions.answers');
 });
 Route::middleware(['auth', 'permission:quiz.form,edit'])->prefix('dashboard/superadmin/quiz/form')->group(function () {
     Route::post('/submissions/{submissionId}/result', [FormController::class, 'saveResult'])->name('quiz.form.submissions.save-result');

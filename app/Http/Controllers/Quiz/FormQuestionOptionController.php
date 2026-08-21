@@ -153,8 +153,10 @@ class FormQuestionOptionController extends Controller
             $position++;
         }
 
+        // Balik ke halaman daftar opsi pertanyaan INI SAJA (difilter question_id),
+        // konsisten dengan halaman yang tadi dibuka user sebelum klik "+ Add Options".
         return redirect()
-            ->route('quiz.form-question-option.index')
+            ->route('quiz.form-question-option.index', ['question_id' => $validated['question_id']])
             ->with('success', count($validated['options']) . ' option berhasil dibuat.');
     }
 

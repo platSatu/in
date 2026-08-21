@@ -96,6 +96,7 @@
                                 @if ($form->result_mode !== 'none')
                                     <th class="text-center">Hasil</th>
                                 @endif
+                                <th class="text-center">Jawaban</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -148,10 +149,18 @@
                                             @endif
                                         </td>
                                     @endif
+                                    <td class="text-center">
+                                        <button type="button" class="btn btn-sm btn-outline-dark text-nowrap"
+                                            data-bs-toggle="modal" data-bs-target="#submissionAnswersModal"
+                                            data-url="{{ route('quiz.form.submissions.answers', $submission->id) }}"
+                                            data-student-name="{{ $submission->student ? trim($submission->student->first_name . ' ' . $submission->student->last_name) : '-' }}">
+                                            Lihat Jawaban
+                                        </button>
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ 5 + ($form->requires_payment ? 1 : 0) + ($form->result_mode !== 'none' ? 1 : 0) }}" class="text-center">
+                                    <td colspan="{{ 6 + ($form->requires_payment ? 1 : 0) + ($form->result_mode !== 'none' ? 1 : 0) }}" class="text-center">
                                         Belum ada peserta yang submit.
                                     </td>
                                 </tr>
@@ -246,6 +255,81 @@
         max-height: 130px;
         overflow-y: auto;
     }
+
+    /* Modal "Jawaban": dipaksa background putih + teks hitam, sama alasannya
+       dengan #formDetailModal di quiz/form/index.blade.php — supaya tidak ikut
+       kebawa dark-mode tema admin. */
+    #submissionAnswersModal .modal-content {
+        background-color: #ffffff !important;
+        color: #1a1a1a !important;
+    }
+    #submissionAnswersModal .modal-header,
+    #submissionAnswersModal .modal-footer {
+        border-color: #e5e7eb !important;
+    }
+    #submissionAnswersModal .modal-title {
+        color: #1a1a1a !important;
+    }
+    #submissionAnswersModal .quiz-answer-row {
+        background-color: #ffffff;
+        color: #1a1a1a;
+        border-color: #e5e7eb !important;
+    }
+    #submissionAnswersModal .text-muted {
+        color: #6c757d !important;
+    }
 </style>
+
+{{-- === MODAL "JAWABAN" ===
+     Sama pola dengan #formDetailModal di quiz/form/index.blade.php: satu modal
+     dipakai ulang buat semua baris, isinya diambil lewat fetch() begitu dibuka
+     (lihat script di bawah), bukan dirender langsung per baris (biar tidak
+     query N+1 buat tiap peserta padahal belum tentu dibuka adminnya). --}}
+<div class="modal fade" id="submissionAnswersModal" tabindex="-1" aria-labelledby="submissionAnswersModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="submissionAnswersModalLabel">Jawaban</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="submissionAnswersModalBody">
+                <div class="text-center text-muted py-4">Memuat...</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        var modalEl = document.getElementById('submissionAnswersModal');
+        if (!modalEl) return;
+
+        var modalBody = document.getElementById('submissionAnswersModalBody');
+        var modalLabel = document.getElementById('submissionAnswersModalLabel');
+
+        modalEl.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            if (!button) return;
+
+            var url = button.getAttribute('data-url');
+            var studentName = button.getAttribute('data-student-name') || '';
+
+            modalLabel.textContent = studentName ? ('Jawaban: ' + studentName) : 'Jawaban';
+            modalBody.innerHTML = '<div class="text-center text-muted py-4">Memuat...</div>';
+
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(function (res) {
+                    if (!res.ok) throw new Error('Gagal memuat jawaban (' + res.status + ')');
+                    return res.text();
+                })
+                .then(function (html) {
+                    modalBody.innerHTML = html;
+                })
+                .catch(function () {
+                    modalBody.innerHTML = '<div class="alert alert-danger mb-0">Gagal memuat jawaban. Silakan coba lagi.</div>';
+                });
+        });
+    });
+</script>
 
 @endsection

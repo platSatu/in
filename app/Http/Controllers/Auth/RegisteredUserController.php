@@ -36,6 +36,11 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
+            // Dulu tidak divalidasi sama sekali padahal field-nya wajib diisi
+            // di form (auth/register.blade.php) dan langsung dipakai buat
+            // kirim WA selamat datang (sendWhatsapp() di bawah) — kalau
+            // kosong, WA welcome message-nya gagal terkirim ke nomor kosong.
+            'handphone' => ['required', 'string', 'max:20'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
         ]);
 

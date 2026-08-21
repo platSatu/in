@@ -176,8 +176,20 @@
                         </div>
                     @endif
 
-                    {{-- Jawaban --}}
-                    <div class="gdoc-answers">
+                    {{-- Jawaban — dibungkus collapse (default kebuka cuma buat submission
+                         terbaru/pertama, sisanya tertutup) karena satu form bisa punya
+                         puluhan pertanyaan, jadi kalau semua submission langsung
+                         ke-expand sekaligus halamannya jadi sangat panjang ke bawah. --}}
+                    <button type="button" class="btn btn-sm btn-outline-secondary gdoc-collapse-btn"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#answers-{{ $submission->id }}"
+                        aria-expanded="{{ $loop->first ? 'true' : 'false' }}"
+                        aria-controls="answers-{{ $submission->id }}">
+                        <i class="bi bi-chevron-down"></i>
+                        {{ $answerGroups->count() }} Pertanyaan &amp; Jawaban
+                    </button>
+
+                    <div class="gdoc-answers collapse {{ $loop->first ? 'show' : '' }}" id="answers-{{ $submission->id }}">
                         @forelse ($answerGroups as $group)
                             @php
                                 $question = optional($group->first())->question;
@@ -418,10 +430,28 @@
     }
 
     .gdoc-submission {
-        margin-top: 28px;
-        padding-top: 24px;
-        border-top: 1px dashed #e3e6ea;
+        margin-top: 20px;
+        padding: 20px 24px 24px;
+        border: 1px solid #e3e6ea;
+        border-radius: 10px;
+        background: #fbfbfc;
+        box-shadow: 0 1px 3px rgba(60, 64, 67, .08);
         scroll-margin-top: 16px;
+    }
+
+    .gdoc-collapse-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 14px;
+    }
+
+    .gdoc-collapse-btn .bi-chevron-down {
+        transition: transform .2s ease;
+    }
+
+    .gdoc-collapse-btn[aria-expanded="true"] .bi-chevron-down {
+        transform: rotate(180deg);
     }
 
     .gdoc-submission-head {

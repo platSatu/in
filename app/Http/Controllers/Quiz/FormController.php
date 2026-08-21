@@ -7,9 +7,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassSchedule;
 use App\Models\CompanyBranch;
 use App\Models\Form;
+use App\Models\FormAnswer;
 use App\Models\FormPayment;
+use App\Models\FormQuestion;
 use App\Models\FormResult;
 use App\Models\FormSubmission;
+use App\Models\Major;
 use App\Models\WhatsappTemplate;
 use App\Services\Whatsapp\WhatsappMessenger;
 use Illuminate\Database\QueryException;
@@ -73,6 +76,102 @@ class FormController extends Controller
         }
 
         return view('quiz.form.submissions', compact('form', 'submissions', 'payments'));
+    }
+
+    /**
+     * Konten modal "Detail" di halaman index Quiz Form — dipanggil lewat AJAX
+     * fetch() dari tombol "Detail" per baris (lihat quiz/form/index.blade.php),
+     * balikin FRAGMEN HTML (bukan JSON/halaman penuh) buat langsung disuntik ke
+     * modal-body. Read-only murni: cuma menampilkan daftar pertanyaan (termasuk
+     * pertanyaan bercabang/anak, nested di bawah opsi pemicunya) beserta
+     * opsi/jawabannya — tidak ada form atau tombol aksi apa pun di dalamnya.
+     */
+    public function detail(string $id)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $form = AdminCrud::findOrFail(Form::class, $id, (string) $userId);
+
+        $questions = FormQuestion::where('form_id', $form->id)
+            ->where('status', 'active')
+            ->with('options')
+            ->orderBy('order')
+            ->orderBy('created_at')
+            ->get();
+
+        // Sama seperti FrontendController::buildFormWizardView(): cuma pertanyaan
+        // ROOT (tanpa parent_option_id) yang dirender di level atas — pertanyaan
+        // anak dirender belakangan secara rekursif lewat @include, begitu opsi
+        // pemicunya muncul (lihat quiz/form/_detail-questions.blade.php).
+        $rootQuestions = $questions->filter(fn (FormQuestion $q) => $q->parent_option_id === null)->values();
+
+        return view('quiz.form._detail-content', compact('form', 'rootQuestions'));
+    }
+
+    /**
+     * Konten modal "Jawaban" di halaman quiz.form.submissions — dipanggil lewat
+     * fetch() begitu tombol "Lihat Jawaban" per baris peserta diklik, balikin
+     * fragment HTML (bukan JSON) buat langsung disuntik ke modal-body. Read-only
+     * murni, sama pola dengan detail() di atas, cuma yang ditampilkan di sini
+     * JAWABAN ASLI milik satu submission (bukan daftar pertanyaan form-nya).
+     *
+     * Jawaban dikelompokkan per pertanyaan (satu pertanyaan multiple_choice bisa
+     * punya lebih dari satu baris form_answers) dan diurutkan sesuai urutan asli
+     * pertanyaan di form (FormQuestion::order), bukan sesuai urutan tersimpannya
+     * di database — supaya runtut kebaca seperti waktu peserta mengisi.
+     */
+    public function submissionAnswers(string $submissionId)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $submission = FormSubmission::with(['student', 'form'])->findOrFail($submissionId);
+
+        $form = $submission->form;
+        if (!$form || (string) $form->user_id !== (string) $userId) {
+            abort(403, 'Submission tidak valid untuk user ini.');
+        }
+
+        $answersByQuestion = FormAnswer::where('submission_id', $submission->id)
+            ->with('option')
+            ->get()
+            ->groupBy('question_id');
+
+        $questions = FormQuestion::where('form_id', $form->id)
+            ->orderBy('order')
+            ->orderBy('created_at')
+            ->get();
+
+        // Cuma pertanyaan yang BENAR-BENAR ada jawabannya yang ditampilkan (sama
+        // seperti aturan penyimpanan di FrontendController: pertanyaan kosong
+        // tidak dibuatkan baris form_answers sama sekali).
+        $groupedAnswers = $questions
+            ->map(fn (FormQuestion $question) => (object) [
+                'question' => $question,
+                'rows' => $answersByQuestion->get($question->id, collect()),
+            ])
+            ->filter(fn ($group) => $group->rows->isNotEmpty())
+            ->values();
+
+        // Resolve nama Major sekali lewat 1 query (bukan N+1) buat pertanyaan
+        // type='major' — form_answers.answer_text nyimpen ID Major-nya, bukan
+        // namanya langsung.
+        $majorIds = $groupedAnswers
+            ->filter(fn ($group) => $group->question->type === 'major')
+            ->flatMap(fn ($group) => $group->rows->pluck('answer_text'))
+            ->filter()
+            ->unique()
+            ->values();
+        $majors = $majorIds->isNotEmpty()
+            ? Major::whereIn('id', $majorIds)->pluck('name', 'id')
+            : collect();
+
+        return view('quiz.form._submission-answers', compact('submission', 'groupedAnswers', 'majors'));
     }
 
     /**
