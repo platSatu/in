@@ -159,6 +159,18 @@
                                             <a href="{{ route('quiz.form.edit', $form->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap flex-shrink-0">Edit</a>
 
+                                            {{-- Duplicate: deep-copy form ini (section, pertanyaan, opsi jawaban,
+                                                 termasuk file fisiknya) jadi form baru bernama "... - Copy" yang
+                                                 selalu berstatus Inactive, siap ditinjau & diedit sendiri oleh admin
+                                                 tanpa memengaruhi form aslinya. Lihat FormController::duplicate(). --}}
+                                            <form action="{{ route('quiz.form.duplicate', $form->id) }}" method="POST"
+                                                onsubmit="return confirm('Duplikat form &quot;{{ $form->name }}&quot; beserta seluruh section, pertanyaan, dan opsi jawabannya?\n\nHasil duplikat akan berstatus Inactive dan bisa diedit bebas tanpa memengaruhi form aslinya.');"
+                                                class="m-0 flex-shrink-0">
+                                                @csrf
+                                                <button type="submit"
+                                                    class="btn btn-sm btn-outline-secondary text-nowrap">Duplicate</button>
+                                            </form>
+
                                             {{-- Section membungkus pertanyaan Placement Test jadi beberapa
                                                  kelompok tampilan (lihat menu "Form Sections"). Sifatnya opsional,
                                                  jadi ditaruh SEBELUM tombol Question di sini supaya alurnya kebaca

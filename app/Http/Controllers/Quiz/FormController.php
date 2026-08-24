@@ -13,7 +13,9 @@ use App\Models\Form;
 use App\Models\FormAnswer;
 use App\Models\FormPayment;
 use App\Models\FormQuestion;
+use App\Models\FormQuestionOption;
 use App\Models\FormResult;
+use App\Models\FormSection;
 use App\Models\FormSubmission;
 use App\Models\Major;
 use App\Models\RoleUser;
@@ -827,5 +829,236 @@ class FormController extends Controller
         return redirect()
             ->route('quiz.form.index')
             ->with('success', 'Semua submission form "' . $form->name . '" (beserta jawaban, hasil, dan histori pembayarannya) berhasil direset. Form, pertanyaan, dan pilihan jawabannya tetap ada.');
+    }
+
+    /**
+     * Duplikat form ini secara PENUH: Form itu sendiri, semua Section, semua
+     * Question (termasuk pertanyaan bercabang lewat parent_option_id), semua
+     * Option jawabannya, DAN file fisiknya (background_image, logo, question
+     * image/audio, option image) — bukan cuma referensi path-nya, betul-betul
+     * disalin jadi file baru di disk (lihat copyPublicFile()) supaya form
+     * asli & hasil duplikatnya independen: menghapus/mengganti file di salah
+     * satu form tidak memengaruhi yang lain.
+     *
+     * Hasil duplikat SELALU berstatus 'inactive' apa pun status form aslinya
+     * — supaya tidak bisa diisi publik sebelum admin sempat meninjau &
+     * mengaktifkannya secara sadar (mis. cek ulang pertanyaan/section yang
+     * baru ter-duplikat, ganti nama/no booth kalau perlu, dst).
+     *
+     * Submission/jawaban/hasil/pembayaran TIDAK ikut diduplikat — form baru
+     * selalu mulai bersih tanpa histori peserta form aslinya (beda dengan
+     * resetSubmissions() di atas yang membersihkan form yang SAMA).
+     *
+     * Struktur pertanyaan bercabang (parent_option_id bisa menunjuk opsi
+     * milik pertanyaan LAIN di form yang sama, tanpa urutan yang dijamin di
+     * database) tidak bisa langsung disalin satu-persatu, karena opsi
+     * pemicunya sendiri belum tentu sudah dibuat duluan. Makanya proses ini
+     * dipecah 3 tahap di dalam satu DB transaction:
+     * 1) Salin semua Section (bangun peta id lama -> id baru), lalu salin
+     *    semua Question pakai section_id dari peta itu (parent_option_id
+     *    DIBIARKAN NULL dulu; bangun peta id lama -> id baru + simpan
+     *    parent_option_id LAMA tiap question baru yang aslinya punya).
+     * 2) Salin semua Option milik question-question form ini pakai
+     *    question_id dari peta id Question tahap 1 (bangun peta id Option
+     *    lama -> id baru).
+     * 3) Baru sekarang isi ulang parent_option_id tiap Question baru yang
+     *    aslinya punya parent_option_id, pakai peta id Option dari tahap 2 —
+     *    karena opsi pemicunya bisa saja baru dibuat di tahap 2, SETELAH
+     *    question-nya sendiri dibuat di tahap 1.
+     */
+    public function duplicate(string $id)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $original = $this->resolveVisibleForm($id);
+
+        $newForm = DB::transaction(function () use ($original, $userId) {
+            $newFormData = $original->only([
+                'branch_id',
+                'company_division_id',
+                'no_booth',
+                'requires_payment',
+                'payment_amount',
+                'payment_position',
+                'is_callback_enabled',
+                'callback_link',
+                'use_whatsapp_notification',
+                'whatsapp_template_id',
+                'has_personal_data_stage',
+                'result_mode',
+                'description',
+                'pre_test_notice',
+                'start_date',
+                'end_date',
+                'timer_enabled',
+                'timer_duration_minutes',
+                'timer_auto_save',
+                'timer_auto_restart',
+            ]);
+
+            $newFormData['user_id'] = (string) $userId;
+            $newFormData['name'] = $original->name . ' - Copy';
+
+            // Duplikat SELALU inactive, apa pun status form aslinya — lihat
+            // docblock method ini.
+            $newFormData['status'] = 'inactive';
+
+            // slug (branch) tetap sama persis dengan form asli (branch-nya
+            // memang sama), booth_slug dibuat ulang dari no_booth yang sama
+            // — generateUniqueBoothSlug() otomatis mendeteksi bahwa
+            // kombinasi slug+booth_slug asli sudah dipakai (oleh form
+            // aslinya sendiri) dan menambahkan suffix "-2", "-3", dst.
+            $newFormData['slug'] = $original->slug;
+            $newFormData['booth_slug'] = $this->generateUniqueBoothSlug($original->slug, $original->no_booth);
+
+            $newFormData['background_image'] = $this->copyPublicFile($original->background_image);
+            $newFormData['logo'] = $this->copyPublicFile($original->logo);
+
+            $newForm = Form::create($newFormData);
+
+            // --- Tahap 1: Section, lalu Question (parent_option_id null dulu) ---
+            $sectionIdMap = [];
+            $sections = FormSection::where('form_id', $original->id)->get();
+            foreach ($sections as $section) {
+                $newSection = FormSection::create([
+                    'user_id' => (string) $userId,
+                    'form_id' => $newForm->id,
+                    'name' => $section->name,
+                    'description' => $section->description,
+                    'order' => $section->order,
+                    'status' => $section->status,
+                ]);
+
+                $sectionIdMap[$section->id] = $newSection->id;
+            }
+
+            $questionIdMap = [];
+            // [newQuestionId => oldParentOptionId] — dipakai di tahap 3, cuma
+            // diisi untuk question yang aslinya benar-benar punya parent_option_id.
+            $questionOldParentOptionId = [];
+            $questions = FormQuestion::where('form_id', $original->id)->get();
+            foreach ($questions as $question) {
+                $newQuestion = FormQuestion::create([
+                    'user_id' => (string) $userId,
+                    'form_id' => $newForm->id,
+                    'parent_option_id' => null,
+                    'stage_group' => $question->stage_group,
+                    'section_id' => $question->section_id ? ($sectionIdMap[$question->section_id] ?? null) : null,
+                    'question_text' => $question->question_text,
+                    'description' => $question->description,
+                    'image' => $this->copyPublicFile($question->image),
+                    'audio' => $this->copyPublicFile($question->audio),
+                    'type' => $question->type,
+                    'correct_answer' => $question->correct_answer,
+                    'match_score' => $question->match_score,
+                    'required' => $question->required,
+                    'order' => $question->order,
+                    'status' => $question->status,
+                ]);
+
+                $questionIdMap[$question->id] = $newQuestion->id;
+
+                if (!empty($question->parent_option_id)) {
+                    $questionOldParentOptionId[$newQuestion->id] = $question->parent_option_id;
+                }
+            }
+
+            // --- Tahap 2: Option ---
+            $optionIdMap = [];
+            if (!empty($questionIdMap)) {
+                $options = FormQuestionOption::whereIn('question_id', array_keys($questionIdMap))->get();
+
+                foreach ($options as $option) {
+                    $newQuestionId = $questionIdMap[$option->question_id] ?? null;
+                    if (!$newQuestionId) {
+                        // Seharusnya tidak pernah terjadi (semua Option di sini
+                        // pasti anak dari salah satu Question form ini, karena
+                        // di-query lewat whereIn question_id) — dilewati sebagai
+                        // pengaman murni.
+                        continue;
+                    }
+
+                    $newOption = FormQuestionOption::create([
+                        'user_id' => (string) $userId,
+                        'question_id' => $newQuestionId,
+                        'order' => $option->order,
+                        'option_text' => $option->option_text,
+                        'image' => $this->copyPublicFile($option->image),
+                        'score' => $option->score,
+                        'is_other' => $option->is_other,
+                        'status' => $option->status,
+                    ]);
+
+                    $optionIdMap[$option->id] = $newOption->id;
+                }
+            }
+
+            // --- Tahap 3: isi ulang parent_option_id pertanyaan bercabang ---
+            foreach ($questionOldParentOptionId as $newQuestionId => $oldParentOptionId) {
+                $newParentOptionId = $optionIdMap[$oldParentOptionId] ?? null;
+
+                if ($newParentOptionId) {
+                    FormQuestion::where('id', $newQuestionId)->update(['parent_option_id' => $newParentOptionId]);
+                }
+                // Kalau opsi pemicu aslinya somehow tidak ikut ter-duplikat
+                // (idealnya tidak pernah terjadi, karena semua Option milik
+                // question form ini pasti diproses di tahap 2), pertanyaan
+                // anak ini dibiarkan jadi pertanyaan root (parent_option_id
+                // tetap null) daripada exception di tengah transaction.
+            }
+
+            return $newForm;
+        });
+
+        return redirect()
+            ->route('quiz.form.index')
+            ->with('success', 'Form "' . $original->name . '" berhasil diduplikat menjadi "' . $newForm->name . '" (status: Inactive — silakan tinjau dulu sebelum diaktifkan).');
+    }
+
+    /**
+     * Salin 1 file dari public/ ke file BARU (nama UUID baru) di folder
+     * relatif yang SAMA persis, dipakai duplicate() untuk background_image,
+     * logo, question image/audio, dan option image — supaya form hasil
+     * duplikat punya file fisiknya sendiri (bukan sekadar menunjuk ke file
+     * milik form asli), sehingga aman dihapus/diganti tanpa saling
+     * memengaruhi. Aman dipanggil dengan path null/kosong (mis. background
+     * belum pernah diupload di form aslinya) — balikin null juga.
+     *
+     * Kalau baris DB menunjuk path yang file fisiknya sudah tidak ada di
+     * disk (data lama yang somehow rusak), duplikat-nya sengaja dibiarkan
+     * null (bukan exception) — daripada seluruh proses duplicate() gagal
+     * total gara-gara satu file yang hilang.
+     */
+    private function copyPublicFile(?string $relativePath): ?string
+    {
+        if (empty($relativePath)) {
+            return null;
+        }
+
+        $sourcePath = public_path($relativePath);
+
+        if (!file_exists($sourcePath)) {
+            return null;
+        }
+
+        $directory = dirname($relativePath);
+        $extension = pathinfo($relativePath, PATHINFO_EXTENSION);
+
+        $destinationDir = public_path($directory);
+        if (!file_exists($destinationDir)) {
+            mkdir($destinationDir, 0755, true);
+        }
+
+        $newFilename = Str::uuid() . ($extension ? '.' . $extension : '');
+        $destinationPath = $destinationDir . '/' . $newFilename;
+
+        if (!copy($sourcePath, $destinationPath)) {
+            return null;
+        }
+
+        return $directory . '/' . $newFilename;
     }
 }

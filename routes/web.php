@@ -290,6 +290,11 @@ Route::middleware(['auth', 'permission:quiz.form,edit'])->prefix('dashboard/supe
     Route::get('/create', [FormController::class, 'create'])->name('quiz.form.create');
     Route::post('/', [FormController::class, 'store'])->name('quiz.form.store');
     Route::get('/{id}/edit', [FormController::class, 'edit'])->name('quiz.form.edit');
+    // Duplicate: deep-copy form ini beserta section/question/option & file
+    // fisiknya (lihat FormController::duplicate()). POST, jadi aman
+    // didaftarkan di sini tanpa risiko tabrakan dengan GET /{id}/edit di
+    // atas walau sama-sama wildcard {id} (beda HTTP method).
+    Route::post('/{id}/duplicate', [FormController::class, 'duplicate'])->name('quiz.form.duplicate');
 });
 Route::middleware(['auth', 'permission:quiz.form'])->prefix('dashboard/superadmin/quiz/form')->group(function () {
     Route::get('/{id}/submissions', [FormController::class, 'submissions'])->name('quiz.form.submissions');
@@ -456,6 +461,12 @@ Route::middleware(['auth', 'permission:quiz.form-question,edit'])->prefix('dashb
     // sama-sama harus didaftarkan sebelum /{id}/edit di bawah.
     Route::get('/section-choices', [FormQuestionController::class, 'sectionChoices'])->name('quiz.form-question.section-choices');
     Route::post('/', [FormQuestionController::class, 'store'])->name('quiz.form-question.store');
+    // Bulk assign: pindahkan/lepas banyak pertanyaan sekaligus dari/ke satu
+    // section, dipanggil dari action bar checkbox di quiz/form-question/
+    // index.blade.php (lihat FormQuestionController::bulkAssignSection()).
+    // POST ke path literal ini, aman didaftarkan di mana pun relatif
+    // terhadap /{id}/edit di bawah (beda path & tidak ada GET /{id} di sini).
+    Route::post('/bulk-assign-section', [FormQuestionController::class, 'bulkAssignSection'])->name('quiz.form-question.bulk-assign-section');
     Route::get('/{id}/edit', [FormQuestionController::class, 'edit'])->name('quiz.form-question.edit');
     Route::put('/{id}', [FormQuestionController::class, 'update'])->name('quiz.form-question.update');
     Route::delete('/{id}', [FormQuestionController::class, 'destroy'])->name('quiz.form-question.destroy');

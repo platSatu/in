@@ -92,7 +92,14 @@ class FormQuestionController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        return view('quiz.form-question.index', compact('data', 'filterForm', 'filterSection'));
+        // Bulk assign: daftar section yang bisa dipilih di action bar checkbox
+        // (lihat quiz/form-question/index.blade.php) — cuma diisi kalau halaman
+        // ini sedang difilter ke SATU form spesifik ($filterForm), karena
+        // bulk-assign cuma boleh terjadi dalam satu form yang sama (section
+        // tidak lintas form).
+        $bulkAssignSectionChoices = $filterForm ? $this->querySectionChoices($filterForm->id) : collect();
+
+        return view('quiz.form-question.index', compact('data', 'filterForm', 'filterSection', 'bulkAssignSectionChoices'));
     }
 
     public function create(Request $request)
@@ -441,6 +448,68 @@ class FormQuestionController extends Controller
         return redirect()
             ->route('quiz.form-question.index', ['form_id' => $validated['form_id']])
             ->with('success', count($validated['questions']) . ' pertanyaan berhasil dibuat.');
+    }
+
+    /**
+     * Bulk assign banyak pertanyaan sekaligus ke satu Section (atau lepas dari
+     * section, section_id null) dalam SATU form — dipanggil dari action bar
+     * checkbox di quiz/form-question/index.blade.php (cuma aktif kalau halaman
+     * sedang difilter ke satu form spesifik lewat $filterForm).
+     *
+     * Diverifikasi 3 lapis:
+     * 1. Form-nya sendiri harus masuk cakupan akses user (isFormAccessible()).
+     * 2. Section tujuan (kalau diisi, bukan "Lepas dari section") harus milik
+     *    form YANG SAMA — sama pengecekan yang sudah ada di store()/update().
+     * 3. UPDATE dibatasi ->where('form_id', ...) juga, supaya question_ids
+     *    "asing" (bukan milik form ini, mis. diselipkan lewat request manual)
+     *    diam-diam diabaikan, bukan malah ikut terpindah section-nya.
+     */
+    public function bulkAssignSection(Request $request)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        // Sama seperti store()/update(): "-- Lepas dari section --" pada
+        // dropdown action bar mengirim string kosong, disamakan ke null di
+        // sini supaya rule 'nullable' benar-benar berlaku.
+        if ($request->input('section_id') === '') {
+            $request->merge(['section_id' => null]);
+        }
+
+        $validated = $request->validate([
+            'form_id' => 'required|string|exists:forms,id',
+            'question_ids' => 'required|array|min:1',
+            'question_ids.*' => 'string|exists:form_questions,id',
+            'section_id' => 'nullable|string|exists:form_sections,id',
+        ]);
+
+        if (!$this->isFormAccessible($validated['form_id'])) {
+            abort(403, 'Form tidak valid untuk cakupan akses Anda.');
+        }
+
+        if (!empty($validated['section_id'])) {
+            $validSection = FormSection::where('id', $validated['section_id'])
+                ->where('form_id', $validated['form_id'])
+                ->exists();
+
+            if (!$validSection) {
+                abort(422, 'Section yang dipilih tidak valid untuk form ini.');
+            }
+        }
+
+        $affected = FormQuestion::where('form_id', $validated['form_id'])
+            ->whereIn('id', $validated['question_ids'])
+            ->update(['section_id' => $validated['section_id']]);
+
+        $message = $validated['section_id']
+            ? $affected . ' pertanyaan berhasil dipindahkan ke section.'
+            : $affected . ' pertanyaan berhasil dilepas dari section.';
+
+        return redirect()
+            ->route('quiz.form-question.index', ['form_id' => $validated['form_id']])
+            ->with('success', $message);
     }
 
     public function edit(string $id)
