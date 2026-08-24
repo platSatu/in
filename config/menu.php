@@ -36,8 +36,19 @@ return [
     // ================= Students =================
     ['key' => 'student.student', 'label' => 'Data Student', 'route' => 'student.student.index', 'group' => 'Students', 'icon' => 'list'],
 
+    // ================= Invitation =================
+    // Sebelumnya menu "Invitations" ini statis (hardcoded, tanpa pengecekan
+    // permission apa pun) di sidebar.blade.php & rute-nya cuma dibungkus
+    // 'auth' polos — jadi SEMUA user yang login (role apa pun) otomatis bisa
+    // akses & CRUD, tidak bisa dibatasi lewat checklist di halaman edit Role.
+    // Didaftarkan di sini supaya modul ini ikut sistem permission yang sama
+    // dengan modul lain (bisa dicentang per role) & tampil dinamis di
+    // sidebar cuma untuk role yang di-grant.
+    ['key' => 'invitation', 'label' => 'Invitations', 'route' => 'dashboard.invitation.index', 'group' => 'Invitation', 'icon' => 'list'],
+
     // ================= Quiz =================
     ['key' => 'quiz.form', 'label' => 'Forms', 'route' => 'quiz.form.index', 'group' => 'Quiz', 'icon' => 'list'],
+    ['key' => 'quiz.form-section', 'label' => 'Form Sections', 'route' => 'quiz.form-section.index', 'group' => 'Quiz', 'icon' => 'list'],
     ['key' => 'quiz.form-question', 'label' => 'Form Questions', 'route' => 'quiz.form-question.index', 'group' => 'Quiz', 'icon' => 'list'],
     ['key' => 'quiz.form-question-option', 'label' => 'Form Question Options', 'route' => 'quiz.form-question-option.index', 'group' => 'Quiz', 'icon' => 'list'],
     ['key' => 'quiz.form-submission', 'label' => 'Form Submission', 'route' => 'quiz.form-submission.index', 'group' => 'Quiz', 'icon' => 'list'],
@@ -63,6 +74,7 @@ return [
     ['key' => 'roleuser', 'label' => 'Role to user', 'route' => 'roleuser.index', 'group' => 'Company', 'icon' => 'list'],
     ['key' => 'roles', 'label' => 'Roles', 'route' => 'roles.index', 'group' => 'Company', 'icon' => 'list'],
     ['key' => 'historyuserlogin', 'label' => 'User Login', 'route' => 'historyuserlogin.index', 'group' => 'Company', 'icon' => 'list'],
+    ['key' => 'activity-log', 'label' => 'Activity Log', 'route' => 'activity-log.index', 'group' => 'Company', 'icon' => 'list'],
 
     // ================= Settings =================
     ['key' => 'settings.payment-gateway', 'label' => 'Payment Gateway', 'route' => 'settings.payment-gateway.index', 'group' => 'Settings', 'icon' => 'list'],

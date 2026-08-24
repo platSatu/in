@@ -7,9 +7,23 @@
     <div class="page-meta mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
         <h4 class="mb-0">Data Student</h4>
 
-        <a href="{{ route('student.student.create') }}" class="btn btn-primary">
-            + Add Student
-        </a>
+        <div class="d-flex flex-wrap gap-2">
+            {{-- Export ikut filter (search/branch_id/form_id) yang lagi aktif di
+                 halaman ini — kosongkan filter dulu (klik &times; di sebelah
+                 tombol Filter) kalau mau export SEMUA student, atau isi
+                 Branch/Form dulu kalau mau export per branch/per form. File-nya
+                 .csv, langsung bisa dibuka di Excel atau di-import ke Google
+                 Sheets (menu File > Import di Google Sheets). --}}
+            <a href="{{ route('student.student.export', request()->only(['search', 'branch_id', 'form_id'])) }}"
+                class="btn btn-outline-success"
+                title="Export sesuai filter yang sedang aktif. Kosongkan filter untuk export semua student.">
+                <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
+            </a>
+
+            <a href="{{ route('student.student.create') }}" class="btn btn-primary">
+                + Add Student
+            </a>
+        </div>
     </div>
 
     @if(session('success'))

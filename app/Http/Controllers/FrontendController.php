@@ -65,6 +65,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\City;
 use App\Models\ClassSchedule;
 use App\Models\Form;
 use App\Models\FormAnswer;
@@ -72,6 +73,7 @@ use App\Models\FormPayment;
 use App\Models\FormQuestion;
 use App\Models\FormQuestionOption;
 use App\Models\FormResult;
+use App\Models\FormSection;
 use App\Models\FormSubmission;
 use App\Models\Major;
 use App\Models\Student;
@@ -168,34 +170,99 @@ class FrontendController extends Controller
     public function universityCatalog(Request $request)
     {
         $search = $request->query('search');
+        $cityId = $request->query('city_id');
+        $majorId = $request->query('major_id');
+        $type = $request->query('type'); // "All Types" filter -> field/program (UniversityProfile::field)
+        $scholarship = $request->query('scholarship'); // '1' = hanya yang ada beasiswa
 
         $universitiesQuery = University::where('status', 'active')->orderBy('name');
 
         if ($search) {
+            // Kolom `city` di tabel universities dipakai sebagai FK ke cities.id
+            // (lihat catatan di City::universities()/University::city()), jadi
+            // pencarian nama kota harus lewat whereHas ke relasi city, bukan
+            // LIKE ke kolom `city` itu sendiri (yang isinya UUID, bukan teks).
             $universitiesQuery->where(function ($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                ->orWhere('city', 'like', "%{$search}%")
-                ->orWhere('country', 'like', "%{$search}%");
+                    ->orWhere('country', 'like', "%{$search}%")
+                    ->orWhereHas('city', function ($cityQuery) use ($search) {
+                        $cityQuery->where('name', 'like', "%{$search}%");
+                    });
+            });
+        }
+
+        if (!empty($cityId)) {
+            $universitiesQuery->where('city', $cityId);
+        }
+
+        if (!empty($majorId)) {
+            $universitiesQuery->where('major_id', $majorId);
+        }
+
+        // Filter "All Types" (Field/program studi) dan Scholarship sama-sama
+        // hidup di tabel university_profiles (bukan kolom langsung di
+        // universities), jadi keduanya digabung lewat satu whereHas ke
+        // relasi profiles().
+        if (!empty($type) || !empty($scholarship)) {
+            $universitiesQuery->whereHas('profiles', function ($q) use ($type, $scholarship) {
+                $q->where('status', 'active');
+
+                if (!empty($type)) {
+                    $q->where('field', 'like', "%{$type}%");
+                }
+
+                if (!empty($scholarship)) {
+                    $q->where('scholarship_available', true);
+                }
             });
         }
 
         $universities = $universitiesQuery->get();
+
+        // Resolve relasi city() secara eksplisit (bukan lewat magic property
+        // $item->city) — kolom `city` di tabel universities punya nama yang
+        // sama persis dengan nama relasinya, jadi $item->city SELALU
+        // mengembalikan nilai kolom mentah (UUID), bukan objek City, walaupun
+        // relasinya sudah di-load() di sini. View mengambil city-nya lewat
+        // $item->getRelation('city'), sama seperti perbaikan di halaman admin.
+        $universities->load('city');
 
         $profiles = UniversityProfile::where('status', 'active')
             ->whereIn('university_id', $universities->pluck('id'))
             ->get()
             ->keyBy('university_id');
 
-        // Kumpulkan daftar field unik untuk filter chip
-        $allFields = collect();
-        foreach ($profiles as $p) {
-            if ($p->field) {
-                $allFields = $allFields->merge(array_map('trim', explode(',', $p->field)));
-            }
-        }
-        $allFields = $allFields->unique()->sort()->values();
+        // Daftar field/program unik untuk dropdown "All Types" — diambil dari
+        // SEMUA profile aktif (bukan cuma dari hasil yang sudah difilter),
+        // supaya pilihan di dropdown-nya tetap lengkap apapun filter yang
+        // sedang aktif.
+        $allFields = UniversityProfile::where('status', 'active')
+            ->whereNotNull('field')
+            ->pluck('field')
+            ->flatMap(fn ($field) => array_map('trim', explode(',', $field)))
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
 
-        return view('frontend.university-catalog', compact('universities', 'profiles', 'search', 'allFields'));
+        // Dropdown City & Major juga menampilkan SEMUA pilihan aktif (bukan
+        // cuma yang match hasil saat ini), konsisten dengan pola filter
+        // dropdown di halaman admin (Student, dsb).
+        $cities = City::where('status', 'active')->orderBy('name')->get();
+        $majors = Major::where('status', 'active')->orderBy('name')->get();
+
+        return view('frontend.university-catalog', compact(
+            'universities',
+            'profiles',
+            'search',
+            'allFields',
+            'cities',
+            'majors',
+            'cityId',
+            'majorId',
+            'type',
+            'scholarship'
+        ));
     }
 
 
@@ -220,7 +287,14 @@ class FrontendController extends Controller
             }])
             ->get();
 
-        return view('frontend.university-profile', compact('university', 'profile', 'albums'));
+        // Kolom `city` di tabel universities juga jadi nama relasi city() —
+        // $university->city (magic property) SELALU mengembalikan nilai
+        // kolom mentah (UUID), bukan objek City (sama persis kasusnya dengan
+        // halaman admin quiz.university.show). Ambil eksplisit lewat method
+        // city() supaya nama kotanya bisa ditampilkan dengan benar.
+        $cityModel = $university->city()->first();
+
+        return view('frontend.university-profile', compact('university', 'profile', 'albums', 'cityModel'));
     }
 
     /**
@@ -268,6 +342,7 @@ class FrontendController extends Controller
         $questions = collect();
         $personalDataQuestions = collect();
         $placementTestQuestions = collect();
+        $sections = collect();
 
         // === PREFILL SETELAH KEMBALI DARI GATEWAY PEMBAYARAN ===
         // Wizard ini satu <form> besar yang me-reload PENUH halaman waktu user
@@ -325,6 +400,55 @@ class FrontendController extends Controller
                     $personalDataQuestions = $rootQuestions->where('stage_group', 'personal_data')->values();
                 }
                 $placementTestQuestions = $rootQuestions->where('stage_group', 'placement_test')->values();
+
+                // Section aktif milik form ini (lihat blok "SECTION" di bawah untuk
+                // bagaimana ini dipakai mengelompokkan $placementTestQuestions).
+                $sections = FormSection::where('form_id', $formId)
+                    ->where('status', 'active')
+                    ->orderBy('order')
+                    ->orderBy('created_at')
+                    ->get();
+            }
+        }
+
+        // === SECTION (pengelompokan tampilan Placement Test) ===
+        // Section sifatnya opsional per form (lihat FormSection & migration
+        // create_form_sections_table) — kalau form ini BELUM punya section sama
+        // sekali, $placementTestGroups dibiarkan kosong dan
+        // frontend/form-wizard.blade.php akan merender $placementTestQuestions
+        // flat seperti sebelum fitur ini ada (TIDAK ada perubahan tampilan sama
+        // sekali untuk form yang sudah berjalan).
+        //
+        // Kalau form ini punya section, pertanyaan dikelompokkan jadi beberapa
+        // "halaman": pertanyaan yang belum ditempatkan ke section mana pun
+        // (section_id null) muncul lebih dulu TANPA judul (halaman transisi,
+        // supaya tidak ada soal yang ke-skip/hilang selama admin belum selesai
+        // mengelompokkan semuanya), baru disusul section-section bernama sesuai
+        // urutannya. Section yang kebetulan tidak punya pertanyaan aktif
+        // dilewati saja (tidak ada gunanya jadi halaman kosong).
+        $placementTestGroups = collect();
+
+        if ($selectedForm && $sections->isNotEmpty()) {
+            $ungroupedQuestions = $placementTestQuestions->whereNull('section_id')->values();
+            if ($ungroupedQuestions->isNotEmpty()) {
+                $placementTestGroups->push((object) [
+                    'id' => null,
+                    'name' => null,
+                    'description' => null,
+                    'questions' => $ungroupedQuestions,
+                ]);
+            }
+
+            foreach ($sections as $section) {
+                $sectionQuestions = $placementTestQuestions->where('section_id', $section->id)->values();
+                if ($sectionQuestions->isNotEmpty()) {
+                    $placementTestGroups->push((object) [
+                        'id' => $section->id,
+                        'name' => $section->name,
+                        'description' => $section->description,
+                        'questions' => $sectionQuestions,
+                    ]);
+                }
             }
         }
 
@@ -334,6 +458,7 @@ class FrontendController extends Controller
             'questions',
             'personalDataQuestions',
             'placementTestQuestions',
+            'placementTestGroups',
             'majors',
             'paymentPrefill'
         ));
@@ -578,6 +703,11 @@ class FrontendController extends Controller
         $student->update([
             'branch_id' => $form->branch_id,
             'form_id' => $form->id,
+            // Dicatat bareng branch_id di atas (lihat App\Helpers\DataScope) —
+            // supaya staff dengan role scope 'division' bisa ikut melihat
+            // student ini di menu admin, konsisten dengan cakupan form yang
+            // baru saja diisi student ini.
+            'company_division_id' => $form->company_division_id,
         ]);
 
         Log::info('[FORM-WIZARD] Lanjut ke proses FormSubmission & FormAnswer', [
@@ -860,6 +990,11 @@ class FrontendController extends Controller
         $student->update([
             'branch_id' => $form->branch_id,
             'form_id' => $form->id,
+            // Dicatat bareng branch_id di atas (lihat App\Helpers\DataScope) —
+            // supaya staff dengan role scope 'division' bisa ikut melihat
+            // student ini di menu admin, konsisten dengan cakupan form yang
+            // baru saja diisi student ini.
+            'company_division_id' => $form->company_division_id,
         ]);
 
         $submission = FormSubmission::create([
@@ -1261,6 +1396,32 @@ class FrontendController extends Controller
                 ]);
 
                 $majorId = $majorIdInput;
+            }
+        } elseif ($question->type === 'exact_match') {
+            // Peserta harus mengetik jawaban PERSIS sama dengan correct_answer
+            // (mis. soal yang jawabannya huruf Mandarin) — lihat migration
+            // add_exact_match_type_to_form_questions_table. Case-sensitive,
+            // cuma spasi di awal/akhir yang diabaikan supaya spasi tidak
+            // sengaja bikin jawaban benar dianggap salah.
+            $answerText = $request->input($questionKey);
+            $answerValue = ($answerText !== null && $answerText !== '') ? $answerText : '-';
+
+            if ($answerText !== null && $answerText !== '') {
+                FormAnswer::create([
+                    'user_id' => $student->id,
+                    'submission_id' => $submission->id,
+                    'question_id' => $question->id,
+                    'option_id' => null,
+                    'answer_text' => $answerText,
+                    'status' => 'active',
+                ]);
+
+                $isExactMatch = $question->correct_answer !== null
+                    && trim($answerText) === trim($question->correct_answer);
+
+                if ($isAutoResultForm && $question->stage_group === 'placement_test' && $isExactMatch) {
+                    $scoreDelta += (float) ($question->match_score ?? 0);
+                }
             }
         } elseif ($question->type === 'file') {
             // Upload jawaban (dokumen pendukung, dsb). Nama field-nya dinamis per

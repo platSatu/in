@@ -5,7 +5,17 @@
 
     <div class="page-meta mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
-            @if ($filterForm)
+            @if ($filterSection)
+                {{-- Datang dari tombol "Lihat Soal"/"+ Add Question" di
+                     quiz/form-section/index.blade.php -> lebih spesifik dari
+                     $filterForm biasa, jadi diprioritaskan duluan. Balik ke daftar
+                     Section (form yang sama), bukan ke daftar Form, supaya alurnya
+                     kebaca: Form -> Section -> Pertanyaan section itu -> (balik ke
+                     Section lagi). --}}
+                <h5 class="mb-0">Pertanyaan section: {{ $filterSection->name }}</h5>
+                <small class="text-muted d-block mb-1">Form: {{ optional($filterForm)->name ?? '-' }}</small>
+                <a href="{{ route('quiz.form-section.index', ['form_id' => $filterSection->form_id]) }}" class="small">&larr; Kembali ke daftar Section</a>
+            @elseif ($filterForm)
                 <h5 class="mb-0">Pertanyaan untuk form: {{ $filterForm->name }}</h5>
                 {{-- Sebelumnya link ini ke daftar SEMUA pertanyaan lintas form (bisa
                      ratusan baris, menyulitkan) — sekarang balik ke daftar Form saja,
@@ -13,8 +23,10 @@
                 <a href="{{ route('quiz.form.index') }}" class="small">&larr; Kembali ke daftar Form</a>
             @endif
         </div>
-        <a href="{{ route('quiz.form-question.create', $filterForm ? ['form_id' => $filterForm->id] : []) }}"
-            class="btn btn-primary">+ Add Question</a>
+        <a href="{{ route('quiz.form-question.create', array_filter([
+                'form_id' => optional($filterForm)->id ?? optional($filterSection)->form_id,
+                'section_id' => optional($filterSection)->id,
+            ])) }}" class="btn btn-primary">+ Add Question</a>
     </div>
 
     @if (session('success'))
@@ -33,6 +45,9 @@
                         @if ($filterForm)
                             <input type="hidden" name="form_id" value="{{ $filterForm->id }}">
                         @endif
+                        @if ($filterSection)
+                            <input type="hidden" name="section_id" value="{{ $filterSection->id }}">
+                        @endif
                         <div class="col-md-10">
                             <input type="text" name="search" class="form-control"
                                 placeholder="Search question/type/status..." value="{{ request('search') }}">
@@ -49,6 +64,7 @@
                             <tr>
                                 <th>No</th>
                                 <th>Form</th>
+                                <th>Section</th>
                                 <th>Question</th>
                                 <th>Type</th>
                                 <th>Order</th>
@@ -66,6 +82,13 @@
                                         @if ($item->form_id !== $lastFormId)
                                             {{ optional($item->form)->name ?? '-' }}
                                             @php $lastFormId = $item->form_id; @endphp
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if ($item->section)
+                                            <span class="badge badge-secondary text-nowrap">{{ $item->section->name }}</span>
+                                        @else
+                                            <span class="text-muted">-</span>
                                         @endif
                                     </td>
                                     <td>{{ $item->question_text }}</td>
@@ -106,7 +129,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center">Belum ada data form question.</td>
+                                    <td colspan="9" class="text-center">Belum ada data form question.</td>
                                 </tr>
                             @endforelse
                         </tbody>

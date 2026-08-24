@@ -124,12 +124,49 @@
                                             {{ old('type', $data->type) === 'major' ? 'selected' : '' }}>Major</option>
                                         <option value="file"
                                             {{ old('type', $data->type) === 'file' ? 'selected' : '' }}>File Upload (jpg/jpeg/png/pdf)</option>
+                                        <option value="exact_match"
+                                            {{ old('type', $data->type) === 'exact_match' ? 'selected' : '' }}>Exact Match (harus diketik persis)</option>
                                     </select>
                                     <div class="form-text">
                                         Single Choice, Multiple Choice, dan Dropdown ambil pilihan jawabannya dari menu "Options" di pertanyaan ini.
                                         File Upload membatasi peserta hanya boleh unggah jpg/jpeg/png/pdf, maksimal 5MB.
+                                        Exact Match menilai jawaban peserta persis sama (huruf besar/kecil dihitung) dengan "Jawaban Benar" di bawah.
                                     </div>
                                     @error('type')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="col-xxl-12 mb-4 exact-match-fields" id="exactMatchFields">
+                                    <label for="correct_answer">Jawaban Benar <span class="text-muted">(harus diketik persis oleh peserta)</span></label>
+                                    <input type="text" class="form-control @error('correct_answer') is-invalid @enderror"
+                                        id="correct_answer" name="correct_answer" placeholder="mis. 你好"
+                                        value="{{ old('correct_answer', $data->correct_answer) }}">
+                                    @error('correct_answer')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+
+                                    <label for="match_score" class="mt-3">Poin (kalau benar)</label>
+                                    <input type="number" class="form-control @error('match_score') is-invalid @enderror"
+                                        id="match_score" name="match_score" placeholder="mis. 10"
+                                        value="{{ old('match_score', $data->match_score) }}">
+                                    @error('match_score')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="col-xxl-12 mb-4">
+                                    <label for="section_id">Section <span class="text-muted">(opsional — pengelompokan tampilan di Placement Test)</span></label>
+                                    <select class="form-select @error('section_id') is-invalid @enderror" id="section_id" name="section_id">
+                                        <option value="">-- Tidak ada section --</option>
+                                        @foreach ($sectionChoices as $section)
+                                            <option value="{{ $section->id }}"
+                                                {{ old('section_id', $data->section_id) == $section->id ? 'selected' : '' }}>
+                                                {{ $section->name }}
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    @error('section_id')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
@@ -229,5 +266,24 @@
     </form>
 
 </div>
+
+<script>
+    (function () {
+        const typeSelect = document.getElementById('type');
+        const exactMatchFields = document.getElementById('exactMatchFields');
+
+        function applyExactMatchVisibility() {
+            if (!typeSelect || !exactMatchFields) {
+                return;
+            }
+            exactMatchFields.style.display = typeSelect.value === 'exact_match' ? '' : 'none';
+        }
+
+        if (typeSelect) {
+            typeSelect.addEventListener('change', applyExactMatchVisibility);
+            applyExactMatchVisibility();
+        }
+    })();
+</script>
 
 @endsection

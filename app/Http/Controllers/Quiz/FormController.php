@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\Quiz;
 
 use App\Helpers\AdminCrud;
+use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
+use App\Models\ClassEnrollment;
 use App\Models\ClassSchedule;
 use App\Models\CompanyBranch;
+use App\Models\CompanyDivision;
 use App\Models\Form;
 use App\Models\FormAnswer;
 use App\Models\FormPayment;
@@ -13,6 +16,7 @@ use App\Models\FormQuestion;
 use App\Models\FormResult;
 use App\Models\FormSubmission;
 use App\Models\Major;
+use App\Models\RoleUser;
 use App\Models\WhatsappTemplate;
 use App\Services\Whatsapp\WhatsappMessenger;
 use Illuminate\Database\QueryException;
@@ -27,24 +31,74 @@ class FormController extends Controller
     {
         $search = $request->query('search');
 
-        $userId = Auth::id();
-        if ($userId === null) {
+        $user = Auth::user();
+        if ($user === null) {
             abort(401);
         }
 
-        $data = AdminCrud::paginate(
-            Form::class,
-            (string) $userId,
-            ['name', 'description', 'no_booth'],
-            $search,
-            10,
-            ['companyBranch', 'formSubmissions', 'formPayments']
-        );
+        // SEBELUMNYA: selalu di-scope ketat `user_id = pembuatnya sendiri`
+        // (AdminCrud::paginate). SEKARANG: ikut cakupan branch/divisi/company
+        // role aktif user ini (lihat App\Helpers\DataScope) — supaya rekan
+        // setim di branch/unit yang sama bisa saling melihat form yang sama,
+        // sesuai role yang di-assign lewat halaman Role to User. Role dengan
+        // scope 'self' (atau user tanpa role apa pun yang relevan) tetap
+        // berperilaku identik seperti sebelumnya: cuma lihat form buatan
+        // sendiri.
+        $query = Form::query()->with(['companyBranch', 'division', 'formSubmissions', 'formPayments']);
+        DataScope::applyBranchDivisionScope($query, $user, 'user_id');
 
-        // Total form yang sudah dibuat admin ini (tidak terpengaruh search/pagination).
-        $totalForms = Form::where('user_id', (string) $userId)->count();
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->orWhere('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%")
+                    ->orWhere('no_booth', 'like', "%{$search}%");
+            });
+        }
+
+        $data = $query->latest('created_at')->paginate(10)->withQueryString();
+
+        // Total form yang BOLEH DILIHAT user ini (bukan lagi selalu "buatan
+        // sendiri" — ikut scope yang sama dengan di atas), tidak terpengaruh
+        // search/pagination.
+        $totalFormsQuery = Form::query();
+        DataScope::applyBranchDivisionScope($totalFormsQuery, $user, 'user_id');
+        $totalForms = $totalFormsQuery->count();
 
         return view('quiz.form.index', compact('data', 'totalForms'));
+    }
+
+    /**
+     * Form yang boleh diakses user ini (lihat App\Helpers\DataScope) —
+     * dipakai SEMUA method di controller ini yang sebelumnya memakai
+     * AdminCrud::findOrFail(Form::class, $id, $userId) (scope ketat "punya
+     * sendiri"). Method ini menggantikan pengecekan itu dengan cakupan
+     * branch/divisi/company sesuai role aktif user, TANPA mengubah cara
+     * AdminCrud dipakai di modul lain — perubahan ini murni lokal di
+     * controller ini.
+     */
+    private function resolveVisibleForm(string $id): Form
+    {
+        $form = Form::findOrFail($id);
+
+        if (!$this->isFormVisible($form)) {
+            abort(403, 'Form tidak valid untuk cakupan akses Anda.');
+        }
+
+        return $form;
+    }
+
+    /**
+     * @param Form|null $form
+     */
+    private function isFormVisible($form): bool
+    {
+        if (!$form) {
+            return false;
+        }
+
+        $visibleIds = DataScope::visibleFormIds(Auth::user());
+
+        return $visibleIds === null || in_array($form->id, $visibleIds, true);
     }
 
     /**
@@ -56,12 +110,11 @@ class FormController extends Controller
      */
     public function submissions(string $id)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        if (Auth::id() === null) {
             abort(401);
         }
 
-        $form = AdminCrud::findOrFail(Form::class, $id, (string) $userId);
+        $form = $this->resolveVisibleForm($id);
 
         $submissions = FormSubmission::where('form_id', $form->id)
             ->with(['student', 'payment', 'result'])
@@ -88,12 +141,11 @@ class FormController extends Controller
      */
     public function detail(string $id)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        if (Auth::id() === null) {
             abort(401);
         }
 
-        $form = AdminCrud::findOrFail(Form::class, $id, (string) $userId);
+        $form = $this->resolveVisibleForm($id);
 
         $questions = FormQuestion::where('form_id', $form->id)
             ->where('status', 'active')
@@ -132,10 +184,13 @@ class FormController extends Controller
 
         $submission = FormSubmission::with(['student', 'form'])->findOrFail($submissionId);
 
-        $form = $submission->form;
-        if (!$form || (string) $form->user_id !== (string) $userId) {
-            abort(403, 'Submission tidak valid untuk user ini.');
+        // Cakupan sama dengan resolveVisibleForm() — bukan lagi mutlak
+        // "form_id.user_id === Auth::id()" (lihat App\Helpers\DataScope).
+        if (!$this->isFormVisible($submission->form)) {
+            abort(403, 'Submission tidak valid untuk cakupan akses Anda.');
         }
+
+        $form = $submission->form;
 
         $answersByQuestion = FormAnswer::where('submission_id', $submission->id)
             ->with('option')
@@ -190,10 +245,13 @@ class FormController extends Controller
 
         $submission = FormSubmission::with(['student', 'form'])->findOrFail($submissionId);
 
-        $form = $submission->form;
-        if (!$form || (string) $form->user_id !== (string) $userId) {
-            abort(403, 'Submission tidak valid untuk user ini.');
+        // Cakupan sama dengan resolveVisibleForm() — bukan lagi mutlak
+        // "form_id.user_id === Auth::id()" (lihat App\Helpers\DataScope).
+        if (!$this->isFormVisible($submission->form)) {
+            abort(403, 'Submission tidak valid untuk cakupan akses Anda.');
         }
+
+        $form = $submission->form;
 
         if ($form->result_mode !== 'manual') {
             abort(422, 'Form ini tidak memakai mode hasil manual.');
@@ -362,8 +420,42 @@ class FormController extends Controller
         $templates = WhatsappTemplate::where('status', 'active')->get();
         $companyBranches = CompanyBranch::select('id', 'name')->orderBy('name')->get();
         $selectedCompanyBranchId = $request->query('company_branch_id');
+        $companyDivisions = CompanyDivision::where('status', 'active')
+            ->select('id', 'name', 'company_branch_id')
+            ->orderBy('name')
+            ->get();
+        $suggestedDivisionId = $this->suggestedDivisionId();
 
-        return view('quiz.form.create', compact('templates', 'companyBranches', 'selectedCompanyBranchId'));
+        return view('quiz.form.create', compact(
+            'templates',
+            'companyBranches',
+            'selectedCompanyBranchId',
+            'companyDivisions',
+            'suggestedDivisionId'
+        ));
+    }
+
+    /**
+     * Divisi yang otomatis "disarankan" (bukan wajib dipilih) waktu bikin
+     * form baru — diambil dari divisi tempat staff yang login sendiri
+     * di-assign lewat Role to User (role_user.company_division_id), kalau
+     * ada lebih dari satu diambil yang pertama saja sebagai default; staff
+     * tetap bebas ganti/kosongkan lewat dropdown-nya. Null kalau staff tidak
+     * punya assignment divisi sama sekali (mis. scope company/branch, atau
+     * belum di-assign role apa pun) — dropdown-nya cukup tampil kosong.
+     */
+    private function suggestedDivisionId(): ?string
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            return null;
+        }
+
+        return RoleUser::query()
+            ->where('user_id', $userId)
+            ->where('status', RoleUser::STATUS_ACTIVE)
+            ->whereNotNull('company_division_id')
+            ->value('company_division_id');
     }
 
     public function store(Request $request)
@@ -377,6 +469,7 @@ class FormController extends Controller
             'use_whatsapp_notification' => 'nullable|boolean',
             'whatsapp_template_id' => 'nullable|string|required_if:use_whatsapp_notification,1|exists:whatsapp_templates,id',
             'branch_id' => 'required|exists:company_branch,id',
+            'company_division_id' => 'nullable|string|exists:company_division,id',
             'no_booth' => 'required|string|max:255',
             'requires_payment' => 'nullable|boolean',
             'payment_amount' => 'nullable|required_if:requires_payment,1|numeric|min:0',
@@ -413,6 +506,7 @@ class FormController extends Controller
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
+        $validated['company_division_id'] = $validated['company_division_id'] ?? null;
 
         $validated = $this->applyTimerFields($request, $validated);
 
@@ -499,23 +593,24 @@ class FormController extends Controller
         }
 
 
-        $data = AdminCrud::findOrFail(
-            Form::class,
-            $id,
-            (string) $userId
-        );
+        $data = $this->resolveVisibleForm($id);
 
 
         $templates = \App\Models\WhatsappTemplate::where('status', 'active')
             ->get();
 
         $companyBranches = CompanyBranch::select('id', 'name')->orderBy('name')->get();
+        $companyDivisions = CompanyDivision::where('status', 'active')
+            ->select('id', 'name', 'company_branch_id')
+            ->orderBy('name')
+            ->get();
 
 
         return view('quiz.form.edit', compact(
             'data',
             'templates',
-            'companyBranches'
+            'companyBranches',
+            'companyDivisions'
         ));
     }
 
@@ -526,7 +621,7 @@ class FormController extends Controller
             abort(401);
         }
 
-        $existing = AdminCrud::findOrFail(Form::class, $id, (string) $userId);
+        $existing = $this->resolveVisibleForm($id);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -537,6 +632,7 @@ class FormController extends Controller
             'use_whatsapp_notification' => 'nullable|boolean',
             'whatsapp_template_id' => 'nullable|string|required_if:use_whatsapp_notification,1|exists:whatsapp_templates,id',
             'branch_id' => 'required|exists:company_branch,id',
+            'company_division_id' => 'nullable|string|exists:company_division,id',
             'no_booth' => 'required|string|max:255',
             'requires_payment' => 'nullable|boolean',
             'payment_amount' => 'nullable|required_if:requires_payment,1|numeric|min:0',
@@ -573,6 +669,7 @@ class FormController extends Controller
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
+        $validated['company_division_id'] = $validated['company_division_id'] ?? null;
 
         $validated = $this->applyTimerFields($request, $validated);
 
@@ -608,7 +705,7 @@ class FormController extends Controller
             unset($validated['logo']);
         }
 
-        AdminCrud::update(Form::class, $id, $validated, (string) $userId);
+        AdminCrud::update(Form::class, $id, $validated, null);
 
         return redirect()
             ->route('quiz.form.index')
@@ -667,10 +764,68 @@ class FormController extends Controller
             abort(401);
         }
 
-        AdminCrud::delete(Form::class, $id, (string) $userId);
+        $this->resolveVisibleForm($id);
+
+        AdminCrud::delete(Form::class, $id, null);
 
         return redirect()
             ->route('quiz.form.index')
             ->with('success', 'Form berhasil dihapus.');
+    }
+
+    /**
+     * "Reset" semua jejak submission form ini — dipakai admin sebelum publish
+     * form ke publik, buat bersihin submission percobaan/testing tanpa perlu
+     * hapus form-nya sendiri. Form, form_questions, dan
+     * form_question_options (question bank/konfigurasinya) TETAP ada —
+     * cuma histori "siapa yang pernah submit form ini" yang dibuang, sampai
+     * ke jawaban/hasil/pembayaran per-submission-nya juga (bukan cuma baris
+     * form_submissions-nya doang).
+     *
+     * Ini hard delete permanen (bukan soft-delete), dibungkus 1 DB
+     * transaction supaya kalau salah satu query gagal di tengah jalan,
+     * semuanya di-rollback (tidak ada submission yang "setengah kehapus").
+     *
+     * Kolom form_id/submission_id di project ini semuanya cuma char(36)
+     * yang di-index (tidak ada foreign key constraint asli di database,
+     * jadi tidak ada ON DELETE CASCADE dari MySQL) — makanya tiap tabel
+     * anak dihapus manual satu-satu di sini, urutannya anak dulu baru induk
+     * (form_submissions paling akhir), biar tidak ninggalin baris yatim.
+     *
+     * TIDAK disentuh: forms, form_questions, form_question_options, dan
+     * `students` (database master student dipakai bareng-bareng lintas
+     * form lain, jadi row student-nya sendiri tidak boleh ikut kehapus).
+     */
+    public function resetSubmissions(string $id)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $form = $this->resolveVisibleForm($id);
+
+        DB::transaction(function () use ($form) {
+            $submissionIds = FormSubmission::where('form_id', $form->id)->pluck('id');
+
+            if ($submissionIds->isNotEmpty()) {
+                ClassEnrollment::whereIn('form_submission_id', $submissionIds)->delete();
+                FormResult::whereIn('form_submission_id', $submissionIds)->delete();
+                FormAnswer::whereIn('submission_id', $submissionIds)->delete();
+                FormPayment::whereIn('form_submission_id', $submissionIds)->delete();
+            }
+
+            // Transaksi pembayaran form ini yang belum sempat "nyambung" ke
+            // submission mana pun (form_submission_id masih NULL — mis.
+            // peserta bayar tapi tidak lanjut submit) ikut dibuang juga,
+            // karena sama-sama data percobaan sebelum publish.
+            FormPayment::where('form_id', $form->id)->whereNull('form_submission_id')->delete();
+
+            FormSubmission::where('form_id', $form->id)->delete();
+        });
+
+        return redirect()
+            ->route('quiz.form.index')
+            ->with('success', 'Semua submission form "' . $form->name . '" (beserta jawaban, hasil, dan histori pembayarannya) berhasil direset. Form, pertanyaan, dan pilihan jawabannya tetap ada.');
     }
 }

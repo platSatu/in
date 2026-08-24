@@ -22,11 +22,14 @@ class FormQuestion extends Model
         'form_id',
         'parent_option_id',
         'stage_group',
+        'section_id',
         'question_text',
         'description',
         'image',
         'audio',
         'type',
+        'correct_answer',
+        'match_score',
         'required',
         'order',
         'status',
@@ -67,5 +70,15 @@ class FormQuestion extends Model
     public function parentOption()
     {
         return $this->belongsTo(FormQuestionOption::class, 'parent_option_id');
+    }
+
+    /**
+     * Section pembungkus pertanyaan ini (mis. "Section A") — opsional/nullable,
+     * lihat migration add_section_id_to_form_questions_table & FormSection.
+     * NULL berarti pertanyaan ini belum dikelompokkan ke section mana pun.
+     */
+    public function section()
+    {
+        return $this->belongsTo(FormSection::class, 'section_id');
     }
 }

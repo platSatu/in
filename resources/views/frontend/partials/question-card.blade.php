@@ -218,6 +218,15 @@
             <i class="bi bi-paperclip"></i>
             Format yang didukung: JPG, JPEG, PNG, atau PDF. Ukuran maksimal 5MB.
         </div>
+    @elseif($question->type === 'exact_match')
+        <input type="text"
+            name="question_{{ $question->id }}"
+            class="form-control"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            placeholder="Ketik jawaban Anda persis sesuai instruksi">
     @endif
 
     <div class="error-message">This question is required, please fill in your answer.</div>

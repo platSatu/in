@@ -66,6 +66,31 @@
 
                         <div class="row mb-4">
                             <div class="col-sm-12">
+                                <label for="company_division_id" class="mb-2">Division/Unit <span class="text-muted">(opsional)</span></label>
+
+                                @php
+                                    $selectedDivisionId = old('company_division_id', $suggestedDivisionId ?? null);
+                                @endphp
+
+                                <select class="form-select @error('company_division_id') is-invalid @enderror" id="company_division_id" name="company_division_id">
+                                    <option value="">-- Tidak ada / lintas divisi --</option>
+                                    @foreach ($companyDivisions as $companyDivision)
+                                        <option value="{{ $companyDivision->id }}" {{ (string) $selectedDivisionId === (string) $companyDivision->id ? 'selected' : '' }}>
+                                            {{ $companyDivision->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text">
+                                    Menentukan tim/unit mana yang bisa ikut melihat form ini (sesuai hak akses role masing-masing). Boleh dikosongkan.
+                                </div>
+                                @error('company_division_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="row mb-4">
+                            <div class="col-sm-12">
                                 <label for="no_booth" class="mb-2">No Booth</label>
                                 <input type="text" class="form-control @error('no_booth') is-invalid @enderror"
                                     id="no_booth" name="no_booth" placeholder="Contoh: 12 atau A1" value="{{ old('no_booth') }}">

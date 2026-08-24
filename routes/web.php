@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ProfileBussinesController;
@@ -30,6 +31,7 @@ use App\Http\Controllers\VoucherController;
 use App\Http\Controllers\Quiz\FormController;
 use App\Http\Controllers\Quiz\FormQuestionController;
 use App\Http\Controllers\Quiz\FormQuestionOptionController;
+use App\Http\Controllers\Quiz\FormSectionController;
 use App\Http\Controllers\Quiz\FormSubmissionController;
 use App\Http\Controllers\Quiz\FormAnswerController;
 use App\Http\Controllers\Quiz\UniversityController;
@@ -228,6 +230,14 @@ Route::middleware(['auth', 'permission:historyuserlogin,edit'])->prefix('dashboa
     Route::delete('/{id}', [HistoryUserLoginController::class, 'destroy'])->name('historyuserlogin.destroy');
 });
 
+// Activity Log: read-only murni (lihat App\Models\ActivityLog & App\Http\Controllers\
+// ActivityLogController) — sengaja cuma 'view' punya rute, tidak ada create/edit/
+// destroy sama sekali untuk log ini, jadi cuma 1 middleware group tanpa ability 'edit'.
+Route::middleware(['auth', 'permission:activity-log'])->prefix('dashboard/superadmin/activity-log')->group(function () {
+    Route::get('/', [ActivityLogController::class, 'index'])->name('activity-log.index');
+    Route::get('/{id}/detail', [ActivityLogController::class, 'detail'])->name('activity-log.detail');
+});
+
 // roles: show (GET /{id}) didaftarkan asli SETELAH create/store, jadi urutan
 // blok di bawah sengaja dipertahankan sama persis (view, edit, view, edit)
 // supaya GET /{id} tidak pernah "menutup" GET /create.
@@ -298,6 +308,10 @@ Route::middleware(['auth', 'permission:quiz.form'])->prefix('dashboard/superadmi
 Route::middleware(['auth', 'permission:quiz.form,edit'])->prefix('dashboard/superadmin/quiz/form')->group(function () {
     Route::post('/submissions/{submissionId}/result', [FormController::class, 'saveResult'])->name('quiz.form.submissions.save-result');
     Route::put('/{id}', [FormController::class, 'update'])->name('quiz.form.update');
+    // Reset submission (bukan hapus form) — dipakai admin sebelum publish form
+    // ke publik buat bersihin submission percobaan/testing. Lihat
+    // FormController::resetSubmissions() untuk detail apa saja yang dihapus.
+    Route::delete('/{id}/reset-submissions', [FormController::class, 'resetSubmissions'])->name('quiz.form.reset-submissions');
     Route::delete('/{id}', [FormController::class, 'destroy'])->name('quiz.form.destroy');
 });
 
@@ -416,6 +430,17 @@ Route::middleware(['auth', 'permission:qrcodes'])->prefix('dashboard/superadmin/
     Route::get('/{id}', [LinkToQrcodeController::class, 'show'])->name('qrcodes.show');
 });
 
+Route::middleware(['auth', 'permission:quiz.form-section'])->prefix('dashboard/superadmin/quiz/form-section')->group(function () {
+    Route::get('/', [FormSectionController::class, 'index'])->name('quiz.form-section.index');
+});
+Route::middleware(['auth', 'permission:quiz.form-section,edit'])->prefix('dashboard/superadmin/quiz/form-section')->group(function () {
+    Route::get('/create', [FormSectionController::class, 'create'])->name('quiz.form-section.create');
+    Route::post('/', [FormSectionController::class, 'store'])->name('quiz.form-section.store');
+    Route::get('/{id}/edit', [FormSectionController::class, 'edit'])->name('quiz.form-section.edit');
+    Route::put('/{id}', [FormSectionController::class, 'update'])->name('quiz.form-section.update');
+    Route::delete('/{id}', [FormSectionController::class, 'destroy'])->name('quiz.form-section.destroy');
+});
+
 Route::middleware(['auth', 'permission:quiz.form-question'])->prefix('dashboard/superadmin/quiz/form-question')->group(function () {
     Route::get('/', [FormQuestionController::class, 'index'])->name('quiz.form-question.index');
 });
@@ -427,6 +452,9 @@ Route::middleware(['auth', 'permission:quiz.form-question,edit'])->prefix('dashb
     // didaftarkan sebelum /{id}/edit di bawah (sama-sama GET) supaya tidak ketelan
     // wildcard {id}.
     Route::get('/parent-options', [FormQuestionController::class, 'parentOptionChoices'])->name('quiz.form-question.parent-options');
+    // Endpoint AJAX serupa untuk dropdown "Section" (lihat FormQuestionController::sectionChoices()) —
+    // sama-sama harus didaftarkan sebelum /{id}/edit di bawah.
+    Route::get('/section-choices', [FormQuestionController::class, 'sectionChoices'])->name('quiz.form-question.section-choices');
     Route::post('/', [FormQuestionController::class, 'store'])->name('quiz.form-question.store');
     Route::get('/{id}/edit', [FormQuestionController::class, 'edit'])->name('quiz.form-question.edit');
     Route::put('/{id}', [FormQuestionController::class, 'update'])->name('quiz.form-question.update');
@@ -645,6 +673,12 @@ Route::middleware(['auth', 'permission:absensi.academic-calendar,edit'])->prefix
 // GET /{id} tidak pernah "menutup" GET /create.
 Route::middleware(['auth', 'permission:student.student'])->prefix('dashboard/superadmin/student/student')->group(function () {
     Route::get('/', [StudentController::class, 'index'])->name('student.student.index');
+    // Export CSV — pakai filter query string yang sama dengan index() (search/
+    // branch_id/form_id), jadi "export semua" = tanpa filter, "export per
+    // form"/"per branch" = tinggal isi filter itu dulu sebelum export. Static
+    // path "/export" ini aman didaftarkan sebelum GET /{id} di bawah karena
+    // Laravel mencocokkan segmen literal lebih dulu ketimbang wildcard.
+    Route::get('/export', [StudentController::class, 'export'])->name('student.student.export');
 });
 Route::middleware(['auth', 'permission:student.student,edit'])->prefix('dashboard/superadmin/student/student')->group(function () {
     Route::get('/create', [StudentController::class, 'create'])->name('student.student.create');
@@ -660,29 +694,53 @@ Route::middleware(['auth', 'permission:student.student,edit'])->prefix('dashboar
     Route::post('/{id}/add-user', [StudentController::class, 'addUser'])->name('student.student.add-user');
 });
 
-Route::get('/dashboard/invitation/register-ulang',  [BackendInvitationController::class, 'RegisterUlangScan'])->name('register-ulang.scan');
-Route::post('/dashboard/invitation/register-ulang', [BackendInvitationController::class, 'processScan'])->name('register-ulang.process');
+// Invitation: SEBELUMNYA cuma dibungkus 'auth' polos (semua user login bisa
+// akses & CRUD apa pun), sekarang ikut sistem permission yang sama dengan
+// modul lain (lihat config/menu.php key 'invitation') supaya bisa dibatasi
+// per role lewat halaman edit Role. Dipecah 'view'/'edit' mengikuti pola yang
+// sama dengan grup 'roles' di atas (index/show = view, sisanya = edit),
+// termasuk 2 route register-ulang (scan) yang tadinya sama sekali TANPA
+// middleware apa pun (bisa diakses tanpa login) — proses scan-nya sendiri
+// mengubah data (registrasi ulang kehadiran), jadi 'processScan' digolongkan
+// 'edit', sedangkan halaman scan-nya (GET) digolongkan 'view'.
+Route::middleware(['auth', 'permission:invitation'])->group(function () {
+    Route::get('/dashboard/invitation/register-ulang', [BackendInvitationController::class, 'RegisterUlangScan'])->name('register-ulang.scan');
+});
+Route::middleware(['auth', 'permission:invitation,edit'])->group(function () {
+    Route::post('/dashboard/invitation/register-ulang', [BackendInvitationController::class, 'processScan'])->name('register-ulang.process');
+});
 
-Route::middleware(['auth'])->prefix('dashboard')->name('dashboard.')->group(function () {
+// PENTING: urutan blok 'view'/'edit' di bawah ini SENGAJA dipertahankan sama
+// persis dengan urutan route asli (index, create, store, show, edit, update,
+// destroy, resend) — bukan dikelompokkan ulang jadi "semua view" lalu "semua
+// edit" — supaya /create (literal) tetap terdaftar SEBELUM /{invitation}
+// (wildcard). Kalau dibalik, /create akan "tertangkap" duluan oleh route
+// /{invitation} (dianggap invitation-nya bernama "create") dan halaman Create
+// Invitation jadi tidak pernah bisa dibuka. Pola pemecahan 4-blok ini sama
+// persis dengan grup 'roles' di atas untuk alasan yang sama.
+Route::middleware(['auth', 'permission:invitation'])->prefix('dashboard')->name('dashboard.')->group(function () {
     Route::prefix('invitation')->name('invitation.')->group(function () {
-        Route::get('/',               [BackendInvitationController::class, 'index'])->name('index');
-        Route::get('/create',         [BackendInvitationController::class, 'create'])->name('create');
-        Route::post('/',              [BackendInvitationController::class, 'store'])->name('store');
-        Route::get('/{invitation}',   [BackendInvitationController::class, 'show'])->name('show');
-        Route::get('/{invitation}/edit', [BackendInvitationController::class, 'edit'])->name('edit');
-        Route::put('/{invitation}',   [BackendInvitationController::class, 'update'])->name('update');
-        Route::delete('/{invitation}',[BackendInvitationController::class, 'destroy'])->name('destroy');
-        Route::post('/{invitation}/resend', [BackendInvitationController::class, 'resend'])->name('resend');
-
-        // ============================================================
-        // Tambahkan 2 route ini di dalam group dashboard
-        // ============================================================
-
-        // Letakkan SEBELUM route /{invitation} agar tidak konflik
-        // Route::get('/register-ulang',  [BackendInvitationController::class, 'RegisterUlangScan'])->name('register-ulang.scan');
-        // Route::post('/register-ulang', [BackendInvitationController::class, 'processScan'])->name('register-ulang.process');
+        Route::get('/', [BackendInvitationController::class, 'index'])->name('index');
     });
-
+});
+Route::middleware(['auth', 'permission:invitation,edit'])->prefix('dashboard')->name('dashboard.')->group(function () {
+    Route::prefix('invitation')->name('invitation.')->group(function () {
+        Route::get('/create', [BackendInvitationController::class, 'create'])->name('create');
+        Route::post('/', [BackendInvitationController::class, 'store'])->name('store');
+    });
+});
+Route::middleware(['auth', 'permission:invitation'])->prefix('dashboard')->name('dashboard.')->group(function () {
+    Route::prefix('invitation')->name('invitation.')->group(function () {
+        Route::get('/{invitation}', [BackendInvitationController::class, 'show'])->name('show');
+    });
+});
+Route::middleware(['auth', 'permission:invitation,edit'])->prefix('dashboard')->name('dashboard.')->group(function () {
+    Route::prefix('invitation')->name('invitation.')->group(function () {
+        Route::get('/{invitation}/edit', [BackendInvitationController::class, 'edit'])->name('edit');
+        Route::put('/{invitation}', [BackendInvitationController::class, 'update'])->name('update');
+        Route::delete('/{invitation}', [BackendInvitationController::class, 'destroy'])->name('destroy');
+        Route::post('/{invitation}/resend', [BackendInvitationController::class, 'resend'])->name('resend');
+    });
 });
 // Halaman "Profile" yang dibuka dari dropdown avatar (header/sidebar). Sengaja
 // TIDAK ada parameter {id} di URL manapun di sini — ProfileController selalu

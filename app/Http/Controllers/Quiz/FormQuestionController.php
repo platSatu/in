@@ -3,11 +3,12 @@
 namespace App\Http\Controllers\Quiz;
 
 use App\Helpers\AdminCrud;
+use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\Form;
 use App\Models\FormQuestion;
 use App\Models\FormQuestionOption;
-use Illuminate\Database\Eloquent\Builder;
+use App\Models\FormSection;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -20,15 +21,25 @@ class FormQuestionController extends Controller
     {
         $search = $request->query('search');
         $formId = $request->query('form_id');
+        $sectionId = $request->query('section_id');
 
-        $userId = Auth::id();
-        if ($userId === null) {
+        $user = Auth::user();
+        if ($user === null) {
             abort(401);
         }
 
-        $query = FormQuestion::query()
-            ->with('form')
-            ->where('user_id', (string) $userId);
+        // SEBELUMNYA: selalu di-scope ketat `user_id = pembuatnya sendiri`.
+        // SEKARANG: FormQuestion tidak punya kolom branch/divisi sendiri,
+        // cakupannya ikut Form induknya lewat form_id (lihat
+        // App\Helpers\DataScope::visibleFormIds()) — soal dari form yang
+        // boleh dilihat user ini, bukan cuma soal buatan sendiri.
+        $visibleFormIds = DataScope::visibleFormIds($user);
+
+        $query = FormQuestion::query()->with(['form', 'section']);
+
+        if ($visibleFormIds !== null) {
+            $query->whereIn('form_id', $visibleFormIds);
+        }
 
         // Dipanggil dari tombol "Show Questions" di quiz/form/index.blade.php ->
         // langsung terfilter cuma soal milik form itu saja.
@@ -36,10 +47,24 @@ class FormQuestionController extends Controller
 
         if (!empty($formId)) {
             $filterForm = Form::where('id', $formId)
-                ->where('user_id', (string) $userId)
+                ->when($visibleFormIds !== null, fn ($q) => $q->whereIn('id', $visibleFormIds))
                 ->first();
 
             $query->where('form_id', $formId);
+        }
+
+        // Dipanggil dari tombol "Lihat Soal" di quiz/form-section/index.blade.php ->
+        // terfilter lebih spesifik lagi, cuma soal milik section itu saja (bukan
+        // seluruh soal form-nya). Selalu dikirim BARENG form_id di atas, jadi
+        // aman diasumsikan $filterForm sudah pasti ada kalau $filterSection ada.
+        $filterSection = null;
+
+        if (!empty($sectionId)) {
+            $filterSection = FormSection::where('id', $sectionId)
+                ->when($visibleFormIds !== null, fn ($q) => $q->whereIn('form_id', $visibleFormIds))
+                ->first();
+
+            $query->where('section_id', $sectionId);
         }
 
         if (!empty($search)) {
@@ -67,20 +92,17 @@ class FormQuestionController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        return view('quiz.form-question.index', compact('data', 'filterForm'));
+        return view('quiz.form-question.index', compact('data', 'filterForm', 'filterSection'));
     }
 
     public function create(Request $request)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        $user = Auth::user();
+        if ($user === null) {
             abort(401);
         }
 
-        /** @var Builder $formQuery */
-        $formQuery = Form::query();
-        $forms = $formQuery
-            ->where(['user_id' => (string) $userId])
+        $forms = DataScope::applyBranchDivisionScope(Form::query(), $user, 'user_id')
             ->orderBy('name')
             ->get();
 
@@ -93,11 +115,26 @@ class FormQuestionController extends Controller
         // > Add), dropdown-nya tetap dirender tapi kosong dulu — begitu admin
         // memilih form di halaman itu, JS mengisi ulang lewat AJAX ke
         // parentOptionChoices() di bawah, tanpa reload halaman.
-        $parentOptionChoices = !empty($selectedFormId)
-            ? $this->queryParentOptionChoices($selectedFormId, (string) $userId)
+        $parentOptionChoices = (!empty($selectedFormId) && $this->isFormAccessible($selectedFormId))
+            ? $this->queryParentOptionChoices($selectedFormId)
             : collect();
 
-        return view('quiz.form-question.create', compact('forms', 'selectedFormId', 'parentOptionChoices'));
+        // Section: daftar section yang sudah dibuat untuk form ini, dipakai untuk
+        // isi awal dropdown "Section" di tiap baris. Sama pola dengan
+        // $parentOptionChoices di atas — kosong dulu kalau form belum terkunci,
+        // diisi ulang lewat AJAX ke sectionChoices() begitu admin memilih form.
+        $sectionChoices = (!empty($selectedFormId) && $this->isFormAccessible($selectedFormId))
+            ? $this->querySectionChoices($selectedFormId)
+            : collect();
+
+        // Dipanggil dari tombol "+ Add Question" di quiz/form-section/index.blade.php
+        // (selalu dikirim bareng ?form_id= di atas) -> dropdown Section di baris
+        // pertanyaan pertama (dan baris-baris berikutnya yang ditambah lewat "+
+        // Tambah Baris") langsung default ke section ini, admin tidak perlu pilih
+        // manual lagi. Cuma default awal, admin tetap bebas mengganti per baris.
+        $preselectedSectionId = $request->query('section_id');
+
+        return view('quiz.form-question.create', compact('forms', 'selectedFormId', 'parentOptionChoices', 'sectionChoices', 'preselectedSectionId'));
     }
 
     /**
@@ -111,8 +148,7 @@ class FormQuestionController extends Controller
      */
     public function parentOptionChoices(Request $request)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        if (Auth::id() === null) {
             abort(401);
         }
 
@@ -121,18 +157,14 @@ class FormQuestionController extends Controller
             return response()->json([]);
         }
 
-        $formOwned = Form::query()
-            ->where(['id' => $formId])
-            ->where(['user_id' => (string) $userId])
-            ->exists();
-
-        if (!$formOwned) {
-            // Form tidak valid/bukan milik user ini — jangan bocorkan info apa pun,
-            // cukup balikin daftar kosong (sama seperti kalau belum pilih form).
+        if (!$this->isFormAccessible($formId)) {
+            // Form tidak valid/tidak masuk cakupan akses user ini — jangan
+            // bocorkan info apa pun, cukup balikin daftar kosong (sama seperti
+            // kalau belum pilih form).
             return response()->json([]);
         }
 
-        $choices = $this->queryParentOptionChoices($formId, (string) $userId)
+        $choices = $this->queryParentOptionChoices($formId)
             ->map(function (FormQuestionOption $option) {
                 return [
                     'id' => $option->id,
@@ -152,7 +184,7 @@ class FormQuestionController extends Controller
      *
      * @return \Illuminate\Support\Collection<int, FormQuestionOption>
      */
-    private function queryParentOptionChoices(string $formId, string $userId, ?string $excludeQuestionId = null)
+    private function queryParentOptionChoices(string $formId, ?string $excludeQuestionId = null)
     {
         return FormQuestionOption::query()
             ->with('question')
@@ -160,11 +192,59 @@ class FormQuestionController extends Controller
             ->when($excludeQuestionId, function ($q) use ($excludeQuestionId) {
                 $q->where('question_id', '!=', $excludeQuestionId);
             })
-            ->whereHas('question', function ($q) use ($formId, $userId) {
-                $q->where('form_id', $formId)->where('user_id', $userId);
+            ->whereHas('question', function ($q) use ($formId) {
+                $q->where('form_id', $formId);
             })
             ->orderBy('question_id')
             ->orderBy('order')
+            ->get();
+    }
+
+    /**
+     * Endpoint AJAX: daftar section untuk sebuah form, dipanggil dari halaman
+     * "Add Question" begitu admin memilih Form di dropdown (pola sama persis
+     * dengan parentOptionChoices() di atas). Hasilnya JSON [{id, label}, ...]
+     * dipakai JS di quiz/form-question/create.blade.php untuk mengisi ulang
+     * dropdown "Section" tanpa reload halaman.
+     */
+    public function sectionChoices(Request $request)
+    {
+        if (Auth::id() === null) {
+            abort(401);
+        }
+
+        $formId = $request->query('form_id');
+        if (empty($formId)) {
+            return response()->json([]);
+        }
+
+        if (!$this->isFormAccessible($formId)) {
+            return response()->json([]);
+        }
+
+        $choices = $this->querySectionChoices($formId)
+            ->map(fn (FormSection $section) => [
+                'id' => $section->id,
+                'label' => $section->name,
+            ])
+            ->values();
+
+        return response()->json($choices);
+    }
+
+    /**
+     * Query bersama untuk daftar section milik sebuah form — dipakai oleh
+     * create(), edit(), dan endpoint AJAX sectionChoices() di atas.
+     *
+     * @return \Illuminate\Support\Collection<int, FormSection>
+     */
+    private function querySectionChoices(string $formId)
+    {
+        return FormSection::query()
+            ->where('form_id', $formId)
+            ->where('status', 'active')
+            ->orderBy('order')
+            ->orderBy('created_at')
             ->get();
     }
 
@@ -218,10 +298,16 @@ class FormQuestionController extends Controller
         // menganggapnya kosong (string "" tetap lolos rule 'string' lalu gagal di
         // rule 'exists'). Disamakan jadi null di sini supaya validasi & penyimpanan
         // konsisten dengan pertanyaan root (tanpa pemicu).
+        // Sama untuk section_id: dropdown "-- Tidak ada section --" (lihat
+        // quiz/form-question/create.blade.php) juga kirim string kosong, bukan
+        // null.
         $normalizedQuestions = (array) $request->input('questions', []);
         foreach ($normalizedQuestions as $key => $row) {
             if (($row['parent_option_id'] ?? null) === '') {
                 $normalizedQuestions[$key]['parent_option_id'] = null;
+            }
+            if (($row['section_id'] ?? null) === '') {
+                $normalizedQuestions[$key]['section_id'] = null;
             }
         }
         $request->merge(['questions' => $normalizedQuestions]);
@@ -231,9 +317,12 @@ class FormQuestionController extends Controller
             'questions' => 'required|array|min:1',
             'questions.*.question_text' => 'nullable|string',
             'questions.*.description' => 'nullable|string',
-            'questions.*.type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file',
+            'questions.*.type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file,exact_match',
             'questions.*.stage_group' => 'nullable|in:personal_data,placement_test',
             'questions.*.parent_option_id' => 'nullable|string|exists:form_question_options,id',
+            'questions.*.section_id' => 'nullable|string|exists:form_sections,id',
+            'questions.*.correct_answer' => 'nullable|string|required_if:questions.*.type,exact_match',
+            'questions.*.match_score' => 'nullable|integer',
             'questions.*.required' => 'nullable|boolean',
             'questions.*.status' => 'nullable|in:active,inactive',
             'questions.*.image' => 'nullable|image|max:4096',
@@ -262,13 +351,8 @@ class FormQuestionController extends Controller
             abort(401);
         }
 
-        $formOwned = Form::query()
-            ->where(['id' => $validated['form_id']])
-            ->where(['user_id' => (string) $userId])
-            ->exists();
-
-        if (!$formOwned) {
-            abort(403, 'Form tidak valid untuk user ini.');
+        if (!$this->isFormAccessible($validated['form_id'])) {
+            abort(403, 'Form tidak valid untuk cakupan akses Anda.');
         }
 
         // Pertanyaan bercabang: parent_option_id (kalau diisi) HARUS menunjuk ke
@@ -290,6 +374,23 @@ class FormQuestionController extends Controller
             foreach ($validated['questions'] as $row) {
                 if (!empty($row['parent_option_id']) && !$validParentOptionIds->contains($row['parent_option_id'])) {
                     abort(422, 'Opsi pemicu ("Tampilkan hanya jika opsi ini dipilih") tidak valid untuk form ini.');
+                }
+            }
+        }
+
+        // Section (kalau diisi) HARUS milik form YANG SAMA — sama alasannya
+        // dengan pengecekan parent_option_id di atas: mencegah satu form
+        // "meminjam" section milik form lain.
+        $sectionIds = collect($validated['questions'])->pluck('section_id')->filter()->unique();
+        if ($sectionIds->isNotEmpty()) {
+            $validSectionIds = FormSection::query()
+                ->whereIn('id', $sectionIds)
+                ->where('form_id', $validated['form_id'])
+                ->pluck('id');
+
+            foreach ($validated['questions'] as $row) {
+                if (!empty($row['section_id']) && !$validSectionIds->contains($row['section_id'])) {
+                    abort(422, 'Section yang dipilih tidak valid untuk form ini.');
                 }
             }
         }
@@ -318,11 +419,14 @@ class FormQuestionController extends Controller
                 'form_id' => $validated['form_id'],
                 'parent_option_id' => $row['parent_option_id'] ?? null,
                 'stage_group' => $row['stage_group'] ?? 'placement_test',
+                'section_id' => $row['section_id'] ?? null,
                 'question_text' => $row['question_text'] ?? null,
                 'description' => $row['description'] ?? null,
                 'image' => $imagePath,
                 'audio' => $audioPath,
                 'type' => $row['type'],
+                'correct_answer' => $row['type'] === 'exact_match' ? ($row['correct_answer'] ?? null) : null,
+                'match_score' => $row['type'] === 'exact_match' ? ($row['match_score'] ?? null) : null,
                 'required' => (bool) ($row['required'] ?? false),
                 'order' => $nextOrder + $position,
                 'status' => $row['status'] ?? 'active',
@@ -341,17 +445,14 @@ class FormQuestionController extends Controller
 
     public function edit(string $id)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        $user = Auth::user();
+        if ($user === null) {
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(FormQuestion::class, $id, (string) $userId, ['form']);
+        $data = $this->resolveVisibleQuestion($id);
 
-        /** @var Builder $formQuery */
-        $formQuery = Form::query();
-        $forms = $formQuery
-            ->where(['user_id' => (string) $userId])
+        $forms = DataScope::applyBranchDivisionScope(Form::query(), $user, 'user_id')
             ->orderBy('name')
             ->get();
 
@@ -360,9 +461,13 @@ class FormQuestionController extends Controller
         // ini sendiri dikecualikan (tidak masuk akal jadi anak dari opsinya
         // sendiri; cycle yang lebih dalam tetap dijaga lewat wouldCreateCycle()
         // di update() di bawah).
-        $parentOptionChoices = $this->queryParentOptionChoices($data->form_id, (string) $userId, $data->id);
+        $parentOptionChoices = $this->queryParentOptionChoices($data->form_id, $data->id);
 
-        return view('quiz.form-question.edit', compact('data', 'forms', 'parentOptionChoices'));
+        // Section: daftar section milik form yang sama, dipakai untuk isi dropdown
+        // "Section" di halaman edit ini.
+        $sectionChoices = $this->querySectionChoices($data->form_id);
+
+        return view('quiz.form-question.edit', compact('data', 'forms', 'parentOptionChoices', 'sectionChoices'));
     }
 
     // public function update(Request $request, string $id)
@@ -404,8 +509,7 @@ class FormQuestionController extends Controller
             abort(401);
         }
 
-        /** @var FormQuestion $existing */
-        $existing = AdminCrud::findOrFail(FormQuestion::class, $id, (string) $userId);
+        $existing = $this->resolveVisibleQuestion($id);
 
         // Sama seperti store(): "-- Tidak ada --" pada dropdown parent_option_id
         // mengirim string kosong, disamakan ke null di sini supaya rule 'nullable'
@@ -414,13 +518,22 @@ class FormQuestionController extends Controller
             $request->merge(['parent_option_id' => null]);
         }
 
+        // Sama untuk section_id: dropdown "-- Tidak ada section --" juga kirim
+        // string kosong, bukan null.
+        if ($request->input('section_id') === '') {
+            $request->merge(['section_id' => null]);
+        }
+
         $validator = Validator::make($request->all(), [
             'form_id' => 'required|string|exists:forms,id',
             'question_text' => 'nullable|string',
             'description' => 'nullable|string',
-            'type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file',
+            'type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file,exact_match',
             'stage_group' => 'nullable|in:personal_data,placement_test',
             'parent_option_id' => 'nullable|string|exists:form_question_options,id',
+            'section_id' => 'nullable|string|exists:form_sections,id',
+            'correct_answer' => 'nullable|string|required_if:type,exact_match',
+            'match_score' => 'nullable|integer',
             'required' => 'required|boolean',
             'order' => 'required|integer|min:0',
             'status' => 'required|in:active,inactive',
@@ -456,17 +569,23 @@ class FormQuestionController extends Controller
                     $validator->errors()->add('parent_option_id', 'Opsi pemicu ini akan membuat perulangan (cycle) pada struktur pertanyaan.');
                 }
             }
+
+            // Section (kalau diisi) harus milik form yang sama — sama alasannya
+            // dengan pengecekan parent_option_id di atas.
+            $sectionId = $request->input('section_id');
+            if (!empty($sectionId)) {
+                $section = FormSection::find($sectionId);
+
+                if (!$section || $section->form_id !== $request->input('form_id')) {
+                    $validator->errors()->add('section_id', 'Section tidak valid untuk form ini.');
+                }
+            }
         });
 
         $validated = $validator->validate();
 
-        $formOwned = Form::query()
-            ->where(['id' => $validated['form_id']])
-            ->where(['user_id' => (string) $userId])
-            ->exists();
-
-        if (!$formOwned) {
-            abort(403, 'Form tidak valid untuk user ini.');
+        if (!$this->isFormAccessible($validated['form_id'])) {
+            abort(403, 'Form tidak valid untuk cakupan akses Anda.');
         }
 
         if ($request->hasFile('image')) {
@@ -493,7 +612,15 @@ class FormQuestionController extends Controller
 
         $validated['stage_group'] = $validated['stage_group'] ?? 'placement_test';
 
-        AdminCrud::update(FormQuestion::class, $id, $validated, (string) $userId);
+        // correct_answer/match_score cuma relevan untuk tipe 'exact_match' — kalau
+        // admin ganti tipe pertanyaan ini jadi tipe lain, keduanya dikosongkan
+        // supaya tidak ada sisa data "cocok persis" yang tidak lagi dipakai.
+        if ($validated['type'] !== 'exact_match') {
+            $validated['correct_answer'] = null;
+            $validated['match_score'] = null;
+        }
+
+        AdminCrud::update(FormQuestion::class, $id, $validated, null);
 
         return redirect()
             ->route('quiz.form-question.index')
@@ -502,18 +629,16 @@ class FormQuestionController extends Controller
 
     public function destroy(string $id)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        if (Auth::id() === null) {
             abort(401);
         }
 
-        /** @var FormQuestion $existing */
-        $existing = AdminCrud::findOrFail(FormQuestion::class, $id, (string) $userId);
+        $existing = $this->resolveVisibleQuestion($id);
 
         $this->deleteQuestionFile($existing->image);
         $this->deleteQuestionFile($existing->audio);
 
-        AdminCrud::delete(FormQuestion::class, $id, (string) $userId);
+        AdminCrud::delete(FormQuestion::class, $id, null);
 
         return redirect()
             ->route('quiz.form-question.index')
@@ -589,5 +714,33 @@ class FormQuestionController extends Controller
         }
 
         return $depth >= 50;
+    }
+
+    /**
+     * FormQuestion yang boleh diakses user ini, ditentukan lewat cakupan Form
+     * induknya (lihat App\Helpers\DataScope::visibleFormIds()) — dipakai
+     * menggantikan AdminCrud::findOrFail(FormQuestion::class, $id, $userId)
+     * yang sebelumnya scope ketat "punya sendiri".
+     */
+    private function resolveVisibleQuestion(string $id): FormQuestion
+    {
+        $question = FormQuestion::with('form')->findOrFail($id);
+
+        if (!$this->isFormAccessible($question->form_id)) {
+            abort(403, 'Pertanyaan tidak valid untuk cakupan akses Anda.');
+        }
+
+        return $question;
+    }
+
+    private function isFormAccessible(?string $formId): bool
+    {
+        if (!$formId) {
+            return false;
+        }
+
+        $visibleFormIds = DataScope::visibleFormIds(Auth::user());
+
+        return $visibleFormIds === null || in_array($formId, $visibleFormIds, true);
     }
 }

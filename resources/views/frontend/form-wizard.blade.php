@@ -809,9 +809,40 @@
                     @endif
 
                     @if($selectedForm && $placementTestQuestions->count() > 0)
-                        @foreach($placementTestQuestions as $index => $question)
-                            @include('frontend.partials.question-card', ['question' => $question, 'index' => $index])
-                        @endforeach
+                        @if($placementTestGroups->isNotEmpty())
+                            {{--
+                                Section (opsional, diatur admin lewat menu "Form Sections"):
+                                pertanyaan ditampilkan satu "halaman" section per satu waktu,
+                                navigasinya ditangani questionsStepNext()/questionsStepPrev()
+                                di bawah. Kelompok pertama tampil duluan, sisanya disembunyikan
+                                lewat class d-none sampai peserta klik Next. Kalau form ini
+                                TIDAK punya section sama sekali, $placementTestGroups kosong dan
+                                cabang lain di bawah dipakai — flat, sama persis seperti sebelum
+                                fitur section ada.
+                            --}}
+                            @if(count($placementTestGroups) > 1)
+                                <div class="quiz-section-progress mb-3 text-muted small" id="sectionProgressLabel"></div>
+                            @endif
+                            @foreach($placementTestGroups as $groupIndex => $group)
+                                <div class="quiz-section-group {{ $loop->first ? '' : 'd-none' }}" data-section-index="{{ $groupIndex }}">
+                                    @if($group->name)
+                                        <div class="quiz-section-header mb-3">
+                                            <h5 class="mb-1">{{ $group->name }}</h5>
+                                            @if($group->description)
+                                                <div class="text-muted" style="font-size: 14px;">{{ $group->description }}</div>
+                                            @endif
+                                        </div>
+                                    @endif
+                                    @foreach($group->questions as $index => $question)
+                                        @include('frontend.partials.question-card', ['question' => $question, 'index' => $index])
+                                    @endforeach
+                                </div>
+                            @endforeach
+                        @else
+                            @foreach($placementTestQuestions as $index => $question)
+                                @include('frontend.partials.question-card', ['question' => $question, 'index' => $index])
+                            @endforeach
+                        @endif
                     @elseif($selectedForm && $placementTestQuestions->count() == 0)
                         <div class="alert alert-warning">
                             This form does not have any questions yet. Please contact the administrator.
@@ -819,10 +850,10 @@
                     @endif
 
                     <div class="d-flex justify-content-between">
-                        <button type="button" class="btn btn-outline-brand" onclick="prevStep()">
+                        <button type="button" class="btn btn-outline-brand" onclick="questionsStepPrev()">
                             <i class="bi bi-arrow-left"></i> Back
                         </button>
-                        <button type="button" class="btn btn-brand" onclick="nextStep()">
+                        <button type="button" class="btn btn-brand" onclick="questionsStepNext()">
                             Next <i class="bi bi-arrow-right"></i>
                         </button>
                     </div>
@@ -910,6 +941,73 @@
     }
 
     let currentStepIndex = 0;
+
+    // === SECTION (pengelompokan tampilan Placement Test) ===========================
+    // .quiz-section-group cuma ada di DOM kalau form ini punya minimal 1 section
+    // dengan pertanyaan di dalamnya (lihat FrontendController::buildFormWizardView()
+    // & markup #step-questions di atas). Untuk form yang belum punya section,
+    // array ini kosong dan questionsStepNext()/questionsStepPrev() di bawah
+    // otomatis berperilaku identik dengan nextStep()/prevStep() biasa — TIDAK ADA
+    // perubahan perilaku untuk form yang sudah berjalan sebelum fitur ini ada.
+    const sectionGroups = Array.from(document.querySelectorAll('#step-questions .quiz-section-group'));
+    let currentSectionGroupIndex = 0;
+
+    function updateSectionProgressLabel() {
+        const label = document.getElementById('sectionProgressLabel');
+        if (label) {
+            label.textContent = 'Section ' + (currentSectionGroupIndex + 1) + ' of ' + sectionGroups.length;
+        }
+    }
+
+    function showSectionGroup(index) {
+        sectionGroups.forEach(function (el, i) {
+            el.classList.toggle('d-none', i !== index);
+        });
+        currentSectionGroupIndex = index;
+
+        // Kartu pertanyaan bercabang bisa saja ada di dalam section yang baru saja
+        // ditampilkan/disembunyikan — hitung ulang visibilitasnya (lihat catatan
+        // tambahan soal .quiz-section-group di refreshNestedQuestionVisibility()).
+        refreshNestedQuestionVisibility();
+        updateSectionProgressLabel();
+
+        const stepEl = document.getElementById('step-questions');
+        if (stepEl) {
+            stepEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    // Tombol "Next"/"Back" di step Placement Test memanggil ini (lihat markup
+    // #step-questions), BUKAN langsung nextStep()/prevStep() lagi — supaya section
+    // bisa dilewati satu per satu dulu sebelum benar-benar pindah ke step lain
+    // (step-review). validateQuestionsStep('step-questions') tetap dipanggil
+    // seperti sebelumnya: karena sekarang cuma memvalidasi kartu yang SEDANG
+    // TERLIHAT (lihat perubahan di validateQuestionsStep()), otomatis cuma
+    // section yang lagi aktif yang divalidasi tiap kali "Next" diklik. Jawaban di
+    // section sebelumnya TIDAK dihapus/direset saat disembunyikan — tetap ikut
+    // tersubmit di akhir karena semuanya masih satu <form> yang sama.
+    function questionsStepNext() {
+        if (!validateQuestionsStep('step-questions')) {
+            return;
+        }
+
+        if (sectionGroups.length > 1 && currentSectionGroupIndex < sectionGroups.length - 1) {
+            showSectionGroup(currentSectionGroupIndex + 1);
+            return;
+        }
+
+        nextStep();
+    }
+
+    function questionsStepPrev() {
+        if (sectionGroups.length > 1 && currentSectionGroupIndex > 0) {
+            showSectionGroup(currentSectionGroupIndex - 1);
+            return;
+        }
+
+        prevStep();
+    }
+
     let paymentInitiated = false;
     let paymentPollTimer = null;
     let currentOrderId = document.getElementById('paymentOrderIdInput').value || null;
@@ -1027,7 +1125,13 @@
             // Pertanyaan cabang yang sedang disembunyikan (opsi pemicunya belum/
             // tidak dipilih) tidak ikut divalidasi sama sekali — PENTING supaya
             // "required" di cabang yang sedang tidak relevan tidak memblokir submit.
-            if (card.classList.contains('d-none')) {
+            // Section (kalau form ini punya section, lihat .quiz-section-group di
+            // markup #step-questions): kartu di dalam section yang SEDANG TIDAK
+            // aktif juga tidak boleh ikut divalidasi, sama alasannya dengan kartu
+            // bercabang yang sedang tersembunyi di bawah. Untuk form tanpa
+            // section, closest('.quiz-section-group.d-none') selalu null, jadi
+            // baris ini tidak mengubah perilaku yang sudah ada.
+            if (card.classList.contains('d-none') || card.closest('.quiz-section-group.d-none')) {
                 card.classList.remove('has-error');
                 // :scope > .error-message: kartu anak sekarang nested di dalam kartu
                 // ini sendiri (lihat isQuestionAnswered()), jadi querySelector biasa
@@ -1116,6 +1220,22 @@
             iterations++;
 
             nestedCards.forEach(function (card) {
+                // Section (kalau ada): kartu bercabang yang section-nya SEDANG
+                // TIDAK aktif dilewati sepenuhnya di sini — visibilitasnya sudah
+                // otomatis ikut tersembunyi lewat CSS (leluhurnya, .quiz-section-group
+                // yang berstatus d-none), dan jawabannya TIDAK boleh direset cuma
+                // karena section-nya lagi tidak ditampilkan (beda dengan cabang yang
+                // opsi pemicunya benar-benar di-uncheck, itu tetap harus direset di
+                // bawah seperti biasa). Nested card SELALU jadi descendant DOM dari
+                // opsi pemicunya sendiri (lihat question-card.blade.php), jadi
+                // keduanya pasti berada di section-group yang sama — cukup cek
+                // kartu ini saja tanpa perlu cek terpisah punya trigger-nya. Untuk
+                // form tanpa section, closest() ini selalu null, jadi baris ini
+                // tidak mengubah perilaku lama sama sekali.
+                if (card.closest('.quiz-section-group.d-none')) {
+                    return;
+                }
+
                 const parentOptionId = card.getAttribute('data-parent-option-id');
                 const trigger = document.getElementById('option_' + parentOptionId);
                 const isTriggered = !!(trigger && trigger.checked);
@@ -1421,6 +1541,13 @@
         // Semua radio/checkbox baru saja di-uncheck di atas, jadi seluruh kartu
         // pertanyaan cabang (kalau ada) harus ikut kembali tersembunyi.
         refreshNestedQuestionVisibility();
+
+        // Section (kalau ada): timer_auto_restart berarti "mulai dari soal
+        // pertama lagi" — navigasi section juga harus balik ke section pertama,
+        // bukan cuma input-nya saja yang dikosongkan.
+        if (sectionGroups.length > 1) {
+            showSectionGroup(0);
+        }
     }
 
     async function postFormDataJson(url, formData) {
@@ -1745,6 +1872,12 @@
         // dimuat (jaga-jaga kalau suatu saat ada opsi yang sudah ter-checked lewat
         // server, mis. prefill) — aman dipanggil walau belum ada yang tercentang.
         refreshNestedQuestionVisibility();
+
+        // Section: label "Section 1 of N" di halaman pertama placement test (kalau
+        // form ini punya lebih dari 1 section).
+        if (sectionGroups.length > 1) {
+            updateSectionProgressLabel();
+        }
 
         // PENTING: kalau redirect ini sebenarnya hasil submit akhir yang gagal
         // validasi (name/email/handphone kosong/tidak valid, dsb), JANGAN lompat

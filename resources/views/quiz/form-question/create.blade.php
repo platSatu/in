@@ -66,7 +66,13 @@
                             <button type="submit" class="btn btn-success w-100">Simpan Semua Pertanyaan</button>
                         </div>
                         <div class="col-sm-3 mb-3">
-                            <a href="{{ route('quiz.form-question.index') }}" class="btn btn-outline-secondary w-100">Cancel</a>
+                            {{-- Balik ke daftar yang konteksnya sama persis dengan halaman
+                                 asal (form + section kalau ada), bukan selalu ke daftar
+                                 semua pertanyaan lintas form. --}}
+                            <a href="{{ route('quiz.form-question.index', array_filter([
+                                    'form_id' => $selectedFormId ?? null,
+                                    'section_id' => $preselectedSectionId ?? null,
+                                ])) }}" class="btn btn-outline-secondary w-100">Cancel</a>
                         </div>
                     </div>
 
@@ -94,7 +100,7 @@
             </div>
             <div class="col-md-4">
                 <label class="form-label small">Type</label>
-                <select class="form-select" name="__NAME__[type]" required>
+                <select class="form-select type-select" name="__NAME__[type]" required>
                     <option value="">Choose...</option>
                     <option value="text">Text (single line)</option>
                     <option value="textarea">Textarea (long text)</option>
@@ -105,6 +111,7 @@
                     <option value="dropdown">Dropdown</option>
                     <option value="major">Major</option>
                     <option value="file">File Upload (jpg/jpeg/png/pdf)</option>
+                    <option value="exact_match">Exact Match (harus diketik persis)</option>
                 </select>
             </div>
         </div>
@@ -144,6 +151,41 @@
                     pertanyaan single/multiple choice beserta opsinya, baru pertanyaan berikutnya
                     bisa dijadikan cabang dari salah satu opsi tersebut.
                 </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
+            <div class="col-md-6">
+                <label class="form-label small">
+                    Section <span class="text-muted">(opsional — pengelompokan tampilan di Placement Test)</span>
+                </label>
+                {{--
+                    Pola sama persis dengan .parent-option-select di atas: seed awal
+                    dari $sectionChoices, diisi ulang lewat AJAX ke
+                    route('quiz.form-question.section-choices') begitu admin memilih
+                    Form (kalau form belum terkunci lewat ?form_id=).
+                --}}
+                <select class="form-select section-select" name="__NAME__[section_id]">
+                    <option value="">-- Tidak ada section --</option>
+                    @foreach ($sectionChoices as $section)
+                        <option value="{{ $section->id }}">{{ $section->name }}</option>
+                    @endforeach
+                </select>
+                <div class="form-text section-empty-hint" style="{{ $sectionChoices->isEmpty() ? '' : 'display:none;' }}">
+                    Form ini belum punya section. Pertanyaan tetap bisa disimpan tanpa section —
+                    buat section dulu lewat menu "Form Sections" kalau mau mengelompokkan.
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1 exact-match-fields" style="display:none;">
+            <div class="col-md-8">
+                <label class="form-label small">Jawaban Benar <span class="text-muted">(harus diketik persis oleh peserta, huruf besar/kecil dihitung)</span></label>
+                <input type="text" class="form-control" name="__NAME__[correct_answer]" placeholder="mis. 你好">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small">Poin (kalau benar)</label>
+                <input type="number" class="form-control" name="__NAME__[match_score]" placeholder="mis. 10">
             </div>
         </div>
 
@@ -195,6 +237,13 @@
         'id' => $opt->id,
         'label' => \Illuminate\Support\Str::limit(optional($opt->question)->question_text ?: 'Pertanyaan', 40)
             . ' → ' . ($opt->option_text ?: '[Gambar]'),
+    ])->values();
+
+    // Sama alasannya dengan $parentOptionChoicesForJs di atas (menghindari koma
+    // di dalam array literal @json()).
+    $sectionChoicesForJs = $sectionChoices->map(fn ($section) => [
+        'id' => $section->id,
+        'label' => $section->name,
     ])->values();
 @endphp
 
@@ -294,6 +343,110 @@
             });
         }
 
+        // === SECTION — dropdown dinamis (pola sama persis dengan pertanyaan
+        // bercabang di atas) ==========================================================
+        let currentSectionChoices = @json($sectionChoicesForJs);
+
+        // Dikirim dari FormQuestionController::create() kalau halaman ini dibuka
+        // lewat tombol "+ Add Question" di quiz/form-section/index.blade.php
+        // (?section_id=...) -> tiap baris pertanyaan baru langsung default ke
+        // section ini, admin tidak perlu pilih manual lagi tiap baris. Tetap cuma
+        // DEFAULT, admin bebas ganti per baris kalau perlu.
+        const preselectedSectionId = @json($preselectedSectionId ?? null);
+
+        function renderSectionSelect(selectEl, choices) {
+            const previousValue = selectEl.value;
+            selectEl.innerHTML = '';
+
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = '-- Tidak ada section --';
+            selectEl.appendChild(placeholder);
+
+            choices.forEach(function (choice) {
+                const opt = document.createElement('option');
+                opt.value = choice.id;
+                opt.textContent = choice.label;
+                selectEl.appendChild(opt);
+            });
+
+            if (choices.some(function (c) { return String(c.id) === previousValue; })) {
+                selectEl.value = previousValue;
+            } else if (preselectedSectionId && choices.some(function (c) { return String(c.id) === String(preselectedSectionId); })) {
+                selectEl.value = preselectedSectionId;
+            }
+        }
+
+        function applySectionChoicesToRow(row) {
+            const select = row.querySelector('.section-select');
+            if (select) {
+                renderSectionSelect(select, currentSectionChoices);
+            }
+
+            const hint = row.querySelector('.section-empty-hint');
+            if (hint) {
+                hint.style.display = currentSectionChoices.length ? 'none' : '';
+            }
+        }
+
+        function applySectionChoicesToAllRows() {
+            container.querySelectorAll('.question-row').forEach(applySectionChoicesToRow);
+        }
+
+        async function fetchSectionChoices(formId) {
+            if (!formId) {
+                currentSectionChoices = [];
+                applySectionChoicesToAllRows();
+                return;
+            }
+
+            try {
+                const response = await fetch(
+                    '{{ route('quiz.form-question.section-choices') }}?form_id=' + encodeURIComponent(formId),
+                    { headers: { 'Accept': 'application/json' } }
+                );
+
+                if (!response.ok) {
+                    throw new Error('Gagal memuat daftar section.');
+                }
+
+                currentSectionChoices = await response.json();
+            } catch (err) {
+                // Sama seperti fetchParentOptionChoices(): diamkan, dropdown section
+                // cukup kosong (pertanyaan tanpa section tetap bisa disimpan).
+                currentSectionChoices = [];
+            }
+
+            applySectionChoicesToAllRows();
+        }
+
+        if (formIdEl && formIdEl.tagName === 'SELECT') {
+            formIdEl.addEventListener('change', function () {
+                fetchSectionChoices(formIdEl.value);
+            });
+        }
+
+        // === EXACT MATCH — tampilkan field "Jawaban Benar"/"Poin" cuma kalau
+        // Type baris itu 'exact_match' =================================================
+        function applyExactMatchVisibility(row) {
+            const typeSelect = row.querySelector('.type-select');
+            const fields = row.querySelector('.exact-match-fields');
+            if (!typeSelect || !fields) {
+                return;
+            }
+
+            fields.style.display = typeSelect.value === 'exact_match' ? '' : 'none';
+        }
+
+        // Delegasi 1 listener untuk semua baris (termasuk yang ditambah belakangan
+        // lewat "+ Tambah Baris") — lebih sederhana daripada mem-bind listener baru
+        // tiap kali addRow() dipanggil.
+        container.addEventListener('change', function (event) {
+            if (event.target.classList.contains('type-select')) {
+                applyExactMatchVisibility(event.target.closest('.question-row'));
+            }
+        });
+
         function renumberRows() {
             const rows = container.querySelectorAll('.question-row');
             rows.forEach(function (row, index) {
@@ -328,6 +481,8 @@
             // (dari seed server atau hasil AJAX terakhir), supaya tidak perlu pilih
             // ulang Form untuk baris-baris berikutnya.
             applyParentOptionChoicesToRow(row);
+            applySectionChoicesToRow(row);
+            applyExactMatchVisibility(row);
 
             container.appendChild(fragment);
             renumberRows();

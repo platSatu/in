@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Quiz;
 
 use App\Helpers\AdminCrud;
+use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\FormQuestion;
 use App\Models\FormQuestionOption;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -20,14 +20,25 @@ class FormQuestionOptionController extends Controller
         $search = $request->query('search');
         $questionId = $request->query('question_id');
 
-        $userId = Auth::id();
-        if ($userId === null) {
+        $user = Auth::user();
+        if ($user === null) {
             abort(401);
         }
 
-        $query = FormQuestionOption::query()
-            ->with('question')
-            ->where('user_id', (string) $userId);
+        // SEBELUMNYA: selalu di-scope ketat `user_id = pembuatnya sendiri`.
+        // SEKARANG: FormQuestionOption tidak punya kolom branch/divisi sendiri,
+        // cakupannya ikut Form "kakek"-nya lewat question_id -> form_id (lihat
+        // App\Helpers\DataScope::visibleFormIds()) — opsi dari form yang boleh
+        // dilihat user ini, bukan cuma opsi buatan sendiri.
+        $visibleFormIds = DataScope::visibleFormIds($user);
+
+        $query = FormQuestionOption::query()->with('question');
+
+        if ($visibleFormIds !== null) {
+            $query->whereHas('question', function ($q) use ($visibleFormIds) {
+                $q->whereIn('form_id', $visibleFormIds);
+            });
+        }
 
         // Dipanggil dari tombol "Show" di quiz/form-question/index.blade.php ->
         // langsung terfilter cuma jawaban/opsi milik pertanyaan itu saja. Ini yang
@@ -37,7 +48,7 @@ class FormQuestionOptionController extends Controller
 
         if (!empty($questionId)) {
             $filterQuestion = FormQuestion::where('id', $questionId)
-                ->where('user_id', (string) $userId)
+                ->when($visibleFormIds !== null, fn ($q) => $q->whereIn('form_id', $visibleFormIds))
                 ->first();
 
             $query->where('question_id', $questionId);
@@ -57,15 +68,15 @@ class FormQuestionOptionController extends Controller
 
     public function create(Request $request)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        $user = Auth::user();
+        if ($user === null) {
             abort(401);
         }
 
-        /** @var Builder $questionQuery */
-        $questionQuery = FormQuestion::query();
-        $questions = $questionQuery
-            ->where(['user_id' => (string) $userId])
+        $visibleFormIds = DataScope::visibleFormIds($user);
+
+        $questions = FormQuestion::query()
+            ->when($visibleFormIds !== null, fn ($q) => $q->whereIn('form_id', $visibleFormIds))
             ->orderBy('question_text')
             ->get();
 
@@ -113,13 +124,8 @@ class FormQuestionOptionController extends Controller
             abort(401);
         }
 
-        $questionOwned = FormQuestion::query()
-            ->where(['id' => $validated['question_id']])
-            ->where(['user_id' => (string) $userId])
-            ->exists();
-
-        if (!$questionOwned) {
-            abort(403, 'Question tidak valid untuk user ini.');
+        if (!$this->isQuestionAccessible($validated['question_id'])) {
+            abort(403, 'Question tidak valid untuk cakupan akses Anda.');
         }
 
         $existingCount = FormQuestionOption::where('question_id', $validated['question_id'])->count();
@@ -162,17 +168,17 @@ class FormQuestionOptionController extends Controller
 
     public function edit(string $id)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        $user = Auth::user();
+        if ($user === null) {
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(FormQuestionOption::class, $id, (string) $userId, ['question']);
+        $data = $this->resolveVisibleOption($id);
 
-        /** @var Builder $questionQuery */
-        $questionQuery = FormQuestion::query();
-        $questions = $questionQuery
-            ->where(['user_id' => (string) $userId])
+        $visibleFormIds = DataScope::visibleFormIds($user);
+
+        $questions = FormQuestion::query()
+            ->when($visibleFormIds !== null, fn ($q) => $q->whereIn('form_id', $visibleFormIds))
             ->orderBy('question_text')
             ->get();
 
@@ -181,13 +187,11 @@ class FormQuestionOptionController extends Controller
 
     public function update(Request $request, string $id)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        if (Auth::id() === null) {
             abort(401);
         }
 
-        /** @var FormQuestionOption $existing */
-        $existing = AdminCrud::findOrFail(FormQuestionOption::class, $id, (string) $userId);
+        $existing = $this->resolveVisibleOption($id);
 
         $validator = Validator::make($request->all(), [
             'question_id' => 'required|string|exists:form_questions,id',
@@ -218,13 +222,8 @@ class FormQuestionOptionController extends Controller
         // di FormController untuk toggle serupa.
         $validated['is_other'] = $request->boolean('is_other');
 
-        $questionOwned = FormQuestion::query()
-            ->where(['id' => $validated['question_id']])
-            ->where(['user_id' => (string) $userId])
-            ->exists();
-
-        if (!$questionOwned) {
-            abort(403, 'Question tidak valid untuk user ini.');
+        if (!$this->isQuestionAccessible($validated['question_id'])) {
+            abort(403, 'Question tidak valid untuk cakupan akses Anda.');
         }
 
         if ($request->hasFile('image')) {
@@ -239,7 +238,7 @@ class FormQuestionOptionController extends Controller
 
         unset($validated['remove_image']);
 
-        AdminCrud::update(FormQuestionOption::class, $id, $validated, (string) $userId);
+        AdminCrud::update(FormQuestionOption::class, $id, $validated, null);
 
         return redirect()
             ->route('quiz.form-question-option.index')
@@ -248,13 +247,11 @@ class FormQuestionOptionController extends Controller
 
     public function destroy(string $id)
     {
-        $userId = Auth::id();
-        if ($userId === null) {
+        if (Auth::id() === null) {
             abort(401);
         }
 
-        /** @var FormQuestionOption $existing */
-        $existing = AdminCrud::findOrFail(FormQuestionOption::class, $id, (string) $userId);
+        $existing = $this->resolveVisibleOption($id);
 
         // Pertanyaan bercabang: opsi ini bisa saja jadi pemicu pertanyaan anak
         // (parent_option_id). Kalau dihapus begitu saja, pertanyaan anaknya akan
@@ -273,7 +270,7 @@ class FormQuestionOptionController extends Controller
 
         $this->deleteOptionFile($existing->image);
 
-        AdminCrud::delete(FormQuestionOption::class, $id, (string) $userId);
+        AdminCrud::delete(FormQuestionOption::class, $id, null);
 
         return redirect()
             ->route('quiz.form-question-option.index')
@@ -313,5 +310,45 @@ class FormQuestionOptionController extends Controller
         if (file_exists($fullPath)) {
             unlink($fullPath);
         }
+    }
+
+    /**
+     * FormQuestionOption yang boleh diakses user ini, ditentukan lewat cakupan
+     * Form "kakek"-nya (question_id -> form_id, lihat
+     * App\Helpers\DataScope::visibleFormIds()) — dipakai menggantikan
+     * AdminCrud::findOrFail(FormQuestionOption::class, $id, $userId) yang
+     * sebelumnya scope ketat "punya sendiri".
+     */
+    private function resolveVisibleOption(string $id): FormQuestionOption
+    {
+        $option = FormQuestionOption::with('question')->findOrFail($id);
+
+        if (!$option->question || !$this->isFormAccessible($option->question->form_id)) {
+            abort(403, 'Option tidak valid untuk cakupan akses Anda.');
+        }
+
+        return $option;
+    }
+
+    private function isQuestionAccessible(?string $questionId): bool
+    {
+        if (!$questionId) {
+            return false;
+        }
+
+        $question = FormQuestion::find($questionId);
+
+        return $question !== null && $this->isFormAccessible($question->form_id);
+    }
+
+    private function isFormAccessible(?string $formId): bool
+    {
+        if (!$formId) {
+            return false;
+        }
+
+        $visibleFormIds = DataScope::visibleFormIds(Auth::user());
+
+        return $visibleFormIds === null || in_array($formId, $visibleFormIds, true);
     }
 }

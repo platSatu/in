@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Student;
 
+use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\CompanyBranch;
 use App\Models\Form;
@@ -15,10 +16,12 @@ use App\Models\RoleUser;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StudentController extends Controller
 {
@@ -37,6 +40,11 @@ class StudentController extends Controller
         $branchId = $request->query('branch_id');
         $formId = $request->query('form_id');
 
+        $user = Auth::user();
+        if ($user === null) {
+            abort(401);
+        }
+
         $data = Student::query()
             ->with([
                 'user',
@@ -48,6 +56,7 @@ class StudentController extends Controller
                 // tapi di sini cukup submission terbaru saja (bukan seluruh riwayat).
                 'formSubmissions' => fn ($query) => $query->latest('created_at')->with('payment'),
             ])
+            ->tap(fn ($query) => DataScope::applyBranchDivisionScope($query, $user, 'handled_by_user_id'))
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")
@@ -72,9 +81,11 @@ class StudentController extends Controller
             ->paginate(10)
             ->withQueryString();
 
-        // Daftar untuk dropdown filter. Sengaja tampilkan semua branch/form (tanpa
-        // scope user_id) supaya superadmin bisa filter lintas branch/form manapun,
-        // konsisten dengan index() ini yang juga tidak discope per user_id.
+        // Daftar untuk dropdown filter. Sengaja tetap tampilkan SEMUA branch/form
+        // (tidak ikut di-scope seperti $data di atas) — ini cuma opsi filter (nama
+        // branch/form bukan data sensitif), staff dengan cakupan terbatas tetap
+        // hanya akan melihat STUDENT-nya yang sesuai scope walau memilih branch/
+        // form di luar scope-nya (hasil query $data di atas tetap kosong).
         $companyBranches = CompanyBranch::select('id', 'name')->orderBy('name')->get();
         $forms = Form::select('id', 'name')->orderBy('name')->get();
 
@@ -92,6 +103,146 @@ class StudentController extends Controller
             'totalBranches',
             'totalForms'
         ));
+    }
+
+    /**
+     * Export Data Student ke CSV (bisa langsung dibuka di Excel maupun
+     * diimport ke Google Sheets: Google Sheets punya menu "File > Import"
+     * yang menerima file .csv langsung).
+     *
+     * Filter-nya SENGAJA persis sama dengan index() di atas (search/
+     * branch_id/form_id, dari query string yang sama) — jadi tombol Export
+     * di halaman index tinggal "ikut" filter yang lagi aktif saat itu:
+     * tidak isi filter apa-apa = export semua student, isi Branch = export
+     * per branch, isi Form = export per form (atau kombinasi keduanya).
+     * Tidak ada UI/endpoint terpisah untuk itu, karena filter yang sudah ada
+     * di index() sudah cukup buat mewakili ketiga skenario itu.
+     */
+    public function export(Request $request): StreamedResponse
+    {
+        $search = $request->query('search');
+        $branchId = $request->query('branch_id');
+        $formId = $request->query('form_id');
+
+        $user = Auth::user();
+        if ($user === null) {
+            abort(401);
+        }
+
+        $query = Student::query()
+            ->with([
+                'companyBranch',
+                'form',
+                'formSubmissions' => fn ($q) => $q->latest('created_at')->with('payment'),
+            ])
+            // Export mengikuti cakupan akses yang sama dengan index() di atas —
+            // staff scope 'division'/'branch'/'self' tidak boleh mengunduh data
+            // student di luar cakupannya hanya karena lewat tombol Export.
+            ->tap(fn ($q) => DataScope::applyBranchDivisionScope($q, $user, 'handled_by_user_id'))
+            ->when($search, function ($q) use ($search) {
+                $q->where(function ($qq) use ($search) {
+                    $qq->where('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('handphone', 'like', "%{$search}%")
+                        ->orWhere('sales_id', 'like', "%{$search}%");
+                });
+            })
+            ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
+            ->when($formId, fn ($q) => $q->where('form_id', $formId));
+
+        $filename = $this->buildExportFilename($branchId, $formId);
+
+        return response()->streamDownload(function () use ($query) {
+            $handle = fopen('php://output', 'w');
+
+            // BOM UTF-8 di awal file supaya Excel (terutama versi Windows)
+            // otomatis mendeteksi encoding-nya sebagai UTF-8 — tanpa ini,
+            // nama/email yang ada karakter non-ASCII bisa tampil rusak
+            // (mojibake) kalau file-nya dibuka langsung dari Excel.
+            fwrite($handle, "\xEF\xBB\xBF");
+
+            fputcsv($handle, [
+                'Nama Lengkap',
+                'Email',
+                'Handphone',
+                'Branch',
+                'Form',
+                'Kode Sales',
+                'Status Pembayaran',
+                'Order ID Pembayaran',
+                'Nominal Pembayaran',
+                'Tanggal Bayar',
+                'Status Student',
+                'Akun Login',
+                'Terdaftar Pada',
+            ]);
+
+            // chunkById() (bukan get() polos) supaya tidak nge-load semua
+            // baris ke memory sekaligus kalau datanya sudah ribuan — jauh
+            // lebih hemat memory buat export besar. Dipakai chunkById (bukan
+            // chunk() biasa) karena lebih aman dari baris ke-skip/dobel kalau
+            // ada data lain yang berubah di tengah proses export (chunkById
+            // pakai "WHERE id > id_terakhir", bukan OFFSET yang bisa geser).
+            $query->chunkById(500, function ($students) use ($handle) {
+                foreach ($students as $student) {
+                    $latestSubmission = $student->formSubmissions->first();
+                    $payment = $latestSubmission->payment ?? null;
+
+                    if (!$student->form || !$student->form->requires_payment) {
+                        $paymentStatus = 'Gratis';
+                    } elseif ($payment) {
+                        $paymentStatus = ucfirst($payment->status);
+                    } else {
+                        $paymentStatus = 'Belum Bayar';
+                    }
+
+                    fputcsv($handle, [
+                        trim($student->first_name . ' ' . $student->last_name),
+                        $student->email,
+                        $student->handphone,
+                        optional($student->companyBranch)->name ?? '-',
+                        optional($student->form)->name ?? '-',
+                        $student->sales_id ?? '-',
+                        $paymentStatus,
+                        $payment->order_id ?? '-',
+                        $payment ? number_format((float) $payment->amount, 0, ',', '.') : '-',
+                        $payment && $payment->paid_at ? $payment->paid_at->format('Y-m-d H:i:s') : '-',
+                        ucfirst($student->status),
+                        $student->user_id ? 'Sudah Terdaftar' : 'Belum Ada',
+                        optional($student->created_at)->format('Y-m-d H:i:s'),
+                    ]);
+                }
+            });
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+        ]);
+    }
+
+    /**
+     * Nama file export mengikuti filter yang lagi aktif, biar dari nama
+     * file-nya saja sudah kelihatan itu "export semua" atau "per branch/
+     * form" — tanpa perlu buka dulu buat tahu isinya.
+     */
+    private function buildExportFilename(?string $branchId, ?string $formId): string
+    {
+        $parts = ['students'];
+
+        if ($branchId) {
+            $branchName = optional(CompanyBranch::find($branchId))->name;
+            $parts[] = 'branch-' . Str::slug($branchName ?: $branchId);
+        }
+
+        if ($formId) {
+            $formName = optional(Form::find($formId))->name;
+            $parts[] = 'form-' . Str::slug($formName ?: $formId);
+        }
+
+        $parts[] = now()->format('Y-m-d_His');
+
+        return implode('_', $parts) . '.csv';
     }
 
     /**
@@ -133,7 +284,7 @@ class StudentController extends Controller
      */
     public function show(string $id): View
     {
-        $data = Student::with(['user', 'companyBranch', 'form'])->findOrFail($id);
+        $data = $this->resolveVisibleStudent($id, ['user', 'companyBranch', 'form']);
 
         $submissions = FormSubmission::where('user_id', $data->id)
             ->with(['form.companyBranch'])
@@ -181,7 +332,7 @@ class StudentController extends Controller
      */
     public function edit(string $id): View
     {
-        $data = Student::findOrFail($id);
+        $data = $this->resolveVisibleStudent($id);
 
         $companyBranches = CompanyBranch::select('id', 'name')->orderBy('name')->get();
         $forms = Form::select('id', 'name')->orderBy('name')->get();
@@ -194,7 +345,7 @@ class StudentController extends Controller
      */
     public function update(Request $request, string $id): RedirectResponse
     {
-        $data = Student::findOrFail($id);
+        $data = $this->resolveVisibleStudent($id);
 
         $validated = $this->validateStudent($request, $data->id);
 
@@ -217,7 +368,7 @@ class StudentController extends Controller
      */
     public function destroy(string $id): RedirectResponse
     {
-        $data = Student::findOrFail($id);
+        $data = $this->resolveVisibleStudent($id);
 
         if ($data->images) {
             $this->deleteImage($data->images);
@@ -237,7 +388,7 @@ class StudentController extends Controller
      */
     public function addUser(string $id): RedirectResponse
     {
-        $student = Student::findOrFail($id);
+        $student = $this->resolveVisibleStudent($id);
 
         if ($student->user_id) {
             return redirect()
@@ -321,5 +472,38 @@ class StudentController extends Controller
         if (file_exists($fullPath)) {
             @unlink($fullPath);
         }
+    }
+
+    /**
+     * Student yang boleh diakses user ini, sesuai cakupan branch/divisi/self
+     * role aktifnya (lihat App\Helpers\DataScope, sama persis dengan filter
+     * yang dipakai di index()/export() di atas) — dipakai di show()/edit()/
+     * update()/destroy()/addUser() supaya staff tidak bisa buka/ubah/hapus
+     * data student di luar cakupannya cuma dengan menebak-nebak ID lewat URL
+     * (sebelumnya method-method ini pakai findOrFail() polos tanpa
+     * pengecekan apa pun, konsisten dengan index() yang juga belum di-scope).
+     *
+     * @param array<int, string|\Closure> $with
+     */
+    private function resolveVisibleStudent(string $id, array $with = []): Student
+    {
+        $user = Auth::user();
+        if ($user === null) {
+            abort(401);
+        }
+
+        $student = Student::with($with)->findOrFail($id);
+
+        $visible = DataScope::applyBranchDivisionScope(
+            Student::query()->where('id', $student->id),
+            $user,
+            'handled_by_user_id'
+        )->exists();
+
+        if (!$visible) {
+            abort(403, 'Student tidak valid untuk cakupan akses Anda.');
+        }
+
+        return $student;
     }
 }

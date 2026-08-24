@@ -159,6 +159,16 @@
                                             <a href="{{ route('quiz.form.edit', $form->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap flex-shrink-0">Edit</a>
 
+                                            {{-- Section membungkus pertanyaan Placement Test jadi beberapa
+                                                 kelompok tampilan (lihat menu "Form Sections"). Sifatnya opsional,
+                                                 jadi ditaruh SEBELUM tombol Question di sini supaya alurnya kebaca
+                                                 alami: Form -> (opsional) Section -> Question -> Jawaban/Opsi. --}}
+                                            <a href="{{ route('quiz.form-section.create', ['form_id' => $form->id]) }}"
+                                                class="btn btn-sm btn-outline-success text-nowrap flex-shrink-0">+ Add Section</a>
+
+                                            <a href="{{ route('quiz.form-section.index', ['form_id' => $form->id]) }}"
+                                                class="btn btn-sm btn-outline-secondary text-nowrap flex-shrink-0">Show Sections</a>
+
                                             <a href="{{ route('quiz.form-question.create', ['form_id' => $form->id]) }}"
                                                 class="btn btn-sm btn-outline-success text-nowrap flex-shrink-0">+ Add Questions</a>
 
@@ -180,6 +190,27 @@
                                                 </svg>
                                                 Preview
                                             </a>
+
+                                            {{-- Reset Submissions: buang histori submission (jawaban, hasil, kelas
+                                                 terdaftar, pembayaran) tanpa hapus form/pertanyaan/opsi jawabannya —
+                                                 dipakai admin buat bersihin data percobaan sebelum form dipublish.
+                                                 Beda dengan "Delete" di sebelahnya yang menghapus form-nya sendiri.
+                                                 Nonaktif kalau belum ada submission sama sekali (tidak ada yang
+                                                 perlu direset). Lihat FormController::resetSubmissions(). --}}
+                                            @if ($form->formSubmissions->count() > 0)
+                                                <form action="{{ route('quiz.form.reset-submissions', $form->id) }}" method="POST"
+                                                    onsubmit="return confirm('Reset SEMUA submission form &quot;{{ $form->name }}&quot;?\n\nSemua histori submission, jawaban, hasil, kelas terdaftar, dan pembayaran peserta akan terhapus PERMANEN dan tidak bisa dikembalikan.\n\nForm, pertanyaan, dan pilihan jawabannya TIDAK ikut terhapus.\n\nLanjutkan?');"
+                                                    class="m-0 flex-shrink-0">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit"
+                                                        class="btn btn-sm btn-outline-warning text-nowrap">Reset Submissions</button>
+                                                </form>
+                                            @else
+                                                <button type="button"
+                                                    class="btn btn-sm btn-outline-warning text-nowrap flex-shrink-0" disabled
+                                                    title="Belum ada submission untuk form ini">Reset Submissions</button>
+                                            @endif
 
                                             <form action="{{ route('quiz.form.destroy', $form->id) }}" method="POST"
                                                 onsubmit="return confirm('Hapus form ini?');" class="m-0 flex-shrink-0">
