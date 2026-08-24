@@ -270,13 +270,15 @@ class FrontendController extends Controller
     {
         $university = University::findOrFail($id);
 
-        // Eager-load 'degrees' (tabel anak university_profile_degrees) supaya
-        // section Degree/Intake di halaman ini bisa tampil — profile itu
-        // sendiri TIDAK punya kolom degree/intake lagi (lihat catatan di
-        // UniversityProfile::degrees()), datanya sepenuhnya di tabel anak ini.
+        // Eager-load 'degrees' (tabel anak university_profile_degrees) & 'payments'
+        // (tabel anak university_profile_payments, sama polanya) supaya section
+        // Degree/Intake/Duration dan Payment di halaman ini bisa tampil — profile
+        // itu sendiri TIDAK punya kolom degree/intake/payment langsung (lihat
+        // catatan di UniversityProfile::degrees()/payments()), datanya sepenuhnya
+        // di tabel anak masing-masing.
         $profile = UniversityProfile::where('university_id', $id)
             ->where('status', 'active')
-            ->with('degrees')
+            ->with(['degrees', 'payments'])
             ->first(); // pakai first(), bukan firstOrFail()
 
         $albums = UniversityAlbum::where('university_id', $id)
