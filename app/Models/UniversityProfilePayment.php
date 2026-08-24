@@ -5,11 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 
-class UniversityProfileDegree extends Model
+class UniversityProfilePayment extends Model
 {
     use HasUuids;
 
-    protected $table = 'university_profile_degrees';
+    protected $table = 'university_profile_payments';
 
     protected $keyType = 'string';
 
@@ -18,10 +18,14 @@ class UniversityProfileDegree extends Model
     protected $fillable = [
         'user_id',
         'university_profile_id',
-        'degree',
-        'intake',
-        'duration',
+        'location',
+        'name',
+        'amount',
         'sort_order',
+    ];
+
+    protected $casts = [
+        'amount' => 'integer',
     ];
 
     /**
