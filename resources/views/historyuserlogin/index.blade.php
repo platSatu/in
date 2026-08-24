@@ -51,7 +51,7 @@
                                 <th>Last Login</th>
                                 <th>Last Logout</th>
                                 <th>Duration</th>
-                                <th class="text-center">Action</th>
+                                <!-- <th class="text-center">Action</th> -->
                             </tr>
                         </thead>
                         <tbody>
@@ -63,7 +63,7 @@
                                     <td>{{ optional($history->last_login)->format('Y-m-d H:i') ?? '-' }}</td>
                                     <td>{{ optional($history->last_logout)->format('Y-m-d H:i') ?? '-' }}</td>
                                     <td>{{ $history->duration ?? '-' }}</td>
-                                    <td class="text-center">
+                                    <!-- <td class="text-center">
                                         <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
                                             <a href="{{ route('historyuserlogin.edit', $history->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
@@ -76,7 +76,7 @@
                                                     class="btn btn-sm btn-outline-danger text-nowrap">Delete</button>
                                             </form>
                                         </div>
-                                    </td>
+                                    </td> -->
                                 </tr>
                             @empty
                                 <tr>
