@@ -236,7 +236,7 @@
 
                         <div class="row mb-4" id="sectionThresholdSettingsWrapper">
                             <div class="col-sm-12">
-                                <div class="form-text mb-2">
+                                <div class="form-text mb-2" style="color:#6c757d;">
                                     Pertanyaan harus ditempatkan di Sub Section (Section dengan Parent Section terisi
                                     — lihat menu "Form Sections"), bukan langsung di Section top-level. Peserta lolos
                                     dari satu Section (lanjut ke Section berikutnya) atau berhenti di situ (jadi
@@ -249,7 +249,7 @@
                                     class="form-control @error('section_fail_threshold') is-invalid @enderror"
                                     id="section_fail_threshold" name="section_fail_threshold"
                                     value="{{ old('section_fail_threshold') }}">
-                                <div class="form-text">Jumlah salah minimal supaya peserta dianggap berhenti (gagal) di Section itu.</div>
+                                <div class="form-text" style="color:#6c757d;">Jumlah salah minimal supaya peserta dianggap berhenti (gagal) di Section itu.</div>
                                 @error('section_fail_threshold')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
@@ -260,7 +260,7 @@
                                     class="form-control @error('section_pass_threshold') is-invalid @enderror"
                                     id="section_pass_threshold" name="section_pass_threshold"
                                     value="{{ old('section_pass_threshold') }}">
-                                <div class="form-text">Jumlah salah maksimal supaya peserta dianggap lolos (lanjut) dari Section itu. Harus lebih kecil dari Fail Threshold.</div>
+                                <div class="form-text" style="color:#6c757d;">Jumlah salah maksimal supaya peserta dianggap lolos (lanjut) dari Section itu. Harus lebih kecil dari Fail Threshold.</div>
                                 @error('section_pass_threshold')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
