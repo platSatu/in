@@ -24,6 +24,7 @@
                             <tr>
                                 <th>No</th>
                                 <th>Gateway</th>
+                                <th>Pemilik</th>
                                 <th>Environment</th>
                                 <th>Status</th>
                                 <th>Aktif</th>
@@ -36,6 +37,7 @@
                                 <tr>
                                     <td>{{ $data->firstItem() + $index }}</td>
                                     <td class="fw-bold">{{ ucfirst($item->gateway) }}</td>
+                                    <td>{{ optional($item->user)->name ?? '-' }}</td>
                                     <td>
                                         @if ($item->environment === 'production')
                                             <span class="badge badge-danger">Production</span>
@@ -85,7 +87,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center">Belum ada data payment gateway.</td>
+                                    <td colspan="8" class="text-center">Belum ada data payment gateway.</td>
                                 </tr>
                             @endforelse
                         </tbody>

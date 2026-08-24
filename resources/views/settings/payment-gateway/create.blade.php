@@ -99,6 +99,21 @@
                                 </div>
 
                                 <div class="col-xxl-12 mb-4">
+                                    <label for="owner_user_id">Pemilik (Admin)</label>
+                                    <select class="form-select @error('owner_user_id') is-invalid @enderror" id="owner_user_id" name="owner_user_id">
+                                        @foreach ($adminUsers as $adminUser)
+                                            <option value="{{ $adminUser->id }}" {{ old('owner_user_id', (string) auth()->id()) === (string) $adminUser->id ? 'selected' : '' }}>
+                                                {{ $adminUser->name }} ({{ $adminUser->email }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div class="form-text">Form publik cuma bisa pakai gateway ini kalau form-nya dibuat oleh admin yang sama dengan yang dipilih di sini.</div>
+                                    @error('owner_user_id')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                <div class="col-xxl-12 mb-4">
                                     <label for="expiry_minutes">Durasi Kedaluwarsa Pembayaran (menit)</label>
                                     <input type="number" min="5" max="1440"
                                         class="form-control @error('expiry_minutes') is-invalid @enderror"

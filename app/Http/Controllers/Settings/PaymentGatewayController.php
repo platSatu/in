@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Settings;
 use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentGateway;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
@@ -19,6 +20,7 @@ class PaymentGatewayController extends Controller
 
         $data = PaymentGateway::query()
             ->where('user_id', (string) $userId)
+            ->with('user')
             ->orderByDesc('is_active')
             ->orderBy('gateway')
             ->paginate(10)
@@ -32,8 +34,9 @@ class PaymentGatewayController extends Controller
     public function create()
     {
         $credentialFields = PaymentGateway::credentialFields();
+        $adminUsers = User::orderBy('name')->get(['id', 'name', 'email']);
 
-        return view('settings.payment-gateway.create', compact('credentialFields'));
+        return view('settings.payment-gateway.create', compact('credentialFields', 'adminUsers'));
     }
 
     public function store(Request $request)
@@ -45,10 +48,18 @@ class PaymentGatewayController extends Controller
             abort(401);
         }
 
-        $validated['user_id'] = (string) $userId;
+        // Pemilik gateway biasanya = admin yang sedang login (yang bikin
+        // credential-nya), TAPI bisa dioverride lewat dropdown "Pemilik
+        // (Admin)" -- dibutuhkan karena FormPaymentController::init() nyari
+        // gateway aktif berdasarkan user_id PEMBUAT FORM, bukan pemilik
+        // gateway secara umum. Kalau form dibuat admin lain, gateway ini
+        // harus di-assign ke admin itu supaya kedetect.
+        $targetUserId = $validated['owner_user_id'] ?? (string) $userId;
+        unset($validated['owner_user_id']);
+        $validated['user_id'] = $targetUserId;
 
         if ($validated['is_active']) {
-            $this->deactivateOthers((string) $userId);
+            $this->deactivateOthers($targetUserId);
         }
 
         PaymentGateway::create($validated);
@@ -67,8 +78,9 @@ class PaymentGatewayController extends Controller
 
         $data = AdminCrud::findOrFail(PaymentGateway::class, $id, (string) $userId);
         $credentialFields = PaymentGateway::credentialFields();
+        $adminUsers = User::orderBy('name')->get(['id', 'name', 'email']);
 
-        return view('settings.payment-gateway.edit', compact('data', 'credentialFields'));
+        return view('settings.payment-gateway.edit', compact('data', 'credentialFields', 'adminUsers'));
     }
 
     public function update(Request $request, string $id)
@@ -82,8 +94,19 @@ class PaymentGatewayController extends Controller
 
         $validated = $this->validateGateway($request);
 
+        // Sama seperti store() -- lihat komentar di sana. Catatan penting:
+        // begitu di-reassign ke admin lain, gateway ini TIDAK AKAN muncul
+        // lagi di halaman index() admin yang sekarang login (index() masih
+        // di-scope ke user_id sendiri), jadi cuma admin baru itu yang bisa
+        // lihat/edit lagi selanjutnya. Kalau butuh dua admin sama-sama bisa
+        // kelola, pertimbangkan assign ke 1 akun superadmin/bersama, bukan
+        // ke akun personal.
+        $targetUserId = $validated['owner_user_id'] ?? (string) $userId;
+        unset($validated['owner_user_id']);
+        $validated['user_id'] = $targetUserId;
+
         if ($validated['is_active']) {
-            $this->deactivateOthers((string) $userId, $id);
+            $this->deactivateOthers($targetUserId, $id);
         }
 
         AdminCrud::update(PaymentGateway::class, $id, $validated, (string) $userId);
@@ -139,6 +162,9 @@ class PaymentGatewayController extends Controller
             'status' => 'nullable|in:active,inactive',
             'is_active' => 'nullable|boolean',
             'expiry_minutes' => 'nullable|integer|min:5|max:1440',
+            // Nullable: default-nya tetap admin yang sedang login (lihat
+            // store()/update()) kalau field ini tidak dikirim/dikosongkan.
+            'owner_user_id' => 'nullable|string|exists:users,id',
         ]);
 
         $fields = PaymentGateway::credentialFields()[$validated['gateway']];
@@ -162,6 +188,7 @@ class PaymentGatewayController extends Controller
             // dan diteruskan ke Duitku sebagai expiryPeriod. Default 60 menit kalau admin
             // mengosongkan field-nya, sama seperti nilai lama yang dulu hardcode di kode.
             'expiry_minutes' => $validated['expiry_minutes'] ?? 60,
+            'owner_user_id' => $validated['owner_user_id'] ?? null,
         ];
     }
 
