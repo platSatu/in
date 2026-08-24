@@ -22,9 +22,11 @@ class UniversityProfileController extends Controller
             abort(401);
         }
 
+        // Sama seperti University sendiri -- daftar Profile boleh dilihat SEMUA
+        // admin, tidak lagi dibatasi per pembuat.
         $data = AdminCrud::paginate(
             UniversityProfile::class,
-            (string) $userId,
+            null,
             ['field', 'language', 'status'],
             $search,
             10,
@@ -94,8 +96,10 @@ public function create(Request $request)
 
     // Eager load 'major' supaya view bisa langsung menampilkan Major dari
     // university yang terkunci (dipakai untuk field "Major" yang di-disable).
+    // Daftar university di dropdown ini SEMUA university (tidak dibatasi
+    // pembuatnya) -- admin manapun boleh bikin Profile untuk university
+    // manapun.
     $universities = University::with('major')
-        ->where('user_id', (string) $userId)
         ->orderBy('name')
         ->get();
 
@@ -139,13 +143,14 @@ public function store(Request $request)
         abort(401);
     }
 
+    // Tidak lagi dibatasi ->where('user_id', ...) -- university boleh milik
+    // admin manapun, yang penting id-nya valid/ada.
     $university = University::with('major')
         ->where('id', $validated['university_id'])
-        ->where('user_id', (string) $userId)
         ->first();
 
     if (!$university) {
-        abort(403, 'University tidak valid untuk user ini.');
+        abort(403, 'University tidak valid.');
     }
 
     // Buang baris degree/intake yang semuanya kosong (bukan disimpan
@@ -217,10 +222,9 @@ public function store(Request $request)
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(UniversityProfile::class, $id, (string) $userId, ['university', 'degrees', 'payments']);
+        $data = AdminCrud::findOrFail(UniversityProfile::class, $id, null, ['university', 'degrees', 'payments']);
 
         $universities = University::query()
-            ->where('user_id', (string) $userId)
             ->orderBy('name')
             ->get();
 
@@ -234,7 +238,7 @@ public function store(Request $request)
             abort(401);
         }
 
-        AdminCrud::findOrFail(UniversityProfile::class, $id, (string) $userId);
+        AdminCrud::findOrFail(UniversityProfile::class, $id, null);
 
         // Catatan: 'degree'/'intake' sengaja tidak divalidasi di sini lewat
         // kolom langsung — tabel `university_profiles` tidak punya kolom itu
@@ -264,13 +268,13 @@ public function store(Request $request)
             'payments.*.amount' => 'nullable|integer|min:0',
         ]);
 
+        // Tidak lagi dibatasi ->where('user_id', ...) -- cukup pastikan id-nya valid.
         $universityOwned = University::query()
             ->where('id', $validated['university_id'])
-            ->where('user_id', (string) $userId)
             ->exists();
 
         if (!$universityOwned) {
-            abort(403, 'University tidak valid untuk user ini.');
+            abort(403, 'University tidak valid.');
         }
 
         // Buang baris degree/intake & payment yang semuanya kosong (sama
@@ -285,7 +289,7 @@ public function store(Request $request)
 
         unset($validated['degree_intakes'], $validated['payments']);
 
-        $profile = AdminCrud::update(UniversityProfile::class, $id, $validated, (string) $userId);
+        $profile = AdminCrud::update(UniversityProfile::class, $id, $validated, null);
 
         // Sinkronisasi baris Degree/Intake & Payment: hapus semua baris lama
         // punya profile ini, lalu buat ulang dari yang dikirim form —
@@ -331,10 +335,10 @@ public function store(Request $request)
 
         // Ambil dulu university_id-nya sebelum dihapus, supaya redirect bisa
         // kembali ke halaman profile University yang sesuai.
-        $existing = AdminCrud::findOrFail(UniversityProfile::class, $id, (string) $userId);
+        $existing = AdminCrud::findOrFail(UniversityProfile::class, $id, null);
         $universityId = $existing->university_id;
 
-        AdminCrud::delete(UniversityProfile::class, $id, (string) $userId);
+        AdminCrud::delete(UniversityProfile::class, $id, null);
 
         return redirect()
             ->route('quiz.university.show', $universityId)

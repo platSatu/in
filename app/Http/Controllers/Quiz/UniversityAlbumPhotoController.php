@@ -20,7 +20,6 @@ namespace App\Http\Controllers\Quiz;
 
 use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
-use App\Models\University;
 use App\Models\UniversityAlbum;
 use App\Models\UniversityAlbumPhoto;
 use Illuminate\Http\Request;
@@ -56,24 +55,48 @@ class UniversityAlbumPhotoController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search');
-    
+        $albumId = $request->query('album_id');
+
         $userId = Auth::id();
         if ($userId === null) {
             abort(401);
         }
-    
-        $data = AdminCrud::paginate(
-            UniversityAlbumPhoto::class,
-            (string) $userId,
-            ['name', 'description'],
-            $search,
-            10
-        );
-    
-        $universities = University::orderBy('name')->get();
-        $selectedUniversityId = $request->query('university_id');
-    
-        return view('quiz.university-album-photo.index', compact('data', 'universities', 'selectedUniversityId'));
+
+        // Sama seperti UniversityAlbumController::index() — query dibangun
+        // manual (bukan lewat AdminCrud::paginate()) supaya bisa di-scope ke
+        // album_id. Sebelumnya album_id (dulu malah dibaca sebagai
+        // university_id, tidak dipakai sama sekali) tidak pernah dipakai
+        // untuk filter (dead scoping), dan kolom search-nya salah ('name',
+        // padahal tabel ini kolomnya 'title') — dua-duanya dibetulkan di sini.
+        // Tidak lagi dibatasi ->where('user_id', ...) -- foto album boleh
+        // dilihat admin manapun, tidak cuma pembuatnya.
+        $query = UniversityAlbumPhoto::query();
+
+        if (!empty($albumId)) {
+            $query->where('album_id', $albumId);
+        }
+
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('title', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        $data = $query->with('album.university')
+            ->orderBy('sort_order')
+            ->latest('created_at')
+            ->paginate(10)
+            ->withQueryString();
+
+        // Konteks Album (kalau index ini dibuka scoped) — dipakai untuk
+        // breadcrumb + tombol "Back to Album" + mengunci album_id di tombol
+        // "+ Add Photo".
+        $album = !empty($albumId)
+            ? UniversityAlbum::where('id', $albumId)->first()
+            : null;
+
+        return view('quiz.university-album-photo.index', compact('data', 'album', 'albumId'));
     }
 
     // public function create()
@@ -123,8 +146,11 @@ class UniversityAlbumPhotoController extends Controller
             ]);
         }
 
+        // Kembali ke index foto yang sudah di-scope ke album itu (bukan
+        // index global) — sesuai alur: add foto -> kembali ke index foto
+        // dari album tersebut.
         return redirect()
-            ->route('quiz.university-album-photo.index')
+            ->route('quiz.university-album-photo.index', ['album_id' => $validated['album_id']])
             ->with('success', 'Foto album berhasil ditambahkan.');
     }
 
@@ -135,7 +161,7 @@ class UniversityAlbumPhotoController extends Controller
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(UniversityAlbumPhoto::class, $id, (string) $userId);
+        $data = AdminCrud::findOrFail(UniversityAlbumPhoto::class, $id, null);
         $albums = UniversityAlbum::orderBy('name')->get();
 
         return view('quiz.university-album-photo.edit', compact('data', 'albums'));
@@ -148,7 +174,7 @@ class UniversityAlbumPhotoController extends Controller
             abort(401);
         }
 
-        $existing = AdminCrud::findOrFail(UniversityAlbumPhoto::class, $id, (string) $userId);
+        $existing = AdminCrud::findOrFail(UniversityAlbumPhoto::class, $id, null);
 
         $validated = $request->validate([
             'album_id' => 'required|exists:university_albums,id',
@@ -166,10 +192,10 @@ class UniversityAlbumPhotoController extends Controller
             unset($validated['photo']);
         }
 
-        AdminCrud::update(UniversityAlbumPhoto::class, $id, $validated, (string) $userId);
+        AdminCrud::update(UniversityAlbumPhoto::class, $id, $validated, null);
 
         return redirect()
-            ->route('quiz.university-album-photo.index')
+            ->route('quiz.university-album-photo.index', ['album_id' => $validated['album_id']])
             ->with('success', 'Foto album berhasil diupdate.');
     }
 
@@ -180,14 +206,15 @@ class UniversityAlbumPhotoController extends Controller
             abort(401);
         }
 
-        $existing = AdminCrud::findOrFail(UniversityAlbumPhoto::class, $id, (string) $userId);
+        $existing = AdminCrud::findOrFail(UniversityAlbumPhoto::class, $id, null);
+        $albumId = $existing->album_id;
 
         $this->deletePhotoFile($existing->photo);
 
-        AdminCrud::delete(UniversityAlbumPhoto::class, $id, (string) $userId);
+        AdminCrud::delete(UniversityAlbumPhoto::class, $id, null);
 
         return redirect()
-            ->route('quiz.university-album-photo.index')
+            ->route('quiz.university-album-photo.index', ['album_id' => $albumId])
             ->with('success', 'Foto album berhasil dihapus.');
     }
 

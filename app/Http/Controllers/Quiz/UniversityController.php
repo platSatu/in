@@ -21,9 +21,14 @@ class UniversityController extends Controller
             abort(401);
         }
 
+        // Semua admin yang login boleh lihat SEMUA university, tidak lagi
+        // dibatasi per pembuat (user_id) -- sama pola dengan Form/Student yang
+        // sudah tim-visible, dan Payment/WhatsApp Gateway yang sudah dibuat
+        // system-wide. userId dipakai TETAP untuk kolom user_id saat create
+        // (jejak siapa yang bikin), bukan untuk membatasi siapa yang boleh lihat.
         $data = AdminCrud::paginate(
             University::class,
-            (string) $userId,
+            null,
             ['name', 'country', 'city', 'description'],
             $search,
             10
@@ -191,7 +196,7 @@ class UniversityController extends Controller
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(University::class, $id, (string) $userId, ['major', 'profiles']);
+        $data = AdminCrud::findOrFail(University::class, $id, null, ['major', 'profiles']);
 
         $data->load(['albums' => function ($query) {
             $query->where('status', 'active')->with(['photos' => function ($q) {
@@ -225,7 +230,7 @@ class UniversityController extends Controller
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(University::class, $id, (string) $userId);
+        $data = AdminCrud::findOrFail(University::class, $id, null);
 
         $cities = City::select('id', 'name')
             ->orderBy('name')
@@ -246,7 +251,7 @@ class UniversityController extends Controller
             abort(401);
         }
 
-        $existing = AdminCrud::findOrFail(University::class, $id, (string) $userId);
+        $existing = AdminCrud::findOrFail(University::class, $id, null);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -288,7 +293,7 @@ class UniversityController extends Controller
             unset($validated['attachment']);
         }
 
-        AdminCrud::update(University::class, $id, $validated, (string) $userId);
+        AdminCrud::update(University::class, $id, $validated, null);
 
         return redirect()
             ->route('quiz.university.index')
@@ -318,7 +323,7 @@ class UniversityController extends Controller
             abort(401);
         }
 
-        AdminCrud::delete(University::class, $id, (string) $userId);
+        AdminCrud::delete(University::class, $id, null);
 
         return redirect()
             ->route('quiz.university.index')

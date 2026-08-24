@@ -34,23 +34,49 @@ class UniversityAlbumController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search');
-    
+        $universityId = $request->query('university_id');
+
         $userId = Auth::id();
         if ($userId === null) {
             abort(401);
         }
-    
-        $data = AdminCrud::paginate(
-            UniversityAlbum::class,
-            (string) $userId,
-            ['name', 'description'],
-            $search,
-            10
-        );
-    
+
+        // AdminCrud::paginate() tidak punya opsi filter tambahan (selain
+        // ownership + search), jadi query-nya dibangun manual di sini supaya
+        // bisa di-scope per university_id — dipakai saat index ini dibuka
+        // dari halaman profile University ("Manage Album"), bukan dari menu
+        // global. Sebelumnya university_id diterima tapi tidak pernah
+        // dipakai untuk filter sama sekali (dead scoping).
+        // Tidak lagi dibatasi ->where('user_id', ...) -- album boleh dilihat
+        // admin manapun, tidak cuma pembuatnya.
+        $query = UniversityAlbum::query();
+
+        if (!empty($universityId)) {
+            $query->where('university_id', $universityId);
+        }
+
+        if (!empty($search)) {
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
+        }
+
+        $data = $query->with('university')
+            ->latest('created_at')
+            ->paginate(10)
+            ->withQueryString();
+
         $universities = University::orderBy('name')->get();
-    
-        return view('quiz.university-album.index', compact('data', 'universities'));
+
+        // Konteks University (kalau index ini dibuka scoped) — dipakai untuk
+        // breadcrumb + tombol "Back to Profile" + mengunci university_id di
+        // tombol "+ Add University Album".
+        $university = !empty($universityId)
+            ? University::where('id', $universityId)->first()
+            : null;
+
+        return view('quiz.university-album.index', compact('data', 'universities', 'university', 'universityId'));
     }
 
     // public function create()
@@ -84,8 +110,11 @@ class UniversityAlbumController extends Controller
 
         AdminCrud::create(UniversityAlbum::class, $validated);
 
+        // Kembali ke album index yang sudah di-scope ke university itu
+        // (bukan index global) — sesuai alur: create album -> kembali ke
+        // album dari university itu.
         return redirect()
-            ->route('quiz.university-album.index')
+            ->route('quiz.university-album.index', ['university_id' => $validated['university_id']])
             ->with('success', 'University Album berhasil dibuat.');
     }
 
@@ -96,7 +125,7 @@ class UniversityAlbumController extends Controller
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(UniversityAlbum::class, $id, (string) $userId);
+        $data = AdminCrud::findOrFail(UniversityAlbum::class, $id, null);
         $universities = University::orderBy('name')->get();
 
         return view('quiz.university-album.edit', compact('data', 'universities'));
@@ -109,7 +138,7 @@ class UniversityAlbumController extends Controller
             abort(401);
         }
 
-        AdminCrud::findOrFail(UniversityAlbum::class, $id, (string) $userId);
+        AdminCrud::findOrFail(UniversityAlbum::class, $id, null);
 
         $validated = $request->validate([
             'university_id' => 'required|exists:universities,id',
@@ -118,10 +147,10 @@ class UniversityAlbumController extends Controller
             'status' => 'required|in:active,inactive',
         ]);
 
-        AdminCrud::update(UniversityAlbum::class, $id, $validated, (string) $userId);
+        AdminCrud::update(UniversityAlbum::class, $id, $validated, null);
 
         return redirect()
-            ->route('quiz.university-album.index')
+            ->route('quiz.university-album.index', ['university_id' => $validated['university_id']])
             ->with('success', 'University Album berhasil diupdate.');
     }
 
@@ -132,10 +161,15 @@ class UniversityAlbumController extends Controller
             abort(401);
         }
 
-        AdminCrud::delete(UniversityAlbum::class, $id, (string) $userId);
+        // Ambil dulu university_id-nya sebelum dihapus, supaya redirect
+        // tetap kembali ke album index yang scoped ke university itu.
+        $existing = AdminCrud::findOrFail(UniversityAlbum::class, $id, null);
+        $universityId = $existing->university_id;
+
+        AdminCrud::delete(UniversityAlbum::class, $id, null);
 
         return redirect()
-            ->route('quiz.university-album.index')
+            ->route('quiz.university-album.index', ['university_id' => $universityId])
             ->with('success', 'University Album berhasil dihapus.');
     }
 }

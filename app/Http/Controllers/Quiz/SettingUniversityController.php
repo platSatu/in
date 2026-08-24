@@ -19,12 +19,12 @@ class SettingUniversityController extends Controller
             abort(401);
         }
 
+        // Tidak lagi dibatasi ->where('user_id', ...) -- boleh dilihat admin manapun.
         $data = SettingUniversity::with([
             'city',
             'major',
             'university'
         ])
-            ->where('user_id', (string) $userId)
             ->when($search, function ($query) use ($search) {
                 $query->whereHas('city', function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%");
@@ -88,7 +88,7 @@ class SettingUniversityController extends Controller
         $data = AdminCrud::findOrFail(
             SettingUniversity::class,
             $id,
-            (string) $userId
+            null
         );
 
         $cities = \App\Models\City::where('status', 'active')->get();
@@ -113,7 +113,7 @@ class SettingUniversityController extends Controller
         AdminCrud::findOrFail(
             SettingUniversity::class,
             $id,
-            (string) $userId
+            null
         );
 
         $validated = $request->validate([
@@ -127,7 +127,7 @@ class SettingUniversityController extends Controller
             SettingUniversity::class,
             $id,
             $validated,
-            (string) $userId
+            null
         );
 
         return redirect()
@@ -145,7 +145,7 @@ class SettingUniversityController extends Controller
         AdminCrud::delete(
             SettingUniversity::class,
             $id,
-            (string) $userId
+            null
         );
 
         return redirect()
