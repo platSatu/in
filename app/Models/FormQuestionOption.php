@@ -25,11 +25,13 @@ class FormQuestionOption extends Model
         'image',
         'score',
         'is_other',
+        'is_correct',
         'status',
     ];
 
     protected $casts = [
         'is_other' => 'boolean',
+        'is_correct' => 'boolean',
     ];
 
     /**

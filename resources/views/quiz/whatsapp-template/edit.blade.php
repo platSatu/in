@@ -70,15 +70,30 @@
 
                 @enderror
 
-                <div class="form-text">
+                <div class="form-text" style="color:#6c757d;">
                     {{-- Pakai @{{ nama }} (Blade raw-echo escape), BUKAN {{ 'dua kurung kurawal' }} --}}
                     {{-- Sebelumnya ditulis {{ '{{name}}' }} dan bikin Blade compiler bingung, karena
                          dia cari tanda penutup "}}" PERTAMA untuk nutup echo-nya, dan itu jatuhnya
                          di TENGAH string tsb (bukan di akhir) — hasil compile jadi PHP yang rusak
                          (unclosed quote), makanya muncul ParseError "Unclosed '(' does not match
-                         '}'" begitu halaman ini dibuka. --}}
+                         '}'" begitu halaman ini dibuka.
+
+                         Warna dipaksa eksplisit (bukan cuma andalkan .form-text) karena kelas itu
+                         di tema admin ini renders nyaris putih di atas background putih —
+                         akibatnya teks "dan" & keterangan callback_link jadi tidak kelihatan sama
+                         sekali, cuma <code> yang tetap kebaca (warnanya sendiri, bukan ikut
+                         .form-text).
+
+                         {{hasil}} & {{pilih_kelas_link}} ditambahkan ke daftar ini (sebelumnya
+                         tidak didokumentasikan sama sekali) — dua placeholder itu SUDAH lama ada
+                         & otomatis terisi di FrontendController/FormController, cuma admin tidak
+                         tahu cara pakainya karena tidak pernah disebut di sini. --}}
                     Placeholder yang bisa dipakai: <code>@{{name}}</code>, <code>@{{form_name}}</code>,
-                    <code>@{{ringkasan_jawaban}}</code>, <code>@{{universitas_major}}</code>, dan
+                    <code>@{{ringkasan_jawaban}}</code>, <code>@{{universitas_major}}</code>,
+                    <code>@{{hasil}}</code> (skor/hasil test — otomatis terisi sesuai mode penilaian
+                    form: Auto = skor, Manual = teks yang admin isi, Section Threshold = nama Section
+                    hasil peserta), <code>@{{pilih_kelas_link}}</code> (link pilih jadwal kelas, hanya
+                    terisi kalau ada jadwal kelas aktif untuk cabang form ini dan hasil sudah keluar), dan
                     <code>@{{callback_link}}</code> (link callback form, mis. link Zoom — hanya terisi kalau
                     form-nya diaktifkan sebagai callback dan sudah lolos verifikasi pembayaran/submit).
                 </div>

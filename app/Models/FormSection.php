@@ -22,6 +22,7 @@ class FormSection extends Model
     protected $fillable = [
         'user_id',
         'form_id',
+        'parent_section_id',
         'name',
         'description',
         'order',
@@ -34,6 +35,30 @@ class FormSection extends Model
     public function form(): BelongsTo
     {
         return $this->belongsTo(Form::class, 'form_id');
+    }
+
+    /**
+     * Section "induk" dari Sub Section ini — null berarti section ini
+     * TOP-LEVEL (baik section 1-level biasa, maupun Section induk di
+     * hierarki 2 level HSK-style). Lihat migration
+     * add_parent_section_id_to_form_sections_table.
+     */
+    public function parentSection(): BelongsTo
+    {
+        return $this->belongsTo(FormSection::class, 'parent_section_id');
+    }
+
+    /**
+     * Seluruh Sub Section aktif milik Section (top-level) ini. Cuma
+     * bermakna kalau section ini sendiri top-level — hierarki sengaja
+     * dibatasi 2 level saja (lihat FormSectionController).
+     */
+    public function subSections(): HasMany
+    {
+        return $this->hasMany(FormSection::class, 'parent_section_id')
+            ->where('status', 'active')
+            ->orderBy('order')
+            ->orderBy('created_at');
     }
 
     /**

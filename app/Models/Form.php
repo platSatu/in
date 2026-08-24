@@ -34,6 +34,8 @@ class Form extends Model
         'whatsapp_template_id',
         'has_personal_data_stage',
         'result_mode',
+        'section_fail_threshold',
+        'section_pass_threshold',
         'description',
         'pre_test_notice',
         'background_image',
@@ -60,6 +62,8 @@ class Form extends Model
         'timer_duration_minutes' => 'integer',
         'timer_auto_save' => 'boolean',
         'timer_auto_restart' => 'boolean',
+        'section_fail_threshold' => 'integer',
+        'section_pass_threshold' => 'integer',
     ];
 
     public function whatsappTemplate()

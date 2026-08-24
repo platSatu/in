@@ -45,7 +45,7 @@
                     </div>
 
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label">Nama Section</label>
                             <input type="text" class="form-control @error('name') is-invalid @enderror"
                                 name="name" value="{{ old('name') }}" placeholder="mis. Section A" required>
@@ -53,7 +53,26 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <div class="col-md-6">
+                        <div class="col-md-4">
+                            <label class="form-label">Parent Section <span class="text-muted">(opsional)</span></label>
+                            <select class="form-select @error('parent_section_id') is-invalid @enderror" name="parent_section_id">
+                                <option value="">-- Tidak ada (Section top-level) --</option>
+                                @foreach ($topLevelSections as $topLevelSection)
+                                    <option value="{{ $topLevelSection->id }}" {{ old('parent_section_id') == $topLevelSection->id ? 'selected' : '' }}>
+                                        {{ optional($topLevelSection->form)->name ?? '-' }} &raquo; {{ $topLevelSection->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">
+                                Pilih kalau section ini adalah Sub Section (mis. "HSK 1 - Listening" di bawah Section
+                                "HSK 1"). Kosongkan kalau ini section top-level biasa. Parent Section harus dari form
+                                yang sama.
+                            </div>
+                            @error('parent_section_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-4">
                             <label class="form-label">Status</label>
                             <select class="form-select" name="status">
                                 <option value="active" selected>Active</option>

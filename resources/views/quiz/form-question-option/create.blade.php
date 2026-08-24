@@ -129,6 +129,22 @@
             </div>
         </div>
 
+        <div class="row g-3 mt-1">
+            <div class="col-md-12">
+                <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="__NAME__[is_correct]" value="1">
+                    <label class="form-check-label small">
+                        Tandai sebagai jawaban BENAR
+                    </label>
+                </div>
+                <div class="form-text">
+                    Dipakai kalau form ini mengaktifkan Mode Hasil "Section Threshold (gaya HSK)" — pertanyaan
+                    dianggap terjawab benar kalau opsi yang ditandai di sinilah yang dipilih peserta. Tidak
+                    berpengaruh untuk mode hasil lainnya.
+                </div>
+            </div>
+        </div>
+
         <div class="form-text mt-2">
             Score dipakai kalau form ini mengaktifkan Mode Hasil "Otomatis" — skor opsi yang dipilih peserta akan
             dijumlahkan jadi hasil akhir. Kosongkan/biarkan 0 kalau opsi ini tidak berkontribusi ke skor.

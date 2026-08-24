@@ -100,6 +100,7 @@ class FormQuestionOptionController extends Controller
             'options.*.image' => 'nullable|image|max:4096',
             'options.*.score' => 'nullable|integer',
             'options.*.is_other' => 'nullable|boolean',
+            'options.*.is_correct' => 'nullable|boolean',
             'options.*.status' => 'nullable|in:active,inactive',
         ]);
 
@@ -153,6 +154,11 @@ class FormQuestionOptionController extends Controller
                 // "Lainnya" (isian bebas) — dipakai di pertanyaan Multiple Choice,
                 // lihat frontend/partials/question-card.blade.php.
                 'is_other' => !empty($row['is_other']),
+                // Penanda jawaban benar — dipakai mode hasil "section_threshold"
+                // (lihat FrontendController::isQuestionAnsweredCorrectly()).
+                // Tidak berpengaruh apa-apa untuk form yang tidak memakai mode
+                // hasil ini.
+                'is_correct' => !empty($row['is_correct']),
                 'status' => $row['status'] ?? 'active',
             ]);
 
@@ -200,6 +206,7 @@ class FormQuestionOptionController extends Controller
             'remove_image' => 'nullable|boolean',
             'score' => 'nullable|integer',
             'is_other' => 'nullable|boolean',
+            'is_correct' => 'nullable|boolean',
             'status' => 'required|in:active,inactive',
         ]);
 
@@ -217,10 +224,11 @@ class FormQuestionOptionController extends Controller
 
         // Checkbox yang tidak dicentang tidak ikut terkirim sama sekali di request,
         // jadi kalau tidak di-set eksplisit di sini, AdminCrud::update() cuma akan
-        // membiarkan nilai is_other lama tidak berubah (bukan jadi false) — beda
-        // dengan pola $validated['x'] = $request->boolean('x') yang sudah dipakai
-        // di FormController untuk toggle serupa.
+        // membiarkan nilai is_other/is_correct lama tidak berubah (bukan jadi
+        // false) — beda dengan pola $validated['x'] = $request->boolean('x')
+        // yang sudah dipakai di FormController untuk toggle serupa.
         $validated['is_other'] = $request->boolean('is_other');
+        $validated['is_correct'] = $request->boolean('is_correct');
 
         if (!$this->isQuestionAccessible($validated['question_id'])) {
             abort(403, 'Question tidak valid untuk cakupan akses Anda.');

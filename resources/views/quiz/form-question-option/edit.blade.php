@@ -82,6 +82,23 @@
                         </div>
                     </div>
 
+                    <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_correct" name="is_correct" value="1"
+                                    {{ old('is_correct', $data->is_correct) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="is_correct">
+                                    Tandai sebagai jawaban BENAR
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Dipakai kalau form ini mengaktifkan Mode Hasil "Section Threshold (gaya HSK)" —
+                                pertanyaan dianggap terjawab benar kalau opsi yang ditandai di sinilah yang dipilih
+                                peserta. Tidak berpengaruh untuk mode hasil lainnya.
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </div>
 

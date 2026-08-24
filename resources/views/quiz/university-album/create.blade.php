@@ -63,7 +63,9 @@
                 @enderror
             </div>
             <button class="btn btn-primary">Save</button>
-            <a href="{{ route('quiz.university-album.index') }}" class="btn btn-secondary"> Back</a>
+            {{-- Kalau university-nya sudah terkunci, Back tetap bawa konteksnya balik
+                 ke album index yang scoped ke university itu. --}}
+            <a href="{{ $lockedUniversity ? route('quiz.university-album.index', ['university_id' => $lockedUniversity->id]) : route('quiz.university-album.index') }}" class="btn btn-secondary"> Back</a>
         </form>
     </div>
 </div>

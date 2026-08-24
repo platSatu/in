@@ -223,11 +223,45 @@
                                     <option value="none" {{ old('result_mode', 'none') === 'none' ? 'selected' : '' }}>Tidak ada hasil</option>
                                     <option value="auto" {{ old('result_mode') === 'auto' ? 'selected' : '' }}>Otomatis (dari skor jawaban)</option>
                                     <option value="manual" {{ old('result_mode') === 'manual' ? 'selected' : '' }}>Manual (diisi admin)</option>
+                                    <option value="section_threshold" {{ old('result_mode') === 'section_threshold' ? 'selected' : '' }}>Section Threshold (gaya HSK)</option>
                                 </select>
                                 <div class="form-text">
-                                    Otomatis: skor dijumlah dari nilai (score) tiap opsi jawaban placement test yang dipilih peserta. Manual: admin mengisi hasil sebagai teks bebas per peserta di halaman submission.
+                                    Otomatis: skor dijumlah dari nilai (score) tiap opsi jawaban placement test yang dipilih peserta. Manual: admin mengisi hasil sebagai teks bebas per peserta di halaman submission. Section Threshold: hasil dihitung otomatis dari jumlah jawaban salah per Section (lihat pengaturan di bawah) — dipakai untuk test berjenjang seperti HSK.
                                 </div>
                                 @error('result_mode')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="row mb-4" id="sectionThresholdSettingsWrapper">
+                            <div class="col-sm-12">
+                                <div class="form-text mb-2" style="color:#6c757d;">
+                                    Pertanyaan harus ditempatkan di Sub Section (Section dengan Parent Section terisi
+                                    — lihat menu "Form Sections"), bukan langsung di Section top-level. Peserta lolos
+                                    dari satu Section (lanjut ke Section berikutnya) atau berhenti di situ (jadi
+                                    hasil akhir) berdasarkan jumlah jawaban salah di Sub Section-Sub Section-nya.
+                                </div>
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="section_fail_threshold" class="mb-2">Section Fail Threshold <span class="text-muted">(kosongkan = default 3)</span></label>
+                                <input type="number" min="1" max="50"
+                                    class="form-control @error('section_fail_threshold') is-invalid @enderror"
+                                    id="section_fail_threshold" name="section_fail_threshold"
+                                    value="{{ old('section_fail_threshold') }}">
+                                <div class="form-text" style="color:#6c757d;">Jumlah salah minimal supaya peserta dianggap berhenti (gagal) di Section itu.</div>
+                                @error('section_fail_threshold')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
+                            <div class="col-sm-6">
+                                <label for="section_pass_threshold" class="mb-2">Section Pass Threshold <span class="text-muted">(kosongkan = default 1)</span></label>
+                                <input type="number" min="0" max="50"
+                                    class="form-control @error('section_pass_threshold') is-invalid @enderror"
+                                    id="section_pass_threshold" name="section_pass_threshold"
+                                    value="{{ old('section_pass_threshold') }}">
+                                <div class="form-text" style="color:#6c757d;">Jumlah salah maksimal supaya peserta dianggap lolos (lanjut) dari Section itu. Harus lebih kecil dari Fail Threshold.</div>
+                                @error('section_pass_threshold')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
@@ -483,6 +517,25 @@
             }
 
             checkbox.addEventListener('change', sync);
+            sync();
+        })();
+
+        (function () {
+            var select = document.getElementById('result_mode');
+            var wrapper = document.getElementById('sectionThresholdSettingsWrapper');
+            var failInput = document.getElementById('section_fail_threshold');
+            var passInput = document.getElementById('section_pass_threshold');
+
+            function sync() {
+                var isSectionThreshold = select.value === 'section_threshold';
+                wrapper.style.display = isSectionThreshold ? '' : 'none';
+                if (!isSectionThreshold) {
+                    failInput.value = '';
+                    passInput.value = '';
+                }
+            }
+
+            select.addEventListener('change', sync);
             sync();
         })();
 

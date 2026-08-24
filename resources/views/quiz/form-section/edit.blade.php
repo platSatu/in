@@ -29,7 +29,7 @@
                     </div>
 
                     <div class="row g-3">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label">Nama Section</label>
                             <input type="text" class="form-control @error('name') is-invalid @enderror"
                                 name="name" value="{{ old('name', $data->name) }}" required>
@@ -37,7 +37,25 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
+                            <label class="form-label">Parent Section <span class="text-muted">(opsional)</span></label>
+                            <select class="form-select @error('parent_section_id') is-invalid @enderror" name="parent_section_id">
+                                <option value="">-- Tidak ada (Section top-level) --</option>
+                                @foreach ($topLevelSections as $topLevelSection)
+                                    <option value="{{ $topLevelSection->id }}" {{ old('parent_section_id', $data->parent_section_id) == $topLevelSection->id ? 'selected' : '' }}>
+                                        {{ optional($topLevelSection->form)->name ?? '-' }} &raquo; {{ $topLevelSection->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">
+                                Pilih kalau section ini Sub Section dari section lain (harus dari form yang sama).
+                                Kosongkan kalau ini section top-level.
+                            </div>
+                            @error('parent_section_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-3">
                             <label class="form-label">Urutan</label>
                             <input type="number" class="form-control @error('order') is-invalid @enderror"
                                 name="order" value="{{ old('order', $data->order) }}" min="0">
@@ -45,7 +63,7 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label">Status</label>
                             <select class="form-select" name="status" required>
                                 <option value="active" {{ old('status', $data->status) === 'active' ? 'selected' : '' }}>Active</option>
