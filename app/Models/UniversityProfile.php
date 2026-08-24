@@ -21,9 +21,6 @@ class UniversityProfile extends Model
         'user_id',
         'university_id',
         'field',
-        'degree_title',
-        'key_courses',
-        'entry_requirements',
         'min_budget',
         'max_budget',
         'language',
@@ -57,17 +54,6 @@ class UniversityProfile extends Model
     public function degrees()
     {
         return $this->hasMany(UniversityProfileDegree::class, 'university_profile_id')
-            ->orderBy('sort_order');
-    }
-
-    /**
-     * Daftar rincian biaya (Payment) per University Profile, sama polanya
-     * dengan degrees() di atas — child table lewat fitur "add row", pilih
-     * lokasi bayar (Indonesia / China) + nama item + jumlah.
-     */
-    public function payments()
-    {
-        return $this->hasMany(UniversityProfilePayment::class, 'university_profile_id')
             ->orderBy('sort_order');
     }
 }

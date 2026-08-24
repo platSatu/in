@@ -221,58 +221,6 @@
         .why-item h6 { font-weight: 700; margin-bottom: 2px; font-size: 14.5px; }
         .why-item p { font-size: 13.5px; color: #6b7186; margin-bottom: 0; }
 
-        /* ---------- ENTRY REQUIREMENTS ---------- */
-        .requirement-item {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-            margin-bottom: 10px;
-            font-size: 14px;
-            color: #4a4f5c;
-            line-height: 1.5;
-        }
-        .requirement-item:last-child { margin-bottom: 0; }
-        .requirement-item i { color: var(--brand); flex-shrink: 0; margin-top: 3px; }
-
-        /* ---------- PAYMENT ---------- */
-        .payment-group { margin-bottom: 20px; }
-        .payment-group:last-child { margin-bottom: 0; }
-
-        .payment-group-title {
-            font-weight: 700;
-            font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: .03em;
-            color: var(--brand);
-            margin-bottom: 8px;
-        }
-
-        .payment-row {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: space-between;
-            align-items: baseline;
-            gap: 4px 12px;
-            padding: 10px 0;
-            border-bottom: 1px solid #eef1f8;
-        }
-        .payment-row:last-child { border-bottom: none; }
-
-        .payment-name {
-            flex: 1 1 55%;
-            min-width: 140px;
-            font-size: 14px;
-            color: #4a4f5c;
-            word-break: break-word;
-        }
-
-        .payment-amount {
-            flex: 0 0 auto;
-            font-weight: 700;
-            font-size: 14px;
-            color: #1d2333;
-        }
-
         /* ---------- GALLERY ---------- */
         .album-block { margin-bottom: 26px; }
         .album-block:last-child { margin-bottom: 0; }
@@ -544,85 +492,15 @@
         $degreeIntakeRows = $profile ? $profile->degrees : collect();
         $degrees = $degreeIntakeRows->pluck('degree')->filter()->map('trim')->unique()->values()->all();
         $intakes = $degreeIntakeRows->pluck('intake')->filter()->map('trim')->unique()->values()->all();
-        // Duration: field baru (nullable) di university_profile_degrees, satu
-        // paket sama Degree/Intake per baris — ditampilkan sebagai daftar
-        // ringkas (deduplikasi), sama persis polanya dengan $degrees/$intakes
-        // di atas (jadi kalau kolom ini belum diisi admin, tampilannya balik
-        // ke placeholder-note seperti biasa, tidak ada yang berubah).
-        $durations = $degreeIntakeRows->pluck('duration')->filter()->map('trim')->unique()->values()->all();
-
-        // Degree Title, Key Courses, Entry Requirements: 3 kolom baru
-        // (nullable) di university_profiles hasil perbandingan dengan brosur
-        // kampus. Semua opsional, jadi setiap bagian di bawah tetap fallback
-        // ke placeholder-note kalau belum diisi admin — desain lama tidak
-        // berubah untuk profile yang belum punya data ini.
-        $degreeTitle = $profile ? trim((string) $profile->degree_title) : '';
-
-        // Key Courses & Entry Requirements sama-sama teks bebas yang admin isi
-        // per baris (dipisah "/" atau baris baru, mengikuti contoh placeholder
-        // di form admin) — dipecah jadi list rapi kalau ada pemisahnya,
-        // fallback ke satu paragraf utuh kalau tidak.
-        $splitFreeText = function (?string $text) {
-            $text = trim((string) $text);
-            if ($text === '') {
-                return [];
-            }
-
-            $parts = str_contains($text, '/')
-                ? explode('/', $text)
-                : preg_split('/\r\n|\r|\n/', $text);
-
-            return collect($parts)->map('trim')->filter()->values()->all();
-        };
-
-        $keyCourseItems = $profile ? $splitFreeText($profile->key_courses) : [];
-        $entryRequirementItems = $profile ? $splitFreeText($profile->entry_requirements) : [];
-
-        // Payment: tabel anak baru university_profile_payments (fitur "add
-        // row" di admin, pilih lokasi bayar Indonesia/China + nama item +
-        // jumlah). Dikelompokkan per lokasi supaya tampilannya sama seperti
-        // brosur kampus ("Payment in Indonesia" / "Payment in China").
-        $paymentRows = ($profile ? $profile->payments : collect())
-            ->filter(fn ($p) => filled($p->name) || filled($p->amount));
-        $paymentsByLocation = $paymentRows->groupBy(fn ($p) => $p->location ?: 'other');
-        $paymentLocationLabels = [
-            'indonesia' => 'Payment in Indonesia',
-            'china' => 'Payment in China',
-            'other' => 'Other Payment',
-        ];
-        $paymentCurrencySymbols = [
-            'indonesia' => 'Rp',
-            'china' => '元',
-            'other' => '',
-        ];
-
         $albumsWithPhotos = isset($albums) ? $albums->filter(fn($a) => $a->photos && $a->photos->count() > 0) : collect();
-
-        // $cityModel dikirim dari controller (relasi city() di-resolve eksplisit
-        // di sana, bukan lewat magic property $university->city yang selalu
-        // balikin nilai kolom mentah/UUID — lihat catatan di
-        // FrontendController::universityProfile()). Kalau $cityModel null
-        // (referensinya putus, atau ini university lama yang city-nya masih
-        // teks bebas manual) tampilkan teks mentahnya, KECUALI kalau teks
-        // mentah itu sendiri berbentuk UUID (berarti referensi City-nya sudah
-        // tidak valid) — dalam kasus itu jangan tampilkan UUID-nya ke publik.
-        $rawCityLooksLikeUuid = is_string($university->city)
-            && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $university->city);
-        $cityDisplay = $cityModel->name
-            ?? (! $rawCityLooksLikeUuid ? $university->city : null);
-
-        // Location sekarang ditampilkan sebagai "Country, City" saja (bukan lagi
-        // City lalu Country) supaya urutannya konsisten di hero maupun Quick Facts.
-        $locationParts = array_filter([$university->country, $cityDisplay], fn ($part) => filled($part));
-        $locationDisplay = count($locationParts) ? implode(', ', $locationParts) : null;
     @endphp
 
     <!-- HERO -->
     <div class="hero {{ $hasBanner ? 'has-banner' : '' }}"
          @if($hasBanner) style="background-image: url('{{ asset($university->banner) }}');" @endif>
         <div class="container hero-content">
-            <a href="{{ route('frontend.university.catalog') }}" class="breadcrumb-link">
-                <i class="bi bi-arrow-left"></i> Back to University
+            <a href="{{ route('frontend.form.wizard') }}" class="breadcrumb-link">
+                <i class="bi bi-arrow-left"></i> Back to Quiz
             </a>
 
             <div class="d-flex align-items-center gap-4 mt-4">
@@ -637,7 +515,11 @@
                     <h1>{{ $university->name }}</h1>
                     <p class="mb-3 opacity-75">
                         <i class="bi bi-geo-alt-fill"></i>
-                        {{ $locationDisplay ?? 'Location not specified yet' }}
+                        @if($university->city || $university->country)
+                            {{ $university->city ?? 'City not specified' }}{{ $university->country ? ', ' . $university->country : '' }}
+                        @else
+                            Location not specified yet
+                        @endif
                     </p>
                     <div class="d-flex flex-wrap gap-2">
                         <span class="badge-pill"><i class="bi bi-mortarboard"></i> Study in China</span>
@@ -657,7 +539,7 @@
                 <div class="fact-card">
                     <div class="fact-icon"><i class="bi bi-geo-alt"></i></div>
                     <div class="fact-label">Location</div>
-                    <div class="fact-value {{ $locationDisplay ? '' : 'muted' }}">{{ $locationDisplay ?? 'N/A' }}</div>
+                    <div class="fact-value {{ $university->city ? '' : 'muted' }}">{{ $university->city ?? 'N/A' }}</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-lg-2">
@@ -728,6 +610,34 @@
                 </div>
 
                 <div class="info-card">
+                    <h4><i class="bi bi-mortarboard"></i> Fields of Study</h4>
+                    @if(count($fields))
+                        <div>
+                            @foreach($fields as $field)
+                                <span class="tag">{{ $field }}</span>
+                            @endforeach
+                        </div>
+                    @else
+                        <div class="placeholder-note">
+                            <i class="bi bi-hourglass-split me-1"></i>
+                            Program details for this university are being finalized. Message us on WhatsApp and our team will share the latest list of available majors.
+                        </div>
+                    @endif
+                </div>
+
+                <div class="info-card">
+                    <h4><i class="bi bi-translate"></i> Language of Instruction</h4>
+                    @if($profile && $profile->language)
+                        <p class="mb-0">{{ $profile->language }}</p>
+                    @else
+                        <div class="placeholder-note">
+                            <i class="bi bi-hourglass-split me-1"></i>
+                            This information will be updated soon. Contact our team for the latest details.
+                        </div>
+                    @endif
+                </div>
+
+                <div class="info-card">
                     <h4><i class="bi bi-mortarboard-fill"></i> Degree Levels</h4>
                     @if(count($degrees))
                         <div>
@@ -755,123 +665,6 @@
                         <div class="placeholder-note">
                             <i class="bi bi-hourglass-split me-1"></i>
                             Intake schedule has not been published yet. Contact our team for the latest intake dates.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-hourglass-split"></i> Program Duration</h4>
-                    @if(count($durations))
-                        <div>
-                            @foreach($durations as $duration)
-                                <span class="tag">{{ $duration }}</span>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Program duration has not been added yet. Contact our team to find out how long each program takes.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-mortarboard"></i> Fields of Study</h4>
-                    @if(count($fields))
-                        <div>
-                            @foreach($fields as $field)
-                                <span class="tag">{{ $field }}</span>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Program details for this university are being finalized. Message us on WhatsApp and our team will share the latest list of available majors.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-award"></i> Degree Title</h4>
-                    @if(filled($degreeTitle))
-                        <p class="mb-0">{{ $degreeTitle }}</p>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            The exact degree title has not been added yet. Contact our team for the latest details.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-translate"></i> Language of Instruction</h4>
-                    @if($profile && $profile->language)
-                        <p class="mb-0">{{ $profile->language }}</p>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            This information will be updated soon. Contact our team for the latest details.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-journal-bookmark"></i> Key Courses</h4>
-                    @if(count($keyCourseItems))
-                        <div>
-                            @foreach($keyCourseItems as $course)
-                                <span class="tag">{{ $course }}</span>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Key courses for this program have not been added yet. Contact our team for the full curriculum.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-clipboard-check"></i> Entry Requirements</h4>
-                    @if(count($entryRequirementItems))
-                        <div>
-                            @foreach($entryRequirementItems as $requirement)
-                                <div class="requirement-item">
-                                    <i class="bi bi-check-circle-fill"></i>
-                                    <span>{{ $requirement }}</span>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Entry requirements have not been added yet. Contact our team for the latest admission criteria.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-cash-coin"></i> Payment Details</h4>
-                    @if($paymentsByLocation->isNotEmpty())
-                        @foreach($paymentsByLocation as $locationKey => $items)
-                            <div class="payment-group">
-                                <div class="payment-group-title">{{ $paymentLocationLabels[$locationKey] ?? ucfirst($locationKey) }}</div>
-                                @foreach($items as $item)
-                                    <div class="payment-row">
-                                        <span class="payment-name">{{ $item->name ?? '-' }}</span>
-                                        @if($item->amount !== null)
-                                            <span class="payment-amount">{{ $paymentCurrencySymbols[$locationKey] ?? '' }} {{ number_format($item->amount, 0, ',', '.') }}</span>
-                                        @else
-                                            <span class="payment-amount text-muted">Contact us</span>
-                                        @endif
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endforeach
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Payment breakdown has not been added yet. Contact our team for the latest tuition and fee details.
                         </div>
                     @endif
                 </div>
@@ -989,8 +782,8 @@
         </div>
 
         <div class="text-center mt-4 mb-5">
-            <a href="{{ route('frontend.university.catalog') }}" class="back-link">
-                <i class="bi bi-arrow-left"></i> Back to University
+            <a href="{{ route('frontend.form.wizard') }}" class="back-link">
+                <i class="bi bi-arrow-left"></i> Back to Quiz
             </a>
         </div>
     </div>

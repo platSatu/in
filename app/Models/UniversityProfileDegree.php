@@ -20,7 +20,6 @@ class UniversityProfileDegree extends Model
         'university_profile_id',
         'degree',
         'intake',
-        'duration',
         'sort_order',
     ];
 
