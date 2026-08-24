@@ -69,10 +69,16 @@
 
                 @enderror
 
-                <div class="form-text">
+                <div class="form-text" style="color:#6c757d;">
                     {{-- Sama seperti bug di edit.blade.php: pakai @{{ nama }} (Blade raw-echo
                          escape), BUKAN {{ 'dua kurung kurawal' }} — kalau tidak, halaman Add
-                         Template ini juga akan ParseError begitu dibuka. --}}
+                         Template ini juga akan ParseError begitu dibuka.
+
+                         Warna dipaksa eksplisit (bukan cuma andalkan .form-text) karena kelas
+                         itu di tema admin ini renders nyaris putih di atas background putih —
+                         akibatnya teks "dan" & keterangan callback_link jadi tidak kelihatan
+                         sama sekali, cuma <code> yang tetap kebaca (warnanya sendiri, bukan
+                         ikut .form-text). --}}
                     Placeholder yang bisa dipakai: <code>@{{name}}</code>, <code>@{{form_name}}</code>,
                     <code>@{{ringkasan_jawaban}}</code>, <code>@{{universitas_major}}</code>, dan
                     <code>@{{callback_link}}</code> (link callback form, mis. link Zoom — hanya terisi kalau

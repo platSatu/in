@@ -70,13 +70,19 @@
 
                 @enderror
 
-                <div class="form-text">
+                <div class="form-text" style="color:#6c757d;">
                     {{-- Pakai @{{ nama }} (Blade raw-echo escape), BUKAN {{ 'dua kurung kurawal' }} --}}
                     {{-- Sebelumnya ditulis {{ '{{name}}' }} dan bikin Blade compiler bingung, karena
                          dia cari tanda penutup "}}" PERTAMA untuk nutup echo-nya, dan itu jatuhnya
                          di TENGAH string tsb (bukan di akhir) — hasil compile jadi PHP yang rusak
                          (unclosed quote), makanya muncul ParseError "Unclosed '(' does not match
-                         '}'" begitu halaman ini dibuka. --}}
+                         '}'" begitu halaman ini dibuka.
+
+                         Warna dipaksa eksplisit (bukan cuma andalkan .form-text) karena kelas itu
+                         di tema admin ini renders nyaris putih di atas background putih —
+                         akibatnya teks "dan" & keterangan callback_link jadi tidak kelihatan sama
+                         sekali, cuma <code> yang tetap kebaca (warnanya sendiri, bukan ikut
+                         .form-text). --}}
                     Placeholder yang bisa dipakai: <code>@{{name}}</code>, <code>@{{form_name}}</code>,
                     <code>@{{ringkasan_jawaban}}</code>, <code>@{{universitas_major}}</code>, dan
                     <code>@{{callback_link}}</code> (link callback form, mis. link Zoom — hanya terisi kalau
