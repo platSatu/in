@@ -244,10 +244,10 @@
                                 </div>
                             </div>
                             <div class="col-sm-6">
-                                <label for="section_fail_threshold" class="mb-2">Section Fail Threshold</label>
+                                <label for="section_fail_threshold" class="mb-2">Section Fail Threshold <span class="text-muted">(kosongkan = default 3)</span></label>
                                 <input type="number" min="1" max="50"
                                     class="form-control @error('section_fail_threshold') is-invalid @enderror"
-                                    id="section_fail_threshold" name="section_fail_threshold" placeholder="Default: 3"
+                                    id="section_fail_threshold" name="section_fail_threshold"
                                     value="{{ old('section_fail_threshold') }}">
                                 <div class="form-text">Jumlah salah minimal supaya peserta dianggap berhenti (gagal) di Section itu.</div>
                                 @error('section_fail_threshold')
@@ -255,10 +255,10 @@
                                 @enderror
                             </div>
                             <div class="col-sm-6">
-                                <label for="section_pass_threshold" class="mb-2">Section Pass Threshold</label>
+                                <label for="section_pass_threshold" class="mb-2">Section Pass Threshold <span class="text-muted">(kosongkan = default 1)</span></label>
                                 <input type="number" min="0" max="50"
                                     class="form-control @error('section_pass_threshold') is-invalid @enderror"
-                                    id="section_pass_threshold" name="section_pass_threshold" placeholder="Default: 1"
+                                    id="section_pass_threshold" name="section_pass_threshold"
                                     value="{{ old('section_pass_threshold') }}">
                                 <div class="form-text">Jumlah salah maksimal supaya peserta dianggap lolos (lanjut) dari Section itu. Harus lebih kecil dari Fail Threshold.</div>
                                 @error('section_pass_threshold')

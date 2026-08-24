@@ -191,7 +191,7 @@ class UniversityController extends Controller
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(University::class, $id, (string) $userId, ['city.country', 'major', 'profiles']);
+        $data = AdminCrud::findOrFail(University::class, $id, (string) $userId, ['major', 'profiles']);
 
         $data->load(['albums' => function ($query) {
             $query->where('status', 'active')->with(['photos' => function ($q) {
@@ -199,7 +199,22 @@ class UniversityController extends Controller
             }]);
         }]);
 
-        return view('quiz.university.show', compact('data'));
+        // Kolom `city` di tabel `universities` sekaligus dipakai sebagai FK ke
+        // `cities.id` (lihat City::universities()) DAN sebagai nama kolom itu
+        // sendiri. Karena namanya sama persis dengan nama relasi city(),
+        // magic property $data->city SELALU mengembalikan nilai kolom mentah
+        // (string) — baik itu UUID kota yang valid maupun teks bebas dari
+        // data lama — bukan pernah objek City, walaupun relasinya sudah
+        // di-eager-load (keterbatasan Eloquent: atribut asli selalu menang
+        // atas nama relasi yang sama). Ini yang bikin breadcrumb di view
+        // crash ("Attempt to read property 'id' on string") begitu ada yang
+        // klik Detail. Makanya di sini relasinya diambil eksplisit lewat
+        // method city(), dikirim terpisah sebagai $cityModel — kalau
+        // city-nya data lama (bukan UUID valid), $cityModel otomatis null
+        // dan view tinggal fallback ke teks mentahnya seperti biasa.
+        $cityModel = $data->city()->with('country')->first();
+
+        return view('quiz.university.show', compact('data', 'cityModel'));
     }
 
     public function edit(string $id)

@@ -68,25 +68,6 @@
                         </div>
                     </div>
 
-                    <div class="row mb-4">
-                        <div class="col-sm-6">
-                            <label for="min_budget" class="mb-2">Min Budget</label>
-                            <input type="number" min="0" class="form-control @error('min_budget') is-invalid @enderror"
-                                id="min_budget" name="min_budget" value="{{ old('min_budget') }}" placeholder="0">
-                            @error('min_budget')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                        <div class="col-sm-6">
-                            <label for="max_budget" class="mb-2">Max Budget</label>
-                            <input type="number" min="0" class="form-control @error('max_budget') is-invalid @enderror"
-                                id="max_budget" name="max_budget" value="{{ old('max_budget') }}" placeholder="0">
-                            @error('max_budget')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
-                        </div>
-                    </div>
-
                     <hr>
                     <label class="form-label">Degree &amp; Intake</label>
                     <div class="form-text mb-2">Boleh dikosongkan, atau isi lebih dari satu kombinasi (mis. Bachelor - September, Master - March).</div>
@@ -126,6 +107,25 @@
                     <button type="button" id="btnAddDegreeIntakeRow" class="btn btn-outline-primary mb-4">
                         + Tambah Degree/Intake
                     </button>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <label for="min_budget" class="mb-2">Min Budget</label>
+                            <input type="number" min="0" class="form-control @error('min_budget') is-invalid @enderror"
+                                id="min_budget" name="min_budget" value="{{ old('min_budget') }}" placeholder="0">
+                            @error('min_budget')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-sm-6">
+                            <label for="max_budget" class="mb-2">Max Budget</label>
+                            <input type="number" min="0" class="form-control @error('max_budget') is-invalid @enderror"
+                                id="max_budget" name="max_budget" value="{{ old('max_budget') }}" placeholder="0">
+                            @error('max_budget')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
 
                     <div class="row mb-4">
                         <div class="col-sm-12">
@@ -181,7 +181,10 @@
                                     <button type="submit" class="btn btn-success w-100">Create Profile</button>
                                 </div>
                                 <div class="col-sm-12">
-                                    <a href="{{ route('quiz.university-profile.index') }}"
+                                    {{-- Kalau university-nya sudah terkunci (datang dari tombol +Profile
+                                         di University), Cancel balik ke halaman profile university itu;
+                                         kalau belum, balik ke index profile seperti biasa. --}}
+                                    <a href="{{ $lockedUniversity ? route('quiz.university.show', $lockedUniversity->id) : route('quiz.university-profile.index') }}"
                                         class="btn btn-outline-secondary w-100">Cancel</a>
                                 </div>
                             </div>

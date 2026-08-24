@@ -53,54 +53,60 @@
 
                                     </td>
                                     <td>{{ $item->country }}</td>
-                                    <td>{{ $item->city ?? '-' }}</td>
+                                    <td>
+                                        @php
+                                            // Kolom `city` juga jadi nama relasi city() di model University, jadi
+                                            // $item->city (magic property) selalu balikin nilai kolom mentah
+                                            // (UUID), bukan objek City, walau relasinya sudah di-load() di
+                                            // controller. Ambil city-nya lewat getRelation() supaya nama kota
+                                            // yang tampil.
+                                            //
+                                            // Kalau relasinya tidak ketemu (city_id-nya sudah tidak match City
+                                            // manapun — misalnya City-nya sudah dihapus, referensinya "putus"),
+                                            // JANGAN tampilkan UUID mentahnya (bikin bingung) — tampilkan '-'
+                                            // saja. Fallback ke nilai mentah HANYA kalau memang bukan berbentuk
+                                            // UUID (berarti data lama yang city-nya masih teks bebas manual).
+                                            $cityRelation = $item->getRelation('city');
+                                            $rawCity = $item->city;
+                                            $rawCityLooksLikeUuid = is_string($rawCity)
+                                                && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawCity);
+                                            $cityDisplay = $cityRelation->name
+                                                ?? (! $rawCityLooksLikeUuid ? $rawCity : null)
+                                                ?? '-';
+                                        @endphp
+                                        {{ $cityDisplay }}
+                                        @if(!$cityRelation && $rawCityLooksLikeUuid)
+                                            <div class="small text-danger" title="City ID di data ini tidak ditemukan di tabel City (kemungkinan City-nya sudah dihapus). Edit university ini dan pilih ulang City-nya.">
+                                                referensi City tidak valid
+                                            </div>
+                                        @endif
+                                    </td>
                                     <td>{{ \Illuminate\Support\Str::limit($item->description, 60) ?? '-' }}</td>
                                     <td>{{ optional($item->created_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
-                                        <div class="dropdown">
-                                            <a class="dropdown-toggle" href="#" role="button"
-                                                id="dropdownMenuLink{{ $item->id }}" data-bs-toggle="dropdown"
-                                                aria-haspopup="true" aria-expanded="true">
-                                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
-                                                    viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
-                                                    class="feather feather-more-horizontal">
-                                                    <circle cx="12" cy="12" r="1"></circle>
-                                                    <circle cx="19" cy="12" r="1"></circle>
-                                                    <circle cx="5" cy="12" r="1"></circle>
-                                                </svg>
-                                            </a>
+                                        {{-- Aksi ditaruh sejajar (flex-row), sama gayanya dengan index Quiz Form/
+                                             Student — bukan dropdown 3-titik lagi. "Detail" mengarah ke halaman
+                                             show internal (quiz.university.show), yang jadi halaman "profile"
+                                             tempat Add Profile/Add Album mengarahkan balik. --}}
+                                        <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                            <a href="{{ route('quiz.university.show', $item->id) }}"
+                                                class="btn btn-sm btn-outline-secondary text-nowrap">Detail</a>
 
-                                            <div class="dropdown-menu" aria-labelledby="dropdownMenuLink{{ $item->id }}">
-                                                <a class="dropdown-item"
-                                                    href="{{ route('quiz.university.edit', $item->id) }}">Edit</a>
-                                                <a class="dropdown-item"
-                                                    href="{{ route('frontend.university.profile', $item->id) }}"
-                                                    target="_blank">
-                                                        Detail
-                                                    </a>
+                                            <a href="{{ route('quiz.university.edit', $item->id) }}"
+                                                class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
 
-                                                <div class="dropdown-divider"></div>
+                                            <a href="{{ route('quiz.university-profile.create', ['university_id' => $item->id]) }}"
+                                                class="btn btn-sm btn-outline-success text-nowrap">+ Profile</a>
 
-                                                <a class="dropdown-item"
-                                                    href="{{ route('quiz.university-profile.create', ['university_id' => $item->id]) }}">
-                                                    + Add Profile
-                                                </a>
-                                                <a class="dropdown-item"
-                                                    href="{{ route('quiz.university-album.create', ['university_id' => $item->id]) }}">
-                                                    + Add Album
-                                                </a>
+                                            <a href="{{ route('quiz.university-album.create', ['university_id' => $item->id]) }}"
+                                                class="btn btn-sm btn-outline-success text-nowrap">+ Album</a>
 
-                                                <div class="dropdown-divider"></div>
-
-                                                <form action="{{ route('quiz.university.destroy', $item->id) }}"
-                                                    method="POST" onsubmit="return confirm('Hapus university ini?');">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit"
-                                                        class="dropdown-item text-danger">Delete</button>
-                                                </form>
-                                            </div>
+                                            <form action="{{ route('quiz.university.destroy', $item->id) }}"
+                                                method="POST" onsubmit="return confirm('Hapus university ini?');" class="m-0">
+                                                @csrf
+                                                @method('DELETE')
+                                                <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">Delete</button>
+                                            </form>
                                         </div>
                                     </td>
                                 </tr>

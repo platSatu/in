@@ -181,7 +181,8 @@
             </button>
 
 
-            <a href="{{ route('quiz.university-album.index') }}"
+            {{-- Back kembali ke album index yang scoped ke university album ini. --}}
+            <a href="{{ route('quiz.university-album.index', ['university_id' => $data->university_id]) }}"
                 class="btn btn-secondary">
 
                 Back

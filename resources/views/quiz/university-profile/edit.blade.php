@@ -155,7 +155,9 @@
                                     <button type="submit" class="btn btn-success w-100">Update Profile</button>
                                 </div>
                                 <div class="col-sm-12">
-                                    <a href="{{ route('quiz.university-profile.index') }}"
+                                    {{-- Cancel balik ke halaman profile University-nya, sama arahnya
+                                         dengan redirect setelah Update di atas. --}}
+                                    <a href="{{ route('quiz.university.show', $data->university_id) }}"
                                         class="btn btn-outline-secondary w-100">Cancel</a>
                                 </div>
                             </div>
