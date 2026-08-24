@@ -40,8 +40,10 @@
                                 <th>No</th>
                                 <th>Name</th>
                                 <th class="text-nowrap">Company Branch</th>
-                                <th>No Booth</th>
-                                <th>Description</th>
+                                {{-- Description: dimatikan dari tampilan index (jarang diisi & bikin tabel
+                                     terlalu lebar) -- tetap ada di data & form create/edit, cuma tidak
+                                     ditampilkan di sini. --}}
+                                {{-- <th>Description</th> --}}
                                 <th class="text-center text-nowrap">Submission</th>
                                 <th class="text-center text-nowrap">Payment</th>
                                 <th class="text-center text-nowrap">Viewer</th>
@@ -100,20 +102,24 @@
                                             </small>
                                         @endif
                                     </td>
-                                    <td class="text-nowrap">{{ optional($form->companyBranch)->name ?? '-' }}</td>
-                                    <td>
-                                        {{ $form->no_booth ?? '-' }}
-                                        @if ($form->requires_payment)
-                                            <br>
-                                            <span class="badge badge-warning">
-                                                Rp {{ number_format((float) $form->payment_amount, 0, ',', '.') }}
-                                            </span>
-                                        @else
-                                            <br>
-                                            <span class="badge badge-secondary">Gratis</span>
-                                        @endif
+                                    <td class="text-nowrap">
+                                        {{ optional($form->companyBranch)->name ?? '-' }}
+                                        {{-- No Booth dipindah ke sini (bawah nama Branch), sama pola dengan
+                                             link URL yang ditaruh di bawah nama Form di kolom Name. --}}
+                                        <br>
+                                        <small class="text-muted">
+                                            No. Booth: {{ $form->no_booth ?? '-' }}
+                                            @if ($form->requires_payment)
+                                                <span class="badge badge-warning">
+                                                    Rp {{ number_format((float) $form->payment_amount, 0, ',', '.') }}
+                                                </span>
+                                            @else
+                                                <span class="badge badge-secondary">Gratis</span>
+                                            @endif
+                                        </small>
                                     </td>
-                                    <td>{{ $form->description ?? '-' }}</td>
+                                    {{-- Description: lihat catatan di <thead> -- dimatikan dari tampilan. --}}
+                                    {{-- <td>{{ $form->description ?? '-' }}</td> --}}
                                     <td class="text-center">
                                         @if ($form->formSubmissions->count() > 0)
                                             <a href="{{ route('quiz.form.submissions', $form->id) }}"
@@ -187,6 +193,10 @@
                                             <a href="{{ route('quiz.form-question.index', ['form_id' => $form->id]) }}"
                                                 class="btn btn-sm btn-outline-secondary text-nowrap flex-shrink-0">Show Questions</a>
 
+                                            {{-- Tombol Preview dimatikan -- link URL publik-nya sudah bisa
+                                                 diklik langsung di bawah nama Form (kolom Name), jadi tombol
+                                                 ini jadi redundant. --}}
+                                            {{--
                                             <a href="{{ ($form->slug && $form->booth_slug)
                                                     ? route('frontend.form.wizard.slug', ['branchSlug' => $form->slug, 'boothSlug' => $form->booth_slug])
                                                     : route('frontend.form.wizard', ['form_id' => $form->id]) }}"
@@ -202,6 +212,7 @@
                                                 </svg>
                                                 Preview
                                             </a>
+                                            --}}
 
                                             {{-- Reset Submissions: buang histori submission (jawaban, hasil, kelas
                                                  terdaftar, pembayaran) tanpa hapus form/pertanyaan/opsi jawabannya —
@@ -236,7 +247,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center">Belum ada data form.</td>
+                                    <td colspan="8" class="text-center">Belum ada data form.</td>
                                 </tr>
                             @endforelse
                         </tbody>
