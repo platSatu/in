@@ -107,6 +107,21 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
+
+                                <div class="col-xxl-12 mb-4">
+                                    <label for="owner_user_id">Pemilik (Admin)</label>
+                                    <select class="form-select @error('owner_user_id') is-invalid @enderror" id="owner_user_id" name="owner_user_id">
+                                        @foreach ($adminUsers as $adminUser)
+                                            <option value="{{ $adminUser->id }}" {{ old('owner_user_id', (string) $data->user_id) === (string) $adminUser->id ? 'selected' : '' }}>
+                                                {{ $adminUser->name }} ({{ $adminUser->email }})
+                                            </option>
+                                        @endforeach
+                                    </select>
+                                    <div class="form-text">WA notifikasi cuma terkirim kalau form-nya dibuat oleh admin yang sama dengan yang dipilih di sini.</div>
+                                    @error('owner_user_id')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
                             </div>
                         </div>
                     </div>

@@ -1345,14 +1345,6 @@ class FrontendController extends Controller
                 'existing_student_id' => $existingStudent->id ?? null,
             ]);
 
-            if ($existingStudent) {
-                Log::info('[FORM-WIZARD] Pakai Student yang sudah ada, tidak insert baru', [
-                    'student_id' => $existingStudent->id,
-                ]);
-
-                return $existingStudent;
-            }
-
             $nameParts = preg_split('/\s+/', trim($validated['name']), 2);
 
             $payload = [
@@ -1362,6 +1354,30 @@ class FrontendController extends Controller
                 'handphone' => $validated['handphone'],
                 'status' => 'active',
             ];
+
+            if ($existingStudent) {
+                // BUGFIX: sebelumnya baris Student lama langsung dipakai apa
+                // adanya tanpa update nama/email sama sekali -- jadi kalau
+                // nomor WhatsApp yang sama pernah dipakai sebelumnya (submit
+                // form lain, testing, atau nomor keluarga/orang lain), nama
+                // yang BARU SAJA diketik peserta di step ini diam-diam
+                // dibuang, dan admin lihat nama LAMA dari submission
+                // sebelumnya -- padahal peserta yakin sudah isi nama yang
+                // benar. Nomor HP dipakai sebagai "kunci" identitas Student
+                // (biar tidak dobel baris per orang), TAPI nama/email harus
+                // tetap ikut yang terbaru diketik tiap kali submit.
+                $existingStudent->update([
+                    'first_name' => $payload['first_name'],
+                    'last_name' => $payload['last_name'],
+                    'email' => $payload['email'],
+                ]);
+
+                Log::info('[FORM-WIZARD] Pakai Student yang sudah ada, update nama/email ke data terbaru', [
+                    'student_id' => $existingStudent->id,
+                ]);
+
+                return $existingStudent;
+            }
 
             Log::info('[FORM-WIZARD] Akan create Student baru dengan payload', $payload);
 

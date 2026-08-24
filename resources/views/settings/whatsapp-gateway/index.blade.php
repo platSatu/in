@@ -24,6 +24,7 @@
                             <tr>
                                 <th>No</th>
                                 <th>Name</th>
+                                <th>Pemilik</th>
                                 <th>API Host</th>
                                 <th>Status</th>
                                 <th>Aktif</th>
@@ -36,6 +37,7 @@
                                 <tr>
                                     <td>{{ $data->firstItem() + $index }}</td>
                                     <td class="fw-bold">{{ $item->name ?: '-' }}</td>
+                                    <td>{{ optional($item->user)->name ?? '-' }}</td>
                                     <td>{{ $item->api_host }}</td>
                                     <td>
                                         @if ($item->status === 'active')
@@ -79,7 +81,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="text-center">
+                                    <td colspan="8" class="text-center">
                                         Belum ada data WhatsApp gateway. Sistem masih pakai kredensial default (.env)
                                         sampai ada gateway yang diaktifkan di sini.
                                     </td>
