@@ -98,12 +98,21 @@ class WhatsappMessenger
                 $phone = '62' . substr($phone, 1);
             }
 
-            $gateway = $userId
-                ? WhatsappGateway::where('user_id', $userId)
-                    ->where('is_active', true)
-                    ->where('status', 'active')
-                    ->first()
-                : null;
+            // BUGFIX (per keputusan owner): gateway ini SEKARANG berlaku
+            // system-wide untuk semua form, tidak peduli form itu dibuat
+            // admin siapa -- sebelumnya di-scope ketat ke user_id PEMBUAT
+            // FORM ($userId param di bawah), jadi kalau WhatsApp Gateway
+            // di-setting oleh admin A tapi form dibuat admin B, WA tidak
+            // pernah kedetect & selalu jatuh ke sendViaLegacyFallback()
+            // (kredensial Wablas lama, sering sudah expired). $userId
+            // sengaja dibiarkan di signature (dipakai banyak caller) tapi
+            // TIDAK dipakai lagi buat filter -- cukup 1 gateway aktif utk
+            // seluruh sistem (lihat WhatsappGatewayController::deactivateOthers()
+            // yang juga sudah tidak di-scope per user lagi).
+            $gateway = WhatsappGateway::where('is_active', true)
+                ->where('status', 'active')
+                ->latest('updated_at')
+                ->first();
 
             $response = $gateway
                 ? $this->sendViaGateway($gateway, $phone, $message)

@@ -18,8 +18,15 @@ class WhatsappGatewayController extends Controller
             abort(401);
         }
 
+        // BUGFIX (per keputusan owner): gateway sekarang system-wide (dipakai
+        // SEMUA form apapun admin pembuatnya -- lihat WhatsappMessenger::send()),
+        // jadi index() & manajemennya (edit/activate/destroy di bawah) juga
+        // TIDAK di-scope lagi ke user_id sendiri. Siapapun yang punya izin
+        // buka halaman Settings > WhatsApp Gateway ini (permission gate-nya
+        // ada di routes/web.php) sekarang bisa lihat & kelola semua gateway,
+        // bukan cuma yang dia buat sendiri -- supaya kalau token/secret perlu
+        // diperbarui, tidak harus menunggu admin yang pertama kali setting.
         $data = WhatsappGateway::query()
-            ->where('user_id', (string) $userId)
             ->with('user')
             ->orderByDesc('is_active')
             ->orderByDesc('created_at')
@@ -46,17 +53,16 @@ class WhatsappGatewayController extends Controller
             abort(401);
         }
 
-        // Sama seperti Payment Gateway (lihat PaymentGatewayController) -- WA
-        // dikirim lewat WhatsappMessenger::send() yang nyari gateway aktif
-        // berdasarkan user_id PEMBUAT FORM, bukan admin yang login waktu
-        // menyimpan Settings ini. Kalau form dibuat admin lain, gateway harus
-        // di-assign ke admin itu supaya kedetect & WA-nya terkirim.
+        // "Pemilik (Admin)" sekarang murni catatan/kontak teknis (siapa yang
+        // pegang device Konexa/Teleios-nya) -- TIDAK lagi menentukan form mana
+        // yang bisa pakai gateway ini (lihat WhatsappMessenger::send(), sudah
+        // system-wide). Default tetap admin yang login kalau tidak dipilih.
         $targetUserId = $validated['owner_user_id'] ?? (string) $userId;
         unset($validated['owner_user_id']);
         $validated['user_id'] = $targetUserId;
 
         if ($validated['is_active']) {
-            $this->deactivateOthers($targetUserId);
+            $this->deactivateOthers();
         }
 
         WhatsappGateway::create($validated);
@@ -73,7 +79,8 @@ class WhatsappGatewayController extends Controller
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(WhatsappGateway::class, $id, (string) $userId);
+        // Tidak lagi di-scope ke user_id sendiri (lihat catatan di index()).
+        $data = AdminCrud::findOrFail(WhatsappGateway::class, $id);
         $gatewayOptions = WhatsappGateway::gatewayOptions();
         $adminUsers = User::orderBy('name')->get(['id', 'name', 'email']);
 
@@ -87,22 +94,19 @@ class WhatsappGatewayController extends Controller
             abort(401);
         }
 
-        AdminCrud::findOrFail(WhatsappGateway::class, $id, (string) $userId);
+        AdminCrud::findOrFail(WhatsappGateway::class, $id);
 
         $validated = $this->validateGateway($request);
 
-        // Lihat komentar di store(). Catatan yang sama juga berlaku: begitu
-        // di-reassign ke admin lain, gateway ini tidak lagi muncul di index()
-        // admin yang sekarang login.
         $targetUserId = $validated['owner_user_id'] ?? (string) $userId;
         unset($validated['owner_user_id']);
         $validated['user_id'] = $targetUserId;
 
         if ($validated['is_active']) {
-            $this->deactivateOthers($targetUserId, $id);
+            $this->deactivateOthers($id);
         }
 
-        AdminCrud::update(WhatsappGateway::class, $id, $validated, (string) $userId);
+        AdminCrud::update(WhatsappGateway::class, $id, $validated);
 
         return redirect()
             ->route('settings.whatsapp-gateway.index')
@@ -119,11 +123,11 @@ class WhatsappGatewayController extends Controller
             abort(401);
         }
 
-        AdminCrud::findOrFail(WhatsappGateway::class, $id, (string) $userId);
+        AdminCrud::findOrFail(WhatsappGateway::class, $id);
 
-        $this->deactivateOthers((string) $userId, $id);
+        $this->deactivateOthers($id);
 
-        AdminCrud::update(WhatsappGateway::class, $id, ['is_active' => true], (string) $userId);
+        AdminCrud::update(WhatsappGateway::class, $id, ['is_active' => true]);
 
         return redirect()
             ->route('settings.whatsapp-gateway.index')
@@ -137,7 +141,7 @@ class WhatsappGatewayController extends Controller
             abort(401);
         }
 
-        AdminCrud::delete(WhatsappGateway::class, $id, (string) $userId);
+        AdminCrud::delete(WhatsappGateway::class, $id);
 
         return redirect()
             ->route('settings.whatsapp-gateway.index')
@@ -174,11 +178,16 @@ class WhatsappGatewayController extends Controller
     }
 
     /**
-     * Pastikan cuma 1 gateway yang is_active = true per user.
+     * Pastikan cuma 1 gateway yang is_active = true, SYSTEM-WIDE (bukan lagi
+     * per user) -- lihat WhatsappMessenger::send() yang sekarang cuma nyari
+     * 1 gateway aktif tanpa filter user_id sama sekali. Kalau ini tetap
+     * di-scope per user seperti dulu, bisa ada lebih dari 1 baris
+     * is_active=true sekaligus (punya admin A dan admin B), dan
+     * WhatsappMessenger::send() jadi ambigu pilih yang mana.
      */
-    private function deactivateOthers(string $userId, ?string $exceptId = null): void
+    private function deactivateOthers(?string $exceptId = null): void
     {
-        WhatsappGateway::where('user_id', $userId)
+        WhatsappGateway::query()
             ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
             ->update(['is_active' => false]);
     }

@@ -18,8 +18,14 @@ class PaymentGatewayController extends Controller
             abort(401);
         }
 
+        // BUGFIX (per keputusan owner, sama seperti WhatsApp Gateway): gateway
+        // sekarang system-wide (dipakai SEMUA form apapun admin pembuatnya --
+        // lihat FormPaymentController::init()), jadi index() & manajemennya
+        // (edit/activate/destroy di bawah) juga TIDAK di-scope lagi ke user_id
+        // sendiri. Siapapun yang punya izin buka halaman Settings > Payment
+        // Gateway ini (permission gate-nya ada di routes/web.php) sekarang
+        // bisa lihat & kelola semua gateway, bukan cuma yang dia buat sendiri.
         $data = PaymentGateway::query()
-            ->where('user_id', (string) $userId)
             ->with('user')
             ->orderByDesc('is_active')
             ->orderBy('gateway')
@@ -48,18 +54,16 @@ class PaymentGatewayController extends Controller
             abort(401);
         }
 
-        // Pemilik gateway biasanya = admin yang sedang login (yang bikin
-        // credential-nya), TAPI bisa dioverride lewat dropdown "Pemilik
-        // (Admin)" -- dibutuhkan karena FormPaymentController::init() nyari
-        // gateway aktif berdasarkan user_id PEMBUAT FORM, bukan pemilik
-        // gateway secara umum. Kalau form dibuat admin lain, gateway ini
-        // harus di-assign ke admin itu supaya kedetect.
+        // "Pemilik (Admin)" sekarang murni catatan/kontak teknis -- TIDAK lagi
+        // menentukan form mana yang bisa pakai gateway ini (lihat
+        // FormPaymentController::init(), sudah system-wide). Default tetap
+        // admin yang login kalau tidak dipilih.
         $targetUserId = $validated['owner_user_id'] ?? (string) $userId;
         unset($validated['owner_user_id']);
         $validated['user_id'] = $targetUserId;
 
         if ($validated['is_active']) {
-            $this->deactivateOthers($targetUserId);
+            $this->deactivateOthers();
         }
 
         PaymentGateway::create($validated);
@@ -76,7 +80,8 @@ class PaymentGatewayController extends Controller
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(PaymentGateway::class, $id, (string) $userId);
+        // Tidak lagi di-scope ke user_id sendiri (lihat catatan di index()).
+        $data = AdminCrud::findOrFail(PaymentGateway::class, $id);
         $credentialFields = PaymentGateway::credentialFields();
         $adminUsers = User::orderBy('name')->get(['id', 'name', 'email']);
 
@@ -90,26 +95,19 @@ class PaymentGatewayController extends Controller
             abort(401);
         }
 
-        AdminCrud::findOrFail(PaymentGateway::class, $id, (string) $userId);
+        AdminCrud::findOrFail(PaymentGateway::class, $id);
 
         $validated = $this->validateGateway($request);
 
-        // Sama seperti store() -- lihat komentar di sana. Catatan penting:
-        // begitu di-reassign ke admin lain, gateway ini TIDAK AKAN muncul
-        // lagi di halaman index() admin yang sekarang login (index() masih
-        // di-scope ke user_id sendiri), jadi cuma admin baru itu yang bisa
-        // lihat/edit lagi selanjutnya. Kalau butuh dua admin sama-sama bisa
-        // kelola, pertimbangkan assign ke 1 akun superadmin/bersama, bukan
-        // ke akun personal.
         $targetUserId = $validated['owner_user_id'] ?? (string) $userId;
         unset($validated['owner_user_id']);
         $validated['user_id'] = $targetUserId;
 
         if ($validated['is_active']) {
-            $this->deactivateOthers($targetUserId, $id);
+            $this->deactivateOthers($id);
         }
 
-        AdminCrud::update(PaymentGateway::class, $id, $validated, (string) $userId);
+        AdminCrud::update(PaymentGateway::class, $id, $validated);
 
         return redirect()
             ->route('settings.payment-gateway.index')
@@ -126,11 +124,11 @@ class PaymentGatewayController extends Controller
             abort(401);
         }
 
-        AdminCrud::findOrFail(PaymentGateway::class, $id, (string) $userId);
+        AdminCrud::findOrFail(PaymentGateway::class, $id);
 
-        $this->deactivateOthers((string) $userId, $id);
+        $this->deactivateOthers($id);
 
-        AdminCrud::update(PaymentGateway::class, $id, ['is_active' => true], (string) $userId);
+        AdminCrud::update(PaymentGateway::class, $id, ['is_active' => true]);
 
         return redirect()
             ->route('settings.payment-gateway.index')
@@ -144,7 +142,7 @@ class PaymentGatewayController extends Controller
             abort(401);
         }
 
-        AdminCrud::delete(PaymentGateway::class, $id, (string) $userId);
+        AdminCrud::delete(PaymentGateway::class, $id);
 
         return redirect()
             ->route('settings.payment-gateway.index')
@@ -193,11 +191,13 @@ class PaymentGatewayController extends Controller
     }
 
     /**
-     * Pastikan cuma 1 gateway yang is_active = true per user.
+     * Pastikan cuma 1 gateway yang is_active = true, SYSTEM-WIDE (bukan lagi
+     * per user) -- lihat FormPaymentController::init() yang sekarang cuma
+     * nyari 1 gateway aktif tanpa filter user_id sama sekali.
      */
-    private function deactivateOthers(string $userId, ?string $exceptId = null): void
+    private function deactivateOthers(?string $exceptId = null): void
     {
-        PaymentGateway::where('user_id', $userId)
+        PaymentGateway::query()
             ->when($exceptId, fn ($q) => $q->where('id', '!=', $exceptId))
             ->update(['is_active' => false]);
     }

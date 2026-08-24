@@ -47,9 +47,14 @@ class FormPaymentController extends Controller
             return response()->json(['message' => 'Form ini tidak membutuhkan pembayaran.'], 422);
         }
 
-        $gateway = PaymentGateway::where('user_id', $form->user_id)
-            ->where('is_active', true)
+        // BUGFIX (per keputusan owner, sama seperti WhatsappMessenger::send()):
+        // gateway pembayaran SEKARANG berlaku system-wide, tidak di-scope lagi
+        // ke user_id pembuat form -- sebelumnya form yang dibuat admin lain
+        // dari admin yang men-setting Payment Gateway selalu gagal ketemu
+        // gateway aktif ("Payment gateway belum diaktifkan oleh admin").
+        $gateway = PaymentGateway::where('is_active', true)
             ->where('status', 'active')
+            ->latest('updated_at')
             ->first();
 
         if (!$gateway) {
