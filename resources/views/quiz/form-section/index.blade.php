@@ -60,6 +60,7 @@
                                 <th>No</th>
                                 <th>Form</th>
                                 <th>Nama Section</th>
+                                <th>Parent Section</th>
                                 <th>Description</th>
                                 <th>Urutan</th>
                                 <th>Jumlah Soal</th>
@@ -72,7 +73,10 @@
                                 <tr>
                                     <td>{{ $data->firstItem() + $index }}</td>
                                     <td>{{ optional($item->form)->name ?? '-' }}</td>
-                                    <td class="fw-bold">{{ $item->name }}</td>
+                                    <td class="fw-bold">
+                                        {{ $item->parent_section_id ? '↳ ' : '' }}{{ $item->name }}
+                                    </td>
+                                    <td>{{ optional($item->parentSection)->name ?? '-' }}</td>
                                     <td>{{ \Illuminate\Support\Str::limit($item->description, 60) ?: '-' }}</td>
                                     <td>{{ $item->order }}</td>
                                     <td>{{ $item->questions_count }}</td>
@@ -109,7 +113,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center">Belum ada section.</td>
+                                    <td colspan="9" class="text-center">Belum ada section.</td>
                                 </tr>
                             @endforelse
                         </tbody>

@@ -481,7 +481,9 @@ class FormController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'has_personal_data_stage' => 'nullable|boolean',
-            'result_mode' => 'nullable|in:none,auto,manual',
+            'result_mode' => 'nullable|in:none,auto,manual,section_threshold',
+            'section_fail_threshold' => 'nullable|integer|min:1|max:50',
+            'section_pass_threshold' => 'nullable|integer|min:0|max:50',
             'timer_enabled' => 'nullable|boolean',
             'timer_duration_minutes' => 'nullable|required_if:timer_enabled,1|integer|min:1|max:600',
             'timer_auto_save' => 'nullable|boolean',
@@ -509,6 +511,7 @@ class FormController extends Controller
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
         $validated['company_division_id'] = $validated['company_division_id'] ?? null;
+        $validated = $this->applySectionThresholdFields($validated);
 
         $validated = $this->applyTimerFields($request, $validated);
 
@@ -644,7 +647,9 @@ class FormController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'has_personal_data_stage' => 'nullable|boolean',
-            'result_mode' => 'nullable|in:none,auto,manual',
+            'result_mode' => 'nullable|in:none,auto,manual,section_threshold',
+            'section_fail_threshold' => 'nullable|integer|min:1|max:50',
+            'section_pass_threshold' => 'nullable|integer|min:0|max:50',
             'timer_enabled' => 'nullable|boolean',
             'timer_duration_minutes' => 'nullable|required_if:timer_enabled,1|integer|min:1|max:600',
             'timer_auto_save' => 'nullable|boolean',
@@ -672,6 +677,7 @@ class FormController extends Controller
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
         $validated['company_division_id'] = $validated['company_division_id'] ?? null;
+        $validated = $this->applySectionThresholdFields($validated);
 
         $validated = $this->applyTimerFields($request, $validated);
 
@@ -712,6 +718,45 @@ class FormController extends Controller
         return redirect()
             ->route('quiz.form.index')
             ->with('success', 'Form berhasil diupdate.');
+    }
+
+    /**
+     * Normalisasi 2 field ambang batas mode hasil "section_threshold" (dipakai
+     * bareng oleh store() & update()) — pola sama dengan applyTimerFields() di
+     * bawah: gerbangnya adalah result_mode, bukan checkbox tersendiri.
+     *
+     * - result_mode === 'section_threshold': kalau admin tidak mengisi
+     *   angkanya, dipakai default semantik 3 (fail) / 1 (pass) — lihat
+     *   FrontendController::computeSectionThresholdResult() untuk bagaimana
+     *   angka ini dipakai. Ditolak (ValidationException) kalau pass >= fail,
+     *   karena kombinasi itu tidak pernah bisa masuk ke "zona abu-abu" mana
+     *   pun dari algoritmanya (pass harus lebih kecil dari fail).
+     * - result_mode lainnya: kedua kolom dipaksa NULL, supaya tidak ada
+     *   angka lama yang "nyangkut" dari form yang PERNAH memakai mode ini
+     *   lalu dipindah ke mode lain.
+     */
+    private function applySectionThresholdFields(array $validated): array
+    {
+        if ($validated['result_mode'] !== 'section_threshold') {
+            $validated['section_fail_threshold'] = null;
+            $validated['section_pass_threshold'] = null;
+
+            return $validated;
+        }
+
+        $failThreshold = $validated['section_fail_threshold'] ?? 3;
+        $passThreshold = $validated['section_pass_threshold'] ?? 1;
+
+        if ($passThreshold >= $failThreshold) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'section_pass_threshold' => 'Section Pass Threshold harus lebih kecil dari Section Fail Threshold.',
+            ]);
+        }
+
+        $validated['section_fail_threshold'] = $failThreshold;
+        $validated['section_pass_threshold'] = $passThreshold;
+
+        return $validated;
     }
 
     /**
@@ -889,6 +934,8 @@ class FormController extends Controller
                 'whatsapp_template_id',
                 'has_personal_data_stage',
                 'result_mode',
+                'section_fail_threshold',
+                'section_pass_threshold',
                 'description',
                 'pre_test_notice',
                 'start_date',
@@ -919,13 +966,22 @@ class FormController extends Controller
 
             $newForm = Form::create($newFormData);
 
-            // --- Tahap 1: Section, lalu Question (parent_option_id null dulu) ---
+            // --- Tahap 1: Section (parent_section_id null dulu), lalu Question (parent_option_id null dulu) ---
+            // Section duplikat sendiri butuh 2 sub-tahap yang sama alasannya dengan
+            // Question/parent_option_id di Tahap 3 di bawah: Sub Section bisa saja
+            // di-query SEBELUM Section induknya sempat dibuat (urutan dari DB tidak
+            // dijamin), jadi id induk yang baru belum tentu ada waktu Sub Section-nya
+            // sendiri dibuat.
             $sectionIdMap = [];
+            // [newSectionId => oldParentSectionId] — cuma diisi untuk Sub Section
+            // (section yang aslinya benar-benar punya parent_section_id).
+            $sectionOldParentId = [];
             $sections = FormSection::where('form_id', $original->id)->get();
             foreach ($sections as $section) {
                 $newSection = FormSection::create([
                     'user_id' => (string) $userId,
                     'form_id' => $newForm->id,
+                    'parent_section_id' => null,
                     'name' => $section->name,
                     'description' => $section->description,
                     'order' => $section->order,
@@ -933,6 +989,24 @@ class FormController extends Controller
                 ]);
 
                 $sectionIdMap[$section->id] = $newSection->id;
+
+                if (!empty($section->parent_section_id)) {
+                    $sectionOldParentId[$newSection->id] = $section->parent_section_id;
+                }
+            }
+
+            foreach ($sectionOldParentId as $newSectionId => $oldParentSectionId) {
+                $newParentSectionId = $sectionIdMap[$oldParentSectionId] ?? null;
+
+                if ($newParentSectionId) {
+                    FormSection::where('id', $newSectionId)->update(['parent_section_id' => $newParentSectionId]);
+                }
+                // Kalau Section induk aslinya somehow tidak ikut ter-duplikat
+                // (idealnya tidak pernah terjadi, karena semua Section form ini
+                // diproses di loop atas), Sub Section ini dibiarkan jadi
+                // top-level (parent_section_id tetap null) daripada exception
+                // di tengah transaction — sama pola dengan fallback
+                // parent_option_id di Tahap 3.
             }
 
             $questionIdMap = [];

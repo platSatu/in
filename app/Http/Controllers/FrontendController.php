@@ -744,6 +744,14 @@ class FrontendController extends Controller
         // cuma sebelumnya tidak pernah dipakai/dijumlahkan di mana pun.
         $isAutoResultForm = $form->result_mode === 'auto';
 
+        // === RESULT (section_threshold / gaya HSK) ===
+        // Sama pola dengan $isAutoResultForm di atas: penanda ini murni dipakai
+        // finalizeCompletedSubmission() untuk memutuskan apakah perlu menjalankan
+        // computeSectionThresholdResult() — TIDAK mengubah apa pun di alur
+        // penyimpanan jawaban (saveQuestionAnswers/processQuestionBranch/
+        // saveSingleQuestionAnswer tetap identik untuk semua result_mode).
+        $isSectionThresholdForm = $form->result_mode === 'section_threshold';
+
         $answers = $this->saveQuestionAnswers($request, $submission, $student, $questions, $isAutoResultForm);
         $ringkasanJawaban = $answers['ringkasan'];
         $autoScore = $answers['autoScore'];
@@ -762,6 +770,7 @@ class FrontendController extends Controller
             $autoScore,
             $universitasMajorMessage,
             $isAutoResultForm,
+            $isSectionThresholdForm,
             $payment
         );
 
@@ -806,6 +815,7 @@ class FrontendController extends Controller
         float $autoScore,
         string $universitasMajorMessage,
         bool $isAutoResultForm,
+        bool $isSectionThresholdForm,
         ?FormPayment $payment
     ): ?string {
         // === RESULT (auto mode) ===
@@ -831,6 +841,40 @@ class FrontendController extends Controller
 
             $hasilMessage = "Skor Anda: {$autoScore}";
         }
+
+        // === RESULT (section_threshold / gaya HSK) ===
+        // Dijalankan PARALEL dengan blok auto di atas (mutually exclusive lewat
+        // result_mode, lihat FormController::store()/update()) — sepenuhnya
+        // TERPISAH & read-only terhadap FormAnswer (tidak menyentuh
+        // saveQuestionAnswers()/processQuestionBranch()/saveSingleQuestionAnswer()
+        // sama sekali). Lihat computeSectionThresholdResult() untuk algoritmanya.
+        // Kalau form ini belum punya Section top-level sama sekali (admin belum
+        // sempat setup section-nya), hasilnya null — TIDAK ada FormResult yang
+        // dibuat, sama seperti result_mode='none'.
+        $sectionThresholdResult = null;
+
+        if ($isSectionThresholdForm) {
+            $sectionThresholdResult = $this->computeSectionThresholdResult($form, $submission);
+
+            if ($sectionThresholdResult) {
+                $formResult = FormResult::updateOrCreate(
+                    ['form_submission_id' => $submission->id],
+                    [
+                        'form_id' => $form->id,
+                        'mode' => 'section_threshold',
+                        'summary_text' => $sectionThresholdResult->name,
+                    ]
+                );
+
+                $hasilMessage = "Hasil Anda: {$sectionThresholdResult->name}";
+            }
+        }
+
+        // Dipakai di beberapa titik di bawah (pilih_kelas_link, tanda waktu kirim
+        // WA) untuk menyatakan "hasil sudah pasti diketahui saat ini juga" —
+        // true untuk auto (skor barusan dihitung) maupun section_threshold yang
+        // berhasil menghasilkan sebuah Section (bukan null).
+        $hasImmediateResult = $isAutoResultForm || ($isSectionThresholdForm && $sectionThresholdResult !== null);
 
         // === CALLBACK LINK ===
         // Kalau form ini diaktifkan sebagai "callback" (is_callback_enabled) dan admin
@@ -864,7 +908,7 @@ class FrontendController extends Controller
         // waktu admin isi lewat FormController::saveResult(), yang punya logic
         // pilih_kelas_link sendiri) — sesuai keputusan awal fitur ini: link
         // "Pilih Kelas" baru muncul "setelah hasil placement test keluar".
-        $pilihKelasLink = ($isAutoResultForm && ClassSchedule::existsActiveForBranch($form->branch_id))
+        $pilihKelasLink = ($hasImmediateResult && ClassSchedule::existsActiveForBranch($form->branch_id))
             ? route('frontend.class-selection.show', ['submissionId' => $submission->id])
             : '';
 
@@ -889,10 +933,10 @@ class FrontendController extends Controller
                 $this->sendWhatsapp($student->handphone, $message, $form->user_id);
                 Log::info('[FORM-WIZARD] sendWhatsapp selesai tanpa exception');
 
-                // Tandai kapan hasil auto ini terkirim via WA (dipakai konsisten dengan
-                // FormController::saveResult() untuk mode manual, supaya kedua mode
-                // sama-sama punya jejak waktu pengiriman).
-                if ($isAutoResultForm && $formResult) {
+                // Tandai kapan hasil (auto ATAU section_threshold) ini terkirim via WA
+                // (dipakai konsisten dengan FormController::saveResult() untuk mode
+                // manual, supaya semua mode sama-sama punya jejak waktu pengiriman).
+                if ($hasImmediateResult && $formResult) {
                     $formResult->update(['whatsapp_sent_at' => now()]);
                 }
             } catch (\Throwable $e) {
@@ -909,6 +953,207 @@ class FrontendController extends Controller
         }
 
         return $callbackLink;
+    }
+
+    /**
+     * === RESULT (section_threshold / gaya HSK) — MESIN PENILAIAN ===
+     *
+     * Dipanggil HANYA dari finalizeCompletedSubmission() ketika
+     * result_mode='section_threshold'. Method ini READ-ONLY terhadap
+     * FormAnswer (cuma query, tidak pernah menulis) — sama sekali tidak
+     * menyentuh saveQuestionAnswers()/processQuestionBranch()/
+     * saveSingleQuestionAnswer(), karena baris FormAnswer sudah selalu
+     * tersimpan lengkap untuk SEMUA result_mode (lihat method-method itu).
+     *
+     * Algoritma (per Section top-level, berurutan sesuai `order`):
+     * 1. Jumlahkan jawaban SALAH di semua Sub Section milik Section ini
+     *    ($totalWrong), dan catat Sub Section dengan jawaban salah
+     *    TERBANYAK ($maxWrongInOneSubSection).
+     * 2. $totalWrong >= section_fail_threshold -> peserta BERHENTI di
+     *    Section ini, jadi hasil akhir.
+     * 3. $totalWrong <= section_pass_threshold -> peserta LOLOS, lanjut ke
+     *    Section berikutnya.
+     * 4. Selain dua kondisi di atas (zona di antara pass & fail threshold)
+     *    -> lihat sebarannya: kalau salahnya menumpuk di SATU Sub Section
+     *    (>= fail_threshold - 1), dianggap BERHENTI (fail) di Section ini;
+     *    kalau tersebar di Sub Section berbeda-beda, dianggap LOLOS.
+     * 5. Kalau peserta lolos sampai Section TERAKHIR, hasil akhirnya ya
+     *    Section terakhir itu (tidak ada "promosi" melebihi Section
+     *    terakhir yang tersedia).
+     *
+     * Section top-level yang tidak punya Sub Section aktif sama sekali
+     * dianggap $totalWrong=0 (otomatis lolos) — tidak menyebabkan error,
+     * cuma tidak berkontribusi apa-apa ke penilaian.
+     *
+     * @return FormSection|null  null kalau form ini belum punya Section
+     *                           top-level aktif sama sekali (admin belum
+     *                           setup section-nya).
+     */
+    private function computeSectionThresholdResult(Form $form, FormSubmission $submission): ?FormSection
+    {
+        $topSections = FormSection::where('form_id', $form->id)
+            ->whereNull('parent_section_id')
+            ->where('status', 'active')
+            ->orderBy('order')
+            ->orderBy('created_at')
+            ->get();
+
+        if ($topSections->isEmpty()) {
+            return null;
+        }
+
+        $subSections = FormSection::where('form_id', $form->id)
+            ->whereNotNull('parent_section_id')
+            ->whereIn('parent_section_id', $topSections->pluck('id'))
+            ->where('status', 'active')
+            ->orderBy('order')
+            ->orderBy('created_at')
+            ->get()
+            ->groupBy('parent_section_id');
+
+        // Cuma 3 tipe pertanyaan ini yang punya konsep "benar/salah" yang jelas
+        // (lihat isQuestionAnsweredCorrectly()) — tipe lain (text/number/major/
+        // file) TIDAK ikut dihitung sama sekali ke total salah.
+        $countableTypes = ['single_choice', 'multiple_choice', 'exact_match'];
+
+        $allSubSectionIds = $subSections->flatten(1)->pluck('id');
+
+        $questionsBySubSection = $allSubSectionIds->isEmpty()
+            ? collect()
+            : FormQuestion::whereIn('section_id', $allSubSectionIds)
+                ->where('status', 'active')
+                ->whereIn('type', $countableTypes)
+                ->with('options')
+                ->orderBy('order')
+                ->get()
+                ->groupBy('section_id');
+
+        $allQuestionIds = $questionsBySubSection->flatten(1)->pluck('id');
+
+        $answersByQuestion = $allQuestionIds->isEmpty()
+            ? collect()
+            : FormAnswer::where('submission_id', $submission->id)
+                ->whereIn('question_id', $allQuestionIds)
+                ->with('option')
+                ->get()
+                ->groupBy('question_id');
+
+        $failThreshold = $form->section_fail_threshold ?? 3;
+        $passThreshold = $form->section_pass_threshold ?? 1;
+
+        $lastSection = null;
+
+        foreach ($topSections as $topSection) {
+            $lastSection = $topSection;
+
+            $totalWrong = 0;
+            $maxWrongInOneSubSection = 0;
+
+            foreach ($subSections->get($topSection->id, collect()) as $subSection) {
+                $wrongCount = 0;
+
+                foreach ($questionsBySubSection->get($subSection->id, collect()) as $question) {
+                    $rows = $answersByQuestion->get($question->id, collect());
+
+                    // Pertanyaan yang tidak terjawab sama sekali (tidak ada baris
+                    // FormAnswer) dianggap SALAH by design — konsisten dengan
+                    // isQuestionAnsweredCorrectly() yang mengembalikan false
+                    // kalau $rows kosong.
+                    if (!$this->isQuestionAnsweredCorrectly($question, $rows)) {
+                        $wrongCount++;
+                    }
+                }
+
+                $totalWrong += $wrongCount;
+                $maxWrongInOneSubSection = max($maxWrongInOneSubSection, $wrongCount);
+            }
+
+            if ($totalWrong >= $failThreshold) {
+                return $topSection;
+            }
+
+            if ($totalWrong <= $passThreshold) {
+                continue;
+            }
+
+            // Zona di antara pass & fail threshold: lihat sebarannya.
+            if ($maxWrongInOneSubSection >= $failThreshold - 1) {
+                return $topSection;
+            }
+        }
+
+        // Lolos sampai Section terakhir -> hasil akhirnya Section terakhir itu.
+        return $lastSection;
+    }
+
+    /**
+     * Benar/salah SATU pertanyaan untuk SATU submission, dipakai
+     * computeSectionThresholdResult() di atas. Cuma dipanggil untuk tipe
+     * single_choice/multiple_choice/exact_match (lihat $countableTypes di
+     * pemanggilnya).
+     *
+     * - single_choice: benar kalau satu-satunya opsi yang dipilih peserta
+     *   ($rows) ditandai is_correct=true oleh admin.
+     * - multiple_choice: benar kalau himpunan opsi yang dipilih peserta
+     *   SAMA PERSIS dengan himpunan opsi yang ditandai is_correct=true oleh
+     *   admin (bukan sekadar "salah satu benar dipilih") — kalau admin
+     *   belum menandai satu pun opsi is_correct=true untuk pertanyaan ini,
+     *   sengaja SELALU dianggap salah (bukan diam-diam "selalu benar"
+     *   karena dua himpunan kosong dianggap sama), supaya konfigurasi yang
+     *   belum lengkap kelihatan lewat hasil, bukan lolos diam-diam.
+     * - exact_match: benar kalau jawaban peserta (trim) sama persis dengan
+     *   correct_answer (trim) — logika sama dengan yang sudah dipakai untuk
+     *   mode hasil 'auto' di saveSingleQuestionAnswer().
+     *
+     * @param  \Illuminate\Support\Collection<int, FormAnswer>  $answerRows
+     */
+    private function isQuestionAnsweredCorrectly(FormQuestion $question, $answerRows): bool
+    {
+        if ($question->type === 'single_choice') {
+            $row = $answerRows->first();
+
+            return $row !== null && $row->option !== null && (bool) $row->option->is_correct;
+        }
+
+        if ($question->type === 'multiple_choice') {
+            $correctOptionIds = $question->options
+                ->where('is_correct', true)
+                ->pluck('id')
+                ->sort()
+                ->values()
+                ->all();
+
+            if (empty($correctOptionIds)) {
+                return false;
+            }
+
+            $selectedOptionIds = $answerRows
+                ->pluck('option_id')
+                ->filter()
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+
+            return $selectedOptionIds === $correctOptionIds;
+        }
+
+        if ($question->type === 'exact_match') {
+            $row = $answerRows->first();
+
+            if ($row === null || $row->answer_text === null || $question->correct_answer === null) {
+                return false;
+            }
+
+            return trim($row->answer_text) === trim($question->correct_answer);
+        }
+
+        // Tipe lain (text/number/major/file) seharusnya tidak pernah sampai ke
+        // sini — sudah difilter lewat $countableTypes di
+        // computeSectionThresholdResult(). Dianggap "tidak salah" (netral)
+        // sebagai pengaman murni supaya tidak pernah mengurangi skor secara
+        // keliru kalau suatu saat dipanggil untuk tipe lain.
+        return true;
     }
 
     /**
@@ -1020,6 +1265,10 @@ class FrontendController extends Controller
         // result_mode='auto' — skor auto cuma dihitung sekali, saat penyelesaian resmi.
         $isAutoResultForm = $isFinal && $form->result_mode === 'auto';
 
+        // Sama pola dengan $isAutoResultForm — hasil section_threshold juga cuma
+        // dihitung sekali, saat ini benar-benar jadi percobaan TERAKHIR.
+        $isSectionThresholdForm = $isFinal && $form->result_mode === 'section_threshold';
+
         $answers = $this->saveQuestionAnswers($request, $submission, $student, $questions, $isAutoResultForm);
 
         Log::info('[FORM-WIZARD] Timeout auto-save tersimpan', [
@@ -1053,6 +1302,7 @@ class FrontendController extends Controller
             $answers['autoScore'],
             $universitasMajorMessage,
             $isAutoResultForm,
+            $isSectionThresholdForm,
             $payment
         );
 
