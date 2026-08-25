@@ -154,7 +154,7 @@
                                             data-bs-toggle="modal" data-bs-target="#submissionAnswersModal"
                                             data-url="{{ route('quiz.form.submissions.answers', $submission->id) }}"
                                             data-student-name="{{ $submission->student ? trim($submission->student->first_name . ' ' . $submission->student->last_name) : '-' }}">
-                                            Lihat Jawaban
+                                            Lihat Hasil
                                         </button>
                                     </td>
                                 </tr>
@@ -289,7 +289,7 @@
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="submissionAnswersModalLabel">Jawaban</h5>
+                <h5 class="modal-title" id="submissionAnswersModalLabel">Hasil</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="submissionAnswersModalBody">
@@ -314,7 +314,7 @@
             var url = button.getAttribute('data-url');
             var studentName = button.getAttribute('data-student-name') || '';
 
-            modalLabel.textContent = studentName ? ('Jawaban: ' + studentName) : 'Jawaban';
+            modalLabel.textContent = studentName ? ('Hasil: ' + studentName) : 'Hasil';
             modalBody.innerHTML = '<div class="text-center text-muted py-4">Memuat...</div>';
 
             fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })

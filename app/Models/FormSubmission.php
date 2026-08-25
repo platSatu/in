@@ -24,10 +24,12 @@ class FormSubmission extends Model
         'form_id',
         'status',
         'is_timeout_partial',
+        'start_at',
     ];
 
     protected $casts = [
         'is_timeout_partial' => 'boolean',
+        'start_at' => 'datetime',
     ];
 
     /**
@@ -77,5 +79,20 @@ class FormSubmission extends Model
     public function result(): HasOne
     {
         return $this->hasOne(FormResult::class, 'form_submission_id');
+    }
+
+    /**
+     * Durasi pengerjaan dalam detik (start_at sampai created_at/waktu submit
+     * selesai) -- null kalau start_at tidak tercatat (mis. submission lama
+     * sebelum kolom ini ada, atau JS gagal mengirim nilainya). Murni informasi
+     * tambahan buat laporan admin, tidak dipakai di logic penilaian mana pun.
+     */
+    public function workDurationSeconds(): ?int
+    {
+        if (!$this->start_at || !$this->created_at) {
+            return null;
+        }
+
+        return abs($this->created_at->getTimestamp() - $this->start_at->getTimestamp());
     }
 }

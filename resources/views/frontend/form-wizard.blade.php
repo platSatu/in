@@ -631,6 +631,11 @@
 
                 <input type="hidden" name="form_id" value="{{ $selectedForm->id ?? '' }}">
                 <input type="hidden" name="payment_order_id" id="paymentOrderIdInput" value="{{ request('order_id') }}">
+                {{-- Dicatat sekali (client-side, JS) begitu peserta pertama kali sampai
+                     di step Pertanyaan -- murni buat "Durasi Pengerjaan" di laporan
+                     admin (FrontendController::parseQuizStartedAt()), BUKAN bagian
+                     dari penilaian lolos/gagal apa pun. --}}
+                <input type="hidden" name="quiz_started_at" id="quizStartedAtInput" value="">
 
                 {{-- STEP: Select Form or User Info --}}
                 <div class="step active" id="step-info">
@@ -1081,6 +1086,16 @@
 
         if (stepId === 'step-questions') {
             startQuizTimer();
+
+            // Catat waktu peserta PERTAMA KALI sampai di step ini -- guard supaya
+            // tidak ke-reset tiap kali showStep() dipanggil ulang (mis. balik ke
+            // step sebelumnya lalu maju lagi), dan supaya restore progress lama
+            // (maybeRestoreQuizProgress(), yang mengisi field ini duluan) tidak
+            // tertimpa.
+            const quizStartedAtInput = document.getElementById('quizStartedAtInput');
+            if (quizStartedAtInput && !quizStartedAtInput.value) {
+                quizStartedAtInput.value = Date.now();
+            }
         }
     }
 
@@ -1606,6 +1621,7 @@
                 formUpdatedAt: QUIZ_FORM_UPDATED_AT,
                 timerDeadline: quizTimerDeadline,
                 paymentOrderId: currentOrderId,
+                quizStartedAt: document.getElementById('quizStartedAtInput').value || null,
                 answers: collectQuizAnswers(),
                 savedAt: Date.now(),
             };
@@ -1745,6 +1761,13 @@
             document.getElementById('paymentOrderIdInput').value = saved.paymentOrderId;
         }
 
+        // Dipulihkan SEBELUM showStep('step-questions') di bawah supaya guard di
+        // showStep() (yang hanya mengisi field ini kalau masih kosong) tidak
+        // menimpanya dengan waktu restore, melainkan tetap waktu mulai yang asli.
+        if (saved.quizStartedAt) {
+            document.getElementById('quizStartedAtInput').value = saved.quizStartedAt;
+        }
+
         restoreQuizAnswers(saved.answers || {});
 
         // Kalau form ini butuh pembayaran DAN order id-nya berhasil dipulihkan,
@@ -1826,6 +1849,14 @@
         // bukan cuma input-nya saja yang dikosongkan.
         if (sectionGroups.length > 1) {
             showSectionGroup(0);
+        }
+
+        // timer_auto_restart = mulai dari nol -- termasuk catatan waktu mulai,
+        // supaya "Durasi Pengerjaan" di laporan admin dihitung dari percobaan
+        // yang baru ini, bukan percobaan sebelumnya yang sudah keburu timeout.
+        const quizStartedAtInput = document.getElementById('quizStartedAtInput');
+        if (quizStartedAtInput) {
+            quizStartedAtInput.value = Date.now();
         }
     }
 

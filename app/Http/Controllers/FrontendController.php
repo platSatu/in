@@ -733,6 +733,7 @@ class FrontendController extends Controller
                 'user_id' => $student->id,
                 'form_id' => $validated['form_id'],
                 'status' => 'active',
+                'start_at' => $this->parseQuizStartedAt($request->input('quiz_started_at')),
             ]);
 
             Log::info('[FORM-WIZARD] FormSubmission dibuat', ['submission_id' => $submission->id]);
@@ -886,7 +887,8 @@ class FrontendController extends Controller
         $sectionThresholdResult = null;
 
         if ($isSectionThresholdForm) {
-            $sectionThresholdResult = $this->computeSectionThresholdResult($form, $submission);
+            $sectionThresholdComputed = $this->computeSectionThresholdResult($form, $submission);
+            $sectionThresholdResult = $sectionThresholdComputed['result'];
 
             if ($sectionThresholdResult) {
                 $formResult = FormResult::updateOrCreate(
@@ -895,6 +897,11 @@ class FrontendController extends Controller
                         'form_id' => $form->id,
                         'mode' => 'section_threshold',
                         'summary_text' => $sectionThresholdResult->name,
+                        // Snapshot rincian per Section/Sub Section -- lihat catatan
+                        // di migration add_section_breakdown_to_form_results_table
+                        // kenapa ini dibekukan di sini, bukan dihitung ulang tiap
+                        // laporan dibuka.
+                        'section_breakdown' => $sectionThresholdComputed['breakdown'],
                     ]
                 );
 
@@ -1021,7 +1028,7 @@ class FrontendController extends Controller
      *                           top-level aktif sama sekali (admin belum
      *                           setup section-nya).
      */
-    private function computeSectionThresholdResult(Form $form, FormSubmission $submission): ?FormSection
+    private function computeSectionThresholdResult(Form $form, FormSubmission $submission): array
     {
         $topSections = FormSection::where('form_id', $form->id)
             ->whereNull('parent_section_id')
@@ -1031,7 +1038,7 @@ class FrontendController extends Controller
             ->get();
 
         if ($topSections->isEmpty()) {
-            return null;
+            return ['result' => null, 'breakdown' => []];
         }
 
         $subSections = FormSection::where('form_id', $form->id)
@@ -1074,17 +1081,26 @@ class FrontendController extends Controller
         $passThreshold = $form->section_pass_threshold ?? 1;
 
         $lastSection = null;
+        // Rincian per Section (lolos/berhenti + rincian tiap Sub Section-nya),
+        // dibangun BARENG dengan perhitungan lolos/gagal di bawah (bukan
+        // dihitung ulang terpisah) -- dipakai buat rapor admin, lihat
+        // finalizeCompletedSubmission(). $isStop di setiap iterasi adalah
+        // rangkuman PERSIS dari 3 kondisi return/continue yang sudah ada
+        // sebelumnya (lihat catatan di masing-masing baris di bawah).
+        $breakdown = [];
 
         foreach ($topSections as $topSection) {
             $lastSection = $topSection;
 
             $totalWrong = 0;
             $maxWrongInOneSubSection = 0;
+            $subSectionBreakdown = [];
 
             foreach ($subSections->get($topSection->id, collect()) as $subSection) {
                 $wrongCount = 0;
+                $subSectionQuestions = $questionsBySubSection->get($subSection->id, collect());
 
-                foreach ($questionsBySubSection->get($subSection->id, collect()) as $question) {
+                foreach ($subSectionQuestions as $question) {
                     $rows = $answersByQuestion->get($question->id, collect());
 
                     // Pertanyaan yang tidak terjawab sama sekali (tidak ada baris
@@ -1096,26 +1112,68 @@ class FrontendController extends Controller
                     }
                 }
 
+                $subSectionBreakdown[] = [
+                    'id' => $subSection->id,
+                    'name' => $subSection->name,
+                    'wrong' => $wrongCount,
+                    'total' => $subSectionQuestions->count(),
+                ];
+
                 $totalWrong += $wrongCount;
                 $maxWrongInOneSubSection = max($maxWrongInOneSubSection, $wrongCount);
             }
 
-            if ($totalWrong >= $failThreshold) {
-                return $topSection;
-            }
+            // $isStop === true kalau salah satu dari 2 kondisi "berhenti di sini"
+            // yang sudah ada sebelumnya terpenuhi: (a) total salah >= Fail
+            // Threshold, ATAU (b) total salah ada di zona abu-abu (di atas Pass
+            // Threshold, di bawah Fail Threshold) DAN ada Sub Section yang
+            // salahnya sendirian sudah menumpuk >= Fail Threshold - 1. Kalau
+            // tidak, peserta lolos (baik karena total <= Pass Threshold, maupun
+            // zona abu-abu yang salahnya menyebar, bukan menumpuk).
+            $isStop = $totalWrong >= $failThreshold
+                || ($totalWrong > $passThreshold && $maxWrongInOneSubSection >= $failThreshold - 1);
 
-            if ($totalWrong <= $passThreshold) {
-                continue;
-            }
+            $breakdown[] = [
+                'section_id' => $topSection->id,
+                'section_name' => $topSection->name,
+                'total_wrong' => $totalWrong,
+                'verdict' => $isStop ? 'stop' : 'pass',
+                'sub_sections' => $subSectionBreakdown,
+            ];
 
-            // Zona di antara pass & fail threshold: lihat sebarannya.
-            if ($maxWrongInOneSubSection >= $failThreshold - 1) {
-                return $topSection;
+            if ($isStop) {
+                return ['result' => $topSection, 'breakdown' => $breakdown];
             }
         }
 
         // Lolos sampai Section terakhir -> hasil akhirnya Section terakhir itu.
-        return $lastSection;
+        return ['result' => $lastSection, 'breakdown' => $breakdown];
+    }
+
+    /**
+     * Parse timestamp epoch-milidetik (dikirim dari JS Date.now() lewat hidden
+     * input quiz_started_at, lihat form-wizard.blade.php) yang menandai kapan
+     * peserta pertama kali sampai di step Pertanyaan -- dipakai HANYA untuk
+     * "Durasi Pengerjaan" di laporan admin (murni informasi tambahan, BUKAN
+     * bagian dari penilaian lolos/gagal apa pun). Karena nilainya berasal dari
+     * browser, divalidasi longgar di sini: kosong/bukan angka/di masa depan/
+     * lebih dari 24 jam yang lalu dianggap tidak masuk akal untuk placement
+     * test (yang durasinya wajar dalam hitungan menit) dan diabaikan (null)
+     * daripada menyimpan angka yang jelas keliru.
+     */
+    private function parseQuizStartedAt(?string $raw): ?\Carbon\Carbon
+    {
+        if (!$raw || !ctype_digit($raw)) {
+            return null;
+        }
+
+        $startedAt = \Carbon\Carbon::createFromTimestampMs((int) $raw);
+
+        if ($startedAt->isFuture() || $startedAt->lt(now()->subDay())) {
+            return null;
+        }
+
+        return $startedAt;
     }
 
     /**
@@ -1279,6 +1337,7 @@ class FrontendController extends Controller
             'form_id' => $form->id,
             'status' => 'active',
             'is_timeout_partial' => true,
+            'start_at' => $this->parseQuizStartedAt($request->input('quiz_started_at')),
         ]);
 
         // Kunci FormPayment ke submission ini HANYA kalau ini percobaan terakhir — sama

@@ -184,7 +184,7 @@ class FormController extends Controller
             abort(401);
         }
 
-        $submission = FormSubmission::with(['student', 'form'])->findOrFail($submissionId);
+        $submission = FormSubmission::with(['student', 'form', 'result'])->findOrFail($submissionId);
 
         // Cakupan sama dengan resolveVisibleForm() — bukan lagi mutlak
         // "form_id.user_id === Auth::id()" (lihat App\Helpers\DataScope).

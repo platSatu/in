@@ -24,12 +24,14 @@ class FormResult extends Model
         'mode',
         'score',
         'summary_text',
+        'section_breakdown',
         'entered_by',
         'whatsapp_sent_at',
     ];
 
     protected $casts = [
         'score' => 'decimal:2',
+        'section_breakdown' => 'array',
         'whatsapp_sent_at' => 'datetime',
     ];
 
