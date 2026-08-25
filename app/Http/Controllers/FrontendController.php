@@ -1338,7 +1338,23 @@ class FrontendController extends Controller
         ]);
 
         try {
-            $existingStudent = Student::where('handphone', $validated['handphone'])->first();
+            // BUGFIX: sebelumnya cuma dicari lewat handphone -- kalau HP yang
+            // diisi peserta BEDA dari yang tersimpan (device/nomor baru) tapi
+            // emailnya kebetulan SAMA dengan Student lain yang sudah ada,
+            // sistem menyimpulkan "ini orang baru" dan mencoba INSERT baris
+            // baru -- lalu nabrak constraint unique di kolom email
+            // (SQLSTATE 23000 Duplicate entry ... for key
+            // 'students_email_unique'), dan submission peserta itu HILANG
+            // TOTAL karena crash terjadi di sini, sebelum FormSubmission/
+            // FormAnswer sempat dibuat sama sekali. Sekarang dicari lewat HP
+            // ATAU email -- keduanya dianggap sinyal identitas yang sama
+            // kuat, siapapun yang cocok salah satunya diperlakukan sebagai
+            // "sudah pernah isi" (datanya di-update ke yang terbaru di bawah,
+            // BUKAN dibikinkan baris baru) -- supaya tidak pernah lagi coba
+            // INSERT yang bisa nabrak constraint unique manapun.
+            $existingStudent = Student::where('handphone', $validated['handphone'])
+                ->orWhere('email', $validated['email'])
+                ->first();
 
             Log::info('[FORM-WIZARD] Hasil cek Student existing', [
                 'found' => $existingStudent ? true : false,
@@ -1370,9 +1386,10 @@ class FrontendController extends Controller
                     'first_name' => $payload['first_name'],
                     'last_name' => $payload['last_name'],
                     'email' => $payload['email'],
+                    'handphone' => $payload['handphone'],
                 ]);
 
-                Log::info('[FORM-WIZARD] Pakai Student yang sudah ada, update nama/email ke data terbaru', [
+                Log::info('[FORM-WIZARD] Pakai Student yang sudah ada (cocok lewat HP atau email), update data ke yang terbaru', [
                     'student_id' => $existingStudent->id,
                 ]);
 
@@ -1381,7 +1398,31 @@ class FrontendController extends Controller
 
             Log::info('[FORM-WIZARD] Akan create Student baru dengan payload', $payload);
 
-            $student = Student::create($payload);
+            try {
+                $student = Student::create($payload);
+            } catch (\Illuminate\Database\QueryException $raceException) {
+                // Jaring pengaman untuk race condition yang sangat jarang: dua
+                // submission yang BENAR-BENAR baru (HP & email dua-duanya
+                // belum pernah ada) masuk nyaris bersamaan, keduanya
+                // lolos pengecekan "belum ada" di atas SEBELUM salah satunya
+                // benar-benar tersimpan -- yang kedua nabrak constraint unique
+                // (handphone atau email). Daripada submission ini ikut hilang
+                // gara-gara race murni (bukan salah datanya), cari ulang baris
+                // yang barusan berhasil disimpan oleh request satunya, lalu
+                // pakai itu -- konsisten dengan alur "Student sudah ada" di atas.
+                if ($raceException->getCode() !== '23000') {
+                    throw $raceException;
+                }
+
+                Log::warning('[FORM-WIZARD] Race condition saat create Student baru, pakai baris yang barusan tersimpan oleh request lain', [
+                    'handphone' => $payload['handphone'],
+                    'email' => $payload['email'],
+                ]);
+
+                $student = Student::where('handphone', $payload['handphone'])
+                    ->orWhere('email', $payload['email'])
+                    ->firstOrFail();
+            }
 
             Log::info('[FORM-WIZARD] Student::create selesai dieksekusi', [
                 'student_id' => $student->id ?? null,
