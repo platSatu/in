@@ -902,6 +902,7 @@
     &copy; {{ date('Y') }} InaStudy. All rights reserved.
 </footer>
 
+<script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     // Urutan step tergantung apakah form ini butuh pembayaran atau tidak, dan kalau
     // butuh, di posisi mana (diatur admin lewat "Posisi Pembayaran" saat create/edit form)
@@ -922,6 +923,18 @@
     // sebenarnya ada di step Info (dan pesan errornya) tidak pernah kelihatan
     // oleh user -> submit kelihatan "diem aja" padahal sebenarnya ditolak server.
     const hasValidationErrors = {{ $errors->any() ? 'true' : 'false' }};
+
+    // === NOTIFIKASI SUKSES/GAGAL (SweetAlert2) =================================
+    // Flash message dari server (session('success') / $errors->first(...)) diubah
+    // jadi variabel JS di sini (pola yang sama seperti hasValidationErrors di
+    // atas), dipakai oleh showFlashNotifications() supaya submit/gagal-submit
+    // ditampilkan lewat popup SweetAlert2 yang lebih jelas -- alert Bootstrap polos
+    // di atas form TETAP dipertahankan sebagai fallback kalau SweetAlert2 gagal
+    // dimuat (mis. CDN diblokir/jaringan bermasalah pas submit gagal justru
+    // karena jaringan) supaya pesannya tetap kelihatan walau JS gagal.
+    const flashSuccessMessage = @json(session('success'));
+    const flashPaymentError = @json($errors->first('payment'));
+    const flashSubmitError = @json($errors->first('submit'));
 
     // Kalau form ini punya step "Data Pribadi", urutannya dikunci: info -> data
     // pribadi -> (pembayaran) -> placement test -> review. Setting "Posisi
@@ -1031,6 +1044,15 @@
     const timerAutoSave = {{ $selectedForm && $selectedForm->timer_auto_save ? 'true' : 'false' }};
     const timerAutoRestart = {{ $selectedForm && $selectedForm->timer_auto_restart ? 'true' : 'false' }};
     const timeoutSaveUrl = @json(route('frontend.form.wizard.timeout-save'));
+
+    // === RESILIENSI PROGRESS PLACEMENT TEST (localStorage) ======================
+    // QUIZ_FORM_UPDATED_AT dipakai buat validasi "basi": kalau admin mengedit ulang
+    // form ini (soal/section berubah) setelah progress lama disimpan, progress itu
+    // otomatis dianggap tidak berlaku lagi (lihat loadQuizProgress()) daripada
+    // memulihkan jawaban yang sudah tidak nyambung dengan soal yang sekarang.
+    const QUIZ_PROGRESS_STORAGE_KEY = 'quiz_progress_' + (document.querySelector('input[name="form_id"]').value || 'unknown');
+    const QUIZ_FORM_UPDATED_AT = @json(optional($selectedForm)->updated_at?->toIso8601String());
+    let quizProgressSaveTimer = null;
 
     function updateProgress() {
         document.getElementById('totalSteps').textContent = stepOrder.length;
@@ -1409,6 +1431,9 @@
 
         // Pertanyaan bercabang: opsi ini bisa jadi pemicu pertanyaan anak.
         refreshNestedQuestionVisibility();
+
+        // Cadangan ringan: simpan progress (debounced) tiap kali jawaban berubah.
+        scheduleSaveQuizProgress();
     }
 
     // Multiple choice toggle
@@ -1442,6 +1467,9 @@
 
         // Pertanyaan bercabang: opsi ini bisa jadi pemicu pertanyaan anak.
         refreshNestedQuestionVisibility();
+
+        // Cadangan ringan: simpan progress (debounced) tiap kali jawaban berubah.
+        scheduleSaveQuizProgress();
     }
 
     // Clear error state as soon as user starts answering text/number/date/select/dropdown
@@ -1454,12 +1482,14 @@
             card.classList.remove('has-error');
             const errorEl = card.querySelector(':scope > .error-message');
             if (errorEl) errorEl.classList.remove('show');
+            scheduleSaveQuizProgress();
         });
         el.addEventListener('change', function () {
             const card = el.closest('.question-card');
             card.classList.remove('has-error');
             const errorEl = card.querySelector(':scope > .error-message');
             if (errorEl) errorEl.classList.remove('show');
+            scheduleSaveQuizProgress();
         });
     });
 
@@ -1484,6 +1514,12 @@
     let quizTimerDeadline = null;
     let quizTimerStarted = false;
 
+    // Diisi oleh maybeRestoreQuizProgress() SEBELUM showStep() memanggil
+    // startQuizTimer() -- kalau ada progress yang dipulihkan, sisa waktu yang
+    // asli dipakai lagi (bukan mulai dari penuh lagi) supaya timer tidak bisa
+    // "di-reset" cuma dengan refresh/tutup-buka browser.
+    let restoredQuizTimerDeadline = null;
+
     function formatMMSS(totalSeconds) {
         const s = Math.max(0, Math.floor(totalSeconds));
         const m = Math.floor(s / 60);
@@ -1495,7 +1531,8 @@
         if (!timerEnabled || quizTimerStarted) return;
 
         quizTimerStarted = true;
-        quizTimerDeadline = Date.now() + (timerDurationSeconds * 1000);
+        quizTimerDeadline = restoredQuizTimerDeadline || (Date.now() + (timerDurationSeconds * 1000));
+        restoredQuizTimerDeadline = null;
         tickQuizTimer();
         quizTimerInterval = window.setInterval(tickQuizTimer, 1000);
     }
@@ -1517,6 +1554,240 @@
 
         display.textContent = formatMMSS(remainingSeconds);
         if (box) box.classList.toggle('quiz-timer-danger', remainingSeconds <= 60);
+    }
+
+    // === RESILIENSI PROGRESS PLACEMENT TEST (localStorage) ======================
+    // Cadangan RINGAN di browser supaya jawaban + sisa waktu tidak hilang percuma
+    // kalau koneksi putus/refresh/tab tidak sengaja tertutup saat mengerjakan
+    // soal. INI BUKAN pengganti penyimpanan di server -- localStorage cuma dipakai
+    // untuk mengisi ulang form di BROWSER YANG SAMA sebelum submit; data baru
+    // benar-benar tersimpan permanen di database saat submit berhasil (lihat
+    // FrontendController::formWizardSubmit()/timeoutSave()). Status pembayaran
+    // TETAP selalu diverifikasi ulang ke server lewat checkPaymentStatus() --
+    // paymentOrderId yang dipulihkan di sini cuma dipakai supaya submit akhir
+    // tetap merujuk ke transaksi yang sudah lunas, PERSIS seperti kalau user
+    // kembali lewat link ?order_id=... dari gateway pembayaran (bukan sumber
+    // kebenaran baru, keamanannya tidak berubah sama sekali).
+
+    function collectQuizAnswers() {
+        const container = document.getElementById('step-questions');
+        if (!container) return {};
+
+        const answers = {};
+
+        container.querySelectorAll('input[type="radio"]:checked').forEach(function (el) {
+            answers[el.name] = el.value;
+        });
+
+        container.querySelectorAll('input[type="checkbox"]:checked').forEach(function (el) {
+            if (!answers[el.name]) answers[el.name] = [];
+            answers[el.name].push(el.value);
+        });
+
+        // input[type=file] SENGAJA tidak diikutkan -- browser tidak mengizinkan
+        // File object dipulihkan lewat JS lagi (batasan keamanan browser), jadi
+        // pertanyaan bertipe upload file tidak ikut dicadangkan (keterbatasan yang
+        // sudah didiskusikan & disepakati).
+        container.querySelectorAll('input[type="text"], input[type="number"], input[type="date"], textarea, select').forEach(function (el) {
+            if (el.name && el.value !== '') {
+                answers[el.name] = el.value;
+            }
+        });
+
+        return answers;
+    }
+
+    function saveQuizProgressNow() {
+        if (!timerEnabled) return;
+
+        try {
+            const payload = {
+                formId: document.querySelector('input[name="form_id"]').value,
+                formUpdatedAt: QUIZ_FORM_UPDATED_AT,
+                timerDeadline: quizTimerDeadline,
+                paymentOrderId: currentOrderId,
+                answers: collectQuizAnswers(),
+                savedAt: Date.now(),
+            };
+            window.localStorage.setItem(QUIZ_PROGRESS_STORAGE_KEY, JSON.stringify(payload));
+        } catch (e) {
+            // Diamkan -- localStorage penuh/diblokir browser bukan alasan untuk
+            // mengganggu jalannya quiz, cadangan ini murni best-effort saja.
+        }
+    }
+
+    function scheduleSaveQuizProgress() {
+        window.clearTimeout(quizProgressSaveTimer);
+        quizProgressSaveTimer = window.setTimeout(saveQuizProgressNow, 400);
+    }
+
+    function clearQuizProgress() {
+        try {
+            window.localStorage.removeItem(QUIZ_PROGRESS_STORAGE_KEY);
+        } catch (e) {
+            // Diamkan, lihat catatan di saveQuizProgressNow().
+        }
+    }
+
+    function loadQuizProgress() {
+        try {
+            const raw = window.localStorage.getItem(QUIZ_PROGRESS_STORAGE_KEY);
+            if (!raw) return null;
+
+            const data = JSON.parse(raw);
+            if (!data || data.formId !== document.querySelector('input[name="form_id"]').value) {
+                return null;
+            }
+
+            // Basi kalau form ini sudah diedit ulang (soal/section bisa saja sudah
+            // berubah total) sejak progress ini disimpan -- daripada memulihkan
+            // jawaban yang sudah tidak nyambung, lebih aman mulai baru.
+            if (QUIZ_FORM_UPDATED_AT && data.formUpdatedAt !== QUIZ_FORM_UPDATED_AT) {
+                return null;
+            }
+
+            return data;
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // Memulihkan jawaban lewat toggleSingleOption()/toggleMultipleOption() yang
+    // SUDAH ADA (bukan menulis ulang logicnya) supaya state visual (.selected)
+    // dan visibilitas pertanyaan bercabang ikut konsisten dengan kalau user
+    // benar-benar klik opsinya sendiri.
+    function restoreQuizAnswers(answers) {
+        const container = document.getElementById('step-questions');
+        if (!container || !answers) return;
+
+        Object.keys(answers).forEach(function (name) {
+            const value = answers[name];
+
+            if (Array.isArray(value)) {
+                value.forEach(function (v) {
+                    const checkbox = container.querySelector(
+                        'input[type="checkbox"][name="' + name + '"][value="' + CSS.escape(v) + '"]'
+                    );
+                    if (!checkbox || checkbox.checked) return;
+                    const optionEl = checkbox.closest('.option-item, .form-option-checkbox');
+                    if (optionEl) {
+                        toggleMultipleOption(optionEl);
+                    } else {
+                        checkbox.checked = true;
+                    }
+                });
+                return;
+            }
+
+            const radio = container.querySelector(
+                'input[type="radio"][name="' + name + '"][value="' + CSS.escape(value) + '"]'
+            );
+            if (radio) {
+                const optionEl = radio.closest('.option-item');
+                const card = radio.closest('.question-card');
+                if (optionEl && card) {
+                    toggleSingleOption(optionEl, card.getAttribute('data-question-id'));
+                } else {
+                    radio.checked = true;
+                }
+                return;
+            }
+
+            const field = container.querySelector('[name="' + name + '"]');
+            if (field && field.type !== 'file') {
+                field.value = value;
+            }
+        });
+
+        refreshNestedQuestionVisibility();
+    }
+
+    // Dipanggil sekali di DOMContentLoaded, SEBELUM blok requiresPayment &&
+    // currentOrderId di bawah -- kalau ada progress valid & user setuju
+    // dipulihkan, currentOrderId & restoredQuizTimerDeadline sudah terisi
+    // duluan di sini, jadi blok requiresPayment yang sudah ada TIDAK perlu
+    // diubah sama sekali (tetap dia yang menentukan langkah berikutnya lewat
+    // verifikasi status pembayaran ke server, apa adanya).
+    async function maybeRestoreQuizProgress() {
+        if (!timerEnabled || stepOrder.indexOf('step-questions') === -1) {
+            return;
+        }
+
+        const saved = loadQuizProgress();
+        if (!saved) {
+            return;
+        }
+
+        let shouldRestore = true;
+        if (window.Swal) {
+            const confirmResult = await Swal.fire({
+                icon: 'question',
+                title: 'Lanjutkan Placement Test?',
+                text: 'Kami menemukan progress pengerjaan yang belum selesai di browser ini. Lanjutkan dari jawaban terakhir Anda?',
+                showCancelButton: true,
+                confirmButtonText: 'Lanjutkan',
+                cancelButtonText: 'Mulai Baru',
+                allowOutsideClick: false,
+                allowEscapeKey: false,
+            });
+            shouldRestore = !!confirmResult.isConfirmed;
+        }
+
+        if (!shouldRestore) {
+            clearQuizProgress();
+            return;
+        }
+
+        restoredQuizTimerDeadline = saved.timerDeadline || null;
+
+        if (saved.paymentOrderId) {
+            currentOrderId = saved.paymentOrderId;
+            document.getElementById('paymentOrderIdInput').value = saved.paymentOrderId;
+        }
+
+        restoreQuizAnswers(saved.answers || {});
+
+        // Kalau form ini butuh pembayaran DAN order id-nya berhasil dipulihkan,
+        // biarkan blok requiresPayment && currentOrderId (di bawah, tidak
+        // diubah) yang menangani verifikasi ulang ke server & lanjut ke step
+        // Pertanyaan. Selain itu (tidak butuh pembayaran, atau pembayaran belum
+        // pernah dimulai saat progress ini disimpan), langsung ke step
+        // Pertanyaan seperti biasa.
+        if (!(requiresPayment && currentOrderId)) {
+            showStep(stepOrder.indexOf('step-questions'));
+        }
+    }
+
+    // === NOTIFIKASI SUKSES/GAGAL (SweetAlert2) ===================================
+    function showFlashNotifications() {
+        if (flashSuccessMessage) {
+            clearQuizProgress();
+        }
+
+        if (!window.Swal) return;
+
+        if (flashSuccessMessage) {
+            Swal.fire({
+                icon: 'success',
+                title: 'Berhasil Terkirim!',
+                text: flashSuccessMessage,
+                confirmButtonText: 'Terima kasih',
+            });
+        } else if (flashSubmitError) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Gagal Mengirim Jawaban',
+                text: flashSubmitError,
+                confirmButtonText: 'Mengerti',
+            });
+        } else if (flashPaymentError) {
+            Swal.fire({
+                icon: 'error',
+                title: 'Kendala Pembayaran',
+                text: flashPaymentError,
+                confirmButtonText: 'Mengerti',
+            });
+        }
     }
 
     // Kosongkan semua input di dalam step-questions (radio/checkbox/text/select),
@@ -1870,10 +2141,26 @@
             });
     }
 
+    // Jaring pengaman terakhir: begitu tab disembunyikan/browser ditutup, paksa
+    // simpan progress sekali lagi (localStorage.setItem bersifat sinkron, jadi
+    // aman dipanggil di titik-titik ini) -- supaya perubahan jawaban dalam
+    // beberapa ratus ms terakhir (yang masih menunggu jeda debounce
+    // scheduleSaveQuizProgress()) tidak ikut hilang kalau user langsung
+    // menutup tab/browser tepat setelah menjawab.
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'hidden') {
+            saveQuizProgressNow();
+        }
+    });
+    window.addEventListener('pagehide', saveQuizProgressNow);
+    window.addEventListener('beforeunload', saveQuizProgressNow);
+
     // Kalau halaman ini dibuka lagi dengan ?order_id=... (user baru kembali dari
     // gateway pembayaran), langsung lompat ke step Payment dan lanjutkan polling
     // tanpa membuat transaksi baru.
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', async function () {
+        showFlashNotifications();
+
         updateProgress();
 
         // Pertanyaan bercabang: hitung status tampil/sembunyi awal begitu halaman
@@ -1896,6 +2183,12 @@
         if (hasValidationErrors) {
             return;
         }
+
+        // Progress placement test yang tersimpan di browser ini (kalau ada &
+        // user setuju) dipulihkan di sini -- SEBELUM blok requiresPayment di
+        // bawah, supaya currentOrderId & restoredQuizTimerDeadline sempat
+        // terisi lebih dulu kalau memang perlu.
+        await maybeRestoreQuizProgress();
 
         if (requiresPayment && currentOrderId) {
             paymentInitiated = true;
