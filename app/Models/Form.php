@@ -127,12 +127,17 @@ class Form extends Model
     {
         $now = now();
 
+        // CATATAN (disepakati dengan admin): end_date SENGAJA TIDAK LAGI membatasi
+        // akses publik di sini. Kalau admin mengisi Tanggal Selesai tapi form masih
+        // ingin tetap tampil setelah tanggal itu lewat, cukup pastikan status tetap
+        // 'active' -- status jadi "saklar utama" (master switch), Tanggal
+        // Selesai murni catatan rencana admin, bukan auto-expire yang mengunci.
+        // start_date TETAP membatasi (form yang belum waktunya tayang tetap
+        // disembunyikan sampai tanggalnya tiba, walau status sudah active) --
+        // beda semantiknya dengan end_date: "belum waktunya" vs "sudah lewat".
         return $query->where('status', 'active')
             ->where(function ($q) use ($now) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', $now);
-            })
-            ->where(function ($q) use ($now) {
-                $q->whereNull('end_date')->orWhere('end_date', '>=', $now);
             });
     }
 }

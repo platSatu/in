@@ -44,6 +44,7 @@
                                      terlalu lebar) -- tetap ada di data & form create/edit, cuma tidak
                                      ditampilkan di sini. --}}
                                 {{-- <th>Description</th> --}}
+                                <th class="text-center text-nowrap">Status</th>
                                 <th class="text-center text-nowrap">Submission</th>
                                 <th class="text-center text-nowrap">Payment</th>
                                 <th class="text-center text-nowrap">Viewer</th>
@@ -120,6 +121,20 @@
                                     </td>
                                     {{-- Description: lihat catatan di <thead> -- dimatikan dari tampilan. --}}
                                     {{-- <td>{{ $form->description ?? '-' }}</td> --}}
+                                    <td class="text-center">
+                                        @if ($form->status === 'active')
+                                            <span class="badge badge-success">Active</span>
+                                        @else
+                                            <span class="badge badge-danger">Inactive</span>
+                                        @endif
+                                        @if ($form->end_date)
+                                            <br>
+                                            <small class="text-muted" data-bs-toggle="tooltip" data-bs-placement="top"
+                                                title="Tanggal Selesai murni catatan rencana -- tidak lagi otomatis menyembunyikan form. Ubah Status ke Inactive kalau ingin benar-benar menghentikan akses publik.">
+                                                s/d {{ $form->end_date->format('Y/m/d H:i') }}
+                                            </small>
+                                        @endif
+                                    </td>
                                     <td class="text-center">
                                         @if ($form->formSubmissions->count() > 0)
                                             <a href="{{ route('quiz.form.submissions', $form->id) }}"

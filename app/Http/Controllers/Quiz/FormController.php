@@ -478,6 +478,7 @@ class FormController extends Controller
             'payment_position' => 'nullable|in:before_questions,after_questions',
             'is_callback_enabled' => 'nullable|boolean',
             'callback_link' => 'nullable|required_if:is_callback_enabled,1|url|max:500',
+            'status' => 'nullable|in:active,inactive',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'has_personal_data_stage' => 'nullable|boolean',
@@ -521,6 +522,7 @@ class FormController extends Controller
         }
 
         $validated['user_id'] = (string) $userId;
+        $validated['status'] = $validated['status'] ?? 'active';
 
         $branch = CompanyBranch::find($validated['branch_id']);
         $branchSlug = Str::slug($branch?->name ?? 'branch') ?: 'branch';
@@ -644,6 +646,7 @@ class FormController extends Controller
             'payment_position' => 'nullable|in:before_questions,after_questions',
             'is_callback_enabled' => 'nullable|boolean',
             'callback_link' => 'nullable|required_if:is_callback_enabled,1|url|max:500',
+            'status' => 'nullable|in:active,inactive',
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'has_personal_data_stage' => 'nullable|boolean',
@@ -680,6 +683,8 @@ class FormController extends Controller
         $validated = $this->applySectionThresholdFields($validated);
 
         $validated = $this->applyTimerFields($request, $validated);
+
+        $validated['status'] = $validated['status'] ?? $existing->status;
 
         // Slug (branch + booth) dibuat ulang kalau branch/no_booth berubah, atau form lama belum punya slug.
         $branch = CompanyBranch::find($validated['branch_id']);

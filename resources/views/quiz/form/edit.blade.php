@@ -300,6 +300,22 @@
 
                     <div class="row mb-4">
                         <div class="col-sm-6">
+                            <label for="status" class="mb-2">Status Form</label>
+                            <select class="form-select @error('status') is-invalid @enderror" id="status" name="status">
+                                <option value="active" {{ old('status', $data->status) === 'active' ? 'selected' : '' }}>Active</option>
+                                <option value="inactive" {{ old('status', $data->status) === 'inactive' ? 'selected' : '' }}>Inactive</option>
+                            </select>
+                            <div class="form-text">
+                                Form hanya bisa diakses publik (di /quiz maupun link slug-nya) kalau Active. Kalau Inactive, form otomatis disembunyikan dari publik walau tanggalnya masih berlaku.
+                            </div>
+                            @error('status')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
                             <label for="start_date" class="mb-2">Tanggal Mulai (Optional)</label>
                             <input type="datetime-local" class="form-control @error('start_date') is-invalid @enderror"
                                 id="start_date" name="start_date"
