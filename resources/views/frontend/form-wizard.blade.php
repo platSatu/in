@@ -610,6 +610,14 @@
                 <div class="alert alert-danger">{{ $message }}</div>
             @enderror
 
+            {{-- Pesan gagal generik kalau ada kendala tak terduga waktu submit
+                 (lihat catch (\Throwable $e) di FrontendController::formWizardSubmit())
+                 -- ditaruh terpisah dari 'payment' di atas supaya pesannya tetap
+                 jelas menunjuk ke masalah yang sebenarnya. --}}
+            @error('submit')
+                <div class="alert alert-danger">{{ $message }}</div>
+            @enderror
+
             <div class="progress mb-3">
                 <div class="progress-bar" id="progressBar" style="width: 25%"></div>
             </div>

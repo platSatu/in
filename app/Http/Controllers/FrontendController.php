@@ -666,123 +666,153 @@ class FrontendController extends Controller
             abort(404);
         }
 
-        // === PAYMENT GATE ===
-        // Kalau form ini butuh pembayaran, placement test/pertanyaan HANYA boleh
-        // disimpan kalau ada FormPayment berstatus "paid" untuk form + order ini.
-        // Status "paid" itu sendiri HANYA pernah diset oleh webhook resmi gateway
-        // (lihat FormPaymentController::handleWebhook), tidak pernah oleh request
-        // browser biasa — jadi ini bukan sekadar validasi UI, tapi gerbang di server.
-        $payment = null;
+        // === PESAN ERROR YANG RAPI KALAU ADA KEGAGALAN TAK TERDUGA ===
+        // Seluruh proses penyimpanan (payment gate, Student, FormSubmission,
+        // FormAnswer, hasil, WhatsApp) dibungkus try-catch di sini. Sebelumnya
+        // kalau ada error tak terduga di tengah jalan (mis. race condition DB,
+        // koneksi database sempat putus, dsb), request ini akan lolos begitu
+        // saja ke error handler default Laravel -- peserta yang sudah capek
+        // isi puluhan pertanyaan cuma lihat halaman error putih polos tanpa
+        // penjelasan apa pun. Sekarang peserta selalu diarahkan balik ke
+        // wizard yang sama dengan pesan yang jelas (lihat @error('submit') di
+        // frontend/form-wizard.blade.php), dan errornya TETAP dicatat lengkap
+        // ke log (bukan didiamkan) supaya tetap bisa ditelusuri.
+        try {
+            // === PAYMENT GATE ===
+            // Kalau form ini butuh pembayaran, placement test/pertanyaan HANYA boleh
+            // disimpan kalau ada FormPayment berstatus "paid" untuk form + order ini.
+            // Status "paid" itu sendiri HANYA pernah diset oleh webhook resmi gateway
+            // (lihat FormPaymentController::handleWebhook), tidak pernah oleh request
+            // browser biasa — jadi ini bukan sekadar validasi UI, tapi gerbang di server.
+            $payment = null;
 
-        if ($form->requires_payment) {
-            $payment = FormPayment::where('order_id', $validated['payment_order_id'] ?? null)
-                ->where('form_id', $form->id)
-                ->where('status', 'paid')
-                ->whereNull('form_submission_id')
-                ->first();
+            if ($form->requires_payment) {
+                $payment = FormPayment::where('order_id', $validated['payment_order_id'] ?? null)
+                    ->where('form_id', $form->id)
+                    ->where('status', 'paid')
+                    ->whereNull('form_submission_id')
+                    ->first();
 
-            if (!$payment) {
-                Log::warning('[FORM-WIZARD] Submit ditolak, pembayaran belum terkonfirmasi', [
-                    'form_id' => $form->id,
-                    'payment_order_id' => $validated['payment_order_id'] ?? null,
-                ]);
+                if (!$payment) {
+                    Log::warning('[FORM-WIZARD] Submit ditolak, pembayaran belum terkonfirmasi', [
+                        'form_id' => $form->id,
+                        'payment_order_id' => $validated['payment_order_id'] ?? null,
+                    ]);
 
-                return redirect()
-                    ->route('frontend.form.wizard', ['form_id' => $form->id])
-                    ->withErrors(['payment' => 'Pembayaran belum terkonfirmasi. Silakan selesaikan pembayaran terlebih dahulu.'])
-                    ->withInput();
+                    return redirect()
+                        ->route('frontend.form.wizard', ['form_id' => $form->id])
+                        ->withErrors(['payment' => 'Pembayaran belum terkonfirmasi. Silakan selesaikan pembayaran terlebih dahulu.'])
+                        ->withInput();
+                }
             }
+
+            $student = $this->findOrCreateStudent($validated);
+
+            // === STUDENT BRANCH/FORM TRACKING ===
+            // Simpan branch & form yang baru diisi student ini di tabel students, dipakai
+            // untuk filter di halaman admin Student (index). Ini "singgahan terakhir" saja
+            // (row students dipakai bareng lintas form via handphone) — history LENGKAP
+            // tiap submission (termasuk yang sebelum-sebelumnya) tetap utuh lewat relasi
+            // Student::formSubmissions(), lihat StudentController::show().
+            $student->update([
+                'branch_id' => $form->branch_id,
+                'form_id' => $form->id,
+                // Dicatat bareng branch_id di atas (lihat App\Helpers\DataScope) —
+                // supaya staff dengan role scope 'division' bisa ikut melihat
+                // student ini di menu admin, konsisten dengan cakupan form yang
+                // baru saja diisi student ini.
+                'company_division_id' => $form->company_division_id,
+            ]);
+
+            Log::info('[FORM-WIZARD] Lanjut ke proses FormSubmission & FormAnswer', [
+                'student_id' => $student->id,
+            ]);
+
+            // Create submission record
+            $submission = FormSubmission::create([
+                'user_id' => $student->id,
+                'form_id' => $validated['form_id'],
+                'status' => 'active',
+            ]);
+
+            Log::info('[FORM-WIZARD] FormSubmission dibuat', ['submission_id' => $submission->id]);
+
+            // Kunci FormPayment ini ke submission yang baru dibuat, supaya order_id yang
+            // sama tidak bisa dipakai lagi untuk submit form kedua kalinya.
+            if ($payment) {
+                $payment->update(['form_submission_id' => $submission->id]);
+            }
+
+            // Get form questions
+            $questions = FormQuestion::where('form_id', $validated['form_id'])
+                ->where('status', 'active')
+                ->with('options')
+                ->orderBy('order')
+                ->get();
+
+            // === RESULT (auto mode) ===
+            // Kalau form ini result_mode='auto', skor dihitung dari kolom
+            // form_question_options.score milik opsi yang dipilih peserta — TAPI hanya
+            // untuk pertanyaan stage_group='placement_test' (bukan pertanyaan data
+            // pribadi). Kolom score sendiri sudah ada & bisa diisi admin sejak awal,
+            // cuma sebelumnya tidak pernah dipakai/dijumlahkan di mana pun.
+            $isAutoResultForm = $form->result_mode === 'auto';
+
+            // === RESULT (section_threshold / gaya HSK) ===
+            // Sama pola dengan $isAutoResultForm di atas: penanda ini murni dipakai
+            // finalizeCompletedSubmission() untuk memutuskan apakah perlu menjalankan
+            // computeSectionThresholdResult() — TIDAK mengubah apa pun di alur
+            // penyimpanan jawaban (saveQuestionAnswers/processQuestionBranch/
+            // saveSingleQuestionAnswer tetap identik untuk semua result_mode).
+            $isSectionThresholdForm = $form->result_mode === 'section_threshold';
+
+            $answers = $this->saveQuestionAnswers($request, $submission, $student, $questions, $isAutoResultForm);
+            $ringkasanJawaban = $answers['ringkasan'];
+            $autoScore = $answers['autoScore'];
+            $selectedMajorIds = $answers['selectedMajorIds'];
+
+            $universitasMajorMessage = '';
+            if (!empty($selectedMajorIds)) {
+                $universitasMajorMessage = $this->buildMajorUniversitiesMessage(array_unique($selectedMajorIds));
+            }
+
+            $callbackLink = $this->finalizeCompletedSubmission(
+                $form,
+                $student,
+                $submission,
+                $ringkasanJawaban,
+                $autoScore,
+                $universitasMajorMessage,
+                $isAutoResultForm,
+                $isSectionThresholdForm,
+                $payment
+            );
+
+            Log::info('[FORM-WIZARD] === END formWizardSubmit, redirect sukses ===', [
+                'student_id' => $student->id,
+            ]);
+
+            return redirect($this->buildWizardRedirectRoute($form))
+                ->with('success', 'Thank you! Your form has been submitted successfully.')
+                ->with('callback_link', $callbackLink);
+        } catch (\Symfony\Component\HttpKernel\Exception\HttpExceptionInterface $e) {
+            // 404/403/dst yang sengaja dilempar (mis. abort() di tempat lain) --
+            // biarkan tetap jadi halaman error HTTP biasa, bukan dibungkus jadi
+            // pesan "submit gagal" yang membingungkan.
+            throw $e;
+        } catch (\Throwable $e) {
+            Log::error('[FORM-WIZARD] Gagal menyimpan submission, peserta diarahkan balik dengan pesan error', [
+                'form_id' => $form->id,
+                'class' => get_class($e),
+                'message' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+
+            return redirect($this->buildWizardRedirectRoute($form))
+                ->withErrors(['submit' => 'Maaf, terjadi kendala saat menyimpan jawaban Anda. Jawaban belum tersimpan -- silakan coba submit ulang. Kalau masih gagal, hubungi penyelenggara.'])
+                ->withInput();
         }
-
-        $student = $this->findOrCreateStudent($validated);
-
-        // === STUDENT BRANCH/FORM TRACKING ===
-        // Simpan branch & form yang baru diisi student ini di tabel students, dipakai
-        // untuk filter di halaman admin Student (index). Ini "singgahan terakhir" saja
-        // (row students dipakai bareng lintas form via handphone) — history LENGKAP
-        // tiap submission (termasuk yang sebelum-sebelumnya) tetap utuh lewat relasi
-        // Student::formSubmissions(), lihat StudentController::show().
-        $student->update([
-            'branch_id' => $form->branch_id,
-            'form_id' => $form->id,
-            // Dicatat bareng branch_id di atas (lihat App\Helpers\DataScope) —
-            // supaya staff dengan role scope 'division' bisa ikut melihat
-            // student ini di menu admin, konsisten dengan cakupan form yang
-            // baru saja diisi student ini.
-            'company_division_id' => $form->company_division_id,
-        ]);
-
-        Log::info('[FORM-WIZARD] Lanjut ke proses FormSubmission & FormAnswer', [
-            'student_id' => $student->id,
-        ]);
-
-        // Create submission record
-        $submission = FormSubmission::create([
-            'user_id' => $student->id,
-            'form_id' => $validated['form_id'],
-            'status' => 'active',
-        ]);
-
-        Log::info('[FORM-WIZARD] FormSubmission dibuat', ['submission_id' => $submission->id]);
-
-        // Kunci FormPayment ini ke submission yang baru dibuat, supaya order_id yang
-        // sama tidak bisa dipakai lagi untuk submit form kedua kalinya.
-        if ($payment) {
-            $payment->update(['form_submission_id' => $submission->id]);
-        }
-
-        // Get form questions
-        $questions = FormQuestion::where('form_id', $validated['form_id'])
-            ->where('status', 'active')
-            ->with('options')
-            ->orderBy('order')
-            ->get();
-
-        // === RESULT (auto mode) ===
-        // Kalau form ini result_mode='auto', skor dihitung dari kolom
-        // form_question_options.score milik opsi yang dipilih peserta — TAPI hanya
-        // untuk pertanyaan stage_group='placement_test' (bukan pertanyaan data
-        // pribadi). Kolom score sendiri sudah ada & bisa diisi admin sejak awal,
-        // cuma sebelumnya tidak pernah dipakai/dijumlahkan di mana pun.
-        $isAutoResultForm = $form->result_mode === 'auto';
-
-        // === RESULT (section_threshold / gaya HSK) ===
-        // Sama pola dengan $isAutoResultForm di atas: penanda ini murni dipakai
-        // finalizeCompletedSubmission() untuk memutuskan apakah perlu menjalankan
-        // computeSectionThresholdResult() — TIDAK mengubah apa pun di alur
-        // penyimpanan jawaban (saveQuestionAnswers/processQuestionBranch/
-        // saveSingleQuestionAnswer tetap identik untuk semua result_mode).
-        $isSectionThresholdForm = $form->result_mode === 'section_threshold';
-
-        $answers = $this->saveQuestionAnswers($request, $submission, $student, $questions, $isAutoResultForm);
-        $ringkasanJawaban = $answers['ringkasan'];
-        $autoScore = $answers['autoScore'];
-        $selectedMajorIds = $answers['selectedMajorIds'];
-
-        $universitasMajorMessage = '';
-        if (!empty($selectedMajorIds)) {
-            $universitasMajorMessage = $this->buildMajorUniversitiesMessage(array_unique($selectedMajorIds));
-        }
-
-        $callbackLink = $this->finalizeCompletedSubmission(
-            $form,
-            $student,
-            $submission,
-            $ringkasanJawaban,
-            $autoScore,
-            $universitasMajorMessage,
-            $isAutoResultForm,
-            $isSectionThresholdForm,
-            $payment
-        );
-
-        Log::info('[FORM-WIZARD] === END formWizardSubmit, redirect sukses ===', [
-            'student_id' => $student->id,
-        ]);
-
-        return redirect($this->buildWizardRedirectRoute($form))
-            ->with('success', 'Thank you! Your form has been submitted successfully.')
-            ->with('callback_link', $callbackLink);
     }
 
     /**
