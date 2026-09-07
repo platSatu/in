@@ -41,4 +41,16 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    // Dipakai App\Services\Zoom\ZoomClient buat panggil Zoom API (Server-to-
+    // Server OAuth). Nilai ASLI cuma sekali ditaruh di .env (lihat perintah
+    // `php artisan zoom:bootstrap-credentials`) lalu dipindah ke tabel
+    // zoom_settings (ter-enkripsi) -- setelah itu, pengelolaan kredensial
+    // sehari-hari lewat menu Settings > Setting Zoom, bukan lewat .env lagi.
+    'zoom' => [
+        'account_id' => env('ZOOM_ACCOUNT_ID'),
+        'client_id' => env('ZOOM_CLIENT_ID'),
+        'client_secret' => env('ZOOM_CLIENT_SECRET'),
+        'secret_token' => env('ZOOM_SECRET_TOKEN'),
+    ],
+
 ];

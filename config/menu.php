@@ -76,7 +76,11 @@ return [
     ['key' => 'historyuserlogin', 'label' => 'User Login', 'route' => 'historyuserlogin.index', 'group' => 'Company', 'icon' => 'list'],
     ['key' => 'activity-log', 'label' => 'Activity Log', 'route' => 'activity-log.index', 'group' => 'Company', 'icon' => 'list'],
 
+    // ================= Zoom =================
+    ['key' => 'zoom.meeting', 'label' => 'Kelola Meeting', 'route' => 'zoom.meeting.index', 'group' => 'Zoom', 'icon' => 'list'],
+
     // ================= Settings =================
+    ['key' => 'settings.zoom', 'label' => 'Setting Zoom', 'route' => 'settings.zoom.index', 'group' => 'Settings', 'icon' => 'list'],
     ['key' => 'settings.payment-gateway', 'label' => 'Payment Gateway', 'route' => 'settings.payment-gateway.index', 'group' => 'Settings', 'icon' => 'list'],
     ['key' => 'settings.whatsapp-gateway', 'label' => 'WhatsApp Gateway', 'route' => 'settings.whatsapp-gateway.index', 'group' => 'Settings', 'icon' => 'list'],
     ['key' => 'qrcodes', 'label' => 'Generate Link to Qrcode', 'route' => 'qrcodes.index', 'group' => 'Settings', 'icon' => 'list'],

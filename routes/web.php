@@ -52,6 +52,8 @@ use App\Http\Controllers\Company\CompanyBranchController;
 use App\Http\Controllers\Company\CompanyDivisionController;
 use App\Http\Controllers\Settings\PaymentGatewayController;
 use App\Http\Controllers\Settings\WhatsappGatewayController;
+use App\Http\Controllers\Settings\ZoomSettingController;
+use App\Http\Controllers\Zoom\MeetingController as ZoomMeetingController;
 use App\Http\Controllers\Payment\FormPaymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -760,6 +762,38 @@ Route::middleware(['auth', 'permission:invitation,edit'])->prefix('dashboard')->
 Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
+});
+
+
+Route::middleware(['auth', 'permission:settings.zoom'])->prefix('dashboard/superadmin/settings/zoom')->group(function () {
+    Route::get('/', [ZoomSettingController::class, 'index'])->name('settings.zoom.index');
+});
+Route::middleware(['auth', 'permission:settings.zoom,edit'])->prefix('dashboard/superadmin/settings/zoom')->group(function () {
+    Route::get('/create', [ZoomSettingController::class, 'create'])->name('settings.zoom.create');
+    Route::post('/', [ZoomSettingController::class, 'store'])->name('settings.zoom.store');
+    Route::get('/{id}/edit', [ZoomSettingController::class, 'edit'])->name('settings.zoom.edit');
+    Route::put('/{id}', [ZoomSettingController::class, 'update'])->name('settings.zoom.update');
+    Route::put('/{id}/activate', [ZoomSettingController::class, 'activate'])->name('settings.zoom.activate');
+    Route::delete('/{id}', [ZoomSettingController::class, 'destroy'])->name('settings.zoom.destroy');
+});
+
+// zoom.meeting: 'recordings' (GET /{id}/recordings) tergolong 'view' (cuma
+// menampilkan & mensinkronkan data, tidak mengubah data meeting itu
+// sendiri), sedangkan 'end' (PUT, memaksa mengakhiri meeting yang sedang
+// berlangsung) tergolong 'edit' -- create/store didaftarkan di grup 'edit'
+// SEBELUM /{id}/edit (sama-sama wildcard {id} tapi beda segmen kedua),
+// mengikuti pola grup 'roles'/'city' dkk di atas.
+Route::middleware(['auth', 'permission:zoom.meeting'])->prefix('dashboard/superadmin/zoom/meeting')->group(function () {
+    Route::get('/', [ZoomMeetingController::class, 'index'])->name('zoom.meeting.index');
+    Route::get('/{id}/recordings', [ZoomMeetingController::class, 'recordings'])->name('zoom.meeting.recordings');
+});
+Route::middleware(['auth', 'permission:zoom.meeting,edit'])->prefix('dashboard/superadmin/zoom/meeting')->group(function () {
+    Route::get('/create', [ZoomMeetingController::class, 'create'])->name('zoom.meeting.create');
+    Route::post('/', [ZoomMeetingController::class, 'store'])->name('zoom.meeting.store');
+    Route::get('/{id}/edit', [ZoomMeetingController::class, 'edit'])->name('zoom.meeting.edit');
+    Route::put('/{id}', [ZoomMeetingController::class, 'update'])->name('zoom.meeting.update');
+    Route::put('/{id}/end', [ZoomMeetingController::class, 'end'])->name('zoom.meeting.end');
+    Route::delete('/{id}', [ZoomMeetingController::class, 'destroy'])->name('zoom.meeting.destroy');
 });
 
 require __DIR__ . '/auth.php';
