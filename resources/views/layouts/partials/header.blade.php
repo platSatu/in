@@ -273,20 +273,23 @@
                     </div>
 
                     @auth
-                        <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top">
-                            <div>
-                                <small class="text-muted d-block">Saldo</small>
-                                <span class="fw-bold">Rp {{ number_format((float) $headerCurrentBalance, 0, ',', '.') }}</span>
+                        <div class="d-flex justify-content-between align-items-center gap-2 mt-2 pt-2 border-top">
+                            <div class="text-truncate">
+                                <small class="text-muted d-block lh-1" style="font-size: .68rem;">Saldo</small>
+                                <span class="fw-semibold text-nowrap" style="font-size: .8rem;">Rp {{ number_format((float) $headerCurrentBalance, 0, ',', '.') }}</span>
                             </div>
 
-                            <a href="{{ route('dashboard.deposit.create') }}" class="btn btn-sm btn-primary" title="Tambah Saldo">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-                                    fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
-                                    stroke-linejoin="round" class="feather feather-plus me-1">
+                            <a href="{{ route('dashboard.deposit.create') }}"
+                                class="btn btn-primary d-flex align-items-center gap-1 text-nowrap flex-shrink-0"
+                                style="font-size: .68rem; padding: .25rem .5rem; line-height: 1;"
+                                title="Tambah Saldo">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24"
+                                    fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"
+                                    stroke-linejoin="round" class="feather feather-plus flex-shrink-0">
                                     <line x1="12" y1="5" x2="12" y2="19"></line>
                                     <line x1="5" y1="12" x2="19" y2="12"></line>
                                 </svg>
-                                Tambah Saldo
+                                Tambah
                             </a>
                         </div>
                     @endauth
