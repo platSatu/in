@@ -79,6 +79,14 @@ return [
     // ================= Zoom =================
     ['key' => 'zoom.meeting', 'label' => 'Kelola Meeting', 'route' => 'zoom.meeting.index', 'group' => 'Zoom', 'icon' => 'list'],
 
+    // ================= Course =================
+    // Urutan sesuai dependency: Type -> Class -> Level -> Package (lihat
+    // routes/web.php grup 'course.*' & migration 2026_09_07_100000 dst).
+    ['key' => 'course.type', 'label' => 'Course Type', 'route' => 'course.type.index', 'group' => 'Course', 'icon' => 'list'],
+    ['key' => 'course.class', 'label' => 'Course Class', 'route' => 'course.class.index', 'group' => 'Course', 'icon' => 'list'],
+    ['key' => 'course.level', 'label' => 'Course Level', 'route' => 'course.level.index', 'group' => 'Course', 'icon' => 'list'],
+    ['key' => 'course.package', 'label' => 'Course Package', 'route' => 'course.package.index', 'group' => 'Course', 'icon' => 'list'],
+
     // ================= Settings =================
     ['key' => 'settings.zoom', 'label' => 'Setting Zoom', 'route' => 'settings.zoom.index', 'group' => 'Settings', 'icon' => 'list'],
     ['key' => 'settings.payment-gateway', 'label' => 'Payment Gateway', 'route' => 'settings.payment-gateway.index', 'group' => 'Settings', 'icon' => 'list'],

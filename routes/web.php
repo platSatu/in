@@ -54,6 +54,10 @@ use App\Http\Controllers\Settings\PaymentGatewayController;
 use App\Http\Controllers\Settings\WhatsappGatewayController;
 use App\Http\Controllers\Settings\ZoomSettingController;
 use App\Http\Controllers\Zoom\MeetingController as ZoomMeetingController;
+use App\Http\Controllers\Course\CourseClassController;
+use App\Http\Controllers\Course\CourseLevelController;
+use App\Http\Controllers\Course\CoursePackageController;
+use App\Http\Controllers\Course\CourseTypeController;
 use App\Http\Controllers\Payment\FormPaymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -794,6 +798,57 @@ Route::middleware(['auth', 'permission:zoom.meeting,edit'])->prefix('dashboard/s
     Route::put('/{id}', [ZoomMeetingController::class, 'update'])->name('zoom.meeting.update');
     Route::put('/{id}/end', [ZoomMeetingController::class, 'end'])->name('zoom.meeting.end');
     Route::delete('/{id}', [ZoomMeetingController::class, 'destroy'])->name('zoom.meeting.destroy');
+});
+
+
+// ================= Course =================
+// Urutan dependency: course_type -> course_class -> course_level ->
+// course_packages (package baru FK ke ketiga master di atas, lihat
+// migration 2026_09_07_100000/100100/100200/100300). Pola route sama
+// persis dengan grup 'country'/'zoom.meeting' di atas: grup 'view' cuma
+// index, grup 'edit' menaungi create/store/edit/update/destroy.
+Route::middleware(['auth', 'permission:course.type'])->prefix('dashboard/superadmin/course/type')->group(function () {
+    Route::get('/', [CourseTypeController::class, 'index'])->name('course.type.index');
+});
+Route::middleware(['auth', 'permission:course.type,edit'])->prefix('dashboard/superadmin/course/type')->group(function () {
+    Route::get('/create', [CourseTypeController::class, 'create'])->name('course.type.create');
+    Route::post('/', [CourseTypeController::class, 'store'])->name('course.type.store');
+    Route::get('/{id}/edit', [CourseTypeController::class, 'edit'])->name('course.type.edit');
+    Route::put('/{id}', [CourseTypeController::class, 'update'])->name('course.type.update');
+    Route::delete('/{id}', [CourseTypeController::class, 'destroy'])->name('course.type.destroy');
+});
+
+Route::middleware(['auth', 'permission:course.class'])->prefix('dashboard/superadmin/course/class')->group(function () {
+    Route::get('/', [CourseClassController::class, 'index'])->name('course.class.index');
+});
+Route::middleware(['auth', 'permission:course.class,edit'])->prefix('dashboard/superadmin/course/class')->group(function () {
+    Route::get('/create', [CourseClassController::class, 'create'])->name('course.class.create');
+    Route::post('/', [CourseClassController::class, 'store'])->name('course.class.store');
+    Route::get('/{id}/edit', [CourseClassController::class, 'edit'])->name('course.class.edit');
+    Route::put('/{id}', [CourseClassController::class, 'update'])->name('course.class.update');
+    Route::delete('/{id}', [CourseClassController::class, 'destroy'])->name('course.class.destroy');
+});
+
+Route::middleware(['auth', 'permission:course.level'])->prefix('dashboard/superadmin/course/level')->group(function () {
+    Route::get('/', [CourseLevelController::class, 'index'])->name('course.level.index');
+});
+Route::middleware(['auth', 'permission:course.level,edit'])->prefix('dashboard/superadmin/course/level')->group(function () {
+    Route::get('/create', [CourseLevelController::class, 'create'])->name('course.level.create');
+    Route::post('/', [CourseLevelController::class, 'store'])->name('course.level.store');
+    Route::get('/{id}/edit', [CourseLevelController::class, 'edit'])->name('course.level.edit');
+    Route::put('/{id}', [CourseLevelController::class, 'update'])->name('course.level.update');
+    Route::delete('/{id}', [CourseLevelController::class, 'destroy'])->name('course.level.destroy');
+});
+
+Route::middleware(['auth', 'permission:course.package'])->prefix('dashboard/superadmin/course/package')->group(function () {
+    Route::get('/', [CoursePackageController::class, 'index'])->name('course.package.index');
+});
+Route::middleware(['auth', 'permission:course.package,edit'])->prefix('dashboard/superadmin/course/package')->group(function () {
+    Route::get('/create', [CoursePackageController::class, 'create'])->name('course.package.create');
+    Route::post('/', [CoursePackageController::class, 'store'])->name('course.package.store');
+    Route::get('/{id}/edit', [CoursePackageController::class, 'edit'])->name('course.package.edit');
+    Route::put('/{id}', [CoursePackageController::class, 'update'])->name('course.package.update');
+    Route::delete('/{id}', [CoursePackageController::class, 'destroy'])->name('course.package.destroy');
 });
 
 require __DIR__ . '/auth.php';
