@@ -69,6 +69,14 @@
                                                     class="btn btn-sm btn-outline-success text-nowrap">Start</a>
                                             @endif
 
+                                            @if ($item->join_url)
+                                                <button type="button" class="btn btn-sm btn-outline-secondary"
+                                                    title="Copy link meeting"
+                                                    onclick="copyMeetingLink('{{ $item->join_url }}')">
+                                                    <i class="bi bi-link-45deg"></i>
+                                                </button>
+                                            @endif
+
                                             <a href="{{ route('zoom.meeting.edit', $item->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
 
@@ -113,5 +121,30 @@
     </div>
 
 </div>
+
+<div class="toast align-items-center text-bg-success border-0 position-fixed bottom-0 end-0 m-3" id="copyLinkToast"
+    role="alert" aria-live="assertive" aria-atomic="true" style="z-index: 1080;">
+    <div class="d-flex">
+        <div class="toast-body">Link meeting berhasil disalin.</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+    </div>
+</div>
+
+<script>
+    function copyMeetingLink(url) {
+        function showCopiedToast() {
+            var toastEl = document.getElementById('copyLinkToast');
+            new bootstrap.Toast(toastEl, {delay: 2000}).show();
+        }
+
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(url).then(showCopiedToast).catch(function () {
+                window.prompt('Salin link berikut secara manual:', url);
+            });
+        } else {
+            window.prompt('Salin link berikut secara manual:', url);
+        }
+    }
+</script>
 
 @endsection
