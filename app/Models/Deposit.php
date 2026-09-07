@@ -42,4 +42,31 @@ class Deposit extends Model
     {
         return $this->belongsTo(User::class, 'user_id', 'id');
     }
+
+    /**
+     * Saldo TERKINI 1 user, diambil dari kolom `balance` baris deposit
+     * terakhirnya (setiap baris deposit sudah menyimpan running balance
+     * setelah baris itu, bukan cuma debit/kredit-nya sendiri).
+     *
+     * Query & urutan sort (payment_date lalu created_at) SENGAJA disamakan
+     * persis dengan yang dipakai di
+     * App\Http\Controllers\Dashboard\DepositController &
+     * App\Http\Controllers\Dashboard\DepositWebhookController supaya
+     * "saldo yang ditampilkan" dan "saldo dasar buat topup berikutnya" tidak
+     * pernah berbeda sumber.
+     */
+    public static function currentBalanceFor(?string $userId): float
+    {
+        if ($userId === null || trim($userId) === '') {
+            return 0.0;
+        }
+
+        $last = static::query()
+            ->where('user_id', $userId)
+            ->orderByDesc('payment_date')
+            ->orderByDesc('created_at')
+            ->first();
+
+        return (float) ($last?->balance ?? 0);
+    }
 }

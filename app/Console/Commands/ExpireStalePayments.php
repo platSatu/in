@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\DepositPayment;
 use App\Models\FormPayment;
 use Illuminate\Console\Command;
 
@@ -38,7 +39,21 @@ class ExpireStalePayments extends Command
             ->update(['status' => 'expired']);
 
         if ($affected > 0) {
-            $this->info("{$affected} transaksi pembayaran ditandai expired.");
+            $this->info("{$affected} transaksi pembayaran (form) ditandai expired.");
+        }
+
+        // Sapuan yang sama untuk topup saldo (deposit_payments) -- jalur
+        // TERPISAH dari form_payments (lihat App\Services\DepositPayment\*),
+        // tapi butuh jaring pengaman self-heal yang sama persis alasannya:
+        // menangkap transaksi yang browsernya ditutup sebelum sempat
+        // di-poll lagi oleh DepositController::status().
+        $affectedDeposits = DepositPayment::where('status', 'pending')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now())
+            ->update(['status' => 'expired']);
+
+        if ($affectedDeposits > 0) {
+            $this->info("{$affectedDeposits} transaksi topup saldo ditandai expired.");
         }
 
         return self::SUCCESS;

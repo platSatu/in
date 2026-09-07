@@ -3,8 +3,11 @@
 namespace App\Providers;
 
 use App\Helpers\ActivityLogger;
+use App\Models\Deposit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -23,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->registerActivityLogging();
+        $this->registerHeaderBalanceComposer();
     }
 
     /**
@@ -59,6 +63,23 @@ class AppServiceProvider extends ServiceProvider
             if ($data[0] instanceof Model) {
                 ActivityLogger::recordDeleted($data[0]);
             }
+        });
+    }
+
+    /**
+     * Bagikan saldo terkini user yang sedang login ke partial header (lihat
+     * resources/views/layouts/partials/header.blade.php -- dropdown profile
+     * yang menampilkan "Saldo: Rp ..." + tombol "+ Tambah Saldo"). Dipasang
+     * lewat View Composer (bukan query manual di tiap controller) supaya 1
+     * sumber logika dipakai di SEMUA halaman yang me-render header ini,
+     * tidak perlu diingat ditambah satu-satu tiap controller baru.
+     */
+    private function registerHeaderBalanceComposer(): void
+    {
+        View::composer('layouts.partials.header', function ($view): void {
+            $userId = Auth::id();
+
+            $view->with('headerCurrentBalance', $userId ? Deposit::currentBalanceFor((string) $userId) : null);
         });
     }
 }

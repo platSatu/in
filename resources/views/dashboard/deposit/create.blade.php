@@ -1,13 +1,16 @@
 @extends('layouts.frontend')
 
 @section('content')
-    <div class="col-lg-12 layout-spacing">
+    <div class="col-lg-6 mx-auto layout-spacing">
         <div class="statbox widget box box-shadow">
             <div class="widget-content widget-content-area">
-                <h4 class="mb-4">Topup Deposit</h4>
+                <h4 class="mb-1">Tambah Saldo</h4>
+                <p class="text-muted">
+                    Saldo saat ini: <strong>Rp {{ number_format((float) $currentBalance, 0, ',', '.') }}</strong>
+                </p>
 
-                @if (session('success'))
-                    <div class="alert alert-success">{{ session('success') }}</div>
+                @if (session('error'))
+                    <div class="alert alert-danger">{{ session('error') }}</div>
                 @endif
 
                 @if ($errors->any())
@@ -24,40 +27,32 @@
                     @csrf
 
                     <div class="mb-3">
-                        <label for="debit" class="form-label">Nominal Deposit</label>
+                        <label for="amount" class="form-label">Nominal Topup</label>
                         <input
                             type="number"
-                            class="form-control @error('debit') is-invalid @enderror"
-                            id="debit"
-                            name="debit"
+                            class="form-control @error('amount') is-invalid @enderror"
+                            id="amount"
+                            name="amount"
                             min="10000"
                             max="10000000"
                             step="1"
-                            value="{{ old('debit') }}"
+                            value="{{ old('amount') }}"
                             required
                         >
-                        <small class="text-muted">Minimal 10.000 dan maksimal 10.000.000</small>
-                        @error('debit')
+                        <small class="text-muted">Minimal Rp 10.000 dan maksimal Rp 10.000.000 per transaksi.</small>
+                        @error('amount')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <div class="mb-3">
-                        <label for="description" class="form-label">Deskripsi (opsional)</label>
-                        <textarea
-                            class="form-control @error('description') is-invalid @enderror"
-                            id="description"
-                            name="description"
-                            rows="3"
-                        >{{ old('description') }}</textarea>
-                        @error('description')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
-                    </div>
+                    <p class="text-muted small">
+                        Kamu akan diarahkan ke halaman pembayaran gateway yang sedang aktif. Saldo
+                        otomatis bertambah setelah pembayaran dikonfirmasi.
+                    </p>
 
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-primary">Submit Deposit</button>
-                        <a href="{{ route('public.packages.index') }}" class="btn btn-outline-secondary">Kembali</a>
+                        <button type="submit" class="btn btn-primary">Lanjut ke Pembayaran</button>
+                        <a href="{{ url()->previous() }}" class="btn btn-outline-secondary">Kembali</a>
                     </div>
                 </form>
             </div>

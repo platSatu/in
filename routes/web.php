@@ -18,6 +18,7 @@ use App\Http\Controllers\TenantController;
 use App\Http\Controllers\PackageController;
 use App\Http\Controllers\Dashboard\PackageController as DashboardPackageController;
 use App\Http\Controllers\Dashboard\DepositController as DashboardDepositController;
+use App\Http\Controllers\Dashboard\DepositWebhookController;
 use App\Http\Controllers\Dashboard\HistoryUserController as DashboardHistoryUserController;
 use App\Http\Controllers\Dashboard\VoucherController as DashboardVoucherController;
 use App\Http\Controllers\CategoryApplicationController;
@@ -122,6 +123,12 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard/deposit/create', [DashboardDepositController::class, 'create'])->name('dashboard.deposit.create');
     Route::post('/dashboard/deposit', [DashboardDepositController::class, 'store'])->name('dashboard.deposit.store');
+    // select-method (Duitku) & return didaftarkan SEBELUM status/{orderId}
+    // supaya tidak ada ambiguitas wildcard, sama pola dengan grup 'zoom.meeting' dkk.
+    Route::get('/dashboard/deposit/return', [DashboardDepositController::class, 'return'])->name('dashboard.deposit.return');
+    Route::get('/dashboard/deposit/{order_id}/select-method', [DashboardDepositController::class, 'selectMethodForm'])->name('dashboard.deposit.select-method');
+    Route::post('/dashboard/deposit/{order_id}/select-method', [DashboardDepositController::class, 'selectMethod'])->name('dashboard.deposit.select-method.submit');
+    Route::get('/dashboard/deposit/{order_id}/status', [DashboardDepositController::class, 'status'])->name('dashboard.deposit.status');
 
     Route::get('/dashboard/history-user', [DashboardHistoryUserController::class, 'index'])->name('dashboard.history-user.index');
 
