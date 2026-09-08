@@ -30,7 +30,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->unique(['application_id', 'checklist_item_id']);
+            $table->unique(['application_id', 'checklist_item_id'], 'app_checklist_entries_app_item_unique');
         });
     }
 
