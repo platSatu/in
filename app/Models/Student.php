@@ -85,4 +85,26 @@ class Student extends Model
     {
         return $this->hasMany(FormSubmission::class, 'user_id');
     }
+
+    /**
+     * Seluruh riwayat pendaftaran kelas (kursus Mandarin, dst) milik student
+     * ini. Ditambahkan untuk fitur Portal Siswa -- dipakai buat cek apakah
+     * menu "Kursus Saya" (InaYule) perlu ditampilkan (relasi lama
+     * ClassEnrollment.student_id sudah ada, ini cuma tambahan inverse-nya
+     * di sisi Student, tidak mengubah apapun di ClassEnrollment).
+     */
+    public function classEnrollments(): HasMany
+    {
+        return $this->hasMany(ClassEnrollment::class, 'student_id');
+    }
+
+    /**
+     * Seluruh Aplikasi Kuliah (apply ke kampus) milik student ini.
+     * Ditambahkan untuk fitur Apply Kampus / Portal Siswa (InaStudy) --
+     * tabel university_applications baru, tidak mengubah tabel Student.
+     */
+    public function applications(): HasMany
+    {
+        return $this->hasMany(UniversityApplication::class, 'student_id');
+    }
 }
