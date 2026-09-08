@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\HistoryUserLogin;
 use App\Models\RoleUser;
 use App\Models\User;
+use App\Services\StudentIdentityResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -75,6 +76,33 @@ class GoogleAuthController extends Controller
                 'role_id' => self::STUDENT_ROLE_ID,
                 'status' => RoleUser::STATUS_ACTIVE,
             ]);
+
+            // Ditambahkan 8 September 2026 (fitur Apply Kampus): sama seperti
+            // registrasi manual (lihat RegisteredUserController::store()),
+            // otomatis cari-atau-buatkan record Student (CRM) untuk User baru
+            // ini supaya orang yang sama nyambung ke satu identitas Student
+            // yang sama, biarpun daftarnya lewat Google. Handphone dikirim
+            // '' (kosong) karena Google tidak pernah memberikan nomor HP --
+            // StudentIdentityResolver sudah menjaga supaya handphone kosong
+            // TIDAK dipakai untuk mencocokkan ke Student manapun (lihat
+            // catatan GUARD di StudentIdentityResolver::findOrCreate()),
+            // jadi pencocokan di sini murni lewat email.
+            $student = (new StudentIdentityResolver())->findOrCreate([
+                'name' => $user->name,
+                'email' => $user->email,
+                'handphone' => '',
+            ]);
+
+            if (empty($student->user_id)) {
+                $student->user_id = $user->id;
+                $student->save();
+            } elseif ($student->user_id !== $user->id) {
+                Log::warning('[GOOGLE-LOGIN] Student hasil pencocokan email sudah ke-link ke User lain, tidak ditimpa', [
+                    'student_id' => $student->id,
+                    'existing_user_id' => $student->user_id,
+                    'new_user_id' => $user->id,
+                ]);
+            }
         } elseif (!$user->hasVerifiedEmail() || !$user->isActive()) {
             // Email Google ini sudah dipakai daftar manual tapi belum
             // diverifikasi -> login via Google otomatis menganggap email

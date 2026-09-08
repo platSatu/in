@@ -77,6 +77,7 @@ use App\Models\FormSection;
 use App\Models\FormSubmission;
 use App\Models\Major;
 use App\Models\Student;
+use App\Services\StudentIdentityResolver;
 use App\Models\SettingUniversity;
 use App\Models\User;
 use App\Models\University;
@@ -706,7 +707,7 @@ class FrontendController extends Controller
                 }
             }
 
-            $student = $this->findOrCreateStudent($validated);
+            $student = (new StudentIdentityResolver())->findOrCreate($validated);
 
             // === STUDENT BRANCH/FORM TRACKING ===
             // Simpan branch & form yang baru diisi student ini di tabel students, dipakai
@@ -1320,7 +1321,7 @@ class FrontendController extends Controller
             }
         }
 
-        $student = $this->findOrCreateStudent($validated);
+        $student = (new StudentIdentityResolver())->findOrCreate($validated);
 
         $student->update([
             'branch_id' => $form->branch_id,
@@ -1412,144 +1413,6 @@ class FrontendController extends Controller
             'submission_id' => $submission->id,
             'redirect_url' => $this->buildWizardRedirectRoute($form),
         ]);
-    }
-
-    /**
-     * Cari Student berdasarkan handphone, atau buat baru kalau belum ada. Dipakai
-     * bareng oleh formWizardSubmit() (submit lengkap) dan formWizardTimeoutSave()
-     * (auto-save saat timer habis).
-     */
-    private function findOrCreateStudent(array $validated): Student
-    {
-        Log::info('[FORM-WIZARD] Cek DB connection aktif', [
-            'connection' => config('database.default'),
-            'database' => DB::connection()->getDatabaseName(),
-        ]);
-
-        try {
-            // BUGFIX: sebelumnya cuma dicari lewat handphone -- kalau HP yang
-            // diisi peserta BEDA dari yang tersimpan (device/nomor baru) tapi
-            // emailnya kebetulan SAMA dengan Student lain yang sudah ada,
-            // sistem menyimpulkan "ini orang baru" dan mencoba INSERT baris
-            // baru -- lalu nabrak constraint unique di kolom email
-            // (SQLSTATE 23000 Duplicate entry ... for key
-            // 'students_email_unique'), dan submission peserta itu HILANG
-            // TOTAL karena crash terjadi di sini, sebelum FormSubmission/
-            // FormAnswer sempat dibuat sama sekali. Sekarang dicari lewat HP
-            // ATAU email -- keduanya dianggap sinyal identitas yang sama
-            // kuat, siapapun yang cocok salah satunya diperlakukan sebagai
-            // "sudah pernah isi" (datanya di-update ke yang terbaru di bawah,
-            // BUKAN dibikinkan baris baru) -- supaya tidak pernah lagi coba
-            // INSERT yang bisa nabrak constraint unique manapun.
-            $existingStudent = Student::where('handphone', $validated['handphone'])
-                ->orWhere('email', $validated['email'])
-                ->first();
-
-            Log::info('[FORM-WIZARD] Hasil cek Student existing', [
-                'found' => $existingStudent ? true : false,
-                'existing_student_id' => $existingStudent->id ?? null,
-            ]);
-
-            $nameParts = preg_split('/\s+/', trim($validated['name']), 2);
-
-            $payload = [
-                'first_name' => $nameParts[0],
-                'last_name' => $nameParts[1] ?? '',
-                'email' => $validated['email'],
-                'handphone' => $validated['handphone'],
-                'status' => 'active',
-            ];
-
-            if ($existingStudent) {
-                // BUGFIX: sebelumnya baris Student lama langsung dipakai apa
-                // adanya tanpa update nama/email sama sekali -- jadi kalau
-                // nomor WhatsApp yang sama pernah dipakai sebelumnya (submit
-                // form lain, testing, atau nomor keluarga/orang lain), nama
-                // yang BARU SAJA diketik peserta di step ini diam-diam
-                // dibuang, dan admin lihat nama LAMA dari submission
-                // sebelumnya -- padahal peserta yakin sudah isi nama yang
-                // benar. Nomor HP dipakai sebagai "kunci" identitas Student
-                // (biar tidak dobel baris per orang), TAPI nama/email harus
-                // tetap ikut yang terbaru diketik tiap kali submit.
-                $existingStudent->update([
-                    'first_name' => $payload['first_name'],
-                    'last_name' => $payload['last_name'],
-                    'email' => $payload['email'],
-                    'handphone' => $payload['handphone'],
-                ]);
-
-                Log::info('[FORM-WIZARD] Pakai Student yang sudah ada (cocok lewat HP atau email), update data ke yang terbaru', [
-                    'student_id' => $existingStudent->id,
-                ]);
-
-                return $existingStudent;
-            }
-
-            Log::info('[FORM-WIZARD] Akan create Student baru dengan payload', $payload);
-
-            try {
-                $student = Student::create($payload);
-            } catch (\Illuminate\Database\QueryException $raceException) {
-                // Jaring pengaman untuk race condition yang sangat jarang: dua
-                // submission yang BENAR-BENAR baru (HP & email dua-duanya
-                // belum pernah ada) masuk nyaris bersamaan, keduanya
-                // lolos pengecekan "belum ada" di atas SEBELUM salah satunya
-                // benar-benar tersimpan -- yang kedua nabrak constraint unique
-                // (handphone atau email). Daripada submission ini ikut hilang
-                // gara-gara race murni (bukan salah datanya), cari ulang baris
-                // yang barusan berhasil disimpan oleh request satunya, lalu
-                // pakai itu -- konsisten dengan alur "Student sudah ada" di atas.
-                if ($raceException->getCode() !== '23000') {
-                    throw $raceException;
-                }
-
-                Log::warning('[FORM-WIZARD] Race condition saat create Student baru, pakai baris yang barusan tersimpan oleh request lain', [
-                    'handphone' => $payload['handphone'],
-                    'email' => $payload['email'],
-                ]);
-
-                $student = Student::where('handphone', $payload['handphone'])
-                    ->orWhere('email', $payload['email'])
-                    ->firstOrFail();
-            }
-
-            Log::info('[FORM-WIZARD] Student::create selesai dieksekusi', [
-                'student_id' => $student->id ?? null,
-                'student_exists_flag' => $student->exists,
-                'was_recently_created' => $student->wasRecentlyCreated,
-            ]);
-
-            // Cek ulang langsung ke DB (bukan dari memory object) untuk memastikan
-            // baris ini SUNGGUH ada di tabel, bukan cuma ada di object PHP-nya.
-            $recheck = DB::table('students')->where('id', $student->id)->first();
-
-            Log::info('[FORM-WIZARD] Recheck langsung ke tabel students via query builder', [
-                'ketemu_di_db' => $recheck ? true : false,
-                'data' => $recheck,
-            ]);
-
-            return $student;
-        } catch (\Illuminate\Database\QueryException $e) {
-            // Ini bakal ke-catch kalau errornya soal SQL (constraint, kolom NOT NULL, dsb)
-            Log::error('[FORM-WIZARD] QueryException saat proses Student', [
-                'message' => $e->getMessage(),
-                'sql' => $e->getSql() ?? null,
-                'bindings' => $e->getBindings() ?? null,
-            ]);
-
-            throw $e;
-        } catch (\Throwable $e) {
-            // Tangkap SEMUA jenis error lain (termasuk yang biasanya bikin whoops page)
-            Log::error('[FORM-WIZARD] Exception tak terduga saat proses Student', [
-                'class' => get_class($e),
-                'message' => $e->getMessage(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-                'trace' => $e->getTraceAsString(),
-            ]);
-
-            throw $e;
-        }
     }
 
     /**

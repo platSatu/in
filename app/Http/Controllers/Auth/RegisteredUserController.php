@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Http\Controllers\Controller;
 use App\Models\RoleUser;
 use App\Models\User;
+use App\Services\StudentIdentityResolver;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -60,6 +61,33 @@ class RegisteredUserController extends Controller
             'role_id' => '019eddb7-8f13-733a-805f-e071502b5dc9',
             'status' => RoleUser::STATUS_ACTIVE,
         ]);
+
+        // Ditambahkan 8 September 2026 (fitur Apply Kampus): otomatis cari-
+        // atau-buatkan record Student (CRM) untuk User baru ini, dicocokkan
+        // lewat handphone ATAU email -- logic PERSIS SAMA dengan yang dipakai
+        // quiz-wizard publik (lihat App\Services\StudentIdentityResolver),
+        // supaya satu orang yang pernah isi quiz kursus Mandarin & sekarang
+        // daftar buat Apply kampus otomatis "ketemu" jadi satu identitas yang
+        // sama, tanpa admin perlu link manual. Student.user_id cuma diisi
+        // kalau MASIH KOSONG -- kalau Student itu ternyata sudah ke-link ke
+        // User lain (kasus langka), tidak ditimpa paksa, cukup dicatat di
+        // log biar admin bisa cek manual.
+        $student = (new StudentIdentityResolver())->findOrCreate([
+            'name' => $user->name,
+            'email' => $user->email,
+            'handphone' => $user->handphone,
+        ]);
+
+        if (empty($student->user_id)) {
+            $student->user_id = $user->id;
+            $student->save();
+        } elseif ($student->user_id !== $user->id) {
+            Log::warning('[REGISTER] Student hasil pencocokan HP/email sudah ke-link ke User lain, tidak ditimpa', [
+                'student_id' => $student->id,
+                'existing_user_id' => $student->user_id,
+                'new_user_id' => $user->id,
+            ]);
+        }
 
         // Kirim WhatsApp
         $this->sendWhatsapp(
