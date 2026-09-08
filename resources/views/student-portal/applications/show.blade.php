@@ -120,7 +120,16 @@
 
         <div class="card-box">
             <p class="mb-3" style="font-size:14.5px;color:#6b7186;">
-                Next, our team will contact you on WhatsApp regarding document requirements and the next steps of your application.
+                Please upload your documents so our team can start processing your application.
+            </p>
+            <a href="{{ route('student-portal.applications.documents.edit', $application->id) }}" class="btn-brand">
+                <i class="bi bi-file-earmark-arrow-up"></i> Upload Documents
+            </a>
+        </div>
+
+        <div class="card-box">
+            <p class="mb-3" style="font-size:14.5px;color:#6b7186;">
+                Questions about document requirements or the next steps? Chat with our team on WhatsApp.
             </p>
             @php
                 $waMessage = "Hello InaStudy, I just submitted application {$application->application_no}";

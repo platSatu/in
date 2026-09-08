@@ -65,6 +65,7 @@ return [
     ['key' => 'quiz.university-album', 'label' => 'University Album', 'route' => 'quiz.university-album.index', 'group' => 'University', 'icon' => 'list'],
     ['key' => 'quiz.university-album-photo', 'label' => 'University Album Photo', 'route' => 'quiz.university-album-photo.index', 'group' => 'University', 'icon' => 'list'],
     ['key' => 'quiz.setting-university', 'label' => 'Setting University', 'route' => 'quiz.setting-university.index', 'group' => 'University', 'icon' => 'list'],
+    ['key' => 'quiz.university-application', 'label' => 'University Applications', 'route' => 'quiz.university-application.index', 'group' => 'University', 'icon' => 'list'],
 
     // ================= Company =================
     ['key' => 'company.profile', 'label' => 'Company Profile', 'route' => 'company.profile.index', 'group' => 'Company', 'icon' => 'list'],

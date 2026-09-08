@@ -136,8 +136,13 @@ class ApplyController extends Controller
             'submitted_at' => now(),
         ]);
 
+        // Fase 5: setelah submit, langsung arahkan ke halaman upload dokumen
+        // (bukan ke ringkasan) -- sesuai alur yang diminta user. Halaman
+        // ringkasan (student-portal.applications.show) tetap ada & masih
+        // bisa dibuka lewat link "View Application Summary" di halaman
+        // dokumen, cuma bukan lagi tujuan redirect pertama.
         return redirect()
-            ->route('student-portal.applications.show', $application->id)
+            ->route('student-portal.applications.documents.edit', $application->id)
             ->with('success', 'Aplikasi berhasil dikirim! Nomor aplikasi Anda: ' . $application->application_no);
     }
 }

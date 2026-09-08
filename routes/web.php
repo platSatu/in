@@ -50,6 +50,8 @@ use App\Http\Controllers\BackendInvitationController;
 use App\Http\Controllers\Student\StudentController;
 use App\Http\Controllers\StudentPortal\ApplyController;
 use App\Http\Controllers\StudentPortal\ApplicationController;
+use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
+use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
 use App\Http\Controllers\Company\CompanyBranchController;
 use App\Http\Controllers\Company\CompanyDivisionController;
@@ -134,6 +136,15 @@ Route::get('/apply/{universityProfile}', [ApplyController::class, 'show'])->name
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/apply/{universityProfile}', [ApplyController::class, 'store'])->name('student-portal.apply.store');
     Route::get('/applications/{application}', [ApplicationController::class, 'show'])->name('student-portal.applications.show');
+
+    // Fase 5 -- upload dokumen aplikasi (per Jenis Dokumen, lihat
+    // DocumentType/ApplicationDocument/ApplicationDocumentHistory). Sama
+    // seperti rute Apply di atas: namespace StudentPortal, SENGAJA tidak
+    // pernah didaftarkan di config/menu.php, cuma dicapai lewat redirect
+    // setelah submit Apply (lihat ApplyController::store()) atau tombol
+    // "Upload Documents" di halaman ringkasan aplikasi.
+    Route::get('/applications/{application}/documents', [ApplicationDocumentController::class, 'edit'])->name('student-portal.applications.documents.edit');
+    Route::post('/applications/{application}/documents', [ApplicationDocumentController::class, 'update'])->name('student-portal.applications.documents.update');
 });
 
 Route::get('/packages', [DashboardPackageController::class, 'index'])->name('public.packages.index');
@@ -564,6 +575,18 @@ Route::middleware(['auth', 'permission:quiz.university-profile,edit'])->prefix('
     Route::get('/{id}/edit', [UniversityProfileController::class, 'edit'])->name('quiz.university-profile.edit');
     Route::put('/{id}', [UniversityProfileController::class, 'update'])->name('quiz.university-profile.update');
     Route::delete('/{id}', [UniversityProfileController::class, 'destroy'])->name('quiz.university-profile.destroy');
+});
+
+// Fase 5 (superadmin) -- lihat Aplikasi Kuliah siswa + dokumen yang sudah
+// disubmit (preview/download). View-only untuk sekarang (belum ada
+// create/update/delete dari sisi admin), makanya cuma 1 level permission
+// ('quiz.university-application', tanpa varian ',edit') -- sama seperti
+// pola modul laporan/monitoring lain, bukan modul CRUD biasa.
+Route::middleware(['auth', 'permission:quiz.university-application'])->prefix('dashboard/superadmin/quiz/university-application')->group(function () {
+    Route::get('/', [UniversityApplicationController::class, 'index'])->name('quiz.university-application.index');
+    Route::get('/{id}', [UniversityApplicationController::class, 'show'])->name('quiz.university-application.show');
+    Route::get('/{id}/documents/{documentId}/download', [UniversityApplicationController::class, 'downloadDocument'])->name('quiz.university-application.documents.download');
+    Route::get('/{id}/documents/history/{historyId}/download', [UniversityApplicationController::class, 'downloadDocumentHistory'])->name('quiz.university-application.documents.history.download');
 });
 
 Route::middleware(['auth', 'permission:company.profile'])->prefix('dashboard/superadmin/company/profile')->group(function () {
