@@ -15,12 +15,21 @@ class UniversityProfilePayment extends Model
 
     public $incrementing = false;
 
+    // Nilai fee_type yang dikenali fitur Apply Kampus untuk auto-deteksi
+    // Registration Fee (lihat migration add_fee_type_to_university_profile_payments_table).
+    public const FEE_TYPE_REGISTRATION = 'registration_fee';
+    public const FEE_TYPE_TUITION = 'tuition_fee';
+    public const FEE_TYPE_DORMITORY = 'dormitory_fee';
+    public const FEE_TYPE_DEPOSIT_CHINA = 'deposit_china';
+    public const FEE_TYPE_OTHER = 'other';
+
     protected $fillable = [
         'user_id',
         'university_profile_id',
         'location',
         'name',
         'amount',
+        'fee_type',
         'sort_order',
     ];
 

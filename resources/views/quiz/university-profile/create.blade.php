@@ -179,7 +179,7 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
-                                <div class="col-md-5">
+                                <div class="col-md-4">
                                     <label class="form-label">Nama Biaya</label>
                                     <input type="text" name="payments[0][name]"
                                         class="form-control @error('payments.0.name') is-invalid @enderror"
@@ -188,12 +188,28 @@
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-2">
                                     <label class="form-label">Jumlah</label>
                                     <input type="number" min="0" name="payments[0][amount]"
                                         class="form-control @error('payments.0.amount') is-invalid @enderror"
                                         value="{{ old('payments.0.amount') }}" placeholder="0">
                                     @error('payments.0.amount')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label">Tipe Biaya</label>
+                                    <select name="payments[0][fee_type]"
+                                        class="form-select @error('payments.0.fee_type') is-invalid @enderror">
+                                        <option value="">Choose...</option>
+                                        <option value="registration_fee" {{ old('payments.0.fee_type') === 'registration_fee' ? 'selected' : '' }}>Registration Fee</option>
+                                        <option value="tuition_fee" {{ old('payments.0.fee_type') === 'tuition_fee' ? 'selected' : '' }}>Tuition Fee</option>
+                                        <option value="dormitory_fee" {{ old('payments.0.fee_type') === 'dormitory_fee' ? 'selected' : '' }}>Dormitory Fee</option>
+                                        <option value="deposit_china" {{ old('payments.0.fee_type') === 'deposit_china' ? 'selected' : '' }}>Deposit Fee (China)</option>
+                                        <option value="other" {{ old('payments.0.fee_type') === 'other' ? 'selected' : '' }}>Lainnya</option>
+                                    </select>
+                                    <div class="form-text" style="font-size:11.5px;">Dipakai fitur Apply Kampus untuk otomatis mendeteksi Registration Fee.</div>
+                                    @error('payments.0.fee_type')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
@@ -341,13 +357,24 @@
                     <option value="china">China (元)</option>
                 </select>
             </div>
-            <div class="col-md-5">
+            <div class="col-md-4">
                 <label class="form-label">Nama Biaya</label>
                 <input type="text" name="payments[__INDEX__][name]" class="form-control" placeholder="mis. Registration Fee">
             </div>
-            <div class="col-md-4">
+            <div class="col-md-2">
                 <label class="form-label">Jumlah</label>
                 <input type="number" min="0" name="payments[__INDEX__][amount]" class="form-control" placeholder="0">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Tipe Biaya</label>
+                <select name="payments[__INDEX__][fee_type]" class="form-select">
+                    <option value="">Choose...</option>
+                    <option value="registration_fee">Registration Fee</option>
+                    <option value="tuition_fee">Tuition Fee</option>
+                    <option value="dormitory_fee">Dormitory Fee</option>
+                    <option value="deposit_china">Deposit Fee (China)</option>
+                    <option value="other">Lainnya</option>
+                </select>
             </div>
         </div>
         <div class="row g-3 mt-1">

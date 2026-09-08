@@ -271,16 +271,33 @@ class FrontendController extends Controller
     {
         $university = University::findOrFail($id);
 
+        // DIUBAH (fase 3, fitur Apply Kampus): sebelumnya cuma ->first() --
+        // satu university dianggap cuma punya SATU Major/program. Sekarang
+        // ->get() SEMUA profile aktif, karena satu university bisa punya
+        // lebih dari satu Major (mis. "Teknik Informatika" & "Bisnis
+        // Internasional" di kampus yang sama), dan tiap Major butuh tombol
+        // Apply-nya sendiri-sendiri (lihat blok "Programs / Majors" di view).
+        //
         // Eager-load 'degrees' (tabel anak university_profile_degrees) & 'payments'
         // (tabel anak university_profile_payments, sama polanya) supaya section
         // Degree/Intake/Duration dan Payment di halaman ini bisa tampil — profile
         // itu sendiri TIDAK punya kolom degree/intake/payment langsung (lihat
         // catatan di UniversityProfile::degrees()/payments()), datanya sepenuhnya
         // di tabel anak masing-masing.
-        $profile = UniversityProfile::where('university_id', $id)
+        $profiles = UniversityProfile::where('university_id', $id)
             ->where('status', 'active')
             ->with(['degrees', 'payments'])
-            ->first(); // pakai first(), bukan firstOrFail()
+            ->orderBy('created_at')
+            ->get();
+
+        // $profile (tunggal) DIPERTAHANKAN untuk bagian-bagian halaman yang
+        // masih menampilkan satu ringkasan umum (hero & quick-facts di
+        // bagian atas) -- diambil dari profile PERTAMA yang aktif, sama
+        // seperti perilaku ->first() sebelumnya. Untuk university yang cuma
+        // punya 1 profile aktif, ini sama persis dengan sebelumnya. Untuk
+        // yang punya lebih dari 1 Major, detail LENGKAP per Major (termasuk
+        // tombol Apply) ada di $profiles (jamak) yang di-loop di view.
+        $profile = $profiles->first();
 
         $albums = UniversityAlbum::where('university_id', $id)
             ->where('status', 'active')
@@ -297,7 +314,7 @@ class FrontendController extends Controller
         // city() supaya nama kotanya bisa ditampilkan dengan benar.
         $cityModel = $university->city()->first();
 
-        return view('frontend.university-profile', compact('university', 'profile', 'albums', 'cityModel'));
+        return view('frontend.university-profile', compact('university', 'profile', 'profiles', 'albums', 'cityModel'));
     }
 
     /**

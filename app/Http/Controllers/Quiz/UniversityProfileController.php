@@ -132,10 +132,14 @@ public function store(Request $request)
         'degree_intakes.*.duration' => 'nullable|string|max:255',
         // Payment: daftar rincian biaya ("add row" juga), pilih lokasi bayar
         // (Indonesia / China) + nama item + jumlah — semuanya opsional.
+        // 'fee_type' (ditambahkan fase 4, fitur Apply Kampus) dipakai supaya
+        // sistem tahu baris mana yang "Registration Fee" tanpa menebak dari
+        // teks nama bebas -- lihat migration add_fee_type_to_university_profile_payments_table.
         'payments' => 'nullable|array',
         'payments.*.location' => 'nullable|in:indonesia,china',
         'payments.*.name' => 'nullable|string|max:255',
         'payments.*.amount' => 'nullable|integer|min:0',
+        'payments.*.fee_type' => 'nullable|in:registration_fee,tuition_fee,dormitory_fee,deposit_china,other',
     ]);
 
     $userId = Auth::id();
@@ -164,7 +168,7 @@ public function store(Request $request)
     // Sama seperti degree/intake di atas — buang baris payment yang
     // semuanya kosong.
     $paymentRows = collect($validated['payments'] ?? [])
-        ->filter(fn ($row) => filled($row['location'] ?? null) || filled($row['name'] ?? null) || filled($row['amount'] ?? null))
+        ->filter(fn ($row) => filled($row['location'] ?? null) || filled($row['name'] ?? null) || filled($row['amount'] ?? null) || filled($row['fee_type'] ?? null))
         ->values();
 
     unset($validated['payments']);
@@ -202,6 +206,7 @@ public function store(Request $request)
             'location' => $row['location'] ?? null,
             'name' => $row['name'] ?? null,
             'amount' => $row['amount'] ?? null,
+            'fee_type' => $row['fee_type'] ?? null,
             'sort_order' => $index,
         ]);
     }
@@ -266,6 +271,7 @@ public function store(Request $request)
             'payments.*.location' => 'nullable|in:indonesia,china',
             'payments.*.name' => 'nullable|string|max:255',
             'payments.*.amount' => 'nullable|integer|min:0',
+            'payments.*.fee_type' => 'nullable|in:registration_fee,tuition_fee,dormitory_fee,deposit_china,other',
         ]);
 
         // Tidak lagi dibatasi ->where('user_id', ...) -- cukup pastikan id-nya valid.
@@ -284,7 +290,7 @@ public function store(Request $request)
             ->values();
 
         $paymentRows = collect($validated['payments'] ?? [])
-            ->filter(fn ($row) => filled($row['location'] ?? null) || filled($row['name'] ?? null) || filled($row['amount'] ?? null))
+            ->filter(fn ($row) => filled($row['location'] ?? null) || filled($row['name'] ?? null) || filled($row['amount'] ?? null) || filled($row['fee_type'] ?? null))
             ->values();
 
         unset($validated['degree_intakes'], $validated['payments']);
@@ -315,6 +321,7 @@ public function store(Request $request)
                 'location' => $row['location'] ?? null,
                 'name' => $row['name'] ?? null,
                 'amount' => $row['amount'] ?? null,
+                'fee_type' => $row['fee_type'] ?? null,
                 'sort_order' => $index,
             ]);
         }

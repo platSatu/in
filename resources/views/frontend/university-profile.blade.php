@@ -190,6 +190,34 @@
             margin-bottom: 8px;
         }
 
+        /* ---------- PROGRAMS / MAJORS (fitur Apply Kampus) ---------- */
+        .major-block { margin-bottom: 26px; }
+        .major-block:last-child { margin-bottom: 0; }
+        .major-block-divider {
+            padding-bottom: 24px;
+            border-bottom: 1px solid #eef1f8;
+        }
+
+        .btn-apply {
+            background: var(--brand);
+            color: #fff;
+            padding: 10px 22px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            white-space: nowrap;
+            transition: all .2s ease;
+        }
+        .btn-apply:hover {
+            background: var(--brand-dark);
+            color: #fff;
+            transform: translateY(-1px);
+        }
+
         .placeholder-note {
             background: #f8f9fc;
             border: 1px dashed #d7dcea;
@@ -551,17 +579,18 @@
         // ke placeholder-note seperti biasa, tidak ada yang berubah).
         $durations = $degreeIntakeRows->pluck('duration')->filter()->map('trim')->unique()->values()->all();
 
-        // Degree Title, Key Courses, Entry Requirements: 3 kolom baru
-        // (nullable) di university_profiles hasil perbandingan dengan brosur
-        // kampus. Semua opsional, jadi setiap bagian di bawah tetap fallback
-        // ke placeholder-note kalau belum diisi admin — desain lama tidak
-        // berubah untuk profile yang belum punya data ini.
-        $degreeTitle = $profile ? trim((string) $profile->degree_title) : '';
-
-        // Key Courses & Entry Requirements sama-sama teks bebas yang admin isi
-        // per baris (dipisah "/" atau baris baru, mengikuti contoh placeholder
-        // di form admin) — dipecah jadi list rapi kalau ada pemisahnya,
-        // fallback ke satu paragraf utuh kalau tidak.
+        // Degree Title, Key Courses, Entry Requirements, Payment: DULU
+        // dihitung di sini dari satu $profile (info-card terpisah per
+        // jenis). Sekarang (fase 3, fitur Apply Kampus) satu university bisa
+        // punya LEBIH DARI SATU Major/profile aktif, jadi field-field ini
+        // dihitung ULANG PER-MAJOR di dalam loop "Programs / Majors
+        // Available" di bawah (lihat variabel $majorKeyCourses dkk di sana),
+        // bukan sekali di sini untuk satu profile saja.
+        //
+        // $splitFreeText tetap didefinisikan di sini (dipakai bareng di
+        // dalam loop per-Major) -- teks bebas Key Courses/Entry Requirements
+        // dipecah jadi list rapi kalau dipisah "/" atau baris baru, fallback
+        // ke satu paragraf utuh kalau tidak ada pemisah.
         $splitFreeText = function (?string $text) {
             $text = trim((string) $text);
             if ($text === '') {
@@ -575,16 +604,6 @@
             return collect($parts)->map('trim')->filter()->values()->all();
         };
 
-        $keyCourseItems = $profile ? $splitFreeText($profile->key_courses) : [];
-        $entryRequirementItems = $profile ? $splitFreeText($profile->entry_requirements) : [];
-
-        // Payment: tabel anak baru university_profile_payments (fitur "add
-        // row" di admin, pilih lokasi bayar Indonesia/China + nama item +
-        // jumlah). Dikelompokkan per lokasi supaya tampilannya sama seperti
-        // brosur kampus ("Payment in Indonesia" / "Payment in China").
-        $paymentRows = ($profile ? $profile->payments : collect())
-            ->filter(fn ($p) => filled($p->name) || filled($p->amount));
-        $paymentsByLocation = $paymentRows->groupBy(fn ($p) => $p->location ?: 'other');
         $paymentLocationLabels = [
             'indonesia' => 'Payment in Indonesia',
             'china' => 'Payment in China',
@@ -727,152 +746,135 @@
                     @endif
                 </div>
 
-                <div class="info-card">
-                    <h4><i class="bi bi-mortarboard-fill"></i> Degree Levels</h4>
-                    @if(count($degrees))
-                        <div>
-                            @foreach($degrees as $degree)
-                                <span class="tag">{{ $degree }}</span>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Degree levels offered have not been added yet. Contact our team to find out what's available.
-                        </div>
-                    @endif
-                </div>
+                {{--
+                    DIUBAH (fase 3, fitur Apply Kampus): 9 info-card terpisah
+                    di atas (Degree Levels, Intake Periods, Program Duration,
+                    Fields of Study, Degree Title, Language of Instruction,
+                    Key Courses, Entry Requirements, Payment Details) dulu
+                    SEMUANYA membaca dari satu $profile -- cukup untuk
+                    university yang cuma punya 1 Major. Sekarang digabung jadi
+                    SATU section "Programs / Majors Available" yang di-loop
+                    per Major ($profiles, jamak), karena tiap Major bisa
+                    punya Degree/Intake/Duration/Payment yang BEDA-BEDA, dan
+                    tiap Major butuh tombol Apply-nya sendiri (supaya
+                    ketahuan "kampus A, jurusan Teknik Informatika, di
+                    apply" -- bukan cuma "kampus A di apply").
 
+                    Untuk university yang cuma punya 1 profile aktif (kasus
+                    lama/paling umum), loop ini otomatis cuma render SATU
+                    blok Major -- isinya sama seperti gabungan 9 info-card
+                    lama, ditambah 1 tombol Apply Now.
+                --}}
                 <div class="info-card">
-                    <h4><i class="bi bi-calendar-event"></i> Intake Periods</h4>
-                    @if(count($intakes))
-                        <div>
-                            @foreach($intakes as $intake)
-                                <span class="tag">{{ $intake }}</span>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Intake schedule has not been published yet. Contact our team for the latest intake dates.
-                        </div>
-                    @endif
-                </div>
+                    <h4><i class="bi bi-mortarboard-fill"></i> Programs / Majors Available</h4>
 
-                <div class="info-card">
-                    <h4><i class="bi bi-hourglass-split"></i> Program Duration</h4>
-                    @if(count($durations))
-                        <div>
-                            @foreach($durations as $duration)
-                                <span class="tag">{{ $duration }}</span>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Program duration has not been added yet. Contact our team to find out how long each program takes.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-mortarboard"></i> Fields of Study</h4>
-                    @if(count($fields))
-                        <div>
-                            @foreach($fields as $field)
-                                <span class="tag">{{ $field }}</span>
-                            @endforeach
-                        </div>
-                    @else
+                    @if($profiles->isEmpty())
                         <div class="placeholder-note">
                             <i class="bi bi-hourglass-split me-1"></i>
                             Program details for this university are being finalized. Message us on WhatsApp and our team will share the latest list of available majors.
                         </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-award"></i> Degree Title</h4>
-                    @if(filled($degreeTitle))
-                        <p class="mb-0">{{ $degreeTitle }}</p>
                     @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            The exact degree title has not been added yet. Contact our team for the latest details.
-                        </div>
-                    @endif
-                </div>
+                        @foreach($profiles as $majorProfile)
+                            @php
+                                $majorDegreeRows = $majorProfile->degrees;
+                                $majorDegrees = $majorDegreeRows->pluck('degree')->filter()->map('trim')->unique()->values()->all();
+                                $majorIntakes = $majorDegreeRows->pluck('intake')->filter()->map('trim')->unique()->values()->all();
+                                $majorDurations = $majorDegreeRows->pluck('duration')->filter()->map('trim')->unique()->values()->all();
+                                $majorKeyCourses = $splitFreeText($majorProfile->key_courses);
+                                $majorEntryReq = $splitFreeText($majorProfile->entry_requirements);
+                                $majorPaymentRows = $majorProfile->payments->filter(fn ($p) => filled($p->name) || filled($p->amount));
+                                $majorPaymentsByLocation = $majorPaymentRows->groupBy(fn ($p) => $p->location ?: 'other');
+                            @endphp
 
-                <div class="info-card">
-                    <h4><i class="bi bi-translate"></i> Language of Instruction</h4>
-                    @if($profile && $profile->language)
-                        <p class="mb-0">{{ $profile->language }}</p>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            This information will be updated soon. Contact our team for the latest details.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-journal-bookmark"></i> Key Courses</h4>
-                    @if(count($keyCourseItems))
-                        <div>
-                            @foreach($keyCourseItems as $course)
-                                <span class="tag">{{ $course }}</span>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Key courses for this program have not been added yet. Contact our team for the full curriculum.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-clipboard-check"></i> Entry Requirements</h4>
-                    @if(count($entryRequirementItems))
-                        <div>
-                            @foreach($entryRequirementItems as $requirement)
-                                <div class="requirement-item">
-                                    <i class="bi bi-check-circle-fill"></i>
-                                    <span>{{ $requirement }}</span>
-                                </div>
-                            @endforeach
-                        </div>
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Entry requirements have not been added yet. Contact our team for the latest admission criteria.
-                        </div>
-                    @endif
-                </div>
-
-                <div class="info-card">
-                    <h4><i class="bi bi-cash-coin"></i> Payment Details</h4>
-                    @if($paymentsByLocation->isNotEmpty())
-                        @foreach($paymentsByLocation as $locationKey => $items)
-                            <div class="payment-group">
-                                <div class="payment-group-title">{{ $paymentLocationLabels[$locationKey] ?? ucfirst($locationKey) }}</div>
-                                @foreach($items as $item)
-                                    <div class="payment-row">
-                                        <span class="payment-name">{{ $item->name ?? '-' }}</span>
-                                        @if($item->amount !== null)
-                                            <span class="payment-amount">{{ $paymentCurrencySymbols[$locationKey] ?? '' }} {{ number_format($item->amount, 0, ',', '.') }}</span>
-                                        @else
-                                            <span class="payment-amount text-muted">Contact us</span>
+                            <div class="major-block {{ ! $loop->last ? 'major-block-divider' : '' }}">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
+                                    <div>
+                                        <h5 class="mb-1">{{ $majorProfile->field ?: 'Program' }}</h5>
+                                        @if(filled($majorProfile->degree_title))
+                                            <div class="text-muted" style="font-size:13.5px;">{{ $majorProfile->degree_title }}</div>
                                         @endif
                                     </div>
-                                @endforeach
+                                    <a href="{{ route('student-portal.apply.show', $majorProfile->id) }}" class="btn-apply">
+                                        <i class="bi bi-send-check"></i> Apply Now
+                                    </a>
+                                </div>
+
+                                @if(count($majorDegrees) || count($majorIntakes) || count($majorDurations) || $majorProfile->language || $majorProfile->scholarship_available)
+                                    <div class="mb-3">
+                                        @foreach($majorDegrees as $degree)<span class="tag">{{ $degree }}</span>@endforeach
+                                        @foreach($majorIntakes as $intake)<span class="tag">{{ $intake }}</span>@endforeach
+                                        @foreach($majorDurations as $duration)<span class="tag">{{ $duration }}</span>@endforeach
+                                        @if($majorProfile->language)
+                                            <span class="tag"><i class="bi bi-translate"></i> {{ $majorProfile->language }}</span>
+                                        @endif
+                                        @if($majorProfile->scholarship_available)
+                                            <span class="tag"><i class="bi bi-award"></i> Scholarship Available</span>
+                                        @endif
+                                    </div>
+                                @else
+                                    <div class="placeholder-note mb-3">
+                                        <i class="bi bi-hourglass-split me-1"></i>
+                                        Degree, intake, and duration options for this program have not been added yet. Contact our team to find out what's available.
+                                    </div>
+                                @endif
+
+                                @if($majorProfile->min_budget || $majorProfile->max_budget)
+                                    <div class="mb-2" style="font-size:14px;">
+                                        <strong>Budget:</strong>
+                                        @if($majorProfile->min_budget && $majorProfile->max_budget)
+                                            Rp {{ number_format($majorProfile->min_budget, 0, ',', '.') }} - Rp {{ number_format($majorProfile->max_budget, 0, ',', '.') }}
+                                        @elseif($majorProfile->min_budget)
+                                            From Rp {{ number_format($majorProfile->min_budget, 0, ',', '.') }}
+                                        @else
+                                            Up to Rp {{ number_format($majorProfile->max_budget, 0, ',', '.') }}
+                                        @endif
+                                    </div>
+                                @endif
+
+                                @if(count($majorKeyCourses))
+                                    <div class="mb-2" style="font-size:14px;">
+                                        <strong>Key Courses:</strong>
+                                        <div class="mt-1">
+                                            @foreach($majorKeyCourses as $course)<span class="tag">{{ $course }}</span>@endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if(count($majorEntryReq))
+                                    <div class="mb-2" style="font-size:14px;">
+                                        <strong>Entry Requirements:</strong>
+                                        <div class="mt-1">
+                                            @foreach($majorEntryReq as $requirement)
+                                                <div class="requirement-item">
+                                                    <i class="bi bi-check-circle-fill"></i>
+                                                    <span>{{ $requirement }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endif
+
+                                @if($majorPaymentsByLocation->isNotEmpty())
+                                    <div class="mt-2">
+                                        @foreach($majorPaymentsByLocation as $locationKey => $items)
+                                            <div class="payment-group">
+                                                <div class="payment-group-title">{{ $paymentLocationLabels[$locationKey] ?? ucfirst($locationKey) }}</div>
+                                                @foreach($items as $item)
+                                                    <div class="payment-row">
+                                                        <span class="payment-name">{{ $item->name ?? '-' }}</span>
+                                                        @if($item->amount !== null)
+                                                            <span class="payment-amount">{{ $paymentCurrencySymbols[$locationKey] ?? '' }} {{ number_format($item->amount, 0, ',', '.') }}</span>
+                                                        @else
+                                                            <span class="payment-amount text-muted">Contact us</span>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
                             </div>
                         @endforeach
-                    @else
-                        <div class="placeholder-note">
-                            <i class="bi bi-hourglass-split me-1"></i>
-                            Payment breakdown has not been added yet. Contact our team for the latest tuition and fee details.
-                        </div>
                     @endif
                 </div>
 

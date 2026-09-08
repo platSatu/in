@@ -48,6 +48,8 @@ use App\Http\Controllers\FrontendController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\BackendInvitationController;
 use App\Http\Controllers\Student\StudentController;
+use App\Http\Controllers\StudentPortal\ApplyController;
+use App\Http\Controllers\StudentPortal\ApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
 use App\Http\Controllers\Company\CompanyBranchController;
 use App\Http\Controllers\Company\CompanyDivisionController;
@@ -114,6 +116,25 @@ Route::get('/invitation/{qrcode}', [InvitationController::class, 'show'])->name(
 
 Route::get('/universities', [FrontendController::class, 'universityCatalog'])->name('frontend.university.catalog');
 Route::get('/university/{id}', [FrontendController::class, 'universityProfile'])->name('frontend.university.profile');
+
+// Fitur "Apply ke Kampus" (fase 4) -- namespace controller StudentPortal
+// (BUKAN Student, yang sudah dipakai untuk CRUD data Student/CRM di sisi
+// superadmin) supaya jelas terpisah: ini semua untuk sisi SISWA yang login.
+// SENGAJA TIDAK didaftarkan di config/menu.php (sidebar admin) -- rute ini
+// hanya dicapai lewat tombol "Apply Now" di halaman frontend.university.profile,
+// tidak pernah muncul di menu superadmin manapun (permintaan user: menu
+// siswa & superadmin harus benar-benar terpisah).
+//
+// GET tidak pakai middleware 'auth' di sini secara langsung -- guest tetap
+// boleh membuka route ini, supaya controller-nya sendiri yang menentukan
+// alur redirect ke Register (bukan Login) dengan intended-URL tersimpan.
+// Lihat StudentPortal\ApplyController::show().
+Route::get('/apply/{universityProfile}', [ApplyController::class, 'show'])->name('student-portal.apply.show');
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/apply/{universityProfile}', [ApplyController::class, 'store'])->name('student-portal.apply.store');
+    Route::get('/applications/{application}', [ApplicationController::class, 'show'])->name('student-portal.applications.show');
+});
 
 Route::get('/packages', [DashboardPackageController::class, 'index'])->name('public.packages.index');
 

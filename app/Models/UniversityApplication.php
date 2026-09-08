@@ -9,9 +9,10 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Satu Aplikasi Kuliah: satu Student apply ke satu Major (UniversityProfile)
- * di satu kampus. degree/intake/duration/registration_fee_amount adalah
- * SNAPSHOT saat submit (lihat catatan di migration-nya) -- jangan diasumsikan
- * selalu sama dengan data terbaru di UniversityProfileDegree/Payment.
+ * di satu kampus. degree/language/intake/intake_year/duration/
+ * registration_fee_amount adalah SNAPSHOT saat submit (lihat catatan di
+ * migration-nya) -- jangan diasumsikan selalu sama dengan data terbaru di
+ * UniversityProfileDegree/Payment/UniversityProfile.
  */
 class UniversityApplication extends Model
 {
@@ -37,7 +38,9 @@ class UniversityApplication extends Model
         'university_profile_id',
         'university_id',
         'degree',
+        'language',
         'intake',
+        'intake_year',
         'duration',
         'whatsapp',
         'registration_fee_amount',
@@ -50,6 +53,7 @@ class UniversityApplication extends Model
     ];
 
     protected $casts = [
+        'intake_year' => 'integer',
         'registration_fee_amount' => 'integer',
         'registration_fee_paid_at' => 'date',
         'deposit_fee_china_amount' => 'integer',
