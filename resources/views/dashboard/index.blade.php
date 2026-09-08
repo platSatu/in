@@ -1,6 +1,45 @@
 @extends('layouts.frontend')
 @section('content')
 
+@if($myApplications->isNotEmpty())
+<div class="row">
+    <div class="col-12">
+        <div class="widget-content widget-content-area br-8 mb-4">
+            <h4 class="mb-3">My University Applications</h4>
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Application No</th>
+                            <th>University</th>
+                            <th>Major</th>
+                            <th>Status</th>
+                            <th>Submitted</th>
+                            <th class="text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($myApplications as $myApplication)
+                            <tr>
+                                <td class="fw-bold">{{ $myApplication->application_no }}</td>
+                                <td>{{ optional($myApplication->university)->name ?? '-' }}</td>
+                                <td>{{ optional($myApplication->universityProfile)->field ?? '-' }}</td>
+                                <td><span class="badge bg-info text-capitalize">{{ str_replace('_', ' ', $myApplication->status) }}</span></td>
+                                <td>{{ optional($myApplication->submitted_at)->format('Y/m/d') }}</td>
+                                <td class="text-center text-nowrap">
+                                    <a href="{{ route('student-portal.applications.show', $myApplication->id) }}" class="btn btn-sm btn-outline-primary">Summary</a>
+                                    <a href="{{ route('student-portal.applications.documents.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-success">Documents</a>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+@endif
+
 <div class="row">
     <div class="col-12">
         <div class="widget-content widget-content-area br-8 mb-4">
