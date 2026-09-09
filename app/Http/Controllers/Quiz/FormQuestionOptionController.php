@@ -7,6 +7,7 @@ use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\FormQuestion;
 use App\Models\FormQuestionOption;
+use App\Models\WhatsappTemplate;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Auth;
@@ -82,7 +83,14 @@ class FormQuestionOptionController extends Controller
 
         $selectedQuestionId = $request->query('question_id');
 
-        return view('quiz.form-question-option.create', compact('questions', 'selectedQuestionId'));
+        // Fitur tambahan: template WA opsional PER OPSI, terpisah dari
+        // whatsapp_template_id milik Form (lihat migration
+        // add_whatsapp_template_to_form_question_options_table). Dropdown-nya
+        // pakai daftar template aktif yang sama dengan yang dipakai di
+        // quiz/form/create.blade.php.
+        $templates = WhatsappTemplate::where('status', 'active')->get();
+
+        return view('quiz.form-question-option.create', compact('questions', 'selectedQuestionId', 'templates'));
     }
 
     /**
@@ -102,6 +110,7 @@ class FormQuestionOptionController extends Controller
             'options.*.is_other' => 'nullable|boolean',
             'options.*.is_correct' => 'nullable|boolean',
             'options.*.status' => 'nullable|in:active,inactive',
+            'options.*.whatsapp_template_id' => 'nullable|string|exists:whatsapp_templates,id',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -160,6 +169,9 @@ class FormQuestionOptionController extends Controller
                 // hasil ini.
                 'is_correct' => !empty($row['is_correct']),
                 'status' => $row['status'] ?? 'active',
+                // Template WA per opsi (fitur tambahan, opsional) -- lihat
+                // FrontendController::sendPerOptionWhatsappMessages().
+                'whatsapp_template_id' => $row['whatsapp_template_id'] ?? null,
             ]);
 
             $position++;
@@ -188,7 +200,9 @@ class FormQuestionOptionController extends Controller
             ->orderBy('question_text')
             ->get();
 
-        return view('quiz.form-question-option.edit', compact('data', 'questions'));
+        $templates = WhatsappTemplate::where('status', 'active')->get();
+
+        return view('quiz.form-question-option.edit', compact('data', 'questions', 'templates'));
     }
 
     public function update(Request $request, string $id)
@@ -208,6 +222,7 @@ class FormQuestionOptionController extends Controller
             'is_other' => 'nullable|boolean',
             'is_correct' => 'nullable|boolean',
             'status' => 'required|in:active,inactive',
+            'whatsapp_template_id' => 'nullable|string|exists:whatsapp_templates,id',
         ]);
 
         $validator->after(function ($validator) use ($request, $existing) {

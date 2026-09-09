@@ -234,6 +234,35 @@
                             </div>
                         </div>
 
+                        <div class="row mb-4" id="personalDataPositionWrapper">
+                            <div class="col-sm-12">
+                                <label class="mb-2 d-block">Posisi Data Pribadi</label>
+
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="personal_data_stage_position"
+                                        id="personal_data_stage_position_first" value="first"
+                                        {{ old('personal_data_stage_position', 'first') === 'first' ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="personal_data_stage_position_first">
+                                        Di awal — Nama/Email/HP diisi dulu sebelum lanjut ke pertanyaan (perilaku saat ini)
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="radio" name="personal_data_stage_position"
+                                        id="personal_data_stage_position_last" value="last"
+                                        {{ old('personal_data_stage_position') === 'last' ? 'checked' : '' }}>
+                                    <label class="form-check-label" for="personal_data_stage_position_last">
+                                        Di akhir — peserta isi pertanyaan dulu, baru Nama/Email/HP sebelum submit
+                                    </label>
+                                </div>
+                                <div class="form-text">
+                                    Kalau form ini juga Requires Payment, pembayaran tetap selalu berada paling akhir (setelah Data Pribadi, sebelum submit) — Posisi Pembayaran di atas otomatis diabaikan khusus untuk kombinasi ini.
+                                </div>
+                                @error('personal_data_stage_position')
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                            </div>
+                        </div>
+
                         <div class="row mb-4" id="sectionThresholdSettingsWrapper">
                             <div class="col-sm-12">
                                 <div class="form-text mb-2" style="color:#6c757d;">

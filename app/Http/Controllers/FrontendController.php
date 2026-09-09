@@ -1003,6 +1003,21 @@ class FrontendController extends Controller
                     'message' => $e->getMessage(),
                 ]);
             }
+
+            // === FITUR TAMBAHAN: TEMPLATE WA PER OPSI JAWABAN ===
+            // Berjalan SETELAH pesan per-Form di atas (dua-duanya jalan, tidak
+            // saling menggantikan) -- lihat sendPerOptionWhatsappMessages().
+            // Sengaja tetap di dalam gate use_whatsapp_notification yang sama:
+            // kalau admin mematikan notifikasi WA untuk form ini sama sekali,
+            // tidak ada WA apa pun yang terkirim, termasuk yang per-opsi.
+            $this->sendPerOptionWhatsappMessages(
+                $form,
+                $student,
+                $submission,
+                $ringkasanJawaban,
+                $callbackLink,
+                $pilihKelasLink
+            );
         } else {
             Log::info('[FORM-WIZARD] use_whatsapp_notification nonaktif, WA tidak dikirim', [
                 'form_id' => $form->id,
@@ -1010,6 +1025,85 @@ class FrontendController extends Controller
         }
 
         return $callbackLink;
+    }
+
+    /**
+     * === FITUR TAMBAHAN: TEMPLATE WA PER OPSI JAWABAN ===
+     *
+     * Selain pesan WA per-Form yang sudah ada (whatsapp_template_id di tabel
+     * forms, dikirim oleh caller method ini SEBELUM memanggil method ini),
+     * tiap OPSI jawaban (form_question_options.whatsapp_template_id) boleh
+     * punya template WA sendiri, opsional. Method ini murni ADDITIF -- tidak
+     * mengganti, menunda, atau memengaruhi pesan per-Form sama sekali.
+     *
+     * Kalau peserta menjawab pertanyaan multiple choice/checkbox dan memilih
+     * LEBIH DARI SATU opsi yang masing-masing punya template terpasang, pesan
+     * dikirim SATU PERSATU per opsi yang cocok (bukan digabung jadi satu
+     * pesan) -- sesuai keputusan yang sudah disepakati. Berlaku utk opsi di
+     * pertanyaan mana pun (radio maupun checkbox), tidak dibatasi ke satu
+     * pertanyaan "spesial" tertentu.
+     *
+     * Read-only terhadap FormAnswer/FormQuestionOption. Kegagalan kirim utk
+     * satu opsi (mis. gateway WA lagi bermasalah) di-catch per opsi supaya
+     * tidak menggagalkan pengiriman opsi lain maupun pesan per-Form yang
+     * sudah terkirim duluan.
+     */
+    private function sendPerOptionWhatsappMessages(
+        Form $form,
+        Student $student,
+        FormSubmission $submission,
+        string $ringkasanJawaban,
+        ?string $callbackLink,
+        ?string $pilihKelasLink
+    ): void {
+        $matchedOptions = FormAnswer::where('submission_id', $submission->id)
+            ->whereNotNull('option_id')
+            ->with('option.whatsappTemplate')
+            ->get()
+            ->pluck('option')
+            ->filter(fn ($option) => $option && !empty($option->whatsapp_template_id))
+            ->unique('id')
+            ->values();
+
+        if ($matchedOptions->isEmpty()) {
+            return;
+        }
+
+        $messenger = new \App\Services\Whatsapp\WhatsappMessenger();
+
+        foreach ($matchedOptions as $option) {
+            $template = $option->whatsappTemplate;
+
+            if (!$template) {
+                // Template pernah dipasang tapi sudah terhapus -- lewati opsi
+                // ini saja, jangan sampai menggagalkan opsi lain.
+                continue;
+            }
+
+            $message = $messenger->buildMessageFromWhatsappTemplate($template, [
+                'name' => trim($student->first_name . ' ' . $student->last_name),
+                'form_name' => $form->name,
+                'ringkasan_jawaban' => $ringkasanJawaban,
+                'callback_link' => $callbackLink ?? '',
+                'pilih_kelas_link' => $pilihKelasLink ?? '',
+            ]);
+
+            if ($message === null) {
+                continue;
+            }
+
+            try {
+                $this->sendWhatsapp($student->handphone, $message, $form->user_id);
+                Log::info('[FORM-WIZARD] sendPerOptionWhatsappMessages: 1 pesan opsi terkirim', [
+                    'option_id' => $option->id,
+                ]);
+            } catch (\Throwable $e) {
+                Log::error('[FORM-WIZARD] sendPerOptionWhatsappMessages gagal utk 1 opsi (opsi lain & pesan per-Form tetap lanjut)', [
+                    'option_id' => $option->id,
+                    'message' => $e->getMessage(),
+                ]);
+            }
+        }
     }
 
     /**

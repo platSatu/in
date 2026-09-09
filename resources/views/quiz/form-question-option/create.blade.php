@@ -114,6 +114,24 @@
         </div>
 
         <div class="row g-3 mt-1">
+            <div class="col-md-6">
+                <label class="form-label small">Template WhatsApp Opsi Ini <span class="text-muted">(Opsional)</span></label>
+                <select class="form-select form-select-sm" name="__NAME__[whatsapp_template_id]">
+                    <option value="">Tidak pakai template khusus opsi ini</option>
+                    @foreach ($templates as $template)
+                        <option value="{{ $template->id }}">{{ $template->name }}</option>
+                    @endforeach
+                </select>
+                <div class="form-text">
+                    Fitur tambahan: kalau diisi, begitu peserta memilih opsi ini akan dikirim SATU pesan WA terpisah
+                    memakai template ini — di luar (bukan pengganti) pesan WA per-form yang sudah ada. Kalau
+                    pertanyaan ini multiple choice dan beberapa opsi yang punya template terpilih sekaligus, pesan
+                    dikirim satu per satu untuk tiap opsi yang cocok.
+                </div>
+            </div>
+        </div>
+
+        <div class="row g-3 mt-1">
             <div class="col-md-12">
                 <div class="form-check">
                     <input class="form-check-input" type="checkbox" name="__NAME__[is_other]" value="1">

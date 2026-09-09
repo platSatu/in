@@ -33,6 +33,7 @@ class Form extends Model
         'use_whatsapp_notification',
         'whatsapp_template_id',
         'has_personal_data_stage',
+        'personal_data_stage_position',
         'result_mode',
         'section_fail_threshold',
         'section_pass_threshold',

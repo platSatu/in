@@ -482,6 +482,7 @@ class FormController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'has_personal_data_stage' => 'nullable|boolean',
+            'personal_data_stage_position' => 'nullable|in:first,last',
             'result_mode' => 'nullable|in:none,auto,manual,section_threshold',
             'section_fail_threshold' => 'nullable|integer|min:1|max:50',
             'section_pass_threshold' => 'nullable|integer|min:0|max:50',
@@ -510,6 +511,11 @@ class FormController extends Controller
         }
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
+        // Default 'first' = perilaku SEBELUMNYA (Data Pribadi selalu di depan) --
+        // form yang sudah berjalan/tidak sengaja mengganti setting ini tidak
+        // berubah sama sekali. Lihat migration
+        // add_personal_data_stage_position_to_forms_table.
+        $validated['personal_data_stage_position'] = $validated['personal_data_stage_position'] ?? 'first';
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
         $validated['company_division_id'] = $validated['company_division_id'] ?? null;
         $validated = $this->applySectionThresholdFields($validated);
@@ -650,6 +656,7 @@ class FormController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'has_personal_data_stage' => 'nullable|boolean',
+            'personal_data_stage_position' => 'nullable|in:first,last',
             'result_mode' => 'nullable|in:none,auto,manual,section_threshold',
             'section_fail_threshold' => 'nullable|integer|min:1|max:50',
             'section_pass_threshold' => 'nullable|integer|min:0|max:50',
@@ -678,6 +685,8 @@ class FormController extends Controller
         }
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
+        // Default 'first' -- lihat catatan yang sama di store().
+        $validated['personal_data_stage_position'] = $validated['personal_data_stage_position'] ?? 'first';
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
         $validated['company_division_id'] = $validated['company_division_id'] ?? null;
         $validated = $this->applySectionThresholdFields($validated);
@@ -938,6 +947,7 @@ class FormController extends Controller
                 'use_whatsapp_notification',
                 'whatsapp_template_id',
                 'has_personal_data_stage',
+                'personal_data_stage_position',
                 'result_mode',
                 'section_fail_threshold',
                 'section_pass_threshold',

@@ -916,6 +916,15 @@
     const paymentPosition = @json($selectedForm->payment_position ?? 'before_questions');
     const hasPersonalDataStage = {{ $selectedForm && $selectedForm->has_personal_data_stage ? 'true' : 'false' }};
 
+    // FITUR TAMBAHAN: posisi step "Nama/Email/HP" (step-info -- BUKAN
+    // step-personal-data yang di atas, itu step TERPISAH untuk pertanyaan
+    // custom "Data Pribadi" opsional). Default 'first' = perilaku SEBELUMNYA
+    // (step-info selalu step pertama) -- form yang sudah berjalan/tidak
+    // sengaja mengubah setting ini TIDAK berubah sama sekali. Lihat migration
+    // add_personal_data_stage_position_to_forms_table &
+    // FormController::store()/update().
+    const personalDataStagePosition = @json($selectedForm->personal_data_stage_position ?? 'first');
+
     // True kalau form ini mengisi "Catatan Sebelum Test/Pembayaran" (opsional,
     // per-Form) — kalau true, 1 step tambahan ("step-notice") disisipkan ke
     // stepOrder di bawah. Kalau kosong, step ini otomatis di-skip sepenuhnya.
@@ -941,29 +950,59 @@
     const flashPaymentError = @json($errors->first('payment'));
     const flashSubmitError = @json($errors->first('submit'));
 
-    // Kalau form ini punya step "Data Pribadi", urutannya dikunci: info -> data
-    // pribadi -> (pembayaran) -> placement test -> review. Setting "Posisi
-    // Pembayaran" (before/after questions) sengaja DIABAIKAN di kasus ini —
-    // pembayaran selalu ditaruh di antara data pribadi dan placement test,
-    // sesuai alur yang sudah disepakati.
-    const stepOrder = hasPersonalDataStage
-        ? (requiresPayment
-            ? ['step-info', 'step-personal-data', 'step-payment', 'step-questions', 'step-review']
-            : ['step-info', 'step-personal-data', 'step-questions', 'step-review'])
-        : (requiresPayment
-            ? (paymentPosition === 'after_questions'
-                ? ['step-info', 'step-questions', 'step-payment', 'step-review']
-                : ['step-info', 'step-payment', 'step-questions', 'step-review'])
-            : ['step-info', 'step-questions', 'step-review']);
+    // "Blok identitas": step-info (Nama/Email/HP, SELALU ada) diikuti
+    // step-personal-data (pertanyaan custom "Data Pribadi", HANYA kalau
+    // has_personal_data_stage aktif) tepat setelahnya -- urutan relatif
+    // KEDUANYA tidak pernah berubah oleh fitur personalDataStagePosition di
+    // bawah, cuma POSISI blok ini secara keseluruhan (di depan/di akhir) yang
+    // bisa diatur. Ini pola/urutan PERSIS yang sudah berjalan sebelumnya.
+    const identityBlock = hasPersonalDataStage
+        ? ['step-info', 'step-personal-data']
+        : ['step-info'];
 
-    // Step "Catatan" (kalau diisi admin) selalu disisipkan tepat setelah Data
-    // Pribadi (atau setelah Info kalau form tidak punya step Data Pribadi),
-    // dan selalu sebelum Payment/Questions — apapun pengaturan
-    // requires_payment/payment_position form ini (sesuai alur yang sudah
-    // disepakati, lihat migration add_pre_test_notice_to_forms_table).
+    // personalDataStagePosition === 'first' (DEFAULT): identityBlock di depan,
+    // urutan selebihnya PERSIS SAMA seperti sebelum fitur ini ada (payment
+    // sebelum/sesudah placement test tetap ikut "Posisi Pembayaran" seperti
+    // biasa; kalau has_personal_data_stage aktif, payment selalu di antara
+    // identityBlock & placement test, sama seperti sebelumnya).
+    //
+    // personalDataStagePosition === 'last' (FITUR TAMBAHAN, opt-in per form):
+    // placement test dulu, baru identityBlock, baru (kalau requires_payment)
+    // payment PALING AKHIR sebelum submit -- gateway pembayaran butuh
+    // nama/email peserta yang sudah terisi, jadi payment tidak bisa
+    // diletakkan sebelum identityBlock (Opsi B yang sudah disepakati).
+    let stepOrder;
+
+    if (personalDataStagePosition === 'last') {
+        stepOrder = requiresPayment
+            ? ['step-questions'].concat(identityBlock, ['step-payment', 'step-review'])
+            : ['step-questions'].concat(identityBlock, ['step-review']);
+    } else {
+        stepOrder = requiresPayment
+            ? (hasPersonalDataStage
+                ? identityBlock.concat(['step-payment', 'step-questions', 'step-review'])
+                : (paymentPosition === 'after_questions'
+                    ? identityBlock.concat(['step-questions', 'step-payment', 'step-review'])
+                    : identityBlock.concat(['step-payment', 'step-questions', 'step-review'])))
+            : identityBlock.concat(['step-questions', 'step-review']);
+    }
+
+    // Step "Catatan" (kalau diisi admin) selalu disisipkan SEBELUM placement
+    // test dimulai (sesuai alur yang sudah disepakati, lihat migration
+    // add_pre_test_notice_to_forms_table):
+    // - personalDataStagePosition 'first' (default, TIDAK berubah dari
+    //   sebelumnya): disisip tepat setelah Data Pribadi (atau setelah Info
+    //   kalau form tidak punya step Data Pribadi custom).
+    // - personalDataStagePosition 'last' (fitur tambahan): identityBlock
+    //   sudah pindah ke BELAKANG placement test, jadi "sebelum test" di sini
+    //   berarti paling depan, tepat sebelum step-questions.
     if (hasPreTestNotice) {
-        const insertAfter = hasPersonalDataStage ? 'step-personal-data' : 'step-info';
-        stepOrder.splice(stepOrder.indexOf(insertAfter) + 1, 0, 'step-notice');
+        if (personalDataStagePosition === 'last') {
+            stepOrder.splice(stepOrder.indexOf('step-questions'), 0, 'step-notice');
+        } else {
+            const insertAfter = hasPersonalDataStage ? 'step-personal-data' : 'step-info';
+            stepOrder.splice(stepOrder.indexOf(insertAfter) + 1, 0, 'step-notice');
+        }
     }
 
     let currentStepIndex = 0;
@@ -2190,6 +2229,46 @@
     // gateway pembayaran), langsung lompat ke step Payment dan lanjutkan polling
     // tanpa membuat transaksi baru.
     document.addEventListener('DOMContentLoaded', async function () {
+        // HTML statis selalu menandai #step-info sebagai class="step active"
+        // (step pertama versi SEBELUM fitur ini ada), dan sebelum fitur ini
+        // stepOrder[0] selalu 'step-info' juga -- jadi blok di bawah ini
+        // TIDAK PERNAH jalan untuk form yang belum memakai
+        // personalDataStagePosition === 'last' (mayoritas form yang sudah
+        // berjalan, termasuk SEMUA form lama): kondisi
+        // `stepOrder[0] !== 'step-info'` akan selalu false, persis seperti
+        // sebelum fitur ini ada.
+        //
+        // Begitu personalDataStagePosition === 'last' membuat step lain
+        // (mis. step-questions) jadi stepOrder[0], showStep() dipanggil
+        // supaya step yang tampil pertama kali benar-benar konsisten dengan
+        // urutan baru itu -- termasuk efek sampingnya (mis. startQuizTimer()
+        // otomatis jalan kalau step pertamanya sekarang step-questions),
+        // sama seperti kalau peserta "tiba" di step itu lewat navigasi
+        // normal.
+        //
+        // DIKECUALIKAN kalau hasValidationErrors true: pesan error
+        // name/email/handphone dari server dirender DI DALAM elemen
+        // step-info itu sendiri, jadi step itu tetap harus yang ditampilkan
+        // supaya pesan errornya kelihatan oleh peserta -- di sini cukup
+        // arahkan showStep() ke index step-info yang SEBENARNYA di stepOrder
+        // (bukan 0), bukan dibiarkan sepenuhnya diam, supaya currentStepIndex
+        // tetap konsisten dengan step yang benar-benar tampil untuk
+        // nextStep()/prevStep() setelahnya.
+        //
+        // SENGAJA dijalankan di sini (dalam DOMContentLoaded), BUKAN di
+        // top-level script seperti percobaan sebelumnya -- showStep() di
+        // atas bisa memicu startQuizTimer(), yang membaca beberapa
+        // const/let (mis. timerEnabled) yang baru dideklarasikan BELAKANGAN
+        // di file ini. Dipanggil di top-level bikin variabel itu belum
+        // terinisialisasi (temporal dead zone) dan JS berhenti total di
+        // tengah jalan -- itu penyebab tombol "Next" sempat tidak merespons
+        // sama sekali. Di titik DOMContentLoaded ini seluruh script sudah
+        // selesai dijalankan sekali dari atas ke bawah, jadi semua
+        // const/let sudah aman diakses.
+        if (stepOrder[0] !== 'step-info') {
+            showStep(hasValidationErrors ? stepOrder.indexOf('step-info') : 0);
+        }
+
         showFlashNotifications();
 
         updateProgress();

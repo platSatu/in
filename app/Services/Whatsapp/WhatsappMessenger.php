@@ -4,6 +4,7 @@ namespace App\Services\Whatsapp;
 
 use App\Models\Form;
 use App\Models\WhatsappGateway;
+use App\Models\WhatsappTemplate;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -66,6 +67,57 @@ class WhatsappMessenger
         // FormController::saveResult()) tapi template belum memuat placeholder
         // {{pilih_kelas_link}} secara eksplisit, tambahkan section terpisah di
         // akhir pesan.
+        $pilihKelasLink = $placeholders['pilih_kelas_link'] ?? '';
+        if (!empty($pilihKelasLink) && !str_contains($content, $pilihKelasLink)) {
+            $content .= "\n\n📚 *Pilih Kelas Anda:*\n" . $pilihKelasLink;
+        }
+
+        return $content;
+    }
+
+    /**
+     * === FITUR TAMBAHAN: TEMPLATE WA PER OPSI JAWABAN ===
+     *
+     * Susun isi pesan WhatsApp dari template MILIK SATU OPSI jawaban
+     * (form_question_options.whatsapp_template_id), BUKAN dari
+     * $form->whatsappTemplate. Method BARU & TERPISAH dari
+     * buildMessageFromTemplate() di atas -- sengaja tidak memodifikasi method
+     * itu sama sekali, supaya perilaku pesan per-Form yang sudah berjalan
+     * (dipakai FrontendController::finalizeCompletedSubmission() &
+     * FormController::saveResult()) tidak berubah sedikit pun.
+     *
+     * Dipakai FrontendController::sendPerOptionWhatsappMessages() untuk
+     * mengirim pesan TAMBAHAN per opsi yang dipilih peserta & punya template
+     * terpasang -- di luar (bukan pengganti) pesan per-Form yang sudah ada.
+     *
+     * Beda dengan buildMessageFromTemplate(): TIDAK ada fallback ke format
+     * pesan default kalau template/isinya kosong -- kembalikan null saja,
+     * biar caller cukup skip pengiriman utk opsi itu (daripada memaksa kirim
+     * pesan default yang bisa dobel dengan pesan per-Form yang sudah terkirim
+     * duluan).
+     *
+     * @param array $placeholders key => value, key TANPA kurung kurawal, misal 'name' utk {{name}}
+     */
+    public function buildMessageFromWhatsappTemplate(WhatsappTemplate $template, array $placeholders): ?string
+    {
+        if (empty($template->content)) {
+            return null;
+        }
+
+        $content = $template->content;
+
+        foreach ($placeholders as $key => $value) {
+            $content = str_replace('{{' . $key . '}}', (string) $value, $content);
+        }
+
+        // Sama pola dengan buildMessageFromTemplate(): tambahkan link di akhir
+        // pesan kalau ada tapi belum dipakai eksplisit lewat placeholder di
+        // template-nya sendiri.
+        $callbackLink = $placeholders['callback_link'] ?? '';
+        if (!empty($callbackLink) && !str_contains($content, $callbackLink)) {
+            $content .= "\n\n🔗 *Link Anda:*\n" . $callbackLink;
+        }
+
         $pilihKelasLink = $placeholders['pilih_kelas_link'] ?? '';
         if (!empty($pilihKelasLink) && !str_contains($content, $pilihKelasLink)) {
             $content .= "\n\n📚 *Pilih Kelas Anda:*\n" . $pilihKelasLink;

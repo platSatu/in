@@ -27,6 +27,7 @@ class FormQuestionOption extends Model
         'is_other',
         'is_correct',
         'status',
+        'whatsapp_template_id',
     ];
 
     protected $casts = [
@@ -62,5 +63,17 @@ class FormQuestionOption extends Model
             ->where('status', 'active')
             ->orderBy('order')
             ->orderBy('created_at');
+    }
+
+    /**
+     * Template WhatsApp khusus opsi ini (fitur tambahan, terpisah dari
+     * whatsapp_template_id milik Form). Kalau peserta memilih opsi ini dan
+     * kolom ini diisi, satu pesan WA terpisah dikirim memakai template ini
+     * -- di luar (bukan pengganti) pesan per-form yang sudah ada. Lihat
+     * FrontendController@sendPerOptionWhatsappMessages.
+     */
+    public function whatsappTemplate()
+    {
+        return $this->belongsTo(WhatsappTemplate::class, 'whatsapp_template_id');
     }
 }

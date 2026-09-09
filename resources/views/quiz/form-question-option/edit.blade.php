@@ -99,6 +99,31 @@
                         </div>
                     </div>
 
+                    <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <label for="whatsapp_template_id" class="mb-2">Template WhatsApp Opsi Ini <span class="text-muted">(Opsional)</span></label>
+                            <select class="form-select @error('whatsapp_template_id') is-invalid @enderror"
+                                id="whatsapp_template_id" name="whatsapp_template_id">
+                                <option value="">Tidak pakai template khusus opsi ini</option>
+                                @foreach ($templates as $template)
+                                    <option value="{{ $template->id }}"
+                                        {{ old('whatsapp_template_id', $data->whatsapp_template_id) === $template->id ? 'selected' : '' }}>
+                                        {{ $template->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">
+                                Fitur tambahan: kalau diisi, begitu peserta memilih opsi ini akan dikirim SATU pesan WA
+                                terpisah memakai template ini — di luar (bukan pengganti) pesan WA per-form yang sudah
+                                ada. Kalau pertanyaan ini multiple choice dan beberapa opsi yang punya template
+                                terpilih sekaligus, pesan dikirim satu per satu untuk tiap opsi yang cocok.
+                            </div>
+                            @error('whatsapp_template_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
                 </div>
             </div>
 
