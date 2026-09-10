@@ -110,6 +110,13 @@ class ApplicationDocumentController extends Controller
                     'uploaded_by_user_id' => $existing->uploaded_by_user_id,
                     'uploaded_at' => $existing->uploaded_at,
                     'replaced_at' => now(),
+                    // Ikut simpan hasil review versi lama (kalau sempat direview
+                    // sebelum di-upload ulang) -- supaya tidak hilang begitu
+                    // baris ApplicationDocument-nya di-reset ke pending di bawah.
+                    'review_status' => $existing->review_status,
+                    'review_note' => $existing->review_note,
+                    'reviewed_by_user_id' => $existing->reviewed_by_user_id,
+                    'reviewed_at' => $existing->reviewed_at,
                 ]);
             }
 

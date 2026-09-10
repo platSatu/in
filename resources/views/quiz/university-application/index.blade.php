@@ -67,6 +67,7 @@
                                 <th>Major</th>
                                 <th>Intake</th>
                                 <th>Status</th>
+                                <th style="width:140px;">Documents</th>
                                 <th>Submitted</th>
                                 <th class="no-content text-center">Action</th>
                             </tr>
@@ -86,6 +87,20 @@
                                     <td>
                                         <span class="badge badge-info text-capitalize">{{ str_replace('_', ' ', $item->status) }}</span>
                                     </td>
+                                    <td>
+                                        @php
+                                            $docsCount = $item->documents_count ?? 0;
+                                            $docsPercent = $totalDocumentTypes > 0 ? min(100, round(($docsCount / $totalDocumentTypes) * 100)) : 0;
+                                            $isComplete = $totalDocumentTypes > 0 && $docsCount >= $totalDocumentTypes;
+                                        @endphp
+                                        <div style="font-size:12px;" class="mb-1">{{ $docsCount }} / {{ $totalDocumentTypes }}</div>
+                                        <div class="progress" style="height:6px;">
+                                            <div class="progress-bar {{ $isComplete ? 'bg-success' : 'bg-primary' }}" role="progressbar" style="width: {{ $docsPercent }}%;" aria-valuenow="{{ $docsPercent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                        </div>
+                                        @if ($isComplete)
+                                            <span class="badge badge-success mt-1" style="font-size:10px;">Documents Complete</span>
+                                        @endif
+                                    </td>
                                     <td>{{ optional($item->submitted_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
                                         <a href="{{ route('quiz.university-application.show', $item->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
@@ -95,7 +110,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center">Belum ada aplikasi kuliah masuk.</td>
+                                    <td colspan="10" class="text-center">Belum ada aplikasi kuliah masuk.</td>
                                 </tr>
                             @endforelse
                         </tbody>

@@ -578,15 +578,23 @@ Route::middleware(['auth', 'permission:quiz.university-profile,edit'])->prefix('
 });
 
 // Fase 5 (superadmin) -- lihat Aplikasi Kuliah siswa + dokumen yang sudah
-// disubmit (preview/download). View-only untuk sekarang (belum ada
-// create/update/delete dari sisi admin), makanya cuma 1 level permission
-// ('quiz.university-application', tanpa varian ',edit') -- sama seperti
-// pola modul laporan/monitoring lain, bukan modul CRUD biasa.
+// disubmit (preview/download). Ability default 'view' untuk index/show/
+// download*.
 Route::middleware(['auth', 'permission:quiz.university-application'])->prefix('dashboard/superadmin/quiz/university-application')->group(function () {
     Route::get('/', [UniversityApplicationController::class, 'index'])->name('quiz.university-application.index');
     Route::get('/{id}', [UniversityApplicationController::class, 'show'])->name('quiz.university-application.show');
     Route::get('/{id}/documents/{documentId}/download', [UniversityApplicationController::class, 'downloadDocument'])->name('quiz.university-application.documents.download');
     Route::get('/{id}/documents/history/{historyId}/download', [UniversityApplicationController::class, 'downloadDocumentHistory'])->name('quiz.university-application.documents.history.download');
+});
+
+// Ability 'edit' -- superadmin approve/reject dokumen & upload dokumen atas
+// nama siswa (lihat diskusi "checklist dokumen", 10 September 2026). Key
+// permission-nya SENGAJA sama dengan grup view-only di atas
+// ('quiz.university-application'), cuma beda ability, mengikuti pola
+// permission:<key> vs permission:<key>,edit modul lain di file ini.
+Route::middleware(['auth', 'permission:quiz.university-application,edit'])->prefix('dashboard/superadmin/quiz/university-application')->group(function () {
+    Route::post('/{id}/documents/{documentId}/review', [UniversityApplicationController::class, 'reviewDocument'])->name('quiz.university-application.documents.review');
+    Route::post('/{id}/documents/type/{documentTypeId}/upload', [UniversityApplicationController::class, 'uploadDocument'])->name('quiz.university-application.documents.upload');
 });
 
 Route::middleware(['auth', 'permission:company.profile'])->prefix('dashboard/superadmin/company/profile')->group(function () {

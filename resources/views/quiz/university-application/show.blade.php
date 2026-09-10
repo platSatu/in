@@ -7,6 +7,24 @@
         <a href="{{ route('quiz.university-application.index') }}" class="btn btn-outline-secondary">&laquo; Back to List</a>
     </div>
 
+    @if (session('success'))
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            {{ session('success') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if ($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <ul class="mb-0 ps-3">
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
+                @endforeach
+            </ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
@@ -77,11 +95,11 @@
                         <table class="table table-bordered align-middle" style="font-size:13.5px;">
                             <thead>
                                 <tr>
-                                    <th style="width:220px;">Document</th>
+                                    <th style="width:200px;">Document</th>
                                     <th>File</th>
-                                    <th style="width:120px;">Status</th>
-                                    <th style="width:160px;">Uploaded</th>
-                                    <th class="text-center" style="width:220px;">Action</th>
+                                    <th style="width:140px;">Status</th>
+                                    <th style="width:150px;">Uploaded</th>
+                                    <th class="text-center" style="width:260px;">Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -100,6 +118,16 @@
                                             @else
                                                 <span class="badge badge-warning">Pending</span>
                                             @endif
+
+                                            @if ($document && $document->reviewed_at)
+                                                <div class="text-muted mt-1" style="font-size:11px;">
+                                                    by {{ optional($document->reviewedBy)->name ?? '-' }}<br>
+                                                    {{ $document->reviewed_at->format('Y/m/d H:i') }}
+                                                </div>
+                                                @if ($document->review_status === 'rejected' && $document->review_note)
+                                                    <div class="text-danger mt-1" style="font-size:11px;">&quot;{{ $document->review_note }}&quot;</div>
+                                                @endif
+                                            @endif
                                         </td>
                                         <td>
                                             {{ $document && $document->uploaded_at ? $document->uploaded_at->format('Y/m/d H:i') : '-' }}
@@ -109,13 +137,49 @@
                                         </td>
                                         <td class="text-center">
                                             @if ($document)
-                                                <div class="d-flex flex-nowrap justify-content-center gap-2">
+                                                <div class="d-flex flex-nowrap justify-content-center gap-2 mb-2">
                                                     <a href="{{ asset($document->file_path) }}" target="_blank" class="btn btn-sm btn-outline-primary text-nowrap">
                                                         Preview
                                                     </a>
                                                     <a href="{{ route('quiz.university-application.documents.download', [$application->id, $document->id]) }}" class="btn btn-sm btn-outline-success text-nowrap">
                                                         Download
                                                     </a>
+                                                </div>
+
+                                                <div class="d-flex flex-nowrap justify-content-center gap-2 mb-2">
+                                                    <form method="POST" action="{{ route('quiz.university-application.documents.review', [$application->id, $document->id]) }}" class="m-0">
+                                                        @csrf
+                                                        <input type="hidden" name="action" value="approve">
+                                                        <button type="submit" class="btn btn-sm btn-success text-nowrap" {{ $document->review_status === 'approved' ? 'disabled' : '' }}>
+                                                            Approve
+                                                        </button>
+                                                    </form>
+                                                    <button type="button" class="btn btn-sm btn-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $documentType->id }}">
+                                                        Reject
+                                                    </button>
+                                                </div>
+
+                                                <div class="modal fade" id="rejectModal-{{ $documentType->id }}" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content text-start">
+                                                            <form method="POST" action="{{ route('quiz.university-application.documents.review', [$application->id, $document->id]) }}">
+                                                                @csrf
+                                                                <input type="hidden" name="action" value="reject">
+                                                                <div class="modal-header">
+                                                                    <h6 class="modal-title mb-0">Reject: {{ $documentType->label }}</h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                </div>
+                                                                <div class="modal-body">
+                                                                    <label class="form-label" style="font-size:13px;">Alasan reject (wajib diisi, siswa akan melihat ini)</label>
+                                                                    <textarea name="note" class="form-control" rows="3" required></textarea>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                                                                    <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
                                                 @if ($document->histories->isNotEmpty())
@@ -125,19 +189,32 @@
                                                         </summary>
                                                         <ul class="mb-0 ps-3" style="font-size:11.5px;">
                                                             @foreach ($document->histories as $history)
-                                                                <li>
+                                                                <li class="mb-1">
                                                                     {{ optional($history->replaced_at)->format('Y/m/d H:i') }} --
                                                                     <a href="{{ asset($history->file_path) }}" target="_blank">Preview</a>
                                                                     /
                                                                     <a href="{{ route('quiz.university-application.documents.history.download', [$application->id, $history->id]) }}">Download</a>
+                                                                    @if ($history->review_status)
+                                                                        <div class="text-muted">
+                                                                            Reviewed: <span class="text-capitalize">{{ $history->review_status }}</span>
+                                                                            @if (optional($history->reviewedBy)->name) by {{ $history->reviewedBy->name }} @endif
+                                                                            @if ($history->review_note) -- &quot;{{ $history->review_note }}&quot; @endif
+                                                                        </div>
+                                                                    @endif
                                                                 </li>
                                                             @endforeach
                                                         </ul>
                                                     </details>
                                                 @endif
                                             @else
-                                                <span class="text-muted">-</span>
+                                                <span class="text-muted d-block mb-2">-</span>
                                             @endif
+
+                                            <form method="POST" action="{{ route('quiz.university-application.documents.upload', [$application->id, $documentType->id]) }}" enctype="multipart/form-data" class="d-flex flex-nowrap justify-content-center gap-1 mt-2">
+                                                @csrf
+                                                <input type="file" name="document" class="form-control form-control-sm" style="max-width:150px;" required>
+                                                <button type="submit" class="btn btn-sm btn-outline-dark text-nowrap">{{ $document ? 'Re-upload' : 'Upload' }}</button>
+                                            </form>
                                         </td>
                                     </tr>
                                 @endforeach

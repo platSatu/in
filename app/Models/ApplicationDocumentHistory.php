@@ -26,11 +26,18 @@ class ApplicationDocumentHistory extends Model
         'uploaded_by_user_id',
         'uploaded_at',
         'replaced_at',
+        // Snapshot hasil review versi LAMA ini (sebelum ditimpa upload ulang)
+        // -- lihat migration add_review_snapshot_to_application_document_histories_table.
+        'review_status',
+        'review_note',
+        'reviewed_by_user_id',
+        'reviewed_at',
     ];
 
     protected $casts = [
         'uploaded_at' => 'datetime',
         'replaced_at' => 'datetime',
+        'reviewed_at' => 'datetime',
     ];
 
     public function applicationDocument(): BelongsTo
@@ -41,5 +48,10 @@ class ApplicationDocumentHistory extends Model
     public function uploadedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'uploaded_by_user_id');
+    }
+
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by_user_id');
     }
 }
