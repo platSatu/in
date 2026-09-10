@@ -86,7 +86,13 @@ class UniversityController extends Controller
                 'status' => 'nullable|string',
                 'logo' => 'nullable|image|max:2048',
                 'banner' => 'nullable|image|max:4096',
-                'attachment' => 'nullable|mimes:jpg,jpeg,pdf|max:5120',
+                // Naikkan dari 5MB -> 15MB per permintaan user (10 September
+                // 2026) -- brosur/dokumen kampus dalam PDF suka lebih besar
+                // dari 5MB. Perhatikan: batas PHP (upload_max_filesize &
+                // post_max_size di php.ini) juga harus >= 15M, kalau tidak
+                // file besar akan gagal terupload SEBELUM sempat divalidasi
+                // rule ini (Laravel tidak bisa "melewati" batas PHP itu).
+                'attachment' => 'nullable|mimes:jpg,jpeg,pdf|max:15360',
             ]);
 
             $userId = Auth::id();
@@ -262,7 +268,10 @@ class UniversityController extends Controller
             'status' => 'nullable|string',
             'logo' => 'nullable|image|max:2048',
             'banner' => 'nullable|image|max:4096',
-            'attachment' => 'nullable|mimes:jpg,jpeg,pdf|max:5120',
+            // Naikkan dari 5MB -> 15MB, sama seperti di store() (lihat
+            // catatan di sana soal batas upload_max_filesize/post_max_size
+            // di php.ini yang juga perlu >= 15M).
+            'attachment' => 'nullable|mimes:jpg,jpeg,pdf|max:15360',
         ]);
 
         // Sama seperti store(): kolom `status` NOT NULL tanpa default. Kalau
