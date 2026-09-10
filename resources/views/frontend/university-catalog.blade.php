@@ -136,9 +136,6 @@
             gap: 10px;
         }
 
-        /* NOTE: dropdown ini sengaja belum difungsikan (placeholder tampilan
-           saja dulu sesuai permintaan) -- tinggal disambungkan ke query filter
-           city/major/type/scholarship kalau datanya sudah siap. */
         .filter-select {
             border: 1px solid #e6e8f0;
             background: #fff;
@@ -187,10 +184,6 @@
             box-shadow: 0 18px 36px rgba(20,30,60,.14);
         }
 
-        /* === FIX POSISI ===
-           Sebelumnya logo di-absolute di atas "banner" berwarna yang menumpuk
-           keluar dari card. Sekarang logo + badge scholarship sejajar dalam
-           satu baris biasa di dalam card, seperti di gambar referensi. */
         .uni-card-top {
             display: flex;
             align-items: flex-start;
@@ -245,9 +238,6 @@
             margin-bottom: 16px;
         }
 
-        /* === FIX: tags field-of-study dihilangkan supaya layout sama persis
-           dengan gambar referensi (yang tidak menampilkan tags sama sekali). === */
-
         .uni-meta {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -273,8 +263,6 @@
             color: #1d2333;
         }
 
-        /* === FIX: "View Profile" sebelumnya tombol merah full-width, sekarang
-           text-link kecil dengan panah, rata kiri, sesuai gambar referensi. === */
         .btn-view {
             color: var(--brand);
             font-weight: 700;
@@ -345,7 +333,12 @@
                         Explore our partner universities and find the best match for your major, budget, and goals.
                     </p>
 
-                    <form method="GET" action="{{ url()->current() }}" class="search-box d-flex gap-2 mx-auto mt-4">
+                    {{-- Form ini jadi SATU-SATUNYA form filter di halaman (id="catalogFilterForm").
+                         4 select di .filter-bar di bawah secara visual ada di luar tag <form> ini,
+                         tapi tetap ikut ke-submit lewat atribut form="catalogFilterForm" pada
+                         masing-masing <select> -- jadi search & semua filter selalu terkirim
+                         bersamaan, tanpa perlu mengubah posisi/markup aslinya. --}}
+                    <form method="GET" action="{{ url()->current() }}" id="catalogFilterForm" class="search-box d-flex gap-2 mx-auto mt-4">
                         <input type="text" name="search" value="{{ $search ?? '' }}"
                                class="form-control border-0 ps-3"
                                placeholder="Search university, city, or country...">
@@ -364,23 +357,40 @@
         <div class="catalog-toolbar">
             <span class="result-count"><strong>{{ $universities->count() }}</strong> universities found</span>
 
-            {{-- Dropdown di bawah ini masih placeholder tampilan saja (belum
-                 difungsikan) sesuai permintaan -- sambungkan ke logic filter
-                 city/major/type/scholarship begitu datanya siap. --}}
             <div class="filter-bar">
-                <select class="filter-select" disabled>
-                    <option>All Cities</option>
+                <select class="filter-select" name="city_id" form="catalogFilterForm" onchange="this.form.submit()">
+                    <option value="">All Cities</option>
+                    @foreach($cities as $city)
+                        <option value="{{ $city->id }}" {{ (string) $cityId === (string) $city->id ? 'selected' : '' }}>
+                            {{ $city->name }}
+                        </option>
+                    @endforeach
                 </select>
-                <select class="filter-select" disabled>
-                    <option>All Majors</option>
+
+                <select class="filter-select" name="major_id" form="catalogFilterForm" onchange="this.form.submit()">
+                    <option value="">All Majors</option>
+                    @foreach($majors as $major)
+                        <option value="{{ $major->id }}" {{ (string) $majorId === (string) $major->id ? 'selected' : '' }}>
+                            {{ $major->name }}
+                        </option>
+                    @endforeach
                 </select>
-                <select class="filter-select" disabled>
-                    <option>All Types</option>
+
+                <select class="filter-select" name="type" form="catalogFilterForm" onchange="this.form.submit()">
+                    <option value="">All Types</option>
+                    @foreach($allFields as $field)
+                        <option value="{{ $field }}" {{ (string) $type === (string) $field ? 'selected' : '' }}>
+                            {{ $field }}
+                        </option>
+                    @endforeach
                 </select>
-                <select class="filter-select" disabled>
-                    <option>Scholarship Available</option>
+
+                <select class="filter-select" name="scholarship" form="catalogFilterForm" onchange="this.form.submit()">
+                    <option value="" {{ empty($scholarship) ? 'selected' : '' }}>Scholarship Available</option>
+                    <option value="1" {{ $scholarship === '1' ? 'selected' : '' }}>Yes, Available Only</option>
                 </select>
-                <a href="{{ url()->current() }}" class="filter-reset">
+
+                <a href="{{ route('frontend.university.catalog') }}" class="filter-reset">
                     <i class="bi bi-arrow-clockwise"></i> Reset
                 </a>
             </div>
@@ -390,7 +400,24 @@
         @if($universities->count())
         <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-4 mb-5" id="catalogGrid">
             @foreach($universities as $uni)
-                @php $profile = $profiles->get($uni->id); @endphp
+                @php
+                    $profile = $profiles->get($uni->id);
+
+                    // Kolom `city` di tabel universities juga jadi nama relasi city()
+                    // (lihat catatan di UniversityController::show()/FrontendController) --
+                    // $uni->city (magic property) SELALU mengembalikan nilai kolom mentah
+                    // (UUID), bukan objek City, walau relasinya sudah di-load() di
+                    // controller (FrontendController::universityCatalog() sudah
+                    // memanggil $universities->load('city')). Ambil lewat getRelation()
+                    // supaya nama kota yang tampil, dengan fallback aman untuk data lama
+                    // yang city-nya masih teks bebas manual, dan tanpa pernah menampilkan
+                    // UUID mentah kalau referensinya ternyata sudah putus.
+                    $cityRelation = $uni->getRelation('city');
+                    $rawCity = $uni->city;
+                    $rawCityLooksLikeUuid = is_string($rawCity)
+                        && preg_match('/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i', $rawCity);
+                    $cityDisplay = $cityRelation->name ?? (! $rawCityLooksLikeUuid ? $rawCity : null);
+                @endphp
                 <div class="col uni-col">
                     <div class="uni-card">
                         <div class="uni-card-top">
@@ -410,7 +437,7 @@
                         <div class="uni-name">{{ $uni->name }}</div>
                         <div class="uni-location">
                             <i class="bi bi-geo-alt"></i>
-                            {{ $uni->city ?? 'City N/A' }}{{ $uni->country ? ', ' . $uni->country : '' }}
+                            {{ $cityDisplay ?? 'City N/A' }}{{ $uni->country ? ', ' . $uni->country : '' }}
                         </div>
 
                         <div class="uni-meta">
@@ -449,7 +476,7 @@
             <i class="bi bi-search"></i>
             <h5>No universities found</h5>
             <p>Try a different keyword or clear your search.</p>
-            <a href="{{ url()->current() }}" class="btn-view d-inline-block px-4">Clear Search</a>
+            <a href="{{ route('frontend.university.catalog') }}" class="btn-view d-inline-block px-4">Clear Search</a>
         </div>
         @endif
 
