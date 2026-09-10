@@ -32,6 +32,16 @@ class UniversityApplication extends Model
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 
+    // FIX (10 September 2026): fitur "Alur Pembayaran 2 Arah Apply Kampus" --
+    // status UNDER REVIEW/PROCESSING/ACCEPTED, SENGAJA terpisah dari
+    // konstanta STATUS_* di atas supaya stepper/filter yang sudah jalan
+    // berdasarkan 'status' tidak ikut berubah. 'under_review' otomatis
+    // diset begitu Registration Fee sukses dibayar (Step 1 & 2 terbuka);
+    // 'processing' & 'accepted' diubah manual oleh admin.
+    public const ADMISSION_STATUS_UNDER_REVIEW = 'under_review';
+    public const ADMISSION_STATUS_PROCESSING = 'processing';
+    public const ADMISSION_STATUS_ACCEPTED = 'accepted';
+
     protected $fillable = [
         'application_no',
         'student_id',
@@ -47,6 +57,8 @@ class UniversityApplication extends Model
         'registration_fee_paid_at',
         'deposit_fee_china_amount',
         'status',
+        // FIX (10 September 2026): lihat catatan ADMISSION_STATUS_* di atas.
+        'admission_status',
         'handled_by_user_id',
         'notes',
         'submitted_at',
@@ -88,5 +100,11 @@ class UniversityApplication extends Model
     public function checklistEntries(): HasMany
     {
         return $this->hasMany(ApplicationChecklistEntry::class, 'application_id');
+    }
+
+    // FIX (10 September 2026): fitur "Alur Pembayaran 2 Arah Apply Kampus".
+    public function payments(): HasMany
+    {
+        return $this->hasMany(ApplicationPayment::class, 'application_id');
     }
 }
