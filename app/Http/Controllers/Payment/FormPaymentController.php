@@ -10,6 +10,7 @@ use App\Models\PaymentGateway;
 use App\Models\UniversityApplication;
 use App\Services\Payment\PaymentGatewayFactory;
 use App\Services\Payment\PaymentSignatureMismatchException;
+use App\Services\Whatsapp\WhatsappMessenger;
 use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -342,12 +343,19 @@ class FormPaymentController extends Controller
 
     /**
      * FIX (10 September 2026): dipanggil SEKALI begitu ApplicationPayment
-     * dikonfirmasi "paid" oleh webhook. Untuk Fase 2 ini baru menangani
-     * bagian Registration Fee (buka admission_status jadi 'under_review',
-     * yang artinya Step 1 Study Plan & Step 2 Upload Documents jadi bisa
-     * diakses -- lihat pengecekan di ApplicationDocumentController). Efek
-     * lain (generate link invoice via WA, dst) menyusul di Fase 6 & 7,
-     * TIDAK dikerjakan di sini supaya tidak keluar dari lingkup Fase 2.
+     * dikonfirmasi "paid" oleh webhook.
+     *
+     * FASE 6 (10 September 2026): efek ini sekarang berlaku untuk KEDUA
+     * purpose (registration_fee & departure_fee) -- generate invoice_token
+     * (link invoice bisa di-print/download PDF, lihat InvoiceController) +
+     * kirim link itu via WhatsApp. Efek Registration Fee (buka
+     * admission_status jadi 'under_review') TETAP cuma untuk purpose
+     * registration_fee seperti Fase 2.
+     *
+     * CATATAN: pengiriman WA di sini SENGAJA belum dicek lewat toggle
+     * "aktifkan notifikasi ketika student selesai melakukan pembayaran" --
+     * toggle itu (+ halaman Settingnya) menyusul di Fase 7. Sampai Fase 7
+     * selesai, WA invoice ini SELALU terkirim (anggap toggle default ON).
      */
     private function onApplicationPaymentPaid(ApplicationPayment $payment): void
     {
@@ -363,6 +371,59 @@ class FormPaymentController extends Controller
                 'admission_status' => UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW,
             ]);
         }
+
+        $this->sendInvoiceNotification($payment, $application);
+    }
+
+    /**
+     * FASE 6 -- generate invoice_token (kalau belum ada, idempotent terhadap
+     * webhook yang mungkin terkirim dobel -- lihat guard isPaid() di
+     * handleWebhook() yang sudah mencegah baris ini dieksekusi 2x untuk
+     * transaksi yang sama, tapi dicek lagi di sini untuk jaga-jaga) + kirim
+     * link invoice-nya via WhatsApp ke nomor yang diisi siswa saat Apply
+     * (application->whatsapp, fallback ke handphone Student).
+     */
+    private function sendInvoiceNotification(ApplicationPayment $payment, UniversityApplication $application): void
+    {
+        if (empty($payment->invoice_token)) {
+            $payment->update(['invoice_token' => $this->generateInvoiceToken()]);
+        }
+
+        $phone = $application->whatsapp ?: ($application->student->handphone ?? null);
+
+        if (empty($phone)) {
+            Log::warning('[PAYMENT][Invoice] Tidak ada nomor WhatsApp untuk kirim link invoice', [
+                'application_id' => $application->id,
+                'payment_id' => $payment->id,
+            ]);
+
+            return;
+        }
+
+        $purposeLabel = $payment->purpose === ApplicationPayment::PURPOSE_DEPARTURE_FEE
+            ? 'Departure Fee'
+            : 'Registration Fee';
+
+        $studentName = trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? ''));
+        // update() di atas juga men-sync attribute 'invoice_token' ke $payment
+        // itu sendiri, jadi bisa langsung dibaca di sini tanpa query ulang.
+        $invoiceUrl = route('invoice.show', $payment->invoice_token);
+
+        $message = "Halo " . ($studentName ?: 'Calon Mahasiswa') . ",\n\n"
+            . "Pembayaran *{$purposeLabel}* untuk aplikasi *{$application->application_no}* sudah kami terima. Terima kasih!\n\n"
+            . "Invoice Anda bisa dilihat, diprint, atau didownload sebagai PDF lewat link berikut:\n"
+            . $invoiceUrl;
+
+        (new WhatsappMessenger())->send($phone, $message);
+    }
+
+    private function generateInvoiceToken(): string
+    {
+        do {
+            $token = Str::random(40);
+        } while (ApplicationPayment::where('invoice_token', $token)->exists());
+
+        return $token;
     }
 
     private function generateOrderId(): string

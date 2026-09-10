@@ -52,6 +52,7 @@ use App\Http\Controllers\StudentPortal\ApplyController;
 use App\Http\Controllers\StudentPortal\ApplicationController;
 use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
 use App\Http\Controllers\StudentPortal\ApplicationPaymentController;
+use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
 use App\Http\Controllers\Company\CompanyBranchController;
@@ -133,6 +134,12 @@ Route::get('/university/{id}', [FrontendController::class, 'universityProfile'])
 // alur redirect ke Register (bukan Login) dengan intended-URL tersimpan.
 // Lihat StudentPortal\ApplyController::show().
 Route::get('/apply/{universityProfile}', [ApplyController::class, 'show'])->name('student-portal.apply.show');
+
+// FASE 6 -- halaman invoice PUBLIK (tanpa login, lihat docblock
+// InvoiceController), dibuka dari link yang dikirim via WhatsApp setelah
+// Registration Fee/Departure Fee lunas. Keamanannya dari invoice_token
+// random 40 karakter itu sendiri, bukan dari sesi login.
+Route::get('/invoice/{token}', [InvoiceController::class, 'show'])->name('invoice.show');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/apply/{universityProfile}', [ApplyController::class, 'store'])->name('student-portal.apply.store');
