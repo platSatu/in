@@ -77,6 +77,16 @@
             <div class="alert alert-info alert-heads-up">{{ session('status') }}</div>
         @endif
 
+        @if(session('apply_conflict'))
+            <div class="alert alert-warning alert-heads-up d-flex align-items-center justify-content-between flex-wrap gap-2">
+                <span>{{ session('apply_conflict') }}</span>
+                <form method="POST" action="{{ route('logout') }}" class="m-0">
+                    @csrf
+                    <button type="submit" class="btn btn-sm btn-outline-dark">Logout</button>
+                </form>
+            </div>
+        @endif
+
         <div class="card-box">
             <h1>Apply Now</h1>
             <p class="subtitle">

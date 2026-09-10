@@ -116,6 +116,26 @@ class ApplyController extends Controller
         if (empty($student->user_id)) {
             $student->user_id = $user->id;
             $student->save();
+        } elseif ($student->user_id !== $user->id) {
+            // Nomor WhatsApp (atau email) yang diisi di form ini ternyata
+            // sudah terhubung ke akun LAIN (StudentIdentityResolver
+            // mencocokkan Student lewat email ATAU handphone -- lihat
+            // findOrCreate()). SENGAJA tidak dipindah/ditimpa otomatis ke
+            // akun yang sedang login, supaya data CRM milik akun lain itu
+            // tidak "kerebut" diam-diam.
+            //
+            // Tapi jangan diteruskan bikin UniversityApplication di sini --
+            // kalau diteruskan, siswa yang baru submit ini pasti ke-block
+            // 403 tanpa penjelasan begitu buka halaman upload dokumennya
+            // sendiri (lihat
+            // ApplicationDocumentController::ownedApplicationOrFail()),
+            // karena aplikasi itu bakal ke-link ke Student yang bukan
+            // miliknya. Jadi dihentikan di sini dengan pesan jelas: minta
+            // dia login pakai akun yang sudah terdaftar itu, bukan bikin
+            // akun/aplikasi baru.
+            return redirect()
+                ->route('student-portal.apply.show', $profile->id)
+                ->with('apply_conflict', 'Maaf, nomor WhatsApp ini sudah terdaftar di akun lain. Jika ini nomor Anda sendiri, silakan logout lalu login menggunakan akun tersebut untuk melanjutkan Apply. Jika Anda merasa ini bukan Anda, silakan hubungi admin kami.');
         }
 
         $registrationFee = $profile->payments()->where('fee_type', 'registration_fee')->first();
