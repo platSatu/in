@@ -177,6 +177,35 @@
                     @endforeach
                 </div>
             </div>
+
+            {{--
+                FASE 5 -- card Departure Fee. Cuma tampil begitu aplikasi
+                sudah "Accepted" -- gerbang SEBENARNYA (menolak transaksi
+                selain saat accepted) ada di
+                ApplicationPaymentController::show()/init(), card ini murni
+                tampilan supaya siswa tidak melihat tombol Bayar yang
+                nantinya cuma akan ditolak server.
+            --}}
+            @if($application->admission_status === 'accepted')
+                <div class="card-box">
+                    <h6 class="fw-bold mb-3">Departure Fee</h6>
+                    @if($departureFeePaid)
+                        <p class="mb-0" style="font-size:14px;color:#1a9c53;">
+                            <i class="bi bi-check-circle-fill"></i> Departure Fee sudah lunas.
+                        </p>
+                    @else
+                        <p class="mb-3" style="font-size:14.5px;color:#6b7186;">
+                            Selamat, aplikasi Anda sudah diterima! Silakan selesaikan Departure Fee untuk melanjutkan proses keberangkatan.
+                            @if($application->deposit_fee_china_amount)
+                                Nominal: <strong>Rp {{ number_format($application->deposit_fee_china_amount, 0, ',', '.') }}</strong>
+                            @endif
+                        </p>
+                        <a href="{{ route('student-portal.applications.payment.show', [$application->id, 'departure_fee']) }}" class="btn-brand">
+                            <i class="bi bi-credit-card"></i> Pay Departure Fee
+                        </a>
+                    @endif
+                </div>
+            @endif
         @endif
 
         <div class="card-box">

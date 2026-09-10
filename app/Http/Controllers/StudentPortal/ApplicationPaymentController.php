@@ -65,14 +65,27 @@ class ApplicationPaymentController extends Controller
             );
         }
 
-        // FIX: Departure Fee (Step 4) mensyaratkan Registration Fee (Step 3)
-        // sudah lunas dulu (admission_status baru terisi setelah itu) --
-        // pengecekan "semua dokumen sudah di-approve" yang lebih lengkap
-        // menyusul di Fase 5 bersamaan UI "buka Step 4"-nya.
-        if ($purpose === ApplicationPayment::PURPOSE_DEPARTURE_FEE && empty($application->admission_status)) {
+        // FASE 5: Departure Fee (Step 4) SEKARANG mensyaratkan aplikasi sudah
+        // "ACCEPTED" (bukan cuma admission_status terisi/under_review) --
+        // ACCEPTED cuma diset admin secara manual setelah dokumen (Study
+        // Plan, Upload Documents, dst) sudah di-review/approve semua dan
+        // Offer Letter/Passport dari InaStudy sudah terbit, lihat
+        // Quiz\UniversityApplicationController::updateAdmissionStatus() &
+        // tracker Under Review -> Processing -> Accepted di halaman
+        // ringkasan siswa. Kalau belum diisi SAMA SEKALI (masih kosong),
+        // artinya Registration Fee juga belum lunas -- arahkan ke situ dulu
+        // (pesan beda supaya jelas bedanya dengan "menunggu review admin").
+        if ($purpose === ApplicationPayment::PURPOSE_DEPARTURE_FEE
+            && $application->admission_status !== UniversityApplication::ADMISSION_STATUS_ACCEPTED) {
+            if (empty($application->admission_status)) {
+                return redirect()
+                    ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
+                    ->with('status', 'Selesaikan pembayaran Registration Fee terlebih dahulu.');
+            }
+
             return redirect()
-                ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
-                ->with('status', 'Selesaikan pembayaran Registration Fee terlebih dahulu.');
+                ->route('student-portal.applications.show', $application->id)
+                ->with('status', 'Departure Fee bisa dibayar setelah aplikasi Anda berstatus "Accepted". Silakan tunggu proses review dokumen oleh tim kami.');
         }
 
         $amount = $purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
@@ -102,6 +115,18 @@ class ApplicationPaymentController extends Controller
         ]);
 
         $application = $this->ownedApplicationOrFail($request, $validated['application_id']);
+
+        // FASE 5: gerbang SEBENARNYA (bukan cuma redirect di show()) --
+        // transaksi Departure Fee ditolak di sini kalau admission_status
+        // aplikasi ini belum "accepted", supaya siswa tidak bisa
+        // menyelundupkan POST langsung ke endpoint ini (mis. lewat
+        // devtools/curl) untuk melewati tampilan halaman payment.blade.php.
+        if ($validated['purpose'] === ApplicationPayment::PURPOSE_DEPARTURE_FEE
+            && $application->admission_status !== UniversityApplication::ADMISSION_STATUS_ACCEPTED) {
+            return response()->json([
+                'message' => 'Departure Fee belum bisa dibayar. Aplikasi Anda harus berstatus "Accepted" terlebih dahulu.',
+            ], 422);
+        }
 
         $amount = $validated['purpose'] === ApplicationPayment::PURPOSE_REGISTRATION_FEE
             ? $application->registration_fee_amount

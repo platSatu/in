@@ -4,6 +4,7 @@ namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDocument;
+use App\Models\ApplicationPayment;
 use App\Models\DocumentType;
 use App\Models\UniversityApplication;
 use Illuminate\Http\Request;
@@ -50,10 +51,21 @@ class ApplicationController extends Controller
             ->get()
             ->keyBy('document_type_id');
 
+        // FASE 5 -- status Departure Fee, dipakai buat card "Departure Fee"
+        // di bawah (lihat show.blade.php). Card itu sendiri cuma tampil
+        // begitu admission_status === 'accepted' (gerbangnya sudah dicek
+        // ganda di ApplicationPaymentController::show()/init(), ini cuma
+        // buat tampilan).
+        $departureFeePaid = ApplicationPayment::where('application_id', $application->id)
+            ->where('purpose', ApplicationPayment::PURPOSE_DEPARTURE_FEE)
+            ->where('status', ApplicationPayment::STATUS_PAID)
+            ->exists();
+
         return view('student-portal.applications.show', [
             'application' => $application,
             'adminDocumentTypes' => $adminDocumentTypes,
             'adminDocuments' => $adminDocuments,
+            'departureFeePaid' => $departureFeePaid,
         ]);
     }
 }
