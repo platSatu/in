@@ -14,6 +14,7 @@
                             <th>University</th>
                             <th>Major</th>
                             <th>Status</th>
+                            <th style="width:150px;">Documents</th>
                             <th>Submitted</th>
                             <th class="text-center">Action</th>
                         </tr>
@@ -25,6 +26,20 @@
                                 <td>{{ optional($myApplication->university)->name ?? '-' }}</td>
                                 <td>{{ optional($myApplication->universityProfile)->field ?? '-' }}</td>
                                 <td><span class="badge bg-info text-capitalize">{{ str_replace('_', ' ', $myApplication->status) }}</span></td>
+                                <td>
+                                    @php
+                                        $docsCount = $myApplication->documents_count ?? 0;
+                                        $docsPercent = $totalDocumentTypes > 0 ? min(100, round(($docsCount / $totalDocumentTypes) * 100)) : 0;
+                                        $isComplete = $totalDocumentTypes > 0 && $docsCount >= $totalDocumentTypes;
+                                    @endphp
+                                    <div style="font-size:12px;" class="mb-1">{{ $docsCount }} / {{ $totalDocumentTypes }}</div>
+                                    <div class="progress" style="height:6px;">
+                                        <div class="progress-bar {{ $isComplete ? 'bg-success' : 'bg-primary' }}" role="progressbar" style="width: {{ $docsPercent }}%;" aria-valuenow="{{ $docsPercent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                                    </div>
+                                    @if ($isComplete)
+                                        <span class="badge bg-success mt-1" style="font-size:10px;width:auto;height:auto;border-radius:.25rem;padding:.25em .5em;">Documents Complete</span>
+                                    @endif
+                                </td>
                                 <td>{{ optional($myApplication->submitted_at)->format('Y/m/d') }}</td>
                                 <td class="text-center text-nowrap">
                                     <a href="{{ route('student-portal.applications.show', $myApplication->id) }}" class="btn btn-sm btn-outline-primary">Summary</a>
@@ -197,7 +212,18 @@
     color: #374151;
 }
 
-.badge {
+/*
+ * SEBELUMNYA: selector ".badge" polos di sini (dimaksudkan cuma untuk kotak
+ * kecil warna di Legend kalender) menimpa class Bootstrap ".badge" di
+ * SELURUH halaman ini -- termasuk badge status "Submitted"/dst di tabel "My
+ * University Applications" di atas, yang jadi keciiil banget (12x12px)
+ * sampai teksnya tidak kelihatan sama sekali (cuma tampil kotak polos).
+ * Diperbaiki dengan scope selector ke ".calendar-legend .badge" saja, supaya
+ * cuma kotak warna Legend yang kena, badge Bootstrap lain di halaman ini
+ * tetap tampil normal (lihat pertanyaan user "itu status kotak gitu aja
+ * mksdnya apa ya", 10 September 2026).
+ */
+.calendar-legend .badge {
     display: inline-block;
     width: 12px;
     height: 12px;
