@@ -19,6 +19,10 @@
         type="text/css" />
     <link href="{{ asset('frontend') }}/layouts/vertical-light-menu/css/dark/plugins.css" rel="stylesheet"
         type="text/css" />
+   
+    <link href="{{ asset('frontend') }}/layouts/vertical-light-menu/css/light/structure.css" rel="stylesheet"
+        type="text/css" />
+   
     <!-- END GLOBAL MANDATORY STYLES -->
     <link href="{{ asset('frontend') }}/src/plugins/css/light/pricing-table/css/component.css" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" type="text/css" href="{{ asset('frontend') }}/src/assets/css/dark/forms/switches.css">
@@ -32,6 +36,16 @@
         body.dark .layout-px-spacing,
         .layout-px-spacing {
             min-height: calc(100vh - 155px) !important;
+        }
+
+        /* FIX (10 September 2026): CSS bawaan template (structure.css) memaksa
+           .navbar-logo jadi persis 40x40px tanpa object-fit, jadi kalau
+           gambarnya bukan bujur sangkar (Logo-icon.png hasil crop, lihat
+           layouts/partials/sidebar.blade.php) akan gepeng/terdistorsi.
+           object-fit: contain menjaga proporsi asli gambar di dalam kotak
+           40x40 itu tanpa memotong atau meregangkannya. */
+        .navbar-logo {
+            object-fit: contain;
         }
     </style>
 

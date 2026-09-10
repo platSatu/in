@@ -23,7 +23,24 @@ var App = function() {
 
     var categoryScroll = {
         scrollCat: function() {
+            // FIX (10 September 2026): sidebar ina belum pernah menandai menu
+            // yang lagi aktif dengan class "active" di <li>-nya (beda dari
+            // demo asli template Equation yang selalu punya 1 item aktif),
+            // jadi baris di bawah ini SELALU dapat `undefined`, lalu crash
+            // begitu baca `.offsetTop`-nya ("Cannot read properties of
+            // undefined"). Karena scrollCat() ini dipanggil paling awal di
+            // App.init() (lewat _mobileResolution.onRefresh(), yang jalan
+            // duluan tiap kali lebar layar <= 991px), begitu ia crash SEMUA
+            // setup sesudahnya batal jalan -- termasuk toggleFunction.sidebar()
+            // yang mendaftarkan klik tombol menu (hamburger) supaya sidebar
+            // bisa dibuka/ditutup di HP. Ini akar masalah kenapa menu di HP
+            // tidak bisa dibuka sama sekali. Sekarang di-skip saja kalau
+            // memang belum ada menu yang ditandai aktif, supaya tidak
+            // menghentikan proses init-nya.
             var sidebarWrapper = document.querySelectorAll('.sidebar-wrapper li.active')[0];
+            if (!sidebarWrapper) {
+                return;
+            }
             var sidebarWrapperTop = sidebarWrapper.offsetTop - 12;
             setTimeout(() => {
                 const scroll = document.querySelector('.menu-categories');
