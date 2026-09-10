@@ -31,7 +31,17 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'pass_photo', 'label' => 'Pass Photo', 'group_label' => 'Identitas & Foto', 'allowed_extensions' => 'jpg,jpeg', 'is_required' => false, 'sort_order' => 50],
 
             // --- Academic (sebelumnya "Akademik" -- penamaan ulang 10 September 2026) ---
-            ['code' => 'formulir', 'label' => 'Formulir', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 60],
+            //
+            // FASE 3 (10 September 2026): 'formulir' (upload file Word/PDF
+            // manual) DINONAKTIFKAN (status 'inactive', BUKAN dihapus -- data
+            // & baris ApplicationDocument yang sudah pernah diupload lewat
+            // slot ini TETAP ada & tetap bisa dilihat admin, cuma tidak
+            // muncul lagi di checklist upload siswa) -- digantikan Formulir
+            // WEB (Step 1 setelah Registration Fee lunas, lihat
+            // ApplicationFormController & ApplicationFormDetail). 'status'
+            // eksplisit di item ini MENIMPA default STATUS_ACTIVE di
+            // foreach() bawah (lihat urutan array_merge()-nya).
+            ['code' => 'formulir', 'label' => 'Formulir', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 60, 'status' => DocumentType::STATUS_INACTIVE],
             ['code' => 'study_plan', 'label' => 'Study Plan', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 70],
             // Label diganti dari "Transcript Nilai" -> "Transcript (Report Card)" (10 September 2026).
             ['code' => 'transcript', 'label' => 'Transcript (Report Card)', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 80],
@@ -85,9 +95,16 @@ class DocumentTypeSeeder extends Seeder
         ];
 
         foreach ($items as $item) {
+            // FASE 3: urutan array_merge() DIBALIK dari sebelumnya -- default
+            // STATUS_ACTIVE sekarang di ARGUMEN PERTAMA, $item di argumen
+            // KEDUA, supaya kalau $item punya key 'status' sendiri (lihat
+            // entry 'formulir' di atas), nilai itu yang menang, bukan selalu
+            // ketiban STATUS_ACTIVE. Untuk semua item LAIN yang tidak punya
+            // key 'status' eksplisit, hasilnya PERSIS SAMA seperti sebelum
+            // perubahan ini (tetap STATUS_ACTIVE).
             DocumentType::updateOrCreate(
                 ['code' => $item['code']],
-                array_merge($item, ['status' => DocumentType::STATUS_ACTIVE])
+                array_merge(['status' => DocumentType::STATUS_ACTIVE], $item)
             );
         }
     }

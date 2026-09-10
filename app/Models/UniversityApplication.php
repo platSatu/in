@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * Satu Aplikasi Kuliah: satu Student apply ke satu Major (UniversityProfile)
@@ -106,5 +107,19 @@ class UniversityApplication extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(ApplicationPayment::class, 'application_id');
+    }
+
+    // FASE 3 (10 September 2026): Step 1 "Formulir" web (biodata lengkap),
+    // relasi 1-ke-1 -- lihat ApplicationFormDetail.
+    public function formDetail(): HasOne
+    {
+        return $this->hasOne(ApplicationFormDetail::class, 'application_id');
+    }
+
+    // FASE 3 -- baris "Education Background" (fitur "add row"), 1-ke-banyak,
+    // lihat ApplicationEducationBackground.
+    public function educationBackgrounds(): HasMany
+    {
+        return $this->hasMany(ApplicationEducationBackground::class, 'application_id')->orderBy('sort_order');
     }
 }

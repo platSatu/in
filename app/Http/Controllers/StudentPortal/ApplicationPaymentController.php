@@ -48,9 +48,11 @@ class ApplicationPaymentController extends Controller
         abort_unless(in_array($purpose, self::PURPOSES, true), 404);
 
         // Sudah lunas -- tidak perlu balik ke halaman bayar, arahkan ke
-        // tujuan berikutnya (Study Plan/Documents untuk registration_fee;
-        // ringkasan aplikasi untuk departure_fee -- belum ada halaman
-        // "sesudah lunas" khusus Fase 5, menyusul nanti).
+        // tujuan berikutnya. FASE 3: untuk registration_fee, tujuannya
+        // sekarang Formulir (Step 1, lihat ApplicationFormController) --
+        // SEBELUMNYA (Fase 2) langsung ke Upload Documents, tapi Step 1
+        // (Formulir web) sekarang berada DI ANTARA pembayaran & Upload
+        // Documents.
         $alreadyPaid = ApplicationPayment::where('application_id', $application->id)
             ->where('purpose', $purpose)
             ->where('status', ApplicationPayment::STATUS_PAID)
@@ -59,7 +61,7 @@ class ApplicationPaymentController extends Controller
         if ($alreadyPaid) {
             return redirect()->route(
                 $purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
-                    ? 'student-portal.applications.documents.edit'
+                    ? 'student-portal.applications.form.edit'
                     : 'student-portal.applications.show',
                 $application->id
             );

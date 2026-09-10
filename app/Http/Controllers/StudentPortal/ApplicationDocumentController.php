@@ -5,6 +5,7 @@ namespace App\Http\Controllers\StudentPortal;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationDocumentHistory;
+use App\Models\ApplicationFormDetail;
 use App\Models\ApplicationPayment;
 use App\Models\DocumentType;
 use App\Models\UniversityApplication;
@@ -51,6 +52,15 @@ class ApplicationDocumentController extends Controller
             return $redirect;
         }
 
+        // FASE 3 -- Step 2 (halaman ini) baru boleh diakses setelah Step 1
+        // (Formulir web, lihat ApplicationFormController) selesai dicentang
+        // Terms & Condition-nya. Dicek lewat kolom terms_accepted_at, BUKAN
+        // sekadar baris ApplicationFormDetail ada/tidak (siswa bisa saja
+        // sempat isi sebagian tanpa submit).
+        if ($redirect = $this->blockIfFormNotSubmitted($application)) {
+            return $redirect;
+        }
+
         // FASE 4 -- dokumen provided_by='admin' (Offer Letter, Passport)
         // SENGAJA tidak ikut ditampilkan sebagai kolom upload di sini --
         // siswa cuma bisa MELIHAT/DOWNLOAD dokumen itu di halaman ringkasan
@@ -86,6 +96,11 @@ class ApplicationDocumentController extends Controller
         // form yang sempat ke-cache/dibuka dari tab lama) tidak bisa
         // melewati gerbang pembayaran.
         if ($redirect = $this->blockIfRegistrationFeeUnpaid($application)) {
+            return $redirect;
+        }
+
+        // Sama seperti guard di edit() -- lihat blockIfFormNotSubmitted().
+        if ($redirect = $this->blockIfFormNotSubmitted($application)) {
             return $redirect;
         }
 
@@ -195,6 +210,26 @@ class ApplicationDocumentController extends Controller
         return redirect()
             ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
             ->with('status', 'Selesaikan pembayaran Registration Fee terlebih dahulu untuk membuka Study Plan & Upload Documents.');
+    }
+
+    /**
+     * FASE 3 -- null kalau Formulir (Step 1, lihat ApplicationFormController)
+     * sudah disubmit (terms_accepted_at terisi), atau RedirectResponse ke
+     * halaman Formulir kalau belum.
+     */
+    private function blockIfFormNotSubmitted(UniversityApplication $application): ?RedirectResponse
+    {
+        $isSubmitted = ApplicationFormDetail::where('application_id', $application->id)
+            ->whereNotNull('terms_accepted_at')
+            ->exists();
+
+        if ($isSubmitted) {
+            return null;
+        }
+
+        return redirect()
+            ->route('student-portal.applications.form.edit', $application->id)
+            ->with('status', 'Silakan lengkapi Formulir terlebih dahulu sebelum upload dokumen.');
     }
 
     /**

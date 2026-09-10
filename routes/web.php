@@ -52,6 +52,7 @@ use App\Http\Controllers\StudentPortal\ApplyController;
 use App\Http\Controllers\StudentPortal\ApplicationController;
 use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
 use App\Http\Controllers\StudentPortal\ApplicationPaymentController;
+use App\Http\Controllers\StudentPortal\ApplicationFormController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
@@ -165,6 +166,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/applications/payment/return', [ApplicationPaymentController::class, 'return'])->name('student-portal.applications.payment.return');
     Route::get('/applications/{application}/payment/{purpose}', [ApplicationPaymentController::class, 'show'])->name('student-portal.applications.payment.show');
 
+    // FASE 3 -- Step 1 SETELAH Registration Fee lunas: Formulir web (biodata
+    // lengkap + Education Background "add row"), menggantikan upload file
+    // manual untuk DocumentType 'formulir' (lihat DocumentTypeSeeder &
+    // ApplicationFormController). HARUS didaftarkan sebelum Upload Documents
+    // di bawah, karena Upload Documents sekarang menolak akses sampai
+    // Formulir ini selesai disubmit (lihat
+    // ApplicationDocumentController::blockIfFormNotSubmitted()).
+    Route::get('/applications/{application}/form', [ApplicationFormController::class, 'edit'])->name('student-portal.applications.form.edit');
+    Route::post('/applications/{application}/form', [ApplicationFormController::class, 'update'])->name('student-portal.applications.form.update');
+
     // Fase 5 -- upload dokumen aplikasi (per Jenis Dokumen, lihat
     // DocumentType/ApplicationDocument/ApplicationDocumentHistory). Sama
     // seperti rute Apply di atas: namespace StudentPortal, SENGAJA tidak
@@ -174,6 +185,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     //
     // FASE 2: sekarang HANYA bisa diakses setelah Registration Fee lunas --
     // lihat guard ApplicationDocumentController::blockIfRegistrationFeeUnpaid().
+    // FASE 3: JUGA baru bisa diakses setelah Formulir (Step 1) disubmit --
+    // lihat blockIfFormNotSubmitted().
     Route::get('/applications/{application}/documents', [ApplicationDocumentController::class, 'edit'])->name('student-portal.applications.documents.edit');
     Route::post('/applications/{application}/documents', [ApplicationDocumentController::class, 'update'])->name('student-portal.applications.documents.update');
 });

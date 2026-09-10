@@ -188,7 +188,7 @@
         // halaman ini dibuka ulang setelah lunas.
         const NEXT_URL_AFTER_PAID = @json(
             $purpose === \App\Models\ApplicationPayment::PURPOSE_REGISTRATION_FEE
-                ? route('student-portal.applications.documents.edit', $application->id)
+                ? route('student-portal.applications.form.edit', $application->id)
                 : route('student-portal.applications.show', $application->id)
         );
 
