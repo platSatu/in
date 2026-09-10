@@ -713,7 +713,39 @@
                             </div>
                         @endif
 
-                        <div class="text-end">
+                        <div class="d-flex justify-content-between">
+                            {{--
+                                Tombol Back BARU -- sebelumnya step-info tidak pernah
+                                punya tombol Back sama sekali, karena dulu step ini
+                                SELALU jadi step pertama (tidak ada step lain sebelumnya
+                                untuk di-kembali-in). Sekarang bisa TIDAK lagi jadi step
+                                pertama kalau personalDataStagePosition === 'last'
+                                (step-questions jadi step pertama, step-info menyusul
+                                setelahnya) -- di-sembunyikan lewat JS di showStep()
+                                kalau step ini kebetulan MEMANG step pertama (lihat
+                                id="btnInfoBack" di sana), supaya form yang masih pakai
+                                posisi default 'first' tampilannya TIDAK berubah sama
+                                sekali. Lihat laporan bug user: "ketika sudah di data
+                                pribadi, button back nya itu tidak ada", 10 September
+                                2026.
+
+                                PENTING soal render AWAL (sebelum JS sempat jalan):
+                                class "d-none" SENGAJA ditaruh langsung di HTML statis
+                                di sini (default tersembunyi), BUKAN cuma diatur lewat
+                                JS saja -- karena untuk form posisi default 'first',
+                                showStep() untuk step-info TIDAK PERNAH dipanggil sama
+                                sekali (lihat blok DOMContentLoaded: kondisinya cuma
+                                jalan kalau stepOrder[0] !== 'step-info'), jadi kalau
+                                elemen ini dibiarkan tanpa "d-none" dari awal, tombol
+                                Back akan nampang selamanya di step pertama form-form
+                                LAMA yang sudah berjalan -- justru regresi baru. JS di
+                                showStep() di bawah cuma bertugas MELEPAS "d-none" ini
+                                kalau step-info ternyata BUKAN step pertama
+                                (personalDataStagePosition === 'last').
+                            --}}
+                            <button type="button" class="btn btn-outline-brand d-none" id="btnInfoBack" onclick="prevStep()">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </button>
                             <button type="button" class="btn btn-brand" onclick="nextStep()">
                                 Next <i class="bi bi-arrow-right"></i>
                             </button>
@@ -1118,6 +1150,19 @@
 
         currentStepIndex = index;
         updateProgress();
+
+        // step-info baru saja dapat tombol Back (lihat markup-nya) -- tapi kalau
+        // step ini KEBETULAN masih jadi step pertama (personalDataStagePosition
+        // default 'first', perilaku LAMA yang tidak boleh berubah), tidak ada
+        // step sebelumnya untuk di-kembali-in, jadi tombolnya disembunyikan di
+        // sini. Kalau bukan step pertama (personalDataStagePosition === 'last'),
+        // tombolnya tampil supaya user bisa balik ke step-questions.
+        if (stepId === 'step-info') {
+            const infoBackBtn = document.getElementById('btnInfoBack');
+            if (infoBackBtn) {
+                infoBackBtn.classList.toggle('d-none', index === 0);
+            }
+        }
 
         if (stepId === 'step-payment' && !paymentInitiated) {
             initPayment();
