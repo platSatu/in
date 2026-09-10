@@ -26,6 +26,11 @@ class DocumentType extends Model
         'label',
         'group_label',
         'allowed_extensions',
+        // FIX (10 September 2026): fitur "Download Template" -- opsional per
+        // jenis dokumen, path relatif ke public/ (contoh:
+        // "document-templates/medical_certificate.pdf"). Lihat
+        // resources/views/student-portal/applications/documents.blade.php.
+        'template_file_path',
         'is_required',
         'sort_order',
         'status',

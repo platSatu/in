@@ -129,6 +129,24 @@
                                 <div>
                                     <div class="doc-name">{{ $documentType->label }}</div>
                                     <div class="doc-hint">Allowed: {{ strtoupper($documentType->allowed_extensions) }} &middot; max 5MB</div>
+
+                                    {{--
+                                        FIX (10 September 2026): fitur "Download Template" --
+                                        beberapa jenis dokumen (contoh pertama: Medical
+                                        Certificate) butuh siswa download form kosongnya
+                                        dulu, isi/tanda tangan, baru diupload lagi lewat
+                                        kolom upload yang sama persis di bawah ini. Tombol
+                                        ini cuma muncul kalau template_file_path diisi
+                                        (lihat DocumentTypeSeeder) -- jenis dokumen lain
+                                        yang tidak punya template tetap tampil normal.
+                                    --}}
+                                    @if($documentType->template_file_path)
+                                        <div class="mt-1">
+                                            <a href="{{ asset($documentType->template_file_path) }}" target="_blank" class="doc-current-link">
+                                                <i class="bi bi-download"></i> Download Template
+                                            </a>
+                                        </div>
+                                    @endif
                                 </div>
 
                                 @if(!$existingDocument)

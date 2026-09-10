@@ -52,7 +52,13 @@ class DocumentTypeSeeder extends Seeder
             // "SKCK" -> "Non Criminal Certificate" (10 September 2026). Nama
             // grup "Kesehatan & Legal" sendiri belum diminta diganti, jadi
             // dibiarkan seperti semula.
-            ['code' => 'medical_checkup', 'label' => 'Medical Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 140],
+            //
+            // FIX (10 September 2026): fitur "Download Template" -- Medical
+            // Certificate dikasih file template kosong (dari user) yang bisa
+            // didownload siswa dulu sebelum diisi & diupload ulang lewat
+            // kolom upload yang sama. File-nya ditaruh di
+            // public/document-templates/medical_certificate.pdf.
+            ['code' => 'medical_checkup', 'label' => 'Medical Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'template_file_path' => 'document-templates/medical_certificate.pdf', 'is_required' => false, 'sort_order' => 140],
             ['code' => 'skck', 'label' => 'Non Criminal Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 150],
 
             // --- Supporting Letter (sebelumnya "Surat Pendukung" -- penamaan
