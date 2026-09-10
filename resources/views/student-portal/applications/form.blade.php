@@ -355,6 +355,24 @@
         </div>
     </template>
 
+    @php
+        // FIX (10 September 2026) -- dipindah ke sini (bukan inline di dalam
+        // @json() di bawah) karena @json() Blade membelah argumennya dengan
+        // explode(',', ...) TANPA sadar tanda kurung/kurung siku bersarang --
+        // array literal multi-baris dengan banyak koma di dalam @json()
+        // langsung dulu bikin hasil compile-nya rusak ("Unclosed '[' ...")
+        // dan 500 di server. Dengan dihitung dulu jadi 1 variabel PHP biasa,
+        // argumen yang masuk ke @json() di bawah tidak punya koma di level
+        // atas lagi, jadi aman.
+        $existingEducationArray = $educationBackgrounds->map(fn ($row) => [
+            'level' => $row->level,
+            'school_name' => $row->school_name,
+            'location' => $row->location,
+            'year_start' => $row->year_start,
+            'year_end' => $row->year_end,
+        ])->values();
+    @endphp
+
     <script>
         // FASE 3 -- "add row" Education Background. Setiap baris di-clone
         // dari <template> di atas, lalu name atributnya diisi ulang
@@ -366,13 +384,7 @@
         const eduRowsContainer = document.getElementById('eduRows');
         const eduRowTemplate = document.getElementById('eduRowTemplate');
 
-        const existingEducation = @json($educationBackgrounds->map(fn ($row) => [
-            'level' => $row->level,
-            'school_name' => $row->school_name,
-            'location' => $row->location,
-            'year_start' => $row->year_start,
-            'year_end' => $row->year_end,
-        ])->values());
+        const existingEducation = @json($existingEducationArray);
 
         function addEduRow(data) {
             data = data || {};
