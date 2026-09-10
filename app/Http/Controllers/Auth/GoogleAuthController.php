@@ -68,8 +68,17 @@ class GoogleAuthController extends Controller
                 'handphone' => '',
                 'password' => Hash::make(Str::random(40)),
                 'status' => User::STATUS_ACTIVE,
-                'email_verified_at' => now(),
             ]);
+
+            // BUGFIX: 'email_verified_at' SENGAJA tidak ada di User::$fillable
+            // (supaya tidak bisa disetel lewat form/endpoint lain yang mungkin
+            // mass-assignment dari input user) -- jadi kalau dikirim lewat
+            // User::create([...]) di atas, Eloquent DIAM-DIAM mengabaikannya
+            // (bukan error), hasilnya user Google tetap punya email_verified_at
+            // NULL padahal status-nya sudah 'active'. Makanya di-set terpisah
+            // di sini lewat forceFill(), sama persis polanya dengan cabang
+            // elseif di bawah untuk user existing.
+            $user->forceFill(['email_verified_at' => now()])->save();
 
             RoleUser::create([
                 'user_id' => $user->id,
