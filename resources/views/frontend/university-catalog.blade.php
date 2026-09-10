@@ -228,8 +228,19 @@
         .uni-name {
             font-weight: 700;
             font-size: 16.5px;
+            line-height: 1.3;
             margin-bottom: 4px;
             color: #1d2333;
+            /* Reservasi tinggi utk 2 baris supaya card dengan nama panjang
+               (jadi 2 baris) dan nama pendek (1 baris) tetap sejajar rapi
+               dalam satu row grid -- dibatasi max 2 baris (line-clamp) biar
+               nama yang sangat panjang tidak mendorong card jadi terlalu
+               tinggi (10 September 2026, permintaan rapikan card catalog). */
+            min-height: calc(1.3em * 2);
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
         }
 
         .uni-location {
@@ -240,8 +251,16 @@
 
         .uni-meta {
             display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
+            /* Sebelumnya 3 kolom (termasuk QS Ranking yang datanya belum ada
+               di DB, selalu "N/A" -- section-nya sekarang dikomen dulu di
+               markup card di bawah, lihat catatan di sana). Sekarang 2 kolom
+               supaya tiap kolom dapat ruang lebih lega -- labelnya ("Tuition
+               / Year") tidak gampang pecah 2 baris, dan angka tuition yang
+               panjang (mis. "Rp 500.000.000+") lebih muat sejajar rapi.
+               Kalau kolom QS Ranking-nya sudah ada datanya, balikin ke
+               repeat(3, 1fr) lagi + buka komentar QS Ranking di markup. */
+            grid-template-columns: repeat(2, 1fr);
+            gap: 14px;
             border-top: 1px solid #f0f1f5;
             padding-top: 14px;
             margin-top: auto;
@@ -255,12 +274,20 @@
             text-transform: uppercase;
             letter-spacing: .03em;
             margin-bottom: 3px;
+            /* Cegah label pecah jadi 2 baris (mis. "TUITION" lalu "YEAR" di
+               baris sendiri) -- kalau itu terjadi, baris value di sebelahnya
+               antar kolom jadi tidak sejajar lagi. */
+            white-space: nowrap;
         }
 
         .uni-meta .value {
             font-weight: 700;
             font-size: 13px;
             color: #1d2333;
+            line-height: 1.35;
+            /* Jaga-jaga di layar sangat sempit -- kalau angka/teksnya
+               terpaksa harus wrap, jangan sampai kepotong di tengah kata. */
+            overflow-wrap: break-word;
         }
 
         .btn-view {
@@ -314,6 +341,13 @@
             .catalog-toolbar { flex-direction: column; align-items: flex-start; }
             .filter-bar { width: 100%; }
             .filter-select { flex: 1 1 45%; }
+
+            /* Tambahan (10 September 2026): di layar sangat sempit, beri
+               gap sedikit lebih rapat & label sedikit lebih kecil supaya
+               "Tuition / Year" + nominal Rp yang panjang tetap nyaman
+               dibaca tanpa mengubah tata letak 2 kolom .uni-meta. */
+            .uni-meta { gap: 10px; }
+            .uni-meta .label { font-size: 10px; }
         }
     </style>
 </head>
@@ -441,13 +475,23 @@
                         </div>
 
                         <div class="uni-meta">
+                            {{--
+                                QS Ranking disembunyikan dulu (10 September 2026, permintaan
+                                rapikan card catalog) -- kolom/data QS Ranking memang belum ada
+                                di skema DB, jadi daripada selalu tampil "N/A", section-nya
+                                dikomen dulu di sini. .uni-meta juga sudah diubah dari grid 3
+                                kolom -> 2 kolom (lihat CSS) supaya 2 kolom yang tersisa dapat
+                                ruang lebih lega. Kalau datanya sudah ada, tinggal buka lagi
+                                komentar ini DAN balikin CSS .uni-meta ke
+                                grid-template-columns: repeat(3, 1fr).
+
+                                <div>
+                                    <span class="label">QS Ranking</span>
+                                    <span class="value">N/A</span>
+                                </div>
+                            --}}
                             <div>
-                                {{-- QS Ranking belum ada di skema DB -- placeholder dulu --}}
-                                <span class="label">QS Ranking</span>
-                                <span class="value">N/A</span>
-                            </div>
-                            <div>
-                                <span class="label">Est. Tuition / Year</span>
+                                <span class="label">Tuition / Year</span>
                                 <span class="value">
                                     @if($profile && $profile->min_budget)
                                         Rp {{ number_format($profile->min_budget, 0, ',', '.') }}+
