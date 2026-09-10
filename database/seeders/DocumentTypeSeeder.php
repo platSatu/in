@@ -30,14 +30,14 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'passport', 'label' => 'Passport', 'group_label' => 'Identitas & Foto', 'allowed_extensions' => 'jpg,jpeg', 'is_required' => false, 'sort_order' => 40],
             ['code' => 'pass_photo', 'label' => 'Pass Photo', 'group_label' => 'Identitas & Foto', 'allowed_extensions' => 'jpg,jpeg', 'is_required' => false, 'sort_order' => 50],
 
-            // --- Akademik ---
-            ['code' => 'formulir', 'label' => 'Formulir', 'group_label' => 'Akademik', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 60],
-            ['code' => 'study_plan', 'label' => 'Study Plan', 'group_label' => 'Akademik', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 70],
+            // --- Academic (sebelumnya "Akademik" -- penamaan ulang 10 September 2026) ---
+            ['code' => 'formulir', 'label' => 'Formulir', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 60],
+            ['code' => 'study_plan', 'label' => 'Study Plan', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 70],
             // Label diganti dari "Transcript Nilai" -> "Transcript (Report Card)" (10 September 2026).
-            ['code' => 'transcript', 'label' => 'Transcript (Report Card)', 'group_label' => 'Akademik', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 80],
-            ['code' => 'graduation_letter_expected', 'label' => 'Graduation Letter Expected', 'group_label' => 'Akademik', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 90],
+            ['code' => 'transcript', 'label' => 'Transcript (Report Card)', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 80],
+            ['code' => 'graduation_letter_expected', 'label' => 'Graduation Letter Expected', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 90],
             // Label diganti dari "Ijazah Translate" -> "Graduation Certificate Translate" (10 September 2026).
-            ['code' => 'ijazah_translate', 'label' => 'Graduation Certificate Translate', 'group_label' => 'Akademik', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 100],
+            ['code' => 'ijazah_translate', 'label' => 'Graduation Certificate Translate', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 100],
 
             // --- Certificate (sebelumnya "Sertifikat Bahasa" -- penamaan ulang
             // 10 September 2026. CSCA yang tadinya di grup "Kesehatan & Legal"
@@ -48,11 +48,12 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'csca', 'label' => 'CSCA', 'group_label' => 'Certificate', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 130],
 
             // --- Kesehatan & Legal ---
-            // CATATAN: label "Medical Checkup" & "SKCK" dan nama grup ini sendiri
-            // BELUM diganti -- ditunda dulu per permintaan user (10 September
-            // 2026), menyusul setelah ini.
-            ['code' => 'medical_checkup', 'label' => 'Medical Checkup', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 140],
-            ['code' => 'skck', 'label' => 'SKCK', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 150],
+            // Label diganti dari "Medical Checkup" -> "Medical Certificate" dan
+            // "SKCK" -> "Non Criminal Certificate" (10 September 2026). Nama
+            // grup "Kesehatan & Legal" sendiri belum diminta diganti, jadi
+            // dibiarkan seperti semula.
+            ['code' => 'medical_checkup', 'label' => 'Medical Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 140],
+            ['code' => 'skck', 'label' => 'Non Criminal Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 150],
 
             // --- Supporting Letter (sebelumnya "Surat Pendukung" -- penamaan
             // ulang 10 September 2026) ---
