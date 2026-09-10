@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\AcademicCalendar;
+use App\Models\DocumentType;
 use App\Models\Student;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -27,9 +28,15 @@ class DashboardController extends Controller
         // jadi aman ditambahkan di sini tanpa mengganggu tampilan mereka.
         $student = Student::where('user_id', $userId)->first();
         $myApplications = $student
-            ? $student->applications()->with(['university', 'universityProfile'])->orderByDesc('submitted_at')->get()
+            ? $student->applications()->with(['university', 'universityProfile'])->withCount('documents')->orderByDesc('submitted_at')->get()
             : collect();
 
-        return view('dashboard.index', compact('calendars', 'myApplications'));
+        // Sama seperti di halaman admin (Quiz\UniversityApplicationController::index)
+        // -- dipakai bareng documents_count di atas untuk progress bar "x / total"
+        // dokumen di widget "My University Applications" (lihat diskusi
+        // "progress bar student dashboard", 10 September 2026).
+        $totalDocumentTypes = DocumentType::active()->count();
+
+        return view('dashboard.index', compact('calendars', 'myApplications', 'totalDocumentTypes'));
     }
 }
