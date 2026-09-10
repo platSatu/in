@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApplicationDocument;
+use App\Models\DocumentType;
 use App\Models\UniversityApplication;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -34,8 +36,24 @@ class ApplicationController extends Controller
 
         abort_unless($ownsApplication, Response::HTTP_FORBIDDEN);
 
+        // FASE 4 -- dokumen yang DIUPLOAD ADMIN untuk siswa ini (Offer
+        // Letter, Passport), ditampilkan sebagai daftar download di card
+        // "Documents from InaStudy" (lihat show.blade.php). Siswa TIDAK
+        // PERNAH upload jenis dokumen ini sendiri -- lihat
+        // DocumentType::scopeAdminProvided() &
+        // StudentPortal\ApplicationDocumentController (yang justru
+        // MENGECUALIKAN jenis ini dari halaman upload siswa).
+        $adminDocumentTypes = DocumentType::active()->adminProvided()->orderBy('sort_order')->get();
+
+        $adminDocuments = ApplicationDocument::where('application_id', $application->id)
+            ->whereIn('document_type_id', $adminDocumentTypes->pluck('id'))
+            ->get()
+            ->keyBy('document_type_id');
+
         return view('student-portal.applications.show', [
             'application' => $application,
+            'adminDocumentTypes' => $adminDocumentTypes,
+            'adminDocuments' => $adminDocuments,
         ]);
     }
 }

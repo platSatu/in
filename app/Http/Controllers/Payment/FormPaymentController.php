@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Payment;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApplicationPayment;
 use App\Models\Form;
 use App\Models\FormPayment;
 use App\Models\PaymentGateway;
+use App\Models\UniversityApplication;
 use App\Services\Payment\PaymentGatewayFactory;
 use App\Services\Payment\PaymentSignatureMismatchException;
 use Closure;
@@ -237,10 +239,24 @@ class FormPaymentController extends Controller
      * Alur umum semua webhook gateway:
      *   1. Ambil order_id dari BODY payload (bukan dari URL) supaya kita
      *      selalu tahu transaksi mana yang dimaksud.
-     *   2. Muat FormPayment + config PaymentGateway MILIK transaksi itu
-     *      sendiri (bukan dari payload) untuk verifikasi signature — supaya
-     *      orang tidak bisa kirim callback palsu mengklaim gateway lain.
+     *   2. Muat FormPayment ATAU ApplicationPayment (lihat catatan
+     *      resolvePaymentByOrderId() di bawah) + config PaymentGateway
+     *      MILIK transaksi itu sendiri (bukan dari payload) untuk
+     *      verifikasi signature — supaya orang tidak bisa kirim callback
+     *      palsu mengklaim gateway lain.
      *   3. Idempotent: transaksi yang sudah "paid" tidak diproses ulang.
+     *
+     * FIX (10 September 2026): fitur "Alur Pembayaran 2 Arah Apply Kampus" --
+     * webhook ini sekarang JUGA mengenali ApplicationPayment (order_id yang
+     * tidak ketemu di form_payments dicoba lagi di application_payments)
+     * SEBELUM PERUBAHAN INI cuma mengenali FormPayment. Ini SATU-SATUNYA
+     * webhook yang ada di sistem (Midtrans TIDAK mendukung notification-url
+     * per-transaksi -- lihat App\Services\Payment\Contracts\Payable), jadi
+     * URL webhook & pendaftarannya di dashboard Duitku/Midtrans/iPaymu TIDAK
+     * PERLU diubah sama sekali. Alur untuk FormPayment (Quiz Form) di bawah
+     * ini TIDAK BERUBAH satu baris pun -- cuma dibuat generik supaya bisa
+     * dipakai ulang untuk ApplicationPayment lewat variabel $payment yang
+     * sama (Eloquent update()/isPaid()/paymentGateway() ada di kedua model).
      */
     private function handleWebhook(Request $request, Closure $resolveOrderId): JsonResponse
     {
@@ -250,7 +266,7 @@ class FormPaymentController extends Controller
             return response()->json(['message' => 'order_id tidak ditemukan pada payload.'], 400);
         }
 
-        $payment = FormPayment::where('order_id', $orderId)->first();
+        $payment = $this->resolvePaymentByOrderId($orderId);
 
         if (!$payment) {
             Log::warning('[PAYMENT] Webhook diterima untuk order_id yang tidak dikenal', ['order_id' => $orderId]);
@@ -265,7 +281,7 @@ class FormPaymentController extends Controller
         $gateway = $payment->paymentGateway;
 
         if (!$gateway) {
-            Log::error('[PAYMENT] FormPayment tanpa payment_gateway_id, tidak bisa verifikasi signature', [
+            Log::error('[PAYMENT] Transaksi tanpa payment_gateway_id, tidak bisa verifikasi signature', [
                 'order_id' => $orderId,
             ]);
 
@@ -298,7 +314,55 @@ class FormPaymentController extends Controller
             'status' => $payment->fresh()->status,
         ]);
 
+        // FIX (10 September 2026): efek samping KHUSUS ApplicationPayment
+        // (buka Step 1 & 2 begitu Registration Fee "paid") -- SENGAJA
+        // dipisah jadi method sendiri & hanya jalan kalau tipe modelnya
+        // ApplicationPayment, supaya alur FormPayment/Quiz sama sekali
+        // tidak tersentuh oleh logic ini.
+        if ($payment instanceof ApplicationPayment && $result['is_paid']) {
+            $this->onApplicationPaymentPaid($payment->fresh());
+        }
+
         return response()->json(['message' => 'OK']);
+    }
+
+    /**
+     * FIX (10 September 2026): coba cari di form_payments dulu (perilaku
+     * ASLI, tidak diubah), baru kalau tidak ketemu, coba di
+     * application_payments. Union type return-nya aman dipakai bergantian
+     * di handleWebhook() di atas karena FormPayment & ApplicationPayment
+     * sama-sama punya method/relasi yang dipanggil di sana (isPaid(),
+     * paymentGateway(), update()).
+     */
+    private function resolvePaymentByOrderId(string $orderId): FormPayment|ApplicationPayment|null
+    {
+        return FormPayment::where('order_id', $orderId)->first()
+            ?? ApplicationPayment::where('order_id', $orderId)->first();
+    }
+
+    /**
+     * FIX (10 September 2026): dipanggil SEKALI begitu ApplicationPayment
+     * dikonfirmasi "paid" oleh webhook. Untuk Fase 2 ini baru menangani
+     * bagian Registration Fee (buka admission_status jadi 'under_review',
+     * yang artinya Step 1 Study Plan & Step 2 Upload Documents jadi bisa
+     * diakses -- lihat pengecekan di ApplicationDocumentController). Efek
+     * lain (generate link invoice via WA, dst) menyusul di Fase 6 & 7,
+     * TIDAK dikerjakan di sini supaya tidak keluar dari lingkup Fase 2.
+     */
+    private function onApplicationPaymentPaid(ApplicationPayment $payment): void
+    {
+        $application = $payment->application;
+
+        if (!$application) {
+            return;
+        }
+
+        if ($payment->purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
+            && empty($application->admission_status)) {
+            $application->update([
+                'admission_status' => UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW,
+            ]);
+        }
     }
 
     private function generateOrderId(): string

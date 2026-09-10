@@ -51,6 +51,7 @@ use App\Http\Controllers\Student\StudentController;
 use App\Http\Controllers\StudentPortal\ApplyController;
 use App\Http\Controllers\StudentPortal\ApplicationController;
 use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
+use App\Http\Controllers\StudentPortal\ApplicationPaymentController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
 use App\Http\Controllers\Company\CompanyBranchController;
@@ -137,12 +138,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/apply/{universityProfile}', [ApplyController::class, 'store'])->name('student-portal.apply.store');
     Route::get('/applications/{application}', [ApplicationController::class, 'show'])->name('student-portal.applications.show');
 
+    // Fase 2 -- pembayaran Registration Fee (Step 3) & Departure Fee (Step 4)
+    // untuk Apply Kampus. Sama pola dengan blok /quiz/payment/* di atas:
+    // rute literal (init/duitku/select-method/{orderId}/status/return) WAJIB
+    // didaftarkan SEBELUM rute wildcard '/applications/{application}/payment/
+    // {purpose}' di bawah supaya tidak ada risiko ambiguitas -- lihat catatan
+    // di blok /quiz/payment/* untuk alasan lengkapnya.
+    //
+    // BEDA dari /quiz/payment/*: controllernya App\Http\Controllers\
+    // StudentPortal\ApplicationPaymentController (bukan Payment\
+    // FormPaymentController) karena rute ini WAJIB login & perlu pengecekan
+    // kepemilikan aplikasi per user (lihat catatan lengkap di docblock class
+    // ApplicationPaymentController). Webhook TETAP satu-satunya di
+    // Payment\FormPaymentController -- controller ini tidak punya route
+    // webhook sendiri.
+    Route::post('/applications/payment/init', [ApplicationPaymentController::class, 'init'])->name('student-portal.applications.payment.init');
+    Route::post('/applications/payment/duitku/select-method', [ApplicationPaymentController::class, 'selectDuitkuMethod'])->name('student-portal.applications.payment.duitku.select-method');
+    Route::get('/applications/payment/{orderId}/status', [ApplicationPaymentController::class, 'status'])->name('student-portal.applications.payment.status');
+    Route::get('/applications/payment/return', [ApplicationPaymentController::class, 'return'])->name('student-portal.applications.payment.return');
+    Route::get('/applications/{application}/payment/{purpose}', [ApplicationPaymentController::class, 'show'])->name('student-portal.applications.payment.show');
+
     // Fase 5 -- upload dokumen aplikasi (per Jenis Dokumen, lihat
     // DocumentType/ApplicationDocument/ApplicationDocumentHistory). Sama
     // seperti rute Apply di atas: namespace StudentPortal, SENGAJA tidak
     // pernah didaftarkan di config/menu.php, cuma dicapai lewat redirect
     // setelah submit Apply (lihat ApplyController::store()) atau tombol
     // "Upload Documents" di halaman ringkasan aplikasi.
+    //
+    // FASE 2: sekarang HANYA bisa diakses setelah Registration Fee lunas --
+    // lihat guard ApplicationDocumentController::blockIfRegistrationFeeUnpaid().
     Route::get('/applications/{application}/documents', [ApplicationDocumentController::class, 'edit'])->name('student-portal.applications.documents.edit');
     Route::post('/applications/{application}/documents', [ApplicationDocumentController::class, 'update'])->name('student-portal.applications.documents.update');
 });
@@ -595,6 +619,17 @@ Route::middleware(['auth', 'permission:quiz.university-application'])->prefix('d
 Route::middleware(['auth', 'permission:quiz.university-application,edit'])->prefix('dashboard/superadmin/quiz/university-application')->group(function () {
     Route::post('/{id}/documents/{documentId}/review', [UniversityApplicationController::class, 'reviewDocument'])->name('quiz.university-application.documents.review');
     Route::post('/{id}/documents/type/{documentTypeId}/upload', [UniversityApplicationController::class, 'uploadDocument'])->name('quiz.university-application.documents.upload');
+    // FASE 2 -- admin isi manual nominal Registration Fee & Departure Fee per
+    // aplikasi (lihat ApplyController::store(), yang sengaja TIDAK lagi
+    // mengisi registration_fee_amount otomatis). Tanpa ini siswa tidak akan
+    // pernah bisa membayar (ApplicationPaymentController::init() menolak
+    // nominal kosong/0).
+    Route::post('/{id}/fees', [UniversityApplicationController::class, 'updateFees'])->name('quiz.university-application.fees.update');
+    // FASE 4 -- admin update manual admission_status (UNDER REVIEW diset
+    // otomatis oleh webhook begitu Registration Fee lunas -- lihat
+    // FormPaymentController::onApplicationPaymentPaid() -- PROCESSING &
+    // ACCEPTED diubah manual oleh admin lewat form ini).
+    Route::post('/{id}/admission-status', [UniversityApplicationController::class, 'updateAdmissionStatus'])->name('quiz.university-application.admission-status.update');
 });
 
 Route::middleware(['auth', 'permission:company.profile'])->prefix('dashboard/superadmin/company/profile')->group(function () {

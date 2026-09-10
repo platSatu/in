@@ -2,8 +2,8 @@
 
 namespace App\Services\Payment\Gateways;
 
-use App\Models\FormPayment;
 use App\Models\PaymentGateway;
+use App\Services\Payment\Contracts\Payable;
 use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -57,7 +57,7 @@ class IpaymuGateway implements PaymentGatewayInterface
         return false;
     }
 
-    public function getPaymentMethods(FormPayment $payment): array
+    public function getPaymentMethods(Payable $payment): array
     {
         return [];
     }
@@ -74,19 +74,19 @@ class IpaymuGateway implements PaymentGatewayInterface
         return hash_hmac('sha256', $stringToSign, $this->apiKey());
     }
 
-    public function createTransaction(FormPayment $payment, ?string $paymentMethod = null): array
+    public function createTransaction(Payable $payment, ?string $paymentMethod = null): array
     {
         $body = [
-            'product' => [$payment->form->name ?? 'Pembayaran Form'],
+            'product' => [$payment->getDescription()],
             'qty' => [1],
-            'price' => [(int) round((float) $payment->amount)],
-            'description' => ['Pembayaran ' . ($payment->form->name ?? 'Form')],
-            'referenceId' => $payment->order_id,
-            'buyerName' => $payment->name,
-            'buyerEmail' => $payment->email,
-            'buyerPhone' => $payment->handphone,
-            'returnUrl' => route('frontend.payment.return', ['order_id' => $payment->order_id]),
-            'cancelUrl' => route('frontend.payment.return', ['order_id' => $payment->order_id]),
+            'price' => [$payment->getAmount()],
+            'description' => [$payment->getDescription()],
+            'referenceId' => $payment->getOrderId(),
+            'buyerName' => $payment->getPayerName(),
+            'buyerEmail' => $payment->getPayerEmail(),
+            'buyerPhone' => $payment->getPayerPhone(),
+            'returnUrl' => $payment->getReturnUrl(),
+            'cancelUrl' => $payment->getReturnUrl(),
             'notifyUrl' => route('payment.webhook.ipaymu'),
         ];
 
@@ -99,7 +99,7 @@ class IpaymuGateway implements PaymentGatewayInterface
 
         if ($response->failed()) {
             Log::error('[PAYMENT][iPaymu] Gagal membuat transaksi', [
-                'order_id' => $payment->order_id,
+                'order_id' => $payment->getOrderId(),
                 'status' => $response->status(),
                 'body' => $response->json(),
             ]);

@@ -2,13 +2,19 @@
 
 namespace App\Services\Payment\Contracts;
 
-use App\Models\FormPayment;
 use Illuminate\Http\Request;
 
 /**
  * Kontrak yang sama dipenuhi oleh MidtransGateway, DuitkuGateway, dan
  * IpaymuGateway supaya FormPaymentController tidak perlu tahu detail
  * masing-masing gateway (semuanya dipanggil lewat interface ini).
+ *
+ * FIX (10 September 2026): type-hint diganti dari FormPayment (konkret)
+ * jadi Payable (interface) supaya gateway yang sama bisa dipakai ulang oleh
+ * ApplicationPayment (fitur Apply Kampus) -- lihat docblock lengkap di
+ * App\Services\Payment\Contracts\Payable. Nilai yang dibaca gateway class
+ * (order id, amount, dst) SAMA PERSIS seperti sebelumnya untuk FormPayment,
+ * cuma dipanggil lewat method interface Payable, bukan properti langsung.
  */
 interface PaymentGatewayInterface
 {
@@ -26,7 +32,7 @@ interface PaymentGatewayInterface
      *
      * @return array<int, array{code: string, name: string, image: ?string, fee: mixed}>
      */
-    public function getPaymentMethods(FormPayment $payment): array;
+    public function getPaymentMethods(Payable $payment): array;
 
     /**
      * Buat transaksi ke gateway. $paymentMethod hanya dipakai gateway yang
@@ -34,7 +40,7 @@ interface PaymentGatewayInterface
      *
      * @return array{redirect_url: ?string, reference: ?string, raw: array}
      */
-    public function createTransaction(FormPayment $payment, ?string $paymentMethod = null): array;
+    public function createTransaction(Payable $payment, ?string $paymentMethod = null): array;
 
     /**
      * Baca & verifikasi notifikasi/callback dari gateway. Melempar

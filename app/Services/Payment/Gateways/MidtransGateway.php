@@ -2,8 +2,8 @@
 
 namespace App\Services\Payment\Gateways;
 
-use App\Models\FormPayment;
 use App\Models\PaymentGateway;
+use App\Services\Payment\Contracts\Payable;
 use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use App\Services\Payment\PaymentSignatureMismatchException;
 use Illuminate\Http\Request;
@@ -46,40 +46,40 @@ class MidtransGateway implements PaymentGatewayInterface
         return false;
     }
 
-    public function getPaymentMethods(FormPayment $payment): array
+    public function getPaymentMethods(Payable $payment): array
     {
         return [];
     }
 
-    public function createTransaction(FormPayment $payment, ?string $paymentMethod = null): array
+    public function createTransaction(Payable $payment, ?string $paymentMethod = null): array
     {
-        [$firstName, $lastName] = $this->splitName($payment->name);
-        $amount = (int) round((float) $payment->amount);
+        [$firstName, $lastName] = $this->splitName($payment->getPayerName());
+        $amount = $payment->getAmount();
 
         $response = Http::withBasicAuth($this->serverKey(), '')
             ->acceptJson()
             ->post($this->transactionUrl(), [
                 'transaction_details' => [
-                    'order_id' => $payment->order_id,
+                    'order_id' => $payment->getOrderId(),
                     'gross_amount' => $amount,
                 ],
                 'customer_details' => [
                     'first_name' => $firstName,
                     'last_name' => $lastName,
-                    'email' => $payment->email,
-                    'phone' => $payment->handphone,
+                    'email' => $payment->getPayerEmail(),
+                    'phone' => $payment->getPayerPhone(),
                 ],
                 'item_details' => [[
-                    'id' => (string) $payment->form_id,
+                    'id' => $payment->getOrderId(),
                     'price' => $amount,
                     'quantity' => 1,
-                    'name' => 'Pembayaran ' . ($payment->form->name ?? 'Form'),
+                    'name' => $payment->getDescription(),
                 ]],
             ]);
 
         if ($response->failed()) {
             Log::error('[PAYMENT][Midtrans] Gagal membuat transaksi', [
-                'order_id' => $payment->order_id,
+                'order_id' => $payment->getOrderId(),
                 'status' => $response->status(),
                 'body' => $response->json(),
             ]);

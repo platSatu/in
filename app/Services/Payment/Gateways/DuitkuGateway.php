@@ -2,8 +2,8 @@
 
 namespace App\Services\Payment\Gateways;
 
-use App\Models\FormPayment;
 use App\Models\PaymentGateway;
+use App\Services\Payment\Contracts\Payable;
 use App\Services\Payment\Contracts\PaymentGatewayInterface;
 use App\Services\Payment\PaymentSignatureMismatchException;
 use Illuminate\Http\Request;
@@ -62,9 +62,9 @@ class DuitkuGateway implements PaymentGatewayInterface
         return true;
     }
 
-    public function getPaymentMethods(FormPayment $payment): array
+    public function getPaymentMethods(Payable $payment): array
     {
-        $amount = (int) round((float) $payment->amount);
+        $amount = $payment->getAmount();
         $datetime = now()->format('Y-m-d H:i:s');
 
         // Formula resmi: SHA256(merchantcode + amount + datetime + apiKey)
@@ -79,7 +79,7 @@ class DuitkuGateway implements PaymentGatewayInterface
 
         if ($response->failed()) {
             Log::error('[PAYMENT][Duitku] Gagal ambil daftar metode pembayaran', [
-                'order_id' => $payment->order_id,
+                'order_id' => $payment->getOrderId(),
                 'status' => $response->status(),
                 'body' => $response->json(),
             ]);
@@ -99,26 +99,26 @@ class DuitkuGateway implements PaymentGatewayInterface
             ->all();
     }
 
-    public function createTransaction(FormPayment $payment, ?string $paymentMethod = null): array
+    public function createTransaction(Payable $payment, ?string $paymentMethod = null): array
     {
         if (empty($paymentMethod)) {
             throw new InvalidArgumentException('Duitku butuh paymentMethod yang sudah dipilih user sebelum transaksi dibuat.');
         }
 
-        $amount = (int) round((float) $payment->amount);
+        $amount = $payment->getAmount();
 
         // Formula resmi: MD5(merchantCode + merchantOrderId + paymentAmount + apiKey)
-        $signature = md5($this->merchantCode() . $payment->order_id . $amount . $this->apiKey());
+        $signature = md5($this->merchantCode() . $payment->getOrderId() . $amount . $this->apiKey());
 
         $response = Http::acceptJson()->post($this->inquiryUrl(), [
             'merchantCode' => $this->merchantCode(),
             'paymentAmount' => $amount,
-            'merchantOrderId' => $payment->order_id,
-            'productDetails' => 'Pembayaran ' . ($payment->form->name ?? 'Form'),
-            'email' => $payment->email,
+            'merchantOrderId' => $payment->getOrderId(),
+            'productDetails' => $payment->getDescription(),
+            'email' => $payment->getPayerEmail(),
             'paymentMethod' => $paymentMethod,
-            'customerVaName' => $payment->name,
-            'returnUrl' => route('frontend.payment.return', ['order_id' => $payment->order_id]),
+            'customerVaName' => $payment->getPayerName(),
+            'returnUrl' => $payment->getReturnUrl(),
             'callbackUrl' => route('payment.webhook.duitku'),
             'signature' => $signature,
             // Dulu hardcode 60. Sekarang dipakaikan expiry_minutes milik gateway ini
@@ -131,7 +131,7 @@ class DuitkuGateway implements PaymentGatewayInterface
 
         if ($response->failed()) {
             Log::error('[PAYMENT][Duitku] Gagal membuat transaksi', [
-                'order_id' => $payment->order_id,
+                'order_id' => $payment->getOrderId(),
                 'status' => $response->status(),
                 'body' => $response->json(),
             ]);

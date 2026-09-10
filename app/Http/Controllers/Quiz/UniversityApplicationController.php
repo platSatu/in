@@ -128,10 +128,17 @@ class UniversityApplicationController extends Controller
 
         $groupedTypes = $documentTypes->groupBy('group_label');
 
+        // FASE 2 -- riwayat transaksi Registration Fee & Departure Fee
+        // aplikasi ini, ditampilkan di card "Payment" (lihat show.blade.php)
+        // supaya admin bisa lihat status pembayaran TANPA harus buka
+        // dashboard gateway terpisah.
+        $payments = $application->payments()->latest('created_at')->get();
+
         return view('quiz.university-application.show', compact(
             'application',
             'groupedTypes',
-            'existingDocuments'
+            'existingDocuments',
+            'payments'
         ));
     }
 
@@ -228,6 +235,69 @@ class UniversityApplicationController extends Controller
         return redirect()
             ->route('quiz.university-application.show', $id)
             ->with('success', 'Dokumen berhasil diupload.');
+    }
+
+    /**
+     * FASE 2 (Alur Pembayaran 2 Arah Apply Kampus, 10 September 2026) --
+     * admin isi manual nominal Registration Fee (registration_fee_amount)
+     * DAN Departure Fee (REUSE kolom deposit_fee_china_amount yang sudah
+     * ada, lihat migration add_admission_status_to_university_applications_
+     * table) untuk 1 aplikasi. Sengaja 1 form gabungan (bukan 2 endpoint
+     * terpisah) karena keduanya sama-sama muncul di 1 card "Pembayaran" di
+     * halaman detail aplikasi.
+     *
+     * Nominal yang sudah pernah dibayar (ada ApplicationPayment berstatus
+     * 'paid' untuk purpose itu) SENGAJA tetap boleh diedit di sini -- form
+     * ini cuma mengubah UniversityApplication::registration_fee_amount /
+     * deposit_fee_china_amount (dipakai untuk transaksi BERIKUTNYA kalau
+     * ada), TIDAK menyentuh baris application_payments yang sudah selesai.
+     */
+    public function updateFees(Request $request, string $id): RedirectResponse
+    {
+        $application = UniversityApplication::findOrFail($id);
+
+        $validated = $request->validate([
+            'registration_fee_amount' => 'nullable|integer|min:0',
+            'deposit_fee_china_amount' => 'nullable|integer|min:0',
+        ]);
+
+        $application->update([
+            'registration_fee_amount' => $validated['registration_fee_amount'] ?? null,
+            'deposit_fee_china_amount' => $validated['deposit_fee_china_amount'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('quiz.university-application.show', $id)
+            ->with('success', 'Nominal pembayaran berhasil disimpan.');
+    }
+
+    /**
+     * FASE 4 -- admin ubah admission_status manual jadi PROCESSING atau
+     * ACCEPTED. UNDER_REVIEW SENGAJA tidak ada di pilihan form ini -- status
+     * itu hanya diset otomatis oleh webhook begitu Registration Fee lunas
+     * (lihat FormPaymentController::onApplicationPaymentPaid()), bukan
+     * pilihan manual admin (kalau admin butuh "mundurkan" status,
+     * cukup pilih kosongkan lewat opsi "- Belum diatur -" di bawah).
+     */
+    public function updateAdmissionStatus(Request $request, string $id): RedirectResponse
+    {
+        $application = UniversityApplication::findOrFail($id);
+
+        $validated = $request->validate([
+            'admission_status' => ['nullable', 'in:' . implode(',', [
+                UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW,
+                UniversityApplication::ADMISSION_STATUS_PROCESSING,
+                UniversityApplication::ADMISSION_STATUS_ACCEPTED,
+            ])],
+        ]);
+
+        $application->update([
+            'admission_status' => $validated['admission_status'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('quiz.university-application.show', $id)
+            ->with('success', 'Admission status berhasil diperbarui.');
     }
 
     /**

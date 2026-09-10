@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use App\Services\Payment\Contracts\Payable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class FormPayment extends Model
+class FormPayment extends Model implements Payable
 {
     use HasUuids;
 
@@ -69,5 +70,45 @@ class FormPayment extends Model
     public function isExpired(): bool
     {
         return $this->status === 'expired';
+    }
+
+    // FIX (10 September 2026): implementasi interface Payable -- lihat
+    // docblock lengkap di App\Services\Payment\Contracts\Payable. Semua
+    // method di bawah cuma MEMBUNGKUS field yang sudah ada, PERSIS nilai
+    // yang dulu diakses langsung oleh DuitkuGateway/MidtransGateway/
+    // IpaymuGateway -- tidak ada perilaku FormPayment yang berubah.
+    public function getOrderId(): string
+    {
+        return (string) $this->order_id;
+    }
+
+    public function getAmount(): int
+    {
+        return (int) round((float) $this->amount);
+    }
+
+    public function getPayerName(): string
+    {
+        return (string) $this->name;
+    }
+
+    public function getPayerEmail(): string
+    {
+        return (string) $this->email;
+    }
+
+    public function getPayerPhone(): string
+    {
+        return (string) $this->handphone;
+    }
+
+    public function getDescription(): string
+    {
+        return 'Pembayaran ' . ($this->form->name ?? 'Form');
+    }
+
+    public function getReturnUrl(): string
+    {
+        return route('frontend.payment.return', ['order_id' => $this->order_id]);
     }
 }

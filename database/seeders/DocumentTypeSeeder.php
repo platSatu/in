@@ -66,6 +66,22 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'recommendation_letter', 'label' => 'Recommendation Letter', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 160],
             ['code' => 'guardian_letter', 'label' => 'Guardian Letter', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 170],
             ['code' => 'any_certificate', 'label' => 'Any Certificate', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 180],
+
+            // --- Documents from InaStudy (FASE 4, 10 September 2026) ---
+            // provided_by = 'admin' -- KEBALIKAN dari semua jenis dokumen di
+            // atas (default provided_by = 'student' dari kolomnya, tidak
+            // perlu disebut eksplisit). 2 baris ini TIDAK PERNAH muncul di
+            // halaman upload siswa (lihat DocumentType::scopeStudentUpload()
+            // & ApplicationDocumentController::edit()/update()) -- siswa
+            // hanya bisa MELIHAT/DOWNLOAD dari halaman ringkasan aplikasi
+            // (student-portal.applications.show), tidak pernah upload sendiri.
+            // Admin yang upload lewat Quiz\UniversityApplicationController::
+            // uploadDocument() (method generik yang sudah ada, tidak perlu
+            // diubah). 'code' SENGAJA beda dari 'passport' (Identitas & Foto)
+            // di atas -- itu foto KTP/paspor siswa sendiri, ini paspor FISIK
+            // yang sudah diproses/terbit dari InaStudy, dokumen yang berbeda.
+            ['code' => 'admin_offer_letter', 'label' => 'Offer Letter', 'group_label' => 'Documents from InaStudy', 'allowed_extensions' => 'pdf,jpg,jpeg', 'provided_by' => DocumentType::PROVIDED_BY_ADMIN, 'is_required' => false, 'sort_order' => 200],
+            ['code' => 'admin_passport', 'label' => 'Passport (Processed)', 'group_label' => 'Documents from InaStudy', 'allowed_extensions' => 'pdf,jpg,jpeg', 'provided_by' => DocumentType::PROVIDED_BY_ADMIN, 'is_required' => false, 'sort_order' => 210],
         ];
 
         foreach ($items as $item) {

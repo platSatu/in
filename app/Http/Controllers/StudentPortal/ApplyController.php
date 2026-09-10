@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
+use App\Models\ApplicationPayment;
 use App\Models\Student;
 use App\Models\UniversityApplication;
 use App\Models\UniversityProfile;
@@ -138,8 +139,14 @@ class ApplyController extends Controller
                 ->with('apply_conflict', 'Maaf, nomor WhatsApp ini sudah terdaftar di akun lain. Jika ini nomor Anda sendiri, silakan logout lalu login menggunakan akun tersebut untuk melanjutkan Apply. Jika Anda merasa ini bukan Anda, silakan hubungi admin kami.');
         }
 
-        $registrationFee = $profile->payments()->where('fee_type', 'registration_fee')->first();
-
+        // FASE 2 (Alur Pembayaran 2 Arah) -- registration_fee_amount TIDAK LAGI
+        // di-auto-isi dari UniversityProfilePayment (fee_type='registration_fee')
+        // seperti sebelumnya. Nominal Registration Fee sekarang WAJIB diisi
+        // manual oleh admin per-aplikasi (lihat ApplicationPaymentController::
+        // init(), yang menolak transaksi kalau nominal ini masih kosong/0).
+        // Sengaja dibiarkan null di sini -- diisi admin lewat halaman detail
+        // aplikasi (Quiz\UniversityApplicationController) sebelum siswa bisa
+        // membayar.
         $application = UniversityApplication::create([
             'application_no' => (new ApplicationNumberGenerator())->next(),
             'student_id' => $student->id,
@@ -151,18 +158,23 @@ class ApplyController extends Controller
             'intake_year' => $validated['intake_year'],
             'duration' => $degreeRow->duration,
             'whatsapp' => $validated['whatsapp'],
-            'registration_fee_amount' => $registrationFee->amount ?? null,
+            'registration_fee_amount' => null,
             'status' => UniversityApplication::STATUS_SUBMITTED,
             'submitted_at' => now(),
         ]);
 
-        // Fase 5: setelah submit, langsung arahkan ke halaman upload dokumen
-        // (bukan ke ringkasan) -- sesuai alur yang diminta user. Halaman
-        // ringkasan (student-portal.applications.show) tetap ada & masih
-        // bisa dibuka lewat link "View Application Summary" di halaman
-        // dokumen, cuma bukan lagi tujuan redirect pertama.
+        // FASE 2 -- sebelum Fase 2, tujuan redirect ini adalah langsung ke
+        // halaman upload dokumen (student-portal.applications.documents.edit).
+        // Sekarang harus lewat gerbang pembayaran Registration Fee dulu (Step
+        // 3 di alur yang disepakati): Study Plan & Upload Documents (Step 1 &
+        // 2 versi lama, sekarang jadi tahap SETELAH bayar) baru terbuka
+        // setelah ApplicationPayment purpose=registration_fee berstatus
+        // "paid" (ditandai oleh webhook gateway, lihat
+        // FormPaymentController::onApplicationPaymentPaid()). Guard di sisi
+        // ApplicationDocumentController::edit()/update() menolak akses kalau
+        // belum lunas (lihat komentar di sana).
         return redirect()
-            ->route('student-portal.applications.documents.edit', $application->id)
+            ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
             ->with('success', 'Aplikasi berhasil dikirim! Nomor aplikasi Anda: ' . $application->application_no);
     }
 }

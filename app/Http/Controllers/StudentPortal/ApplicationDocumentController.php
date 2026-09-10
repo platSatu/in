@@ -5,6 +5,7 @@ namespace App\Http\Controllers\StudentPortal;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationDocumentHistory;
+use App\Models\ApplicationPayment;
 use App\Models\DocumentType;
 use App\Models\UniversityApplication;
 use Illuminate\Http\RedirectResponse;
@@ -36,11 +37,26 @@ class ApplicationDocumentController extends Controller
      * dengan status upload terkini (belum upload / pending / approved /
      * rejected) untuk tiap jenis dokumen.
      */
-    public function edit(Request $request, string $applicationId): View
+    public function edit(Request $request, string $applicationId): View|RedirectResponse
     {
         $application = $this->ownedApplicationOrFail($request, $applicationId);
 
-        $documentTypes = DocumentType::active()->orderBy('sort_order')->get();
+        // FASE 2 (Alur Pembayaran 2 Arah) -- Step 1 (Study Plan, lihat
+        // group_label "Academic" di DocumentTypeSeeder) & Step 2 (Upload
+        // Documents, halaman ini) BARU boleh diakses setelah Registration Fee
+        // lunas. Kalau belum, arahkan balik ke halaman pembayaran alih-alih
+        // menampilkan 403 -- lebih ramah karena ini alur normal (siswa baru
+        // submit Apply), bukan percobaan akses tidak sah.
+        if ($redirect = $this->blockIfRegistrationFeeUnpaid($application)) {
+            return $redirect;
+        }
+
+        // FASE 4 -- dokumen provided_by='admin' (Offer Letter, Passport)
+        // SENGAJA tidak ikut ditampilkan sebagai kolom upload di sini --
+        // siswa cuma bisa MELIHAT/DOWNLOAD dokumen itu di halaman ringkasan
+        // aplikasi (student-portal.applications.show), tidak pernah upload
+        // sendiri. Lihat DocumentType::scopeStudentUpload().
+        $documentTypes = DocumentType::active()->studentUpload()->orderBy('sort_order')->get();
 
         $existingDocuments = ApplicationDocument::where('application_id', $application->id)
             ->with('histories.uploadedBy')
@@ -65,7 +81,19 @@ class ApplicationDocumentController extends Controller
     {
         $application = $this->ownedApplicationOrFail($request, $applicationId);
 
-        $documentTypes = DocumentType::active()->get()->keyBy('id');
+        // Sama seperti guard di edit() -- dicek lagi di sini (bukan cuma di
+        // edit()) supaya submit langsung ke endpoint POST ini (mis. lewat
+        // form yang sempat ke-cache/dibuka dari tab lama) tidak bisa
+        // melewati gerbang pembayaran.
+        if ($redirect = $this->blockIfRegistrationFeeUnpaid($application)) {
+            return $redirect;
+        }
+
+        // FASE 4 -- sama seperti edit(): dibatasi ke studentUpload() supaya
+        // POST manual (mis. lewat curl/devtools) tidak bisa menyelundupkan
+        // documents.{admin_document_type_id} dan menimpa dokumen yang
+        // seharusnya cuma admin yang boleh isi.
+        $documentTypes = DocumentType::active()->studentUpload()->get()->keyBy('id');
 
         // Rule validasi dibangun dinamis per DocumentType supaya ekstensi
         // yang diizinkan (mis. Passport & Pass Photo cuma jpg/jpeg) tetap
@@ -143,6 +171,30 @@ class ApplicationDocumentController extends Controller
         return redirect()
             ->route('student-portal.applications.documents.edit', $application->id)
             ->with('success', 'Documents uploaded successfully. Our team will review them shortly.');
+    }
+
+    /**
+     * FASE 2 -- null kalau Registration Fee aplikasi ini sudah lunas (boleh
+     * lanjut), atau RedirectResponse ke halaman pembayaran kalau belum.
+     * Dicek lewat tabel application_payments (BUKAN cuma
+     * admission_status), karena admission_status baru diisi oleh webhook
+     * SETELAH pembayaran ini juga -- lihat
+     * FormPaymentController::onApplicationPaymentPaid().
+     */
+    private function blockIfRegistrationFeeUnpaid(UniversityApplication $application): ?RedirectResponse
+    {
+        $isPaid = ApplicationPayment::where('application_id', $application->id)
+            ->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+            ->where('status', ApplicationPayment::STATUS_PAID)
+            ->exists();
+
+        if ($isPaid) {
+            return null;
+        }
+
+        return redirect()
+            ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
+            ->with('status', 'Selesaikan pembayaran Registration Fee terlebih dahulu untuk membuka Study Plan & Upload Documents.');
     }
 
     /**
