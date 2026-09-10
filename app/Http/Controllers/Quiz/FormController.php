@@ -1078,6 +1078,20 @@ class FormController extends Controller
                         'image' => $this->copyPublicFile($option->image),
                         'score' => $option->score,
                         'is_other' => $option->is_other,
+                        // FIX (10 September 2026): dua kolom ini sebelumnya
+                        // tidak ikut di-copy, jadi selalu jatuh ke default
+                        // (is_correct = false, whatsapp_template_id = null)
+                        // di form hasil duplikat -- akibatnya form dengan
+                        // result_mode 'section_threshold' menganggap SEMUA
+                        // jawaban single/multiple_choice salah (lihat
+                        // FrontendController::isQuestionAnsweredCorrectly()),
+                        // jadi student yang isi form hasil copy bisa gagal
+                        // padahal jawabannya benar. whatsapp_template_id
+                        // aman disalin apa adanya (foreign key ke template
+                        // WhatsApp yang memang tidak ikut diduplikat, jadi
+                        // tetap menunjuk ke template yang sama & masih ada).
+                        'is_correct' => $option->is_correct,
+                        'whatsapp_template_id' => $option->whatsapp_template_id,
                         'status' => $option->status,
                     ]);
 
