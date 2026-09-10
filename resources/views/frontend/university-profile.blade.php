@@ -50,9 +50,28 @@
                                radial-gradient(circle at 85% 75%, rgba(255,255,255,.08) 0, transparent 45%);
         }
 
+        /* FIX (10 September 2026): overlay merah pekat sebelumnya
+           (rgba(150,10,25,.88)) bikin teks hero (h1/lokasi/breadcrumb) jadi
+           nyaris tak kelihatan -- soalnya warna teks-teks itu memang
+           dirancang untuk background TERANG (bg-uv.png default), gelap
+           (#1F2937/#2b2f38), jadi begitu ditimpa overlay gelap juga,
+           kontrasnya hilang. Sekarang overlay dibuat jauh lebih tipis &
+           netral (bukan merah lagi), dan teks hero di-override jadi putih
+           KHUSUS saat ada banner (lihat blok .hero.has-banner di bawah),
+           supaya tetap kebaca di atas foto apa pun tanpa perlu overlay
+           setebal sebelumnya. */
         .hero.has-banner::before {
-            background: linear-gradient(135deg, rgba(150,10,25,.88) 0%, rgba(30,10,20,.75) 100%);
+            background: linear-gradient(135deg, rgba(10,8,10,.4) 0%, rgba(10,8,10,.55) 100%);
         }
+
+        .hero.has-banner .breadcrumb-link,
+        .hero.has-banner .breadcrumb-link i,
+        .hero.has-banner h1,
+        .hero.has-banner .hero-content p {
+            color: #fff;
+        }
+
+        .hero.has-banner .breadcrumb-link:hover { color: #fde3e3; }
 
         .hero-content { position: relative; z-index: 1; }
 
