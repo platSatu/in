@@ -139,6 +139,18 @@ class CompanyDivisionController extends Controller
             'status' => $validated['status'],
         ]);
 
+        // FIX (permintaan user, 14 September 2026): sama seperti
+        // App\Http\Controllers\UserController::store() &
+        // App\Http\Controllers\Student\StudentController::addUser() -- akun
+        // yang dibuat manual dari sini (superadmin bikin user langsung lewat
+        // Company > Division > Add User) TIDAK PERNAH memicu event Registered
+        // seperti alur daftar sendiri, jadi tidak ada email verifikasi yang
+        // benar-benar terkirim. Kalau dibiarkan, email_verified_at tetap null
+        // dan user ini akan MENTOK SELAMANYA di halaman "verifikasi email
+        // dulu" begitu coba login. Karena akun ini memang sengaja dibuat
+        // admin (bukan daftar sendiri), tandai langsung terverifikasi di sini.
+        $newUser->markEmailAsVerified();
+
         AdminCrud::create(CompanyDivisionUser::class, [
             'company_division_id' => $data->id,
             'user_id' => $newUser->id,

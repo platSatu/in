@@ -46,7 +46,21 @@ class UserController extends Controller
             'status' => 'required|in:active,inactive',
         ]);
 
-        AdminCrud::create(User::class, $validated);
+        $user = AdminCrud::create(User::class, $validated);
+
+        // FIX (permintaan user, 14 September 2026): akun yang dibuat manual dari
+        // sini (superadmin bikin user staff/sales langsung lewat menu Users)
+        // TIDAK PERNAH memicu event Registered seperti alur daftar sendiri di
+        // Auth\RegisteredUserController -- jadi tidak ada email verifikasi
+        // yang benar-benar terkirim. Kalau dibiarkan, email_verified_at tetap
+        // null dan user ini akan MENTOK SELAMANYA di halaman "verifikasi email
+        // dulu" begitu coba login (tidak akan pernah bisa verifikasi karena
+        // link verifikasinya memang tidak pernah dikirim sama sekali). Sama
+        // persis pola fix yang sudah ada di
+        // App\Http\Controllers\Student\StudentController::addUser() -- karena
+        // akun ini memang sengaja dibuat admin (bukan daftar sendiri), tandai
+        // langsung terverifikasi di sini.
+        $user->markEmailAsVerified();
 
         return redirect()
             ->route('user.index')
