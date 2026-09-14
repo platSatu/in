@@ -39,6 +39,7 @@ class User extends Authenticatable implements MustVerifyEmail
         'status',
        // 'saldo',
        'image',
+       'sales_code',
     ];
 
     protected static function booted(): void

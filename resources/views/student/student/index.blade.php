@@ -136,6 +136,7 @@
                                 <th class="text-nowrap">Branch</th>
                                 <th>Form</th>
                                 <th class="text-nowrap">Kode Sales</th>
+                                <th class="text-nowrap">Sales Ditugaskan</th>
                                 <th class="text-nowrap">Pembayaran</th>
                                 <th class="text-nowrap">Status</th>
                                 <th class="text-nowrap">Akun Login</th>
@@ -159,6 +160,16 @@
                                     <td class="text-nowrap">{{ $item->companyBranch->name ?? '-' }}</td>
                                     <td>{{ $item->form->name ?? '-' }}</td>
                                     <td class="text-nowrap">{{ $item->sales_id ?? '-' }}</td>
+                                    <td class="text-nowrap">
+                                        @if ($item->handledBy)
+                                            {{ $item->handledBy->name }}
+                                            @if ($item->handledBy->sales_code)
+                                                <div class="small text-muted">{{ $item->handledBy->sales_code }}</div>
+                                            @endif
+                                        @else
+                                            <span class="text-muted">-</span>
+                                        @endif
+                                    </td>
                                     <td class="text-nowrap">
                                         @php
                                             // Ambil submission TERBARU student ini (sudah di-eager-load & diurutkan
@@ -220,7 +231,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="12" class="text-center">Belum ada data.</td>
+                                    <td colspan="13" class="text-center">Belum ada data.</td>
                                 </tr>
                             @endforelse
                         </tbody>

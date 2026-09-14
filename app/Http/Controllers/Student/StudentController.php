@@ -10,6 +10,7 @@ use App\Models\FormAnswer;
 use App\Models\FormPayment;
 use App\Models\FormSubmission;
 use App\Models\Major;
+use App\Models\Role;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\RoleUser;
@@ -50,6 +51,9 @@ class StudentController extends Controller
                 'user',
                 'companyBranch',
                 'form',
+                // Fix (14 September 2026, permintaan user): supaya kolom "Sales
+                // Ditugaskan" di index.blade.php tidak N+1 query per baris.
+                'handledBy',
                 // Dipakai di index.blade.php untuk kolom "Pembayaran": ambil submission
                 // TERBARU milik student ini beserta payment-nya (kalau ada), supaya tidak
                 // N+1 query per baris. Sama seperti pola $paymentsBySubmission di show(),
@@ -133,6 +137,7 @@ class StudentController extends Controller
             ->with([
                 'companyBranch',
                 'form',
+                'handledBy',
                 'formSubmissions' => fn ($q) => $q->latest('created_at')->with('payment'),
             ])
             // Export mengikuti cakupan akses yang sama dengan index() di atas —
@@ -169,6 +174,7 @@ class StudentController extends Controller
                 'Branch',
                 'Form',
                 'Kode Sales',
+                'Sales Ditugaskan',
                 'Status Pembayaran',
                 'Order ID Pembayaran',
                 'Nominal Pembayaran',
@@ -204,6 +210,7 @@ class StudentController extends Controller
                         optional($student->companyBranch)->name ?? '-',
                         optional($student->form)->name ?? '-',
                         $student->sales_id ?? '-',
+                        optional($student->handledBy)->name ?? '-',
                         $paymentStatus,
                         $payment->order_id ?? '-',
                         $payment ? number_format((float) $payment->amount, 0, ',', '.') : '-',
@@ -336,8 +343,9 @@ class StudentController extends Controller
 
         $companyBranches = CompanyBranch::select('id', 'name')->orderBy('name')->get();
         $forms = Form::select('id', 'name')->orderBy('name')->get();
+        $salesUsers = $this->activeSalesUsers();
 
-        return view('student.student.edit', compact('data', 'companyBranches', 'forms'));
+        return view('student.student.edit', compact('data', 'companyBranches', 'forms', 'salesUsers'));
     }
 
     /**
@@ -463,8 +471,32 @@ class StudentController extends Controller
             // belum pernah terhubung ke branch/form manapun saat dibuat manual dari sini.
             'branch_id' => ['nullable', 'exists:company_branch,id'],
             'form_id' => ['nullable', 'exists:forms,id'],
+            // Fix (14 September 2026, permintaan user): dropdown "Assign ke
+            // Sales" di form edit -- superadmin mencocokkan sales_id (kode
+            // teks bebas di atas) ke akun sales resmi lewat kolom ini.
+            'handled_by_user_id' => ['nullable', 'exists:users,id'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
+    }
+
+    /**
+     * Daftar user dengan role "sales" aktif (dicocokkan lewat slug, bukan ID
+     * hardcode -- role "sales" dibuat dinamis lewat halaman Roles), dipakai
+     * untuk dropdown "Assign ke Sales" di form edit Student -- lihat
+     * App\Http\Controllers\RoleUserController::assignSalesCodeIfNeeded()
+     * untuk asal Kode Sales (User::sales_code) yang ditampilkan sebagai
+     * referensi tiap opsinya.
+     */
+    private function activeSalesUsers()
+    {
+        return User::query()
+            ->whereHas('roles', function ($query) {
+                $query->where('slug', 'sales')
+                    ->where('roles.status', Role::STATUS_ACTIVE)
+                    ->where('role_user.status', RoleUser::STATUS_ACTIVE);
+            })
+            ->orderBy('name')
+            ->get(['id', 'name', 'sales_code']);
     }
 
     /**

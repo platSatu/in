@@ -6,6 +6,7 @@ use App\Helpers\AdminCrud;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
 class UserController extends Controller
@@ -68,11 +69,20 @@ class UserController extends Controller
             'email' => 'required|string|email|max:255|unique:users,email,' . $data->id,
             'password' => ['nullable', 'confirmed', Password::defaults()],
             'handphone' => 'nullable|string|max:30',
+            // Fix (14 September 2026, permintaan user): Kode Sales normalnya
+            // dibuat OTOMATIS oleh sistem saat role "sales" di-assign (lihat
+            // RoleUserController::assignSalesCodeIfNeeded()), tapi superadmin
+            // tetap boleh mengganti manual dari sini kalau perlu.
+            'sales_code' => ['nullable', 'string', 'max:50', Rule::unique('users', 'sales_code')->ignore($data->id)],
             'status' => 'required|in:active,inactive',
         ]);
 
         if (empty($validated['password'])) {
             unset($validated['password']);
+        }
+
+        if (empty($validated['sales_code'])) {
+            $validated['sales_code'] = null;
         }
 
         AdminCrud::update(User::class, $id, $validated);

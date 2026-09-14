@@ -65,6 +65,18 @@
 
                     <div class="row mb-4">
                         <div class="col-sm-6">
+                            <label for="sales_code" class="mb-2">Kode Sales <span class="text-muted">(opsional)</span></label>
+                            <input type="text" class="form-control @error('sales_code') is-invalid @enderror"
+                                   id="sales_code" name="sales_code" value="{{ old('sales_code', $data->sales_code) }}" placeholder="Terisi otomatis saat role Sales di-assign">
+                            <div class="form-text">Otomatis terisi sistem saat role "Sales" di-assign ke user ini. Bisa diganti manual di sini kalau perlu.</div>
+                            @error('sales_code')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
                             <label for="password" class="mb-2">Password (opsional)</label>
                             <input type="password" class="form-control @error('password') is-invalid @enderror"
                                    id="password" name="password" placeholder="Kosongkan jika tidak diubah">

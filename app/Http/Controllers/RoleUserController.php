@@ -87,6 +87,11 @@ class RoleUserController extends Controller
 
         $this->assertScopeSelected($roles, $validated);
 
+        // Fix (14 September 2026, permintaan user): dipakai di bawah untuk
+        // auto-generate Kode Sales (lihat assignSalesCodeIfNeeded()) kalau
+        // salah satu role yang di-assign adalah role "sales".
+        $hasSalesRole = $roles->contains(fn (Role $role) => $role->slug === 'sales');
+
         $count = 0;
         foreach ($validated['user_ids'] as $userId) {
             foreach ($validated['role_ids'] as $roleId) {
@@ -98,6 +103,10 @@ class RoleUserController extends Controller
                     )
                 );
                 $count++;
+            }
+
+            if ($hasSalesRole && $validated['status'] === RoleUser::STATUS_ACTIVE) {
+                $this->assignSalesCodeIfNeeded($userId);
             }
         }
 
@@ -151,6 +160,13 @@ class RoleUserController extends Controller
         );
 
         AdminCrud::update(RoleUser::class, $id, $payload);
+
+        // Fix (14 September 2026, permintaan user): sama seperti di store(),
+        // auto-generate Kode Sales kalau role yang di-assign/diupdate ke
+        // status aktif adalah role "sales".
+        if ($role->slug === 'sales' && $validated['status'] === RoleUser::STATUS_ACTIVE) {
+            $this->assignSalesCodeIfNeeded($validated['user_id']);
+        }
 
         return redirect()
             ->route('roleuser.index')
@@ -372,6 +388,63 @@ class RoleUserController extends Controller
         if (!empty($errors)) {
             throw ValidationException::withMessages($errors);
         }
+    }
+
+    /**
+     * Assign Kode Sales otomatis (format SLS-001, SLS-002, dst -- lihat
+     * nextSalesCode()) ke user begitu dia diberi role "sales" (dicocokkan
+     * lewat slug, bukan ID hardcode -- role "sales" dibuat dinamis lewat
+     * halaman Roles, bukan seed tetap seperti role "student") dengan status
+     * aktif, dan dia belum punya kode. Kode ini yang jadi identitas resmi
+     * dicocokkan superadmin dengan "Kode Sales" (Student::sales_id, teks
+     * bebas) di dropdown "Assign ke Sales" pada form edit Student -- lihat
+     * StudentController::edit()/update(). Superadmin tetap bisa mengganti
+     * kode ini manual lewat halaman edit User kalau perlu.
+     */
+    private function assignSalesCodeIfNeeded(string $userId): void
+    {
+        $user = User::find($userId);
+
+        if ($user === null || !empty($user->sales_code)) {
+            return;
+        }
+
+        for ($attempt = 0; $attempt < 3; $attempt++) {
+            try {
+                $user->update(['sales_code' => $this->nextSalesCode()]);
+
+                return;
+            } catch (\Illuminate\Database\QueryException $e) {
+                if ($e->getCode() !== '23000') {
+                    throw $e;
+                }
+
+                // Kode barusan keburu dipakai proses lain yang nyaris
+                // bersamaan (race condition jarang terjadi) -- coba lagi
+                // dengan angka berikutnya, konsisten dengan pola retry di
+                // App\Services\StudentIdentityResolver.
+            }
+        }
+    }
+
+    /**
+     * Nomor urut Kode Sales berikutnya, dihitung dari kode SLS-xxx tertinggi
+     * yang sudah ada. Dipanggil ulang tiap percobaan di assignSalesCodeIfNeeded()
+     * kalau kena race condition, supaya angkanya maju (bukan stuck di angka
+     * yang sama).
+     */
+    private function nextSalesCode(): string
+    {
+        $lastNumber = User::query()
+            ->whereNotNull('sales_code')
+            ->where('sales_code', 'like', 'SLS-%')
+            ->get(['sales_code'])
+            ->map(fn (User $user) => (int) str_replace('SLS-', '', $user->sales_code))
+            ->max();
+
+        $next = ($lastNumber ?? 0) + 1;
+
+        return 'SLS-' . str_pad((string) $next, 3, '0', STR_PAD_LEFT);
     }
 
     /**

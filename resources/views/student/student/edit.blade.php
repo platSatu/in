@@ -100,6 +100,28 @@
                             @enderror
                         </div>
 
+                        {{-- Fix (14 September 2026, permintaan user): dropdown untuk
+                             superadmin assign student ke sales resmi (User dengan role
+                             Sales), dicocokkan manual dengan "Kode Sales" di sebelah kiri
+                             yang diisi student sendiri (tetap teks bebas, tidak diubah). --}}
+                        <div class="col-md-6">
+                            <label class="form-label">Assign ke Sales <span class="text-muted">(opsional)</span></label>
+                            <select name="handled_by_user_id" class="form-select @error('handled_by_user_id') is-invalid @enderror">
+                                <option value="">-- Belum di-assign --</option>
+                                @foreach ($salesUsers as $salesUser)
+                                    <option value="{{ $salesUser->id }}" {{ old('handled_by_user_id', $data->handled_by_user_id) == $salesUser->id ? 'selected' : '' }}>
+                                        {{ $salesUser->name }} ({{ $salesUser->sales_code ?? 'belum ada kode' }})
+                                    </option>
+                                @endforeach
+                            </select>
+                            <div class="form-text">
+                                Cocokkan dengan Kode Sales yang diisi student di sebelah kiri, lalu pilih sales yang sesuai.
+                            </div>
+                            @error('handled_by_user_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
                         <div class="col-md-6">
                             <label class="form-label">Status</label>
                             <select name="status" class="form-select @error('status') is-invalid @enderror">

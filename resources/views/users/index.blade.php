@@ -49,6 +49,7 @@
                                 <th>Name</th>
                                 <th>Email</th>
                                 <th>Handphone</th>
+                                <th>Kode Sales</th>
                                 <th>Status</th>
                                 <th class="text-center">Action</th>
                             </tr>
@@ -60,6 +61,7 @@
                                     <td>{{ $user->name }}</td>
                                     <td>{{ $user->email }}</td>
                                     <td>{{ $user->handphone ?? '-' }}</td>
+                                    <td>{{ $user->sales_code ?? '-' }}</td>
                                     <td>
                                         <span class="badge {{ $user->status === 'active' ? 'badge-success' : 'badge-danger' }}">
                                             {{ ucfirst($user->status) }}
@@ -82,7 +84,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center">Belum ada data user.</td>
+                                    <td colspan="7" class="text-center">Belum ada data user.</td>
                                 </tr>
                             @endforelse
                         </tbody>
