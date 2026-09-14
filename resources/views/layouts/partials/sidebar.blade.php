@@ -88,12 +88,19 @@
                 login yang punya data Student terhubung (siswa, siapa pun
                 role-nya), TIDAK lewat sistem permission di bawah (itu khusus
                 modul admin). Per diskusi "menu bertingkat siswa" 10 September
-                2026: contoh yang diminta "Menu > Inastudy > Inayule" -- grup
-                "InaYule" (produk lain) belum ada menu/route-nya sama sekali
-                jadi SENGAJA belum ditambahkan (biar tidak ada link nyasar ke
-                halaman kosong); tinggal tambah 1 entry array lagi di
-                $studentMenuGroups di bawah ini kalau sudah siap, formatnya
-                sama persis dengan grup InaStudy.
+                2026: contoh yang diminta "Menu > Inastudy > Inayule".
+
+                Fix (14 September 2026, permintaan user): item di dalam grup
+                "InaStudy" ini sekarang InaYule / InaStudy / InaTrip (nama-nama
+                produk di bawah payung InaStudy) -- sebelumnya "Browse
+                Universities" & "My Applications". InaYule & InaTrip BELUM
+                punya menu/route sendiri sama sekali (produk lain, belum
+                dibangun) jadi 'route' => null (dirender sbg "Segera Hadir",
+                tidak nyasar ke halaman kosong -- lihat @foreach items di
+                bawah); "InaStudy" sendiri tetap mengarah ke route('dashboard')
+                sama persis seperti "My Applications" sebelumnya (cuma label
+                yang berubah). Tinggal isi 'route' => 'nama.route' begitu
+                InaYule/InaTrip sudah punya halamannya sendiri.
             --}}
             @php
                 $studentMenuGroups = collect();
@@ -102,8 +109,9 @@
                         [
                             'label' => 'InaStudy',
                             'items' => [
-                                ['label' => 'Browse Universities', 'route' => 'frontend.university.catalog'],
-                                ['label' => 'My Applications', 'route' => 'dashboard'],
+                                ['label' => 'InaYule', 'route' => null],
+                                ['label' => 'InaStudy', 'route' => 'dashboard'],
+                                ['label' => 'InaTrip', 'route' => null],
                             ],
                         ],
                     ]);
@@ -141,7 +149,16 @@
                         data-bs-parent="#accordionExample">
                         @foreach ($studentGroup['items'] as $studentItem)
                             <li>
-                                <a href="{{ route($studentItem['route']) }}"> {{ $studentItem['label'] }}</a>
+                                @if (!empty($studentItem['route']))
+                                    <a href="{{ route($studentItem['route']) }}"> {{ $studentItem['label'] }}</a>
+                                @else
+                                    {{-- Belum punya halaman/route sendiri, lihat catatan fix
+                                         14 September 2026 di atas -- href="#" biar tidak nyasar. --}}
+                                    <a href="#" class="text-muted" onclick="return false;">
+                                        {{ $studentItem['label'] }}
+                                        <span class="badge bg-secondary ms-1" style="font-size:10px;">Segera Hadir</span>
+                                    </a>
+                                @endif
                             </li>
                         @endforeach
                     </ul>
