@@ -259,8 +259,11 @@ class StudentController extends Controller
     {
         $companyBranches = CompanyBranch::select('id', 'name')->orderBy('name')->get();
         $forms = Form::select('id', 'name')->orderBy('name')->get();
+        // Fix (14 September 2026, permintaan user): dropdown "Assign ke Sales"
+        // sekarang juga tampil di form Add Student, sama seperti di Edit.
+        $salesUsers = $this->activeSalesUsers();
 
-        return view('student.student.create', compact('companyBranches', 'forms'));
+        return view('student.student.create', compact('companyBranches', 'forms', 'salesUsers'));
     }
 
     /**
