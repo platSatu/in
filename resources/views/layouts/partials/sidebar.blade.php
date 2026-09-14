@@ -97,10 +97,17 @@
                 punya menu/route sendiri sama sekali (produk lain, belum
                 dibangun) jadi 'route' => null (dirender sbg "Segera Hadir",
                 tidak nyasar ke halaman kosong -- lihat @foreach items di
-                bawah); "InaStudy" sendiri tetap mengarah ke route('dashboard')
-                sama persis seperti "My Applications" sebelumnya (cuma label
-                yang berubah). Tinggal isi 'route' => 'nama.route' begitu
-                InaYule/InaTrip sudah punya halamannya sendiri.
+                bawah).
+
+                Fix lanjutan (14 September 2026, permintaan user -- "dashboard
+                itu hanya tanggal saja, InaStudy dibuat halaman terpisah"):
+                "InaStudy" tadinya mengarah ke route('dashboard') (satu
+                halaman yang sama dengan menu Dashboard, isinya campur dengan
+                Academic Calendar). Sekarang diarahkan ke route('inastudy.index')
+                -- halaman terpisah, lihat
+                App\Http\Controllers\StudentPortal\InaStudyController.
+                Tinggal isi 'route' => 'nama.route' begitu InaYule/InaTrip
+                sudah punya halamannya sendiri.
             --}}
             @php
                 $studentMenuGroups = collect();
@@ -110,7 +117,7 @@
                             'label' => 'InaStudy',
                             'items' => [
                                 ['label' => 'InaYule', 'route' => null],
-                                ['label' => 'InaStudy', 'route' => 'dashboard'],
+                                ['label' => 'InaStudy', 'route' => 'inastudy.index'],
                                 ['label' => 'InaTrip', 'route' => null],
                             ],
                         ],

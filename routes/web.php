@@ -53,6 +53,7 @@ use App\Http\Controllers\StudentPortal\ApplicationController;
 use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
 use App\Http\Controllers\StudentPortal\ApplicationPaymentController;
 use App\Http\Controllers\StudentPortal\ApplicationFormController;
+use App\Http\Controllers\StudentPortal\InaStudyController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
@@ -220,12 +221,16 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
-// FASE "InaStudy Register Manual" (14 September 2026) -- registrasi Aplikasi
-// Kuliah manual tanpa pembayaran, langsung dari widget di dashboard. Lihat
-// docblock DashboardController::registerApplication() untuk detail lengkap.
-Route::post('/dashboard/apply/manual', [DashboardController::class, 'registerApplication'])
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard.apply.manual');
+// FIX (14 September 2026, permintaan user -- "dashboard itu hanya tanggal
+// saja, InaStudy dibuat halaman terpisah"): halaman "InaStudy" (widget "My
+// University Applications" + Register manual tanpa pembayaran) sekarang
+// punya route & controller sendiri, TERPISAH dari /dashboard -- lihat
+// docblock App\Http\Controllers\StudentPortal\InaStudyController untuk
+// detail lengkap. Menu "InaStudy" di sidebar diarahkan ke 'inastudy.index'.
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/inastudy', [InaStudyController::class, 'index'])->name('inastudy.index');
+    Route::post('/inastudy/register', [InaStudyController::class, 'registerApplication'])->name('inastudy.register');
+});
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {
 
