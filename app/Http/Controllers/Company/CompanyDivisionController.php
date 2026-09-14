@@ -17,22 +17,41 @@ class CompanyDivisionController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search');
+        $companyBranchId = $request->query('company_branch_id');
 
         $userId = Auth::id();
         if ($userId === null) {
             abort(401);
         }
 
-        $data = AdminCrud::paginate(
-            CompanyDivision::class,
-            (string) $userId,
-            ['name', 'description'],
-            $search,
-            10,
-            ['companyBranch']
-        );
+        // Fix (14 September 2026, permintaan user, rangkaian navigasi Company
+        // Profile -> Branch -> Division -> User -> Role): query dibangun
+        // manual (bukan AdminCrud::paginate() polos) supaya tombol "Show" di
+        // halaman Company Branch bisa mengarah ke sini dengan filter
+        // company_branch_id -- pola sama persis dengan fix di
+        // CompanyBranchController::index() (filter company_profile_id).
+        $data = CompanyDivision::query()
+            ->with('companyBranch')
+            ->where('user_id', (string) $userId)
+            ->when($companyBranchId, fn ($query) => $query->where('company_branch_id', $companyBranchId))
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%");
+                });
+            })
+            ->latest('created_at')
+            ->paginate(10)
+            ->withQueryString();
 
-        return view('company.division.index', compact('data'));
+        // Kalau lagi difilter dari 1 branch tertentu, ambil datanya supaya
+        // judul halaman & tombol "+ Add Division" bisa nunjukin/bawa branch
+        // itu (sama pola dengan $companyProfile di CompanyBranchController).
+        $companyBranch = $companyBranchId
+            ? CompanyBranch::where('user_id', (string) $userId)->find($companyBranchId)
+            : null;
+
+        return view('company.division.index', compact('data', 'companyBranchId', 'companyBranch'));
     }
 
     public function create(Request $request)

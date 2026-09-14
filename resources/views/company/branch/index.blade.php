@@ -8,12 +8,20 @@
             <div class="col-md-6">
                 <nav class="breadcrumb-style-one" aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item active" aria-current="page">Company Branch</li>
+                        @if ($companyProfile)
+                            <li class="breadcrumb-item"><a href="{{ route('company.profile.index') }}">Company Profile</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">{{ $companyProfile->name }} - Branch</li>
+                        @else
+                            <li class="breadcrumb-item active" aria-current="page">Company Branch</li>
+                        @endif
                     </ol>
                 </nav>
             </div>
             <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                <a href="{{ route('company.branch.create') }}" class="btn btn-primary">+ Add Branch</a>
+                @if ($companyProfile)
+                    <a href="{{ route('company.branch.index') }}" class="btn btn-outline-secondary me-2">Lihat Semua Branch</a>
+                @endif
+                <a href="{{ route('company.branch.create', $companyProfileId ? ['company_profile_id' => $companyProfileId] : []) }}" class="btn btn-primary">+ Add Branch</a>
             </div>
         </div>
     </div>
@@ -31,6 +39,9 @@
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('company.branch.index') }}" class="row g-2">
+                        @if ($companyProfileId)
+                            <input type="hidden" name="company_profile_id" value="{{ $companyProfileId }}">
+                        @endif
                         <div class="col-md-10">
                             <input type="text" name="search" class="form-control"
                                 placeholder="Search name/address/email..." value="{{ request('search') }}">
@@ -76,6 +87,9 @@
                                     <td>{{ optional($item->created_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
                                         <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                            <a href="{{ route('company.division.index', ['company_branch_id' => $item->id]) }}"
+                                                class="btn btn-sm btn-outline-secondary text-nowrap">Show</a>
+
                                             <a href="{{ route('company.branch.edit', $item->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
 

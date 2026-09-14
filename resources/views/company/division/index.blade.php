@@ -8,12 +8,20 @@
             <div class="col-md-6">
                 <nav class="breadcrumb-style-one" aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item active" aria-current="page">Company Division</li>
+                        @if ($companyBranch)
+                            <li class="breadcrumb-item"><a href="{{ route('company.branch.index') }}">Company Branch</a></li>
+                            <li class="breadcrumb-item active" aria-current="page">{{ $companyBranch->name }} - Division</li>
+                        @else
+                            <li class="breadcrumb-item active" aria-current="page">Company Division</li>
+                        @endif
                     </ol>
                 </nav>
             </div>
             <div class="col-md-6 text-md-end mt-3 mt-md-0">
-                <a href="{{ route('company.division.create') }}" class="btn btn-primary">+ Add Division</a>
+                @if ($companyBranch)
+                    <a href="{{ route('company.division.index') }}" class="btn btn-outline-secondary me-2">Lihat Semua Division</a>
+                @endif
+                <a href="{{ route('company.division.create', $companyBranchId ? ['company_branch_id' => $companyBranchId] : []) }}" class="btn btn-primary">+ Add Division</a>
             </div>
         </div>
     </div>
@@ -31,6 +39,9 @@
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('company.division.index') }}" class="row g-2">
+                        @if ($companyBranchId)
+                            <input type="hidden" name="company_branch_id" value="{{ $companyBranchId }}">
+                        @endif
                         <div class="col-md-10">
                             <input type="text" name="search" class="form-control"
                                 placeholder="Search name/description..." value="{{ request('search') }}">
