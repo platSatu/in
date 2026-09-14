@@ -35,6 +35,23 @@ class CompanyProfileController extends Controller
         return view('company.profile.create');
     }
 
+    /**
+     * Detail 1 company profile -- isinya daftar branch (CompanyBranch) milik
+     * profile ini (lihat CompanyProfile::branches()). Ditambahkan 14
+     * September 2026 (permintaan user, tombol "Show" di index).
+     */
+    public function show(string $id)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        $data = AdminCrud::findOrFail(CompanyProfile::class, $id, (string) $userId, ['branches']);
+
+        return view('company.profile.show', compact('data'));
+    }
+
     public function store(Request $request)
     {
         $validated = $request->validate([
