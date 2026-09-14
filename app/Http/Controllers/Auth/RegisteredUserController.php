@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Role;
 use App\Models\RoleUser;
 use App\Models\User;
 use App\Services\StudentIdentityResolver;
@@ -58,7 +59,7 @@ class RegisteredUserController extends Controller
 
         RoleUser::create([
             'user_id' => $user->id,
-            'role_id' => '019eddb7-8f13-733a-805f-e071502b5dc9',
+            'role_id' => $this->resolveStudentRoleId(),
             'status' => RoleUser::STATUS_ACTIVE,
         ]);
 
@@ -112,6 +113,27 @@ class RegisteredUserController extends Controller
             ->with('status', 'Registrasi berhasil! Kami sudah mengirimkan email verifikasi ke ' . $user->email . '. Silakan cek email Anda (termasuk folder spam) dan klik link verifikasi untuk mengaktifkan akun.');
     }
 
+
+    // Fix (14 September 2026, permintaan user -- BUGFIX): dulu role_id di
+    // atas di-hardcode langsung sebagai string UUID. ID role itu ternyata
+    // dipakai sama di 3 tempat berbeda (di sini, GoogleAuthController, &
+    // StudentController::addUser() -- lihat catatan bugfix di
+    // StudentController) -- begitu role dengan ID itu di-EDIT namanya lewat
+    // halaman Roles (mis. tanpa sadar jadi "Sales"), SEMUA pendaftar baru di
+    // ketiga jalur itu ikut ke-assign role yang salah, karena ID-nya tidak
+    // berubah walau namanya sudah beda. Sekarang dicari dinamis lewat slug
+    // "student", dan sengaja abort(500) yang jelas kalau role-nya sampai
+    // tidak ketemu -- lebih aman daripada diam-diam assign role yang salah.
+    private function resolveStudentRoleId(): string
+    {
+        $roleId = Role::where('slug', 'student')->value('id');
+
+        if ($roleId === null) {
+            abort(500, 'Role "student" tidak ditemukan (dicari lewat slug "student"). Cek halaman Roles -- pastikan ada role dengan slug persis "student".');
+        }
+
+        return $roleId;
+    }
 
     private function sendWhatsapp($phone, $message)
     {

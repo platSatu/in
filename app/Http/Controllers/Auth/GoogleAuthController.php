@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\HistoryUserLogin;
+use App\Models\Role;
 use App\Models\RoleUser;
 use App\Models\User;
 use App\Services\StudentIdentityResolver;
@@ -28,7 +29,13 @@ use Throwable;
  */
 class GoogleAuthController extends Controller
 {
-    private const STUDENT_ROLE_ID = '019eddb7-8f13-733a-805f-e071502b5dc9';
+    // Fix (14 September 2026, permintaan user -- BUGFIX): konstanta ID
+    // hardcode di sini dihapus -- ID yang sama ternyata dipakai juga di
+    // RegisteredUserController & StudentController::addUser(), jadi begitu
+    // role dengan ID itu di-EDIT namanya lewat halaman Roles (mis. tanpa
+    // sadar jadi "Sales"), user baru yang login lewat Google ikut ke-assign
+    // role yang salah walau ID-nya tidak berubah. Sekarang dicari dinamis
+    // lewat slug "student" -- lihat resolveStudentRoleId() di bawah.
 
     /**
      * Redirect ke halaman consent Google.
@@ -82,7 +89,7 @@ class GoogleAuthController extends Controller
 
             RoleUser::create([
                 'user_id' => $user->id,
-                'role_id' => self::STUDENT_ROLE_ID,
+                'role_id' => $this->resolveStudentRoleId(),
                 'status' => RoleUser::STATUS_ACTIVE,
             ]);
 
@@ -130,5 +137,16 @@ class GoogleAuthController extends Controller
         ]);
 
         return redirect()->intended(route('dashboard', absolute: false));
+    }
+
+    private function resolveStudentRoleId(): string
+    {
+        $roleId = Role::where('slug', 'student')->value('id');
+
+        if ($roleId === null) {
+            abort(500, 'Role "student" tidak ditemukan (dicari lewat slug "student"). Cek halaman Roles -- pastikan ada role dengan slug persis "student".');
+        }
+
+        return $roleId;
     }
 }

@@ -26,11 +26,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class StudentController extends Controller
 {
-    /**
-     * UUID role "student" pada tabel roles.
-     * Dipakai saat insert ke role_user ketika tombol "+ Add User" diklik.
-     */
-    private const ROLE_STUDENT_ID = '019eddb7-8f13-733a-805f-e071502b5dc9';
+    // Fix (14 September 2026, permintaan user -- BUGFIX): dulu di sini ada
+    // konstanta ROLE_STUDENT_ID yang isinya UUID role "student" di-hardcode
+    // langsung. Masalahnya: role di tabel roles itu dinamis (bisa di-edit
+    // namanya kapan saja lewat halaman Roles TANPA ID-nya ikut berubah) --
+    // begitu role yang ID-nya sama persis dengan konstanta itu di-edit
+    // namanya (mis. tanpa sadar jadi "Sales" alih-alih dibuatkan role baru),
+    // tombol "+ Add User" di sini diam-diam ikut assign role "Sales" itu ke
+    // akun baru, bukan "student" -- persis bug yang dilaporkan user. Sekarang
+    // role "student" dicari dinamis lewat slug (lihat resolveStudentRoleId()
+    // di bawah), sama seperti pencarian role "sales" di activeSalesUsers().
 
     /**
      * Tampilkan daftar student.
@@ -440,7 +445,7 @@ class StudentController extends Controller
 
             RoleUser::create([
                 'user_id' => $user->id,
-                'role_id' => self::ROLE_STUDENT_ID,
+                'role_id' => $this->resolveStudentRoleId(),
                 'status' => RoleUser::STATUS_ACTIVE,
             ]);
 
@@ -480,6 +485,23 @@ class StudentController extends Controller
             'handled_by_user_id' => ['nullable', 'exists:users,id'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
+    }
+
+    /**
+     * ID role "student", dicari dinamis lewat slug (BUKAN ID hardcode --
+     * lihat catatan BUGFIX di atas const lama yang sudah dihapus). Dibuat
+     * abort(500) yang jelas kalau role-nya sampai tidak ketemu sama sekali,
+     * daripada diam-diam assign role lain yang salah ke akun baru.
+     */
+    private function resolveStudentRoleId(): string
+    {
+        $roleId = Role::where('slug', 'student')->value('id');
+
+        if ($roleId === null) {
+            abort(500, 'Role "student" tidak ditemukan (dicari lewat slug "student"). Cek halaman Roles -- pastikan ada role dengan slug persis "student" sebelum membuat akun login student lewat tombol "+ Add User".');
+        }
+
+        return $roleId;
     }
 
     /**
