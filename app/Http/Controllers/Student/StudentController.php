@@ -413,6 +413,20 @@ class StudentController extends Controller
                 'status' => 'active',
             ]);
 
+            // Fix (14 September 2026, permintaan user): akun yang dibuat manual
+            // dari sini (oleh sales/admin) TIDAK pernah memicu event Registered
+            // seperti alur daftar sendiri di Auth\RegisteredUserController --
+            // jadi tidak ada email verifikasi otomatis terkirim. Kalau
+            // dibiarkan, email_verified_at tetap null dan siswa ini akan
+            // mentok di halaman "verifikasi email dulu" begitu login pertama
+            // kali (lihat middleware 'verified' & ApplyController::show()).
+            // Karena akun ini memang sengaja dibuatkan admin/sales (bukan
+            // daftar sendiri), email verification langsung ditandai selesai
+            // di sini -- markEmailAsVerified() bawaan trait MustVerifyEmail,
+            // sama seperti yang dipanggil VerifyEmailController saat siswa
+            // klik link verifikasi di alur normal.
+            $user->markEmailAsVerified();
+
             RoleUser::create([
                 'user_id' => $user->id,
                 'role_id' => self::ROLE_STUDENT_ID,
