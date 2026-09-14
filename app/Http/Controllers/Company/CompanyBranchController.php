@@ -14,22 +14,45 @@ class CompanyBranchController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search');
+        $companyProfileId = $request->query('company_profile_id');
 
         $userId = Auth::id();
         if ($userId === null) {
             abort(401);
         }
 
-        $data = AdminCrud::paginate(
-            CompanyBranch::class,
-            (string) $userId,
-            ['name', 'address', 'email', 'handphone'],
-            $search,
-            10,
-            ['companyProfile']
-        );
+        // Fix (14 September 2026, permintaan user): sebelumnya dipakaikan
+        // AdminCrud::paginate() polos (tidak bisa difilter per company
+        // profile). Sekarang query dibangun manual (pola sama dengan
+        // Student\StudentController::index()) supaya tombol "Show" di
+        // halaman Company Profile bisa diarahkan langsung ke sini dengan
+        // filter company_profile_id, TANPA perlu bikin controller/route/view
+        // "show" baru -- halaman list branch yang sudah ada ini cukup dipakai
+        // ulang.
+        $data = CompanyBranch::query()
+            ->with('companyProfile')
+            ->where('user_id', (string) $userId)
+            ->when($companyProfileId, fn ($query) => $query->where('company_profile_id', $companyProfileId))
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                        ->orWhere('address', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('handphone', 'like', "%{$search}%");
+                });
+            })
+            ->latest('created_at')
+            ->paginate(10)
+            ->withQueryString();
 
-        return view('company.branch.index', compact('data'));
+        // Kalau lagi difilter dari 1 company profile tertentu, ambil datanya
+        // supaya judul halaman & tombol "+ Add Branch" bisa nunjukin/bawa
+        // company profile itu.
+        $companyProfile = $companyProfileId
+            ? CompanyProfile::where('user_id', (string) $userId)->find($companyProfileId)
+            : null;
+
+        return view('company.branch.index', compact('data', 'companyProfileId', 'companyProfile'));
     }
 
     public function create(Request $request)

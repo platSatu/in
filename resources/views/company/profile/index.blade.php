@@ -77,7 +77,7 @@
                                     <td>{{ optional($item->created_at)->format('Y/m/d') }}</td>
                                     <td class="text-center">
                                         <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
-                                            <a href="{{ route('company.profile.show', $item->id) }}"
+                                            <a href="{{ route('company.branch.index', ['company_profile_id' => $item->id]) }}"
                                                 class="btn btn-sm btn-outline-secondary text-nowrap">Show</a>
 
                                             <a href="{{ route('company.profile.edit', $item->id) }}"

@@ -662,14 +662,6 @@ Route::middleware(['auth', 'permission:company.profile,edit'])->prefix('dashboar
     Route::put('/{id}', [CompanyProfileController::class, 'update'])->name('company.profile.update');
     Route::delete('/{id}', [CompanyProfileController::class, 'destroy'])->name('company.profile.destroy');
 });
-// company.profile: show (GET /{id}) SENGAJA didaftarkan SETELAH create/store/
-// edit/destroy di atas (prefix sama) -- supaya '/create' tidak ketiban match
-// duluan oleh wildcard '/{id}' kalau show didaftar lebih awal. Pola sama
-// persis dengan catatan quiz.university di atas.
-Route::middleware(['auth', 'permission:company.profile'])->prefix('dashboard/superadmin/company/profile')->group(function () {
-    Route::get('/{id}', [CompanyProfileController::class, 'show'])->name('company.profile.show');
-});
-
 Route::middleware(['auth', 'permission:company.branch'])->prefix('dashboard/superadmin/company/branch')->group(function () {
     Route::get('/', [CompanyBranchController::class, 'index'])->name('company.branch.index');
 });
