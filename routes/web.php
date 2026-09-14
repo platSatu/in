@@ -220,6 +220,13 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+// FASE "InaStudy Register Manual" (14 September 2026) -- registrasi Aplikasi
+// Kuliah manual tanpa pembayaran, langsung dari widget di dashboard. Lihat
+// docblock DashboardController::registerApplication() untuk detail lengkap.
+Route::post('/dashboard/apply/manual', [DashboardController::class, 'registerApplication'])
+    ->middleware(['auth', 'verified'])
+    ->name('dashboard.apply.manual');
+
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {
 
     Route::get('/', [ProfileBussinesController::class, 'index'])->name('profile-bussines.index');

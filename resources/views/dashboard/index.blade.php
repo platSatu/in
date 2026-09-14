@@ -1,11 +1,60 @@
 @extends('layouts.frontend')
 @section('content')
 
-@if($myApplications->isNotEmpty())
+{{--
+    FASE "InaStudy Register Manual" (14 September 2026, permintaan user):
+    widget ini dulu cuma tampil kalau $myApplications tidak kosong
+    (@if($myApplications->isNotEmpty())). Sekarang widgetnya SELALU tampil
+    untuk siswa (dicek lewat $hasStudent, bukan lagi isi/tidaknya
+    $myApplications) -- kalau masih kosong, tabel menampilkan baris
+    "Data not found" + tombol Register, supaya siswa yang belum pernah apply
+    tetap bisa mulai proses langsung dari sini tanpa lewat halaman katalog
+    publik (yang sudah tidak ada link-nya lagi di sidebar student, lihat
+    perubahan menu InaYule/InaStudy/InaTrip).
+--}}
+@if($hasStudent)
 <div class="row">
     <div class="col-12">
         <div class="widget-content widget-content-area br-8 mb-4">
             <h4 class="mb-3">My University Applications</h4>
+
+            {{-- Panel Register: default hidden, ditampilkan lewat tombol "+ Register"
+                 di atas, atau otomatis kalau validasi submit sebelumnya gagal
+                 (old('university_id') masih terisi). --}}
+            <div id="registerFormPanel" class="border rounded p-3 mb-3" style="{{ $errors->any() && old('university_id') ? '' : 'display:none;' }} background:#f8f9fa;">
+                <h6 class="mb-3">Register Aplikasi Kuliah</h6>
+                <form method="POST" action="{{ route('dashboard.apply.manual') }}">
+                    @csrf
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Universitas</label>
+                            <select name="university_id" id="registerUniversitySelect" class="form-select @error('university_id') is-invalid @enderror" required>
+                                <option value="">-- Pilih Universitas --</option>
+                                @foreach($registerUniversities as $university)
+                                    <option value="{{ $university->id }}" {{ old('university_id') == $university->id ? 'selected' : '' }}>{{ $university->name }}</option>
+                                @endforeach
+                            </select>
+                            @error('university_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6" id="registerProfileWrapper" style="{{ old('university_id') ? '' : 'display:none;' }}">
+                            <label class="form-label">Jurusan</label>
+                            <select name="university_profile_id" id="registerProfileSelect" class="form-select @error('university_profile_id') is-invalid @enderror" required>
+                                <option value="">-- Pilih Jurusan --</option>
+                            </select>
+                            @error('university_profile_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <button type="submit" class="btn btn-success btn-sm">Save</button>
+                        <button type="button" id="btnCancelRegister" class="btn btn-outline-secondary btn-sm">Cancel</button>
+                    </div>
+                </form>
+            </div>
+
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
                     <thead>
@@ -20,7 +69,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach($myApplications as $myApplication)
+                        @forelse($myApplications as $myApplication)
                             <tr>
                                 <td class="fw-bold">{{ $myApplication->application_no }}</td>
                                 <td>{{ optional($myApplication->university)->name ?? '-' }}</td>
@@ -43,10 +92,18 @@
                                 <td>{{ optional($myApplication->submitted_at)->format('Y/m/d') }}</td>
                                 <td class="text-center text-nowrap">
                                     <a href="{{ route('student-portal.applications.show', $myApplication->id) }}" class="btn btn-sm btn-outline-primary">Summary</a>
+                                    <a href="{{ route('student-portal.applications.form.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-warning">Form</a>
                                     <a href="{{ route('student-portal.applications.documents.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-success">Documents</a>
                                 </td>
                             </tr>
-                        @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">
+                                    <div class="mb-2">Data not found</div>
+                                    <button type="button" id="btnShowRegister" class="btn btn-primary btn-sm">Register</button>
+                                </td>
+                            </tr>
+                        @endforelse
                     </tbody>
                 </table>
             </div>
@@ -314,6 +371,80 @@ document.addEventListener('DOMContentLoaded', function() {
     
     renderCalendar();
 });
+</script>
+
+{{--
+    FASE "InaStudy Register Manual" (14 September 2026) -- JS pendukung panel
+    Register di widget "My University Applications" di atas: buka/tutup
+    panel, dan isi cascading dropdown Jurusan berdasarkan Universitas yang
+    dipilih (data-nya dari $registerUniversities, sudah termasuk relasi
+    profiles() masing-masing lewat eager load di DashboardController::index()).
+    Dibungkus pengecekan elemen (bukan @if($hasStudent) di Blade) supaya aman
+    kalau suatu saat markup di atas berubah tanpa perlu ingat sinkronkan
+    kondisinya di sini juga.
+--}}
+<script>
+(function () {
+    const registerUniversities = @json($registerUniversities ?? []);
+    const btnShow = document.getElementById('btnShowRegister');
+    const panel = document.getElementById('registerFormPanel');
+    const btnCancel = document.getElementById('btnCancelRegister');
+    const uniSelect = document.getElementById('registerUniversitySelect');
+    const profileWrapper = document.getElementById('registerProfileWrapper');
+    const profileSelect = document.getElementById('registerProfileSelect');
+
+    if (!panel || !uniSelect || !profileSelect || !profileWrapper) {
+        return;
+    }
+
+    function populateProfiles(universityId, selectedProfileId) {
+        profileSelect.innerHTML = '<option value="">-- Pilih Jurusan --</option>';
+
+        const university = registerUniversities.find(function (u) { return u.id === universityId; });
+        const profiles = university ? (university.profiles || []) : [];
+
+        profiles.forEach(function (profile) {
+            const option = document.createElement('option');
+            option.value = profile.id;
+            option.textContent = profile.degree_title ? (profile.field + ' - ' + profile.degree_title) : profile.field;
+            if (selectedProfileId && String(selectedProfileId) === String(profile.id)) {
+                option.selected = true;
+            }
+            profileSelect.appendChild(option);
+        });
+
+        profileWrapper.style.display = profiles.length ? '' : 'none';
+    }
+
+    if (btnShow) {
+        btnShow.addEventListener('click', function () {
+            panel.style.display = '';
+            panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        });
+    }
+
+    if (btnCancel) {
+        btnCancel.addEventListener('click', function () {
+            panel.style.display = 'none';
+            uniSelect.value = '';
+            profileSelect.innerHTML = '<option value="">-- Pilih Jurusan --</option>';
+            profileWrapper.style.display = 'none';
+        });
+    }
+
+    uniSelect.addEventListener('change', function () {
+        populateProfiles(this.value, null);
+    });
+
+    // Kalau submit sebelumnya gagal validasi (university_id masih terisi
+    // lewat old()), panel-nya sudah otomatis ditampilkan lewat inline style
+    // di Blade di atas -- tinggal isi ulang dropdown Jurusan-nya di sini.
+    const oldUniversityId = @json(old('university_id'));
+    const oldProfileId = @json(old('university_profile_id'));
+    if (oldUniversityId) {
+        populateProfiles(oldUniversityId, oldProfileId);
+    }
+})();
 </script>
 
 @endsection
