@@ -212,6 +212,26 @@
                                             <a href="{{ route('student.student.edit', $item->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap flex-shrink-0">Edit</a>
 
+                                            {{-- Fix (15 September 2026, permintaan user): tombol langsung ke
+                                                 progress Formulir + Upload Dokumen InaStudy student ini (halaman
+                                                 admin quiz.university-application.show, dipanggil pakai id
+                                                 aplikasi -- lihat $item->applications di
+                                                 StudentController::index()). Kalau student belum pernah Register
+                                                 InaStudy (belum ada baris UniversityApplication sama sekali),
+                                                 tombolnya nonaktif -- belum ada halaman yang bisa dituju. Sales
+                                                 (scope 'self') otomatis cuma bisa buka aplikasi student yang dia
+                                                 tangani sendiri, lihat guard di
+                                                 Quiz\UniversityApplicationController::assertVisibleApplication();
+                                                 role-nya juga HARUS diberi akses "Aplikasi Kuliah" dulu lewat
+                                                 halaman Roles supaya tombol ini tidak 403. --}}
+                                            @php $latestApplication = $item->applications->first(); @endphp
+                                            @if ($latestApplication)
+                                                <a href="{{ route('quiz.university-application.show', $latestApplication->id) }}"
+                                                    class="btn btn-sm btn-outline-info text-nowrap flex-shrink-0">Progress InaStudy</a>
+                                            @else
+                                                <button type="button" class="btn btn-sm btn-outline-info text-nowrap flex-shrink-0" disabled title="Student ini belum Register InaStudy">Progress InaStudy</button>
+                                            @endif
+
                                             @unless($item->user_id)
                                                 <form action="{{ route('student.student.add-user', $item->id) }}"
                                                     method="POST" onsubmit="return confirm('Buat akun login untuk {{ $item->first_name }}?');" class="m-0 flex-shrink-0">

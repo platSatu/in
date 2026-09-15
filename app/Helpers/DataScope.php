@@ -3,6 +3,7 @@
 namespace App\Helpers;
 
 use App\Models\Form;
+use App\Models\Student;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -92,6 +93,34 @@ class DataScope
         }
 
         return self::applyBranchDivisionScope(Form::query(), $user, 'user_id')
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * Daftar id Student yang boleh dilihat user ini, dipakai modul yang
+     * TABEL-NYA SENDIRI tidak punya kolom branch/divisi tapi TERHUBUNG ke
+     * Student (mis. UniversityApplication lewat student_id) -- pola sama
+     * persis dengan visibleFormIds() di atas, cuma model dasarnya Student
+     * (yang sudah punya branch_id/company_division_id/handled_by_user_id,
+     * lihat StudentController::index()). Null berarti TIDAK DIBATASI (scope
+     * company), jangan di-whereIn sama sekali.
+     *
+     * FIX (15 September 2026, permintaan user -- sales bisa lihat progress
+     * InaStudy student miliknya): dipakai oleh
+     * Quiz\UniversityApplicationController::index()/show() supaya sales
+     * (scope 'self') cuma bisa lihat/buka Aplikasi Kuliah milik student yang
+     * dia tangani sendiri, bukan seluruh aplikasi di sistem.
+     *
+     * @return array<int, string>|null
+     */
+    public static function visibleStudentIds(User $user): ?array
+    {
+        if ($user->isCompanyScoped()) {
+            return null;
+        }
+
+        return self::applyBranchDivisionScope(Student::query(), $user, 'handled_by_user_id')
             ->pluck('id')
             ->all();
     }

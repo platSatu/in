@@ -64,6 +64,17 @@ class StudentController extends Controller
                 // N+1 query per baris. Sama seperti pola $paymentsBySubmission di show(),
                 // tapi di sini cukup submission terbaru saja (bukan seluruh riwayat).
                 'formSubmissions' => fn ($query) => $query->latest('created_at')->with('payment'),
+                // FIX (15 September 2026, permintaan user -- sales bisa lihat progress
+                // InaStudy student miliknya): ambil semua Aplikasi Kuliah student ini
+                // (biasanya cuma ada 1, lihat guard "hasApplication" di
+                // InaStudyController::registerApplication()), diurutkan terbaru dulu,
+                // supaya tombol "Progress InaStudy" di index.blade.php bisa ambil
+                // ->first() dan langsung link ke quiz.university-application.show
+                // pakai id-nya, tanpa N+1 query. SENGAJA TIDAK pakai ->limit(1) di
+                // sini -- limit() pada eager load hasMany berlaku GLOBAL ke seluruh
+                // baris gabungan (bukan per-student), jadi kalau dipasang cuma
+                // 1 aplikasi TOTAL se-halaman yang kebawa, bukan 1 per student.
+                'applications' => fn ($query) => $query->latest('submitted_at'),
             ])
             ->tap(fn ($query) => DataScope::applyBranchDivisionScope($query, $user, 'handled_by_user_id'))
             ->when($search, function ($query) use ($search) {

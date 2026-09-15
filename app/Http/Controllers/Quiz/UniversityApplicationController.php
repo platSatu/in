@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Quiz;
 
+use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationDocumentHistory;
@@ -23,6 +24,17 @@ use Illuminate\Support\Str;
  * route permission 'quiz.university-application,edit' terpisah di
  * routes/web.php, key permission-nya tetap SAMA dengan yang view-only
  * (mengikuti pola modul CRUD lain: 1 key, 2 ability).
+ *
+ * FIX (15 September 2026, permintaan user -- "bagaimana cara nya si sales
+ * melihat progress dari inastudy"): index()/show() sekarang ikut di-scope
+ * lewat App\Helpers\DataScope::visibleStudentIds() -- sales (scope 'self')
+ * cuma bisa lihat/buka Aplikasi Kuliah milik STUDENT YANG DIA TANGANI
+ * SENDIRI (Student::handled_by_user_id), bukan seluruh aplikasi di sistem.
+ * Superadmin (scope company) tidak terpengaruh sama sekali (tetap lihat
+ * semua). Supaya sales benar-benar bisa membuka halaman ini, role "Sales"
+ * juga HARUS diberi centang permission "Aplikasi Kuliah" (key
+ * quiz.university-application, ability Lihat) lewat halaman Roles -- ini
+ * pengaturan/data, bukan kode, jadi tidak otomatis ikut ter-set di sini.
  */
 class UniversityApplicationController extends Controller
 {
@@ -48,6 +60,14 @@ class UniversityApplicationController extends Controller
         // (lihat migration create_application_documents_table).
         $query = UniversityApplication::with(['student', 'university', 'universityProfile'])
             ->withCount('documents');
+
+        // FIX (15 September 2026): batasi ke aplikasi milik student yang jadi
+        // cakupan user ini (lihat docblock class & DataScope::visibleStudentIds()).
+        // null = tidak dibatasi (scope company/superadmin).
+        $visibleStudentIds = DataScope::visibleStudentIds($request->user());
+        if ($visibleStudentIds !== null) {
+            $query->whereIn('student_id', $visibleStudentIds);
+        }
 
         if (!empty($universityId)) {
             $query->where('university_id', $universityId);
@@ -114,10 +134,12 @@ class UniversityApplicationController extends Controller
         ));
     }
 
-    public function show(string $id)
+    public function show(Request $request, string $id)
     {
         $application = UniversityApplication::with(['student', 'university', 'universityProfile', 'handledBy'])
             ->findOrFail($id);
+
+        $this->assertVisibleApplication($request->user(), $application);
 
         $documentTypes = DocumentType::active()->orderBy('sort_order')->get();
 
@@ -305,11 +327,13 @@ class UniversityApplicationController extends Controller
      * + jenis dokumen), mengikuti pola
      * FrontendController::handbookDownload().
      */
-    public function downloadDocument(string $id, string $documentId)
+    public function downloadDocument(Request $request, string $id, string $documentId)
     {
         $document = ApplicationDocument::where('application_id', $id)
             ->with(['application.student', 'documentType'])
             ->findOrFail($documentId);
+
+        $this->assertVisibleApplication($request->user(), $document->application);
 
         return $this->downloadFile(
             $document->file_path,
@@ -322,7 +346,7 @@ class UniversityApplicationController extends Controller
     /**
      * Download 1 versi LAMA dari sebuah dokumen (ApplicationDocumentHistory).
      */
-    public function downloadDocumentHistory(string $id, string $historyId)
+    public function downloadDocumentHistory(Request $request, string $id, string $historyId)
     {
         $history = ApplicationDocumentHistory::with(['applicationDocument.application.student', 'applicationDocument.documentType'])
             ->findOrFail($historyId);
@@ -331,12 +355,30 @@ class UniversityApplicationController extends Controller
 
         abort_unless($document && $document->application_id === $id, 404);
 
+        $this->assertVisibleApplication($request->user(), $document->application);
+
         return $this->downloadFile(
             $history->file_path,
             $document->application->student ?? null,
             ($document->documentType->label ?? 'document') . '-old',
             $history->original_filename
         );
+    }
+
+    /**
+     * 403 kalau aplikasi ini di LUAR cakupan user (mis. sales scope 'self'
+     * yang coba buka/download aplikasi milik student yang BUKAN tanganannya,
+     * dengan menebak-nebak ID lewat URL) -- lihat docblock class &
+     * App\Helpers\DataScope::visibleStudentIds(). Dipakai di show()/
+     * downloadDocument()/downloadDocumentHistory().
+     */
+    private function assertVisibleApplication($user, UniversityApplication $application): void
+    {
+        $visibleStudentIds = DataScope::visibleStudentIds($user);
+
+        if ($visibleStudentIds !== null && !in_array($application->student_id, $visibleStudentIds, true)) {
+            abort(403);
+        }
     }
 
     private function downloadFile(?string $relativePath, $student, string $label, ?string $originalFilename)
