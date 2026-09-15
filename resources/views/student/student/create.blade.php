@@ -59,17 +59,33 @@
 
                         <div class="col-md-6">
                             <label class="form-label">Branch <span class="text-muted">(opsional)</span></label>
-                            <select name="branch_id" class="form-select @error('branch_id') is-invalid @enderror">
-                                <option value="">-- Belum ada Branch --</option>
-                                @foreach ($companyBranches as $companyBranch)
-                                    <option value="{{ $companyBranch->id }}" {{ old('branch_id') == $companyBranch->id ? 'selected' : '' }}>
-                                        {{ $companyBranch->name }}
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('branch_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            {{-- Fix (14 September 2026, permintaan user): sales (scope 'self')
+                                 dikunci ke branch tempat dia sendiri terdaftar (lewat Company >
+                                 Division > Add User), supaya tidak bisa salah/sengaja pilih
+                                 branch lain -- lihat StudentController::create()/store() &
+                                 ownBranchId(). Field disabled TIDAK ikut ter-submit, jadi nilai
+                                 sebenarnya dikirim lewat hidden input, dan tetap dipaksa ulang
+                                 di server (store()) apapun yang terkirim. --}}
+                            @if ($isSelfScoped)
+                                @php $lockedBranch = $companyBranches->firstWhere('id', $lockedBranchId); @endphp
+                                <select class="form-select" disabled>
+                                    <option selected>{{ $lockedBranch->name ?? '-- Branch Anda belum terdaftar di divisi manapun --' }}</option>
+                                </select>
+                                <input type="hidden" name="branch_id" value="{{ $lockedBranchId }}">
+                                <div class="form-text">Otomatis mengikuti branch Anda.</div>
+                            @else
+                                <select name="branch_id" class="form-select @error('branch_id') is-invalid @enderror">
+                                    <option value="">-- Belum ada Branch --</option>
+                                    @foreach ($companyBranches as $companyBranch)
+                                        <option value="{{ $companyBranch->id }}" {{ old('branch_id') == $companyBranch->id ? 'selected' : '' }}>
+                                            {{ $companyBranch->name }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('branch_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            @endif
                         </div>
 
                         <div class="col-md-6">
@@ -100,17 +116,32 @@
                              student baru, tidak perlu buka Edit lagi setelahnya. --}}
                         <div class="col-md-6">
                             <label class="form-label">Assign ke Sales <span class="text-muted">(opsional)</span></label>
-                            <select name="handled_by_user_id" class="form-select @error('handled_by_user_id') is-invalid @enderror">
-                                <option value="">-- Belum di-assign --</option>
-                                @foreach ($salesUsers as $salesUser)
-                                    <option value="{{ $salesUser->id }}" {{ old('handled_by_user_id') == $salesUser->id ? 'selected' : '' }}>
-                                        {{ $salesUser->name }} ({{ $salesUser->sales_code ?? 'belum ada kode' }})
-                                    </option>
-                                @endforeach
-                            </select>
-                            @error('handled_by_user_id')
-                                <div class="invalid-feedback">{{ $message }}</div>
-                            @enderror
+                            {{-- Fix (14 September 2026, permintaan user): sales (scope 'self')
+                                 otomatis dikunci assign ke DIRINYA SENDIRI di sini -- supaya
+                                 student yang baru dia input tidak hilang dari daftarnya sendiri
+                                 (scope 'self' cuma memfilter dari handled_by_user_id, lihat
+                                 App\Helpers\DataScope::applyBranchDivisionScope()), dan tidak
+                                 bisa sengaja/salah assign ke sales lain. --}}
+                            @if ($isSelfScoped)
+                                @php $lockedSalesUser = $salesUsers->firstWhere('id', $lockedSalesUserId); @endphp
+                                <select class="form-select" disabled>
+                                    <option selected>{{ $lockedSalesUser->name ?? '(Anda)' }} ({{ $lockedSalesUser->sales_code ?? 'belum ada kode' }})</option>
+                                </select>
+                                <input type="hidden" name="handled_by_user_id" value="{{ $lockedSalesUserId }}">
+                                <div class="form-text">Otomatis di-assign ke Anda sendiri.</div>
+                            @else
+                                <select name="handled_by_user_id" class="form-select @error('handled_by_user_id') is-invalid @enderror">
+                                    <option value="">-- Belum di-assign --</option>
+                                    @foreach ($salesUsers as $salesUser)
+                                        <option value="{{ $salesUser->id }}" {{ old('handled_by_user_id') == $salesUser->id ? 'selected' : '' }}>
+                                            {{ $salesUser->name }} ({{ $salesUser->sales_code ?? 'belum ada kode' }})
+                                        </option>
+                                    @endforeach
+                                </select>
+                                @error('handled_by_user_id')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            @endif
                         </div>
 
                         <div class="col-md-6">

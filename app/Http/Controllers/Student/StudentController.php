@@ -268,7 +268,30 @@ class StudentController extends Controller
         // sekarang juga tampil di form Add Student, sama seperti di Edit.
         $salesUsers = $this->activeSalesUsers();
 
-        return view('student.student.create', compact('companyBranches', 'forms', 'salesUsers'));
+        $user = Auth::user();
+
+        // FIX (permintaan user, 14 September 2026): sales (scope 'self') yang
+        // menambahkan student MILIKNYA SENDIRI sekarang otomatis dikunci ke
+        // (a) branch tempat dia terdaftar (lewat Company > Division > Add
+        // User -- App\Models\User::divisions(), lihat ownBranchId() di
+        // bawah) dan (b) dirinya sendiri di "Assign ke Sales" -- supaya
+        // student yang baru saja dia input TIDAK hilang dari daftarnya
+        // sendiri (scope 'self' memfilter murni dari handled_by_user_id,
+        // lihat App\Helpers\DataScope::applyBranchDivisionScope()), dan
+        // tidak bisa salah/sengaja assign ke sales lain. Superadmin serta
+        // role scope branch/division tetap bebas memilih seperti biasa.
+        $isSelfScoped = $user->isSelfScopedOnly();
+        $lockedBranchId = $isSelfScoped ? $this->ownBranchId($user) : null;
+        $lockedSalesUserId = $isSelfScoped ? $user->id : null;
+
+        return view('student.student.create', compact(
+            'companyBranches',
+            'forms',
+            'salesUsers',
+            'isSelfScoped',
+            'lockedBranchId',
+            'lockedSalesUserId'
+        ));
     }
 
     /**
@@ -277,6 +300,18 @@ class StudentController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $this->validateStudent($request);
+
+        $user = Auth::user();
+
+        // FIX (permintaan user, 14 September 2026): guard SERVER-SIDE --
+        // jangan cuma andalkan field yang di-disable di form. Kalau yang
+        // submit scope 'self' (sales), branch_id & handled_by_user_id SELALU
+        // dipaksa ke branch/dirinya sendiri di sini, apapun yang terkirim
+        // dari form (mis. kalau field disabled itu diakali lewat devtools).
+        if ($user->isSelfScopedOnly()) {
+            $validated['branch_id'] = $this->ownBranchId($user);
+            $validated['handled_by_user_id'] = $user->id;
+        }
 
         if ($request->hasFile('images')) {
             $validated['images'] = $this->storeImage($request->file('images'));
@@ -522,6 +557,20 @@ class StudentController extends Controller
             })
             ->orderBy('name')
             ->get(['id', 'name', 'sales_code']);
+    }
+
+    /**
+     * Branch tempat user ini (biasanya sales, scope 'self') terdaftar lewat
+     * Company > Division > Add User (App\Models\User::divisions(), pivot
+     * company_division_user) -- dipakai untuk mengunci field Branch di form
+     * Add Student saat yang login scope 'self', lihat create()/store() di
+     * atas. Null kalau user itu tidak terdaftar di divisi manapun (tidak
+     * seharusnya terjadi untuk sales yang benar, tapi dijaga supaya tidak
+     * fatal error, cukup jadi field kosong/tidak terkunci).
+     */
+    private function ownBranchId(User $user): ?string
+    {
+        return $user->divisions()->value('company_branch_id');
     }
 
     /**
