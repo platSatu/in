@@ -10,6 +10,7 @@ use App\Models\UniversityProfileDegree;
 use App\Models\UniversityProfilePayment;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class UniversityProfileController extends Controller
 {
@@ -126,10 +127,23 @@ public function store(Request $request)
         // Degree/Intake sekarang berupa daftar baris ("add row" di form,
         // sama polanya dengan upload foto album) — semuanya opsional karena
         // tidak semua kampus datanya lengkap.
+        //
+        // FIX (15 September 2026, permintaan user -- flow "pilih kampus ->
+        // degree -> jurusan" di /universities): 1 baris sekarang jadi 1
+        // "Course" utuh di bawah Degree terpilih (bukan cuma degree/intake/
+        // duration lagi) -- course_name/starting_date/application_deadline/
+        // language/tuition_fee ditambahkan di sini. 'degree' dibatasi ke 4
+        // pilihan tetap (lihat UniversityProfileDegree::DEGREES) supaya
+        // konsisten dipakai sebagai langkah filter pertama di halaman publik.
         'degree_intakes' => 'nullable|array',
-        'degree_intakes.*.degree' => 'nullable|string|max:255',
+        'degree_intakes.*.degree' => ['nullable', 'string', Rule::in(UniversityProfileDegree::DEGREES)],
+        'degree_intakes.*.course_name' => 'nullable|string|max:255',
         'degree_intakes.*.intake' => 'nullable|string|max:255',
         'degree_intakes.*.duration' => 'nullable|string|max:255',
+        'degree_intakes.*.starting_date' => 'nullable|date',
+        'degree_intakes.*.application_deadline' => 'nullable|date',
+        'degree_intakes.*.language' => 'nullable|string|max:255',
+        'degree_intakes.*.tuition_fee' => 'nullable|integer|min:0',
         // Payment: daftar rincian biaya ("add row" juga), pilih lokasi bayar
         // (Indonesia / China) + nama item + jumlah — semuanya opsional.
         // 'fee_type' (ditambahkan fase 4, fitur Apply Kampus) dipakai supaya
@@ -157,10 +171,19 @@ public function store(Request $request)
         abort(403, 'University tidak valid.');
     }
 
-    // Buang baris degree/intake yang semuanya kosong (bukan disimpan
-    // sebagai baris kosong).
+    // Buang baris Course/Degree yang SEMUA kolomnya kosong (bukan disimpan
+    // sebagai baris kosong) -- dicek ke SEMUA kolom baru juga, supaya baris
+    // yang cuma diisi mis. course_name + tuition_fee (tanpa degree/intake)
+    // tetap ikut kesimpan, bukan malah dianggap "kosong" dan terbuang.
     $degreeIntakeRows = collect($validated['degree_intakes'] ?? [])
-        ->filter(fn ($row) => filled($row['degree'] ?? null) || filled($row['intake'] ?? null) || filled($row['duration'] ?? null))
+        ->filter(fn ($row) => filled($row['degree'] ?? null)
+            || filled($row['course_name'] ?? null)
+            || filled($row['intake'] ?? null)
+            || filled($row['duration'] ?? null)
+            || filled($row['starting_date'] ?? null)
+            || filled($row['application_deadline'] ?? null)
+            || filled($row['language'] ?? null)
+            || filled($row['tuition_fee'] ?? null))
         ->values();
 
     unset($validated['degree_intakes']);
@@ -193,8 +216,13 @@ public function store(Request $request)
             'user_id' => (string) $userId,
             'university_profile_id' => $profile->id,
             'degree' => $row['degree'] ?? null,
+            'course_name' => $row['course_name'] ?? null,
             'intake' => $row['intake'] ?? null,
             'duration' => $row['duration'] ?? null,
+            'starting_date' => $row['starting_date'] ?? null,
+            'application_deadline' => $row['application_deadline'] ?? null,
+            'language' => $row['language'] ?? null,
+            'tuition_fee' => $row['tuition_fee'] ?? null,
             'sort_order' => $index,
         ]);
     }
@@ -264,9 +292,14 @@ public function store(Request $request)
             // seluruh baris lama diganti dengan baris yang dikirim form ini
             // (lihat sinkronisasi delete+recreate di bawah).
             'degree_intakes' => 'nullable|array',
-            'degree_intakes.*.degree' => 'nullable|string|max:255',
+            'degree_intakes.*.degree' => ['nullable', 'string', Rule::in(UniversityProfileDegree::DEGREES)],
+            'degree_intakes.*.course_name' => 'nullable|string|max:255',
             'degree_intakes.*.intake' => 'nullable|string|max:255',
             'degree_intakes.*.duration' => 'nullable|string|max:255',
+            'degree_intakes.*.starting_date' => 'nullable|date',
+            'degree_intakes.*.application_deadline' => 'nullable|date',
+            'degree_intakes.*.language' => 'nullable|string|max:255',
+            'degree_intakes.*.tuition_fee' => 'nullable|integer|min:0',
             'payments' => 'nullable|array',
             'payments.*.location' => 'nullable|in:indonesia,china',
             'payments.*.name' => 'nullable|string|max:255',
@@ -283,10 +316,17 @@ public function store(Request $request)
             abort(403, 'University tidak valid.');
         }
 
-        // Buang baris degree/intake & payment yang semuanya kosong (sama
+        // Buang baris Course/Degree & payment yang semuanya kosong (sama
         // logikanya dengan store()).
         $degreeIntakeRows = collect($validated['degree_intakes'] ?? [])
-            ->filter(fn ($row) => filled($row['degree'] ?? null) || filled($row['intake'] ?? null) || filled($row['duration'] ?? null))
+            ->filter(fn ($row) => filled($row['degree'] ?? null)
+                || filled($row['course_name'] ?? null)
+                || filled($row['intake'] ?? null)
+                || filled($row['duration'] ?? null)
+                || filled($row['starting_date'] ?? null)
+                || filled($row['application_deadline'] ?? null)
+                || filled($row['language'] ?? null)
+                || filled($row['tuition_fee'] ?? null))
             ->values();
 
         $paymentRows = collect($validated['payments'] ?? [])
@@ -307,8 +347,13 @@ public function store(Request $request)
                 'user_id' => (string) $userId,
                 'university_profile_id' => $profile->id,
                 'degree' => $row['degree'] ?? null,
+                'course_name' => $row['course_name'] ?? null,
                 'intake' => $row['intake'] ?? null,
                 'duration' => $row['duration'] ?? null,
+                'starting_date' => $row['starting_date'] ?? null,
+                'application_deadline' => $row['application_deadline'] ?? null,
+                'language' => $row['language'] ?? null,
+                'tuition_fee' => $row['tuition_fee'] ?? null,
                 'sort_order' => $index,
             ]);
         }
