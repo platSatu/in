@@ -112,15 +112,24 @@
                     </div>
 
                     <hr>
-                    <label class="form-label">Degree &amp; Intake</label>
-                    <div class="form-text mb-2" style="color:#6c757d;">Boleh dikosongkan, atau isi lebih dari satu kombinasi (mis. Bachelor - September - 4 Years, Master - March - 2.5 Years).</div>
+                    <label class="form-label">Degree &amp; Course</label>
+                    <div class="form-text mb-2" style="color:#6c757d;">Boleh dikosongkan, atau isi lebih dari satu Course di bawah Degree yang sama (mis. Bachelor - Teknik Informatika, Bachelor - Bisnis Internasional).</div>
 
                     @php
                         $existingDegrees = old('degree_intakes', $data->degrees->map(function ($d) {
-                            return ['degree' => $d->degree, 'intake' => $d->intake, 'duration' => $d->duration];
+                            return [
+                                'degree' => $d->degree,
+                                'course_name' => $d->course_name,
+                                'intake' => $d->intake,
+                                'duration' => $d->duration,
+                                'starting_date' => optional($d->starting_date)->format('Y-m-d'),
+                                'application_deadline' => optional($d->application_deadline)->format('Y-m-d'),
+                                'language' => $d->language,
+                                'tuition_fee' => $d->tuition_fee,
+                            ];
                         })->toArray());
                         if (empty($existingDegrees)) {
-                            $existingDegrees = [['degree' => null, 'intake' => null, 'duration' => null]];
+                            $existingDegrees = [['degree' => null, 'course_name' => null, 'intake' => null, 'duration' => null, 'starting_date' => null, 'application_deadline' => null, 'language' => null, 'tuition_fee' => null]];
                         }
                     @endphp
 
@@ -128,13 +137,26 @@
                         @foreach ($existingDegrees as $index => $row)
                             <div class="degree-intake-row border rounded p-3 mb-3">
                                 <div class="row g-3">
-                                    <div class="col-md-4">
+                                    <div class="col-md-3">
                                         <label class="form-label">Degree</label>
-                                        <input type="text" name="degree_intakes[{{ $index }}][degree]"
-                                            class="form-control @error('degree_intakes.' . $index . '.degree') is-invalid @enderror"
-                                            value="{{ old('degree_intakes.' . $index . '.degree', $row['degree'] ?? '') }}"
-                                            placeholder="Degree">
+                                        <select name="degree_intakes[{{ $index }}][degree]"
+                                            class="form-select @error('degree_intakes.' . $index . '.degree') is-invalid @enderror">
+                                            <option value="">Choose...</option>
+                                            @foreach (\App\Models\UniversityProfileDegree::DEGREES as $degreeOption)
+                                                <option value="{{ $degreeOption }}" {{ old('degree_intakes.' . $index . '.degree', $row['degree'] ?? '') === $degreeOption ? 'selected' : '' }}>{{ $degreeOption }}</option>
+                                            @endforeach
+                                        </select>
                                         @error('degree_intakes.' . $index . '.degree')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-5">
+                                        <label class="form-label">Course Name</label>
+                                        <input type="text" name="degree_intakes[{{ $index }}][course_name]"
+                                            class="form-control @error('degree_intakes.' . $index . '.course_name') is-invalid @enderror"
+                                            value="{{ old('degree_intakes.' . $index . '.course_name', $row['course_name'] ?? '') }}"
+                                            placeholder="mis. Teknik Informatika">
+                                        @error('degree_intakes.' . $index . '.course_name')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
@@ -148,13 +170,55 @@
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
-                                    <div class="col-md-4">
+                                </div>
+                                <div class="row g-3 mt-1">
+                                    <div class="col-md-3">
                                         <label class="form-label">Duration</label>
                                         <input type="text" name="degree_intakes[{{ $index }}][duration]"
                                             class="form-control @error('degree_intakes.' . $index . '.duration') is-invalid @enderror"
                                             value="{{ old('degree_intakes.' . $index . '.duration', $row['duration'] ?? '') }}"
                                             placeholder="mis. 4 Years">
                                         @error('degree_intakes.' . $index . '.duration')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Starting Date</label>
+                                        <input type="date" name="degree_intakes[{{ $index }}][starting_date]"
+                                            class="form-control @error('degree_intakes.' . $index . '.starting_date') is-invalid @enderror"
+                                            value="{{ old('degree_intakes.' . $index . '.starting_date', $row['starting_date'] ?? '') }}">
+                                        @error('degree_intakes.' . $index . '.starting_date')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Application Deadline</label>
+                                        <input type="date" name="degree_intakes[{{ $index }}][application_deadline]"
+                                            class="form-control @error('degree_intakes.' . $index . '.application_deadline') is-invalid @enderror"
+                                            value="{{ old('degree_intakes.' . $index . '.application_deadline', $row['application_deadline'] ?? '') }}">
+                                        @error('degree_intakes.' . $index . '.application_deadline')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Language</label>
+                                        <input type="text" name="degree_intakes[{{ $index }}][language]"
+                                            class="form-control @error('degree_intakes.' . $index . '.language') is-invalid @enderror"
+                                            value="{{ old('degree_intakes.' . $index . '.language', $row['language'] ?? '') }}"
+                                            placeholder="mis. English">
+                                        @error('degree_intakes.' . $index . '.language')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-1">
+                                    <div class="col-md-4">
+                                        <label class="form-label">Tuition Fee</label>
+                                        <input type="number" min="0" name="degree_intakes[{{ $index }}][tuition_fee]"
+                                            class="form-control @error('degree_intakes.' . $index . '.tuition_fee') is-invalid @enderror"
+                                            value="{{ old('degree_intakes.' . $index . '.tuition_fee', $row['tuition_fee'] ?? '') }}"
+                                            placeholder="0">
+                                        @error('degree_intakes.' . $index . '.tuition_fee')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
@@ -338,17 +402,46 @@
 <template id="degreeIntakeRowTemplate">
     <div class="degree-intake-row border rounded p-3 mb-3">
         <div class="row g-3">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <label class="form-label">Degree</label>
-                <input type="text" name="degree_intakes[__INDEX__][degree]" class="form-control">
+                <select name="degree_intakes[__INDEX__][degree]" class="form-select">
+                    <option value="">Choose...</option>
+                    @foreach (\App\Models\UniversityProfileDegree::DEGREES as $degreeOption)
+                        <option value="{{ $degreeOption }}">{{ $degreeOption }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label class="form-label">Course Name</label>
+                <input type="text" name="degree_intakes[__INDEX__][course_name]" class="form-control" placeholder="mis. Teknik Informatika">
             </div>
             <div class="col-md-4">
                 <label class="form-label">Intake</label>
                 <input type="text" name="degree_intakes[__INDEX__][intake]" class="form-control">
             </div>
-            <div class="col-md-4">
+        </div>
+        <div class="row g-3 mt-1">
+            <div class="col-md-3">
                 <label class="form-label">Duration</label>
                 <input type="text" name="degree_intakes[__INDEX__][duration]" class="form-control" placeholder="mis. 4 Years">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Starting Date</label>
+                <input type="date" name="degree_intakes[__INDEX__][starting_date]" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Application Deadline</label>
+                <input type="date" name="degree_intakes[__INDEX__][application_deadline]" class="form-control">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Language</label>
+                <input type="text" name="degree_intakes[__INDEX__][language]" class="form-control" placeholder="mis. English">
+            </div>
+        </div>
+        <div class="row g-3 mt-1">
+            <div class="col-md-4">
+                <label class="form-label">Tuition Fee</label>
+                <input type="number" min="0" name="degree_intakes[__INDEX__][tuition_fee]" class="form-control" placeholder="0">
             </div>
         </div>
         <div class="row g-3 mt-1">
@@ -427,9 +520,11 @@
                     e.target.closest('.degree-intake-row').remove();
                 } else {
                     // Baris terakhir tetap dibiarkan ada, tapi boleh kosong
-                    // (degree/intake/duration nullable) — jadi cukup dikosongkan saja.
-                    var inputs = e.target.closest('.degree-intake-row').querySelectorAll('input');
-                    inputs.forEach(function (input) { input.value = ''; });
+                    // (semua field degree/course nullable) — jadi cukup
+                    // dikosongkan saja (termasuk select Degree).
+                    var row = e.target.closest('.degree-intake-row');
+                    row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+                    row.querySelectorAll('select').forEach(function (select) { select.value = ''; });
                 }
             }
         });
