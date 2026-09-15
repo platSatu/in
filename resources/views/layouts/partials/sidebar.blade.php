@@ -116,7 +116,7 @@
                         [
                             'label' => 'InaStudy',
                             'items' => [
-                                ['label' => 'InaYule', 'route' => null],
+                                ['label' => 'InaYule', 'route' => 'inayule.index'],
                                 ['label' => 'InaStudy', 'route' => 'inastudy.index'],
                                 ['label' => 'InaTrip', 'route' => null],
                             ],

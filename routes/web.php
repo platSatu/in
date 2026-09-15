@@ -54,6 +54,7 @@ use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
 use App\Http\Controllers\StudentPortal\ApplicationPaymentController;
 use App\Http\Controllers\StudentPortal\ApplicationFormController;
 use App\Http\Controllers\StudentPortal\InaStudyController;
+use App\Http\Controllers\StudentPortal\InaYuleController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
@@ -230,6 +231,14 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/inastudy', [InaStudyController::class, 'index'])->name('inastudy.index');
     Route::post('/inastudy/register', [InaStudyController::class, 'registerApplication'])->name('inastudy.register');
+
+    // STEP 1 (15 September 2026, permintaan user): halaman "InaYule" (modul
+    // kursus Mandarin: Buy Packages / History / Schedule) -- baru
+    // tampilannya saja dulu (semua tab masih placeholder "Data not found"),
+    // lihat docblock App\Http\Controllers\StudentPortal\InaYuleController.
+    // Menu "InaYule" di sidebar diarahkan ke 'inayule.index' (lihat
+    // resources/views/layouts/partials/sidebar.blade.php).
+    Route::get('/inayule', [InaYuleController::class, 'index'])->name('inayule.index');
 });
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {
