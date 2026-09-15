@@ -217,6 +217,72 @@
             border-bottom: 1px solid #eef1f8;
         }
 
+        /* ---------- DEGREE & COURSE (flow "pilih kampus -> degree -> jurusan",
+           FIX 15 September 2026) -- tiap Major/Profile bisa punya beberapa baris
+           Course (university_profile_degrees) yang dikelompokkan per Degree
+           (Diploma/Bachelor/Master/PhD) di sini, gantinya daftar tag
+           Degree/Intake/Duration lepas-lepas yang lama. Warna & bentuk mengikuti
+           .tag / .payment-group yang sudah ada supaya konsisten. */
+        .degree-group { margin-bottom: 18px; }
+        .degree-group:last-child { margin-bottom: 0; }
+
+        .degree-group-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--brand);
+            color: #fff;
+            padding: 5px 14px;
+            border-radius: 20px;
+            font-size: 12.5px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            margin-bottom: 10px;
+        }
+
+        .course-item {
+            border: 1px solid #eef1f8;
+            border-radius: 12px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+        }
+        .course-item:last-child { margin-bottom: 0; }
+
+        .course-name {
+            font-weight: 700;
+            font-size: 14.5px;
+            color: #1d2333;
+            margin-bottom: 6px;
+            word-break: break-word;
+        }
+
+        .course-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 10px;
+        }
+
+        .course-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #f8f9fc;
+            color: #6b7186;
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12.5px;
+            font-weight: 600;
+        }
+        .course-chip i { color: var(--brand); }
+
+        .course-fee {
+            margin-top: 8px;
+            font-size: 13.5px;
+            font-weight: 700;
+            color: var(--brand);
+        }
+
         .btn-apply {
             background: var(--brand);
             color: #fff;
@@ -796,9 +862,21 @@
                         @foreach($profiles as $majorProfile)
                             @php
                                 $majorDegreeRows = $majorProfile->degrees;
-                                $majorDegrees = $majorDegreeRows->pluck('degree')->filter()->map('trim')->unique()->values()->all();
-                                $majorIntakes = $majorDegreeRows->pluck('intake')->filter()->map('trim')->unique()->values()->all();
-                                $majorDurations = $majorDegreeRows->pluck('duration')->filter()->map('trim')->unique()->values()->all();
+                                // DIUBAH (15 September 2026, flow "pilih kampus -> degree ->
+                                // jurusan"): baris degree/intake/duration lama sekarang
+                                // dikelompokkan PER DEGREE ($majorDegreeGroups), karena tiap
+                                // baris ($courseRow) sudah mewakili 1 Course utuh (course_name +
+                                // starting_date + application_deadline + language + tuition_fee),
+                                // bukan cuma kombinasi Degree/Intake/Duration lepas-lepas lagi --
+                                // urutan grupnya mengikuti UniversityProfileDegree::DEGREES
+                                // (Diploma/Bachelor/Master/PhD), baris lama tanpa degree
+                                // (sebelum fitur ini ada) masuk grup "Other" di akhir.
+                                $majorDegreeGroups = $majorDegreeRows
+                                    ->groupBy(fn ($row) => $row->degree ?: 'Other')
+                                    ->sortBy(function ($rows, $degreeLabel) {
+                                        $order = array_search($degreeLabel, \App\Models\UniversityProfileDegree::DEGREES);
+                                        return $order === false ? 99 : $order;
+                                    });
                                 $majorKeyCourses = $splitFreeText($majorProfile->key_courses);
                                 $majorEntryReq = $splitFreeText($majorProfile->entry_requirements);
                                 $majorPaymentRows = $majorProfile->payments->filter(fn ($p) => filled($p->name) || filled($p->amount));
@@ -818,22 +896,59 @@
                                     </a>
                                 </div>
 
-                                @if(count($majorDegrees) || count($majorIntakes) || count($majorDurations) || $majorProfile->language || $majorProfile->scholarship_available)
+                                @if($majorDegreeGroups->isNotEmpty())
                                     <div class="mb-3">
-                                        @foreach($majorDegrees as $degree)<span class="tag">{{ $degree }}</span>@endforeach
-                                        @foreach($majorIntakes as $intake)<span class="tag">{{ $intake }}</span>@endforeach
-                                        @foreach($majorDurations as $duration)<span class="tag">{{ $duration }}</span>@endforeach
+                                        @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
+                                            <div class="degree-group">
+                                                <span class="degree-group-title">
+                                                    <i class="bi bi-mortarboard-fill"></i>
+                                                    {{ $degreeLabel === 'Other' ? 'Degree not specified' : $degreeLabel }}
+                                                </span>
+                                                @foreach($courseRows as $courseRow)
+                                                    <div class="course-item">
+                                                        <div class="course-name">{{ $courseRow->course_name ?: ($majorProfile->field ?: 'Program') }}</div>
+                                                        @if($courseRow->intake || $courseRow->duration || $courseRow->starting_date || $courseRow->application_deadline || $courseRow->language)
+                                                            <div class="course-meta">
+                                                                @if($courseRow->intake)
+                                                                    <span class="course-chip"><i class="bi bi-calendar-event"></i> {{ $courseRow->intake }}</span>
+                                                                @endif
+                                                                @if($courseRow->duration)
+                                                                    <span class="course-chip"><i class="bi bi-hourglass-split"></i> {{ $courseRow->duration }}</span>
+                                                                @endif
+                                                                @if($courseRow->starting_date)
+                                                                    <span class="course-chip"><i class="bi bi-play-circle"></i> Starts {{ $courseRow->starting_date->format('d M Y') }}</span>
+                                                                @endif
+                                                                @if($courseRow->application_deadline)
+                                                                    <span class="course-chip"><i class="bi bi-hourglass-bottom"></i> Deadline {{ $courseRow->application_deadline->format('d M Y') }}</span>
+                                                                @endif
+                                                                @if($courseRow->language)
+                                                                    <span class="course-chip"><i class="bi bi-translate"></i> {{ $courseRow->language }}</span>
+                                                                @endif
+                                                            </div>
+                                                        @endif
+                                                        @if($courseRow->tuition_fee !== null)
+                                                            <div class="course-fee">Tuition Fee: Rp {{ number_format($courseRow->tuition_fee, 0, ',', '.') }}</div>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @else
+                                    <div class="placeholder-note mb-3">
+                                        <i class="bi bi-hourglass-split me-1"></i>
+                                        Degree and course options for this program have not been added yet. Contact our team to find out what's available.
+                                    </div>
+                                @endif
+
+                                @if($majorProfile->language || $majorProfile->scholarship_available)
+                                    <div class="mb-3">
                                         @if($majorProfile->language)
                                             <span class="tag"><i class="bi bi-translate"></i> {{ $majorProfile->language }}</span>
                                         @endif
                                         @if($majorProfile->scholarship_available)
                                             <span class="tag"><i class="bi bi-award"></i> Scholarship Available</span>
                                         @endif
-                                    </div>
-                                @else
-                                    <div class="placeholder-note mb-3">
-                                        <i class="bi bi-hourglass-split me-1"></i>
-                                        Degree, intake, and duration options for this program have not been added yet. Contact our team to find out what's available.
                                     </div>
                                 @endif
 
