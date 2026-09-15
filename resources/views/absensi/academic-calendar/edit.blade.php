@@ -89,6 +89,44 @@
                         </div>
                     </div>
 
+                    {{-- FIX (15 September 2026, permintaan user): tentukan siapa yang
+                         boleh lihat kalender ini di Dashboard-nya masing-masing --
+                         kosongkan salah satu/keduanya untuk broadcast ke SEMUA role
+                         atau SEMUA branch (lihat DashboardController::index()). --}}
+                    <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <label for="target_role_id" class="mb-2">Untuk Role</label>
+                            <select class="form-select @error('target_role_id') is-invalid @enderror"
+                                id="target_role_id" name="target_role_id">
+                                <option value="">-- Semua Role --</option>
+                                @foreach ($roles as $role)
+                                    <option value="{{ $role->id }}" {{ old('target_role_id', $data->target_role_id) == $role->id ? 'selected' : '' }}>
+                                        {{ $role->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('target_role_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-sm-6">
+                            <label for="target_branch_id" class="mb-2">Untuk Branch</label>
+                            <select class="form-select @error('target_branch_id') is-invalid @enderror"
+                                id="target_branch_id" name="target_branch_id">
+                                <option value="">-- Semua Branch --</option>
+                                @foreach ($companyBranches as $companyBranch)
+                                    <option value="{{ $companyBranch->id }}" {{ old('target_branch_id', $data->target_branch_id) == $companyBranch->id ? 'selected' : '' }}>
+                                        {{ $companyBranch->name }}
+                                    </option>
+                                @endforeach
+                            </select>
+                            @error('target_branch_id')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
                 </div>
             </div>
 

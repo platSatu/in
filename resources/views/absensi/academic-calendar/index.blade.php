@@ -51,6 +51,8 @@
                                 <th>Start Date</th>
                                 <th>End Date</th>
                                 <th>Type</th>
+                                <th class="text-nowrap">Untuk Role</th>
+                                <th class="text-nowrap">Untuk Branch</th>
                                 <th>Status</th>
                                 <th class="no-content text-center">Action</th>
                             </tr>
@@ -66,6 +68,8 @@
                                     <td>
                                         <span class="badge badge-info text-uppercase">{{ $item->event_type }}</span>
                                     </td>
+                                    <td class="text-nowrap">{{ $item->targetRole->name ?? 'Semua Role' }}</td>
+                                    <td class="text-nowrap">{{ $item->targetBranch->name ?? 'Semua Branch' }}</td>
                                     <td>
                                         @if($item->is_active)
                                             <span class="badge badge-success">Active</span>
@@ -105,7 +109,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center">Belum ada data kalender akademik.</td>
+                                    <td colspan="10" class="text-center">Belum ada data kalender akademik.</td>
                                 </tr>
                             @endforelse
                         </tbody>

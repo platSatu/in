@@ -571,17 +571,21 @@ class StudentController extends Controller
     }
 
     /**
-     * Branch tempat user ini (biasanya sales, scope 'self') terdaftar lewat
-     * Company > Division > Add User (App\Models\User::divisions(), pivot
-     * company_division_user) -- dipakai untuk mengunci field Branch di form
-     * Add Student saat yang login scope 'self', lihat create()/store() di
-     * atas. Null kalau user itu tidak terdaftar di divisi manapun (tidak
-     * seharusnya terjadi untuk sales yang benar, tapi dijaga supaya tidak
-     * fatal error, cukup jadi field kosong/tidak terkunci).
+     * Branch tempat user ini (biasanya sales, scope 'self') "berada" --
+     * dipakai untuk mengunci field Branch di form Add Student saat yang
+     * login scope 'self', lihat create()/store() di atas. Null kalau tidak
+     * ketemu sama sekali (tidak seharusnya terjadi untuk sales yang benar,
+     * tapi dijaga supaya tidak fatal error, cukup jadi field kosong/tidak
+     * terkunci).
+     *
+     * FIX (15 September 2026): logic-nya DIPUSATKAN ke
+     * App\Models\User::resolveOwnBranchId() (dipakai bareng
+     * DashboardController::index() untuk filter Academic Calendar per
+     * branch) supaya tidak dobel-tulis di 2 tempat berbeda.
      */
     private function ownBranchId(User $user): ?string
     {
-        return $user->divisions()->value('company_branch_id');
+        return $user->resolveOwnBranchId();
     }
 
     /**

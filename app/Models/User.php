@@ -7,6 +7,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Str;
@@ -103,5 +104,42 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    /**
+     * Data Student milik akun login ini, kalau ada (siswa yang daftar/login
+     * lewat Portal Siswa) -- inverse dari Student::user(). Dipakai
+     * resolveOwnBranchId() di bawah, TIDAK semua User punya ini (staff biasa
+     * seperti sales/pengajar/superadmin tidak punya baris Student).
+     */
+    public function student(): HasOne
+    {
+        return $this->hasOne(Student::class, 'user_id');
+    }
+
+    /**
+     * Branch tempat user ini "berada", dicari lewat 2 jalur berbeda
+     * tergantung jenis akunnya -- dipakai FIX (15 September 2026, permintaan
+     * user) untuk filter Academic Calendar per branch di
+     * DashboardController::index(), juga dipakai
+     * Student\StudentController::ownBranchId() sebelumnya (logic yang sama,
+     * sekarang dipusatkan di sini supaya tidak dobel):
+     * 1. Staff (sales/pengajar/admin) -- lewat Company > Division > Add User
+     *    (divisions(), pivot company_division_user), branch-nya ikut divisi.
+     * 2. Siswa (login Portal Siswa) -- langsung dari Student::branch_id
+     *    miliknya sendiri (siswa tidak pernah masuk company_division_user).
+     * Null kalau user ini tidak match keduanya (mis. staff yang belum
+     * ditempatkan ke divisi manapun, atau siswa yang belum pernah keisi
+     * branch_id sama sekali).
+     */
+    public function resolveOwnBranchId(): ?string
+    {
+        $branchId = $this->divisions()->value('company_branch_id');
+
+        if ($branchId) {
+            return $branchId;
+        }
+
+        return $this->student?->branch_id;
     }
 }
