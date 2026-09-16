@@ -983,7 +983,12 @@
                                                             </div>
                                                         @endif
                                                         @if($courseRow->tuition_fee !== null)
-                                                            <div class="course-fee">Tuition Fee: Rp {{ number_format($courseRow->tuition_fee, 0, ',', '.') }}</div>
+                                                            {{-- FIX (permintaan user, 16 September 2026): tuition fee per
+                                                                 Course (university_profile_degrees) ini nilainya
+                                                                 memang dalam Yuan (Tuition Fee kampus China), jadi
+                                                                 simbolnya disamakan dengan 元 yang sudah dipakai di
+                                                                 section "Payment in China" -- BUKAN Rupiah. --}}
+                                                            <div class="course-fee">Tuition Fee: 元 {{ number_format($courseRow->tuition_fee, 0, ',', '.') }}</div>
                                                         @endif
                                                     </div>
                                                 @endforeach
