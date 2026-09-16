@@ -69,11 +69,11 @@
                             <tr>
                                 <th>No</th>
                                 <th>Student</th>
-                                <th>Kontak</th>
                                 <th>Package</th>
-                                <th>Sumber</th>
-                                <th>Harga Dibayar</th>
+                                <th>Harga</th>
                                 <th>Credits</th>
+                                <th>Terpakai</th>
+                                <th>Sisa</th>
                                 <th>Status</th>
                                 <th>Tanggal</th>
                             </tr>
@@ -86,28 +86,39 @@
                             <tr>
                                 <td>{{ $purchases->firstItem() + $index }}</td>
 
+                                {{--
+                                    FIX (16 September 2026, permintaan user):
+                                    kolom "Kontak" digabung ke sini -- Nama,
+                                    lalu Email & Handphone sebagai small text
+                                    center di bawahnya.
+                                --}}
                                 <td class="fw-bold">
-                                    {{ trim((optional($purchase->student)->first_name ?? '') . ' ' . (optional($purchase->student)->last_name ?? '')) ?: '-' }}
+                                    <div>{{ trim((optional($purchase->student)->first_name ?? '') . ' ' . (optional($purchase->student)->last_name ?? '')) ?: '-' }}</div>
+                                    <div class="text-center text-muted fw-normal" style="font-size:12px;">{{ optional($purchase->student)->email ?? '-' }}</div>
+                                    <div class="text-center text-muted fw-normal" style="font-size:12px;">{{ optional($purchase->student)->handphone ?? '-' }}</div>
                                 </td>
 
+                                {{--
+                                    FIX (16 September 2026, permintaan user):
+                                    Type/Class/Level package ditambahkan
+                                    sebagai small text di bawah nama package.
+                                --}}
                                 <td>
-                                    <div style="font-size:13px;">{{ optional($purchase->student)->email ?? '-' }}</div>
-                                    <div class="text-muted" style="font-size:12px;">{{ optional($purchase->student)->handphone ?? '-' }}</div>
+                                    <div class="fw-bold">{{ optional($purchase->coursePackage)->name ?? '-' }}</div>
+                                    <div class="text-muted" style="font-size:12px;">{{ optional(optional($purchase->coursePackage)->type)->name ?? '-' }}</div>
+                                    <div class="text-muted" style="font-size:12px;">{{ optional(optional($purchase->coursePackage)->courseClass)->name ?? '-' }}</div>
+                                    <div class="text-muted" style="font-size:12px;">{{ optional(optional($purchase->coursePackage)->level)->name ?? '-' }}</div>
                                 </td>
 
-                                <td>{{ optional($purchase->coursePackage)->name ?? '-' }}</td>
-
-                                <td>
-                                    @if($purchase->source === 'trial_claim')
-                                        <span class="badge bg-info text-dark">Trial (Gratis)</span>
-                                    @else
-                                        <span class="badge bg-primary">Pembelian (Deposit)</span>
-                                    @endif
-                                </td>
+                                {{-- FIX (16 September 2026, permintaan user): kolom "Sumber" dihapus dari tampilan. --}}
 
                                 <td>Rp {{ number_format((float) $purchase->price_paid, 0, ',', '.') }}</td>
 
                                 <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_granted, 2, ',', '.'), '0'), ',') }}</td>
+
+                                <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_used, 2, ',', '.'), '0'), ',') }}</td>
+
+                                <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_remaining, 2, ',', '.'), '0'), ',') }}</td>
 
                                 <td>
                                     @if($purchase->status === 'completed')
