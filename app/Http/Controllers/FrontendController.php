@@ -284,9 +284,18 @@ class FrontendController extends Controller
         // itu sendiri TIDAK punya kolom degree/intake/payment langsung (lihat
         // catatan di UniversityProfile::degrees()/payments()), datanya sepenuhnya
         // di tabel anak masing-masing.
+        //
+        // FIX (permintaan user, 16 September 2026): tambah eager-load
+        // 'scholarships' (tabel anak university_profile_scholarships) --
+        // kartu "Scholarship" di quick-facts dulu cuma menampilkan boolean
+        // scholarship_available ("Available"/"Contact us"), padahal datanya
+        // (Name/Price/Currency, bisa lebih dari satu baris) sudah ada dari
+        // fitur "add row" Scholarship di admin. Sekarang view menampilkan
+        // nama-nama scholarship-nya langsung (lihat $scholarshipNames di
+        // frontend.university-profile).
         $profiles = UniversityProfile::where('university_id', $id)
             ->where('status', 'active')
-            ->with(['degrees', 'payments'])
+            ->with(['degrees', 'payments', 'scholarships'])
             ->orderBy('created_at')
             ->get();
 

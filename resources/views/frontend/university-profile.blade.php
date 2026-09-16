@@ -177,6 +177,16 @@
             font-style: italic;
         }
 
+        /* FIX (permintaan user, 16 September 2026): dipakai kartu
+           "Scholarship" di quick-facts kalau lebih dari satu nama scholarship
+           ditampilkan sekaligus (dipisah koma) -- font default .fact-value
+           (14px) kepanjangan/kepotong kalau list-nya lebih dari 1 item,
+           jadi dikecilkan supaya tetap muat rapi di kartu yang sempit. */
+        .fact-value.fact-value-list {
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
         /* ---------- CARDS ---------- */
         .info-card {
             background: #fff;
@@ -770,6 +780,19 @@
         // ke placeholder-note seperti biasa, tidak ada yang berubah).
         $durations = $degreeIntakeRows->pluck('duration')->filter()->map('trim')->unique()->values()->all();
 
+        // FIX (permintaan user, 16 September 2026): kartu "Scholarship" di
+        // quick-facts bawah dulu cuma menampilkan boolean scholarship_available
+        // ("Available"/"Contact us"), padahal datanya (baris Name/Price/
+        // Currency dari fitur "add row" Scholarship di admin, bisa lebih
+        // dari satu) sudah ada -- lihat UniversityProfile::scholarships().
+        // Sekarang nama-nama scholarship-nya ditampilkan langsung (dipisah
+        // koma, sama polanya dengan $degrees/$intakes di atas), fallback ke
+        // "Available"/"Contact us" seperti sebelumnya kalau belum ada baris
+        // Scholarship yang diisi namanya.
+        $scholarshipNames = $profile
+            ? $profile->scholarships->pluck('name')->filter()->map('trim')->unique()->values()->all()
+            : [];
+
         // Degree Title, Key Courses, Entry Requirements, Payment: DULU
         // dihitung di sini dari satu $profile (info-card terpisah per
         // jenis). Sekarang (fase 3, fitur Apply Kampus) satu university bisa
@@ -912,9 +935,17 @@
                 <div class="fact-card">
                     <div class="fact-icon"><i class="bi bi-award"></i></div>
                     <div class="fact-label">Scholarship</div>
-                    <div class="fact-value {{ ($profile && $profile->scholarship_available) ? '' : 'muted' }}">
-                        {{ $profile && $profile->scholarship_available ? 'Available' : 'Contact us' }}
-                    </div>
+                    @if(count($scholarshipNames))
+                        {{-- FIX (permintaan user, 16 September 2026): tampilkan
+                             nama scholarship-nya langsung (bisa lebih dari 1),
+                             font dikecilkan lewat .fact-value-list supaya
+                             tetap muat di kartu ini. --}}
+                        <div class="fact-value fact-value-list">{{ implode(', ', $scholarshipNames) }}</div>
+                    @else
+                        <div class="fact-value {{ ($profile && $profile->scholarship_available) ? '' : 'muted' }}">
+                            {{ $profile && $profile->scholarship_available ? 'Available' : 'Contact us' }}
+                        </div>
+                    @endif
                 </div>
             </div>
         </div>
