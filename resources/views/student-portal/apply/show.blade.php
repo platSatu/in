@@ -124,18 +124,48 @@
                     @csrf
 
                     <div class="mb-3">
-                        <label class="form-label">Degree, Intake &amp; Duration</label>
-                        <select name="degree_intake_id" class="form-select @error('degree_intake_id') is-invalid @enderror" required>
+                        {{--
+                            FIX (permintaan user, 16 September 2026): dulu label option-nya
+                            gabungan "Degree - Intake - Duration" (mis. "Bachelor -
+                            September - 4 Years") -- kalau 1 Program punya beberapa Course
+                            dengan Degree/Intake/Duration yang SAMA, opsi-opsinya jadi
+                            kelihatan identik/tidak bisa dibedakan (course_name-nya malah
+                            tidak pernah ditampilkan sama sekali). Sekarang select ini
+                            fokus ke JURUSAN (course_name) dulu -- Degree ikut ditulis di
+                            belakang dalam kurung supaya tetap jelas kalau 1 Program ada
+                            campuran Bachelor & Master. Begitu jurusan dipilih, field
+                            Intake & Duration di bawah otomatis muncul (readonly, cuma
+                            utk konfirmasi -- bukan diisi manual) mengambil nilai dari
+                            Course yang dipilih, lewat data-intake/data-duration di tiap
+                            <option> + IIFE vanilla JS di bagian bawah file (pola sama
+                            dengan IIFE lain di codebase ini, bukan Bootstrap JS).
+                        --}}
+                        <label class="form-label">Program / Major</label>
+                        <select id="degreeIntakeSelect" name="degree_intake_id" class="form-select @error('degree_intake_id') is-invalid @enderror" required>
                             <option value="">Choose...</option>
                             @foreach($profile->degrees as $degreeRow)
-                                <option value="{{ $degreeRow->id }}" {{ old('degree_intake_id') === $degreeRow->id ? 'selected' : '' }}>
-                                    {{ collect([$degreeRow->degree, $degreeRow->intake, $degreeRow->duration])->filter()->implode(' - ') }}
+                                <option value="{{ $degreeRow->id }}"
+                                    data-intake="{{ $degreeRow->intake }}"
+                                    data-duration="{{ $degreeRow->duration }}"
+                                    {{ old('degree_intake_id') === $degreeRow->id ? 'selected' : '' }}>
+                                    {{ $degreeRow->course_name ?: ($profile->field ?: 'Program') }}{{ $degreeRow->degree ? ' (' . $degreeRow->degree . ')' : '' }}
                                 </option>
                             @endforeach
                         </select>
                         @error('degree_intake_id')
                             <div class="invalid-feedback">{{ $message }}</div>
                         @enderror
+                    </div>
+
+                    <div class="row g-3 mb-3" id="degreeIntakeDetails" style="display:none;">
+                        <div class="col-sm-6">
+                            <label class="form-label">Intake</label>
+                            <input type="text" id="degreeIntakeDetailsIntake" class="form-control" value="" disabled>
+                        </div>
+                        <div class="col-sm-6">
+                            <label class="form-label">Duration</label>
+                            <input type="text" id="degreeIntakeDetailsDuration" class="form-control" value="" disabled>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -166,6 +196,46 @@
         </div>
 
     </div>
+
+    <script>
+        // FIX (permintaan user, 16 September 2026): begitu jurusan (Program /
+        // Major) dipilih di #degreeIntakeSelect, otomatis tampilkan &amp; isi
+        // #degreeIntakeDetails (Intake & Duration, readonly) dari atribut
+        // data-intake/data-duration milik <option> yang dipilih. Dijalankan
+        // juga 1x saat halaman baru dibuka (bukan cuma saat event 'change')
+        // supaya kalau validasi form gagal & halaman reload dengan
+        // old('degree_intake_id') sudah keisi, box Intake/Duration ikut
+        // langsung kelihatan terisi -- bukan cuma keisi setelah user
+        // mengubah pilihannya secara manual.
+        (function () {
+            var select = document.getElementById('degreeIntakeSelect');
+            var details = document.getElementById('degreeIntakeDetails');
+            var intakeInput = document.getElementById('degreeIntakeDetailsIntake');
+            var durationInput = document.getElementById('degreeIntakeDetailsDuration');
+
+            if (!select || !details || !intakeInput || !durationInput) {
+                return;
+            }
+
+            function syncDegreeIntakeDetails() {
+                var selectedOption = select.options[select.selectedIndex];
+
+                if (!selectedOption || !selectedOption.value) {
+                    details.style.display = 'none';
+                    intakeInput.value = '';
+                    durationInput.value = '';
+                    return;
+                }
+
+                intakeInput.value = selectedOption.getAttribute('data-intake') || '';
+                durationInput.value = selectedOption.getAttribute('data-duration') || '';
+                details.style.display = '';
+            }
+
+            select.addEventListener('change', syncDegreeIntakeDetails);
+            syncDegreeIntakeDetails();
+        })();
+    </script>
 
 </body>
 
