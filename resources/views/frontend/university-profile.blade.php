@@ -292,16 +292,6 @@
             border-radius: 8px;
         }
 
-        /* FIX v2 (permintaan user, 16 September 2026): tombol Apply kecil di
-           tiap jurusan (course-item), gantinya tombol per-Degree-tab
-           (.btn-apply-sm di atas, sekarang tidak dipakai lagi di sini). */
-        .btn-apply-course {
-            padding: 6px 14px;
-            font-size: 12px;
-            border-radius: 8px;
-            flex-shrink: 0;
-        }
-
         /* ---------- DEGREE & COURSE (flow "pilih kampus -> degree -> jurusan",
            FIX 15 September 2026) -- tiap Major/Profile bisa punya beberapa baris
            Course (university_profile_degrees) yang dikelompokkan per Degree
@@ -348,10 +338,17 @@
             word-break: break-word;
         }
 
+        /* FIX v3 (permintaan user, 16 September 2026): jarak antara baris
+           chip meta (September/Duration/Starts/Deadline/Language) dengan
+           "Tuition Fee" di bawahnya ditambah (dulu cuma margin-top 8px di
+           .course-fee, kelihatan terlalu rapat) -- ditambah margin-bottom
+           di .course-meta JUGA supaya jaraknya konsisten dipakai baik pas
+           .course-fee ada maupun tidak (mis. course tanpa tuition_fee). */
         .course-meta {
             display: flex;
             flex-wrap: wrap;
             gap: 5px 8px;
+            margin-bottom: 6px;
         }
 
         .course-chip {
@@ -368,7 +365,7 @@
         .course-chip i { color: var(--brand); }
 
         .course-fee {
-            margin-top: 8px;
+            margin-top: 6px;
             font-size: 13.5px;
             font-weight: 700;
             color: var(--brand);
@@ -392,6 +389,24 @@
             background: var(--brand-dark);
             color: #fff;
             transform: translateY(-1px);
+        }
+
+        /* FIX v3 (permintaan user, 16 September 2026): tombol Apply kecil
+           di TIAP jurusan (course-item), gantinya tombol per-Degree-tab
+           yang sudah dihapus. Aturan ini SENGAJA diletakkan SETELAH
+           .btn-apply di atas (bukan sebelumnya) -- .btn-apply-course
+           dipakai BARENG .btn-apply lewat class="btn-apply btn-apply-course"
+           di HTML, dan karena spesifisitas keduanya sama-sama 1 class,
+           urutan di CSS ini yang menentukan siapa menang: taruh SETELAH
+           .btn-apply supaya padding/font-size/border-radius yang lebih
+           kecil di sini yang dipakai (versi SEBELUMNYA taruh di ATAS
+           .btn-apply, jadi ke-override balik jadi ukuran besar -- itu
+           sebabnya tombolnya kelihatan tetap besar, bukan mengecil). */
+        .btn-apply-course {
+            padding: 5px 12px;
+            font-size: 11.5px;
+            border-radius: 8px;
+            flex-shrink: 0;
         }
 
         .placeholder-note {
