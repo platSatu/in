@@ -25,27 +25,47 @@
                  submit sebelumnya gagal (old('university_id') masih terisi). --}}
             <div id="registerFormPanel" class="border rounded p-3 mb-3" style="{{ $errors->any() && old('university_id') ? '' : 'display:none;' }} background:#f8f9fa;">
                 <h6 class="mb-3">Register Aplikasi Kuliah</h6>
+                {{--
+                    FIX v2 (permintaan user, 16 September 2026): disamakan
+                    dengan alur Apply dari halaman publik
+                    (frontend.university-profile / ApplyController) yang
+                    sekarang 3 langkah -- pilih Kampus, lalu Degree-nya
+                    kekuar, lalu Jurusan (Course)-nya keluar. Dulu di sini
+                    cuma 2 langkah (Universitas -> Jurusan langsung ke level
+                    Major/UniversityProfile). "Degree" & "Jurusan" di bawah
+                    di-populate dinamis lewat JS (lihat script di bawah),
+                    sama polanya dengan dropdown Jurusan versi lama.
+                --}}
                 <form method="POST" action="{{ route('inastudy.register') }}">
                     @csrf
                     <div class="row g-3">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <label class="form-label">Universitas</label>
                             <select name="university_id" id="registerUniversitySelect" class="form-select @error('university_id') is-invalid @enderror" required>
                                 <option value="">-- Pilih Universitas --</option>
                                 @foreach($registerUniversities as $university)
-                                    <option value="{{ $university->id }}" {{ old('university_id') == $university->id ? 'selected' : '' }}>{{ $university->name }}</option>
+                                    <option value="{{ $university['id'] }}" {{ old('university_id') == $university['id'] ? 'selected' : '' }}>{{ $university['name'] }}</option>
                                 @endforeach
                             </select>
                             @error('university_id')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
-                        <div class="col-md-6" id="registerProfileWrapper" style="{{ old('university_id') ? '' : 'display:none;' }}">
+                        <div class="col-md-4" id="registerDegreeWrapper" style="{{ old('university_id') ? '' : 'display:none;' }}">
+                            <label class="form-label">Degree</label>
+                            <select name="degree" id="registerDegreeSelect" class="form-select @error('degree') is-invalid @enderror" required>
+                                <option value="">-- Pilih Degree --</option>
+                            </select>
+                            @error('degree')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-4" id="registerCourseWrapper" style="{{ old('degree') ? '' : 'display:none;' }}">
                             <label class="form-label">Jurusan</label>
-                            <select name="university_profile_id" id="registerProfileSelect" class="form-select @error('university_profile_id') is-invalid @enderror" required>
+                            <select name="degree_intake_id" id="registerCourseSelect" class="form-select @error('degree_intake_id') is-invalid @enderror" required>
                                 <option value="">-- Pilih Jurusan --</option>
                             </select>
-                            @error('university_profile_id')
+                            @error('degree_intake_id')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
@@ -116,35 +136,73 @@
 
 <script>
 (function () {
+    // FIX v2 (permintaan user, 16 September 2026): dulu cuma 1 tingkat
+    // cascade (Universitas -> Jurusan/Major langsung). Sekarang 2 tingkat
+    // (Universitas -> Degree -> Jurusan/Course), sama alurnya dengan Apply
+    // dari halaman publik -- registerUniversities[i].courses berisi SEMUA
+    // Course (gabungan semua Major aktif) universitas itu, masing-masing
+    // sudah bawa field "degree" (lihat InaStudyController::index()).
     const registerUniversities = @json($registerUniversities ?? []);
+    const degreeOrder = @json($registerDegreeOrder ?? []);
     const btnShow = document.getElementById('btnShowRegister');
     const panel = document.getElementById('registerFormPanel');
     const btnCancel = document.getElementById('btnCancelRegister');
     const uniSelect = document.getElementById('registerUniversitySelect');
-    const profileWrapper = document.getElementById('registerProfileWrapper');
-    const profileSelect = document.getElementById('registerProfileSelect');
+    const degreeWrapper = document.getElementById('registerDegreeWrapper');
+    const degreeSelect = document.getElementById('registerDegreeSelect');
+    const courseWrapper = document.getElementById('registerCourseWrapper');
+    const courseSelect = document.getElementById('registerCourseSelect');
 
-    if (!panel || !uniSelect || !profileSelect || !profileWrapper) {
+    if (!panel || !uniSelect || !degreeSelect || !degreeWrapper || !courseSelect || !courseWrapper) {
         return;
     }
 
-    function populateProfiles(universityId, selectedProfileId) {
-        profileSelect.innerHTML = '<option value="">-- Pilih Jurusan --</option>';
-
+    function coursesForUniversity(universityId) {
         const university = registerUniversities.find(function (u) { return u.id === universityId; });
-        const profiles = university ? (university.profiles || []) : [];
+        return university ? (university.courses || []) : [];
+    }
 
-        profiles.forEach(function (profile) {
-            const option = document.createElement('option');
-            option.value = profile.id;
-            option.textContent = profile.degree_title ? (profile.field + ' - ' + profile.degree_title) : profile.field;
-            if (selectedProfileId && String(selectedProfileId) === String(profile.id)) {
-                option.selected = true;
-            }
-            profileSelect.appendChild(option);
+    function populateDegrees(universityId, selectedDegree) {
+        degreeSelect.innerHTML = '<option value="">-- Pilih Degree --</option>';
+        courseSelect.innerHTML = '<option value="">-- Pilih Jurusan --</option>';
+        courseWrapper.style.display = 'none';
+
+        const courses = coursesForUniversity(universityId);
+        const availableDegrees = degreeOrder.filter(function (degree) {
+            return courses.some(function (course) { return course.degree === degree; });
         });
 
-        profileWrapper.style.display = profiles.length ? '' : 'none';
+        availableDegrees.forEach(function (degree) {
+            const option = document.createElement('option');
+            option.value = degree;
+            option.textContent = degree;
+            if (selectedDegree && selectedDegree === degree) {
+                option.selected = true;
+            }
+            degreeSelect.appendChild(option);
+        });
+
+        degreeWrapper.style.display = availableDegrees.length ? '' : 'none';
+    }
+
+    function populateCourses(universityId, degree, selectedCourseId) {
+        courseSelect.innerHTML = '<option value="">-- Pilih Jurusan --</option>';
+
+        const courses = coursesForUniversity(universityId).filter(function (course) {
+            return course.degree === degree;
+        });
+
+        courses.forEach(function (course) {
+            const option = document.createElement('option');
+            option.value = course.id;
+            option.textContent = course.label;
+            if (selectedCourseId && String(selectedCourseId) === String(course.id)) {
+                option.selected = true;
+            }
+            courseSelect.appendChild(option);
+        });
+
+        courseWrapper.style.display = courses.length ? '' : 'none';
     }
 
     if (btnShow) {
@@ -158,22 +216,32 @@
         btnCancel.addEventListener('click', function () {
             panel.style.display = 'none';
             uniSelect.value = '';
-            profileSelect.innerHTML = '<option value="">-- Pilih Jurusan --</option>';
-            profileWrapper.style.display = 'none';
+            degreeSelect.innerHTML = '<option value="">-- Pilih Degree --</option>';
+            degreeWrapper.style.display = 'none';
+            courseSelect.innerHTML = '<option value="">-- Pilih Jurusan --</option>';
+            courseWrapper.style.display = 'none';
         });
     }
 
     uniSelect.addEventListener('change', function () {
-        populateProfiles(this.value, null);
+        populateDegrees(this.value, null);
+    });
+
+    degreeSelect.addEventListener('change', function () {
+        populateCourses(uniSelect.value, this.value, null);
     });
 
     // Kalau submit sebelumnya gagal validasi (university_id masih terisi
     // lewat old()), panel-nya sudah otomatis ditampilkan lewat inline style
-    // di Blade di atas -- tinggal isi ulang dropdown Jurusan-nya di sini.
+    // di Blade di atas -- tinggal isi ulang dropdown Degree & Jurusan-nya di sini.
     const oldUniversityId = @json(old('university_id'));
-    const oldProfileId = @json(old('university_profile_id'));
+    const oldDegree = @json(old('degree'));
+    const oldCourseId = @json(old('degree_intake_id'));
     if (oldUniversityId) {
-        populateProfiles(oldUniversityId, oldProfileId);
+        populateDegrees(oldUniversityId, oldDegree);
+        if (oldDegree) {
+            populateCourses(oldUniversityId, oldDegree, oldCourseId);
+        }
     }
 })();
 </script>
