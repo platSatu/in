@@ -145,6 +145,13 @@ public function store(Request $request)
         'degree_intakes.*.application_deadline' => 'nullable|date',
         'degree_intakes.*.language' => 'nullable|string|max:255',
         'degree_intakes.*.tuition_fee' => 'nullable|integer|min:0',
+        // FIX (permintaan user, 16 September 2026): Registration Fee (Rp) &
+        // CSCA Subject sekarang diisi DI SINI per Course, gantinya alur isi
+        // manual admin per-aplikasi SETELAH siswa submit -- lihat
+        // ApplyController::store() & migration add_registration_fee_and_
+        // csca_subject_to_university_profile_degrees_table.
+        'degree_intakes.*.registration_fee_amount' => 'nullable|integer|min:0',
+        'degree_intakes.*.csca_subject' => ['nullable', 'string', Rule::in(UniversityProfileDegree::CSCA_SUBJECTS)],
         // Payment: daftar rincian biaya ("add row" juga), pilih lokasi bayar
         // (Indonesia / China) + nama item + jumlah — semuanya opsional.
         // 'fee_type' (ditambahkan fase 4, fitur Apply Kampus) dipakai supaya
@@ -194,7 +201,9 @@ public function store(Request $request)
             || filled($row['starting_date'] ?? null)
             || filled($row['application_deadline'] ?? null)
             || filled($row['language'] ?? null)
-            || filled($row['tuition_fee'] ?? null))
+            || filled($row['tuition_fee'] ?? null)
+            || filled($row['registration_fee_amount'] ?? null)
+            || filled($row['csca_subject'] ?? null))
         ->values();
 
     unset($validated['degree_intakes']);
@@ -243,6 +252,8 @@ public function store(Request $request)
             'application_deadline' => $row['application_deadline'] ?? null,
             'language' => $row['language'] ?? null,
             'tuition_fee' => $row['tuition_fee'] ?? null,
+            'registration_fee_amount' => $row['registration_fee_amount'] ?? null,
+            'csca_subject' => $row['csca_subject'] ?? null,
             'sort_order' => $index,
         ]);
     }
@@ -336,6 +347,8 @@ public function store(Request $request)
             'degree_intakes.*.application_deadline' => 'nullable|date',
             'degree_intakes.*.language' => 'nullable|string|max:255',
             'degree_intakes.*.tuition_fee' => 'nullable|integer|min:0',
+            'degree_intakes.*.registration_fee_amount' => 'nullable|integer|min:0',
+            'degree_intakes.*.csca_subject' => ['nullable', 'string', Rule::in(UniversityProfileDegree::CSCA_SUBJECTS)],
             'payments' => 'nullable|array',
             'payments.*.location' => 'nullable|in:indonesia,china',
             'payments.*.name' => 'nullable|string|max:255',
@@ -376,7 +389,9 @@ public function store(Request $request)
                 || filled($row['starting_date'] ?? null)
                 || filled($row['application_deadline'] ?? null)
                 || filled($row['language'] ?? null)
-                || filled($row['tuition_fee'] ?? null))
+                || filled($row['tuition_fee'] ?? null)
+                || filled($row['registration_fee_amount'] ?? null)
+                || filled($row['csca_subject'] ?? null))
             ->values();
 
         $paymentRows = collect($validated['payments'] ?? [])
@@ -408,6 +423,8 @@ public function store(Request $request)
                 'application_deadline' => $row['application_deadline'] ?? null,
                 'language' => $row['language'] ?? null,
                 'tuition_fee' => $row['tuition_fee'] ?? null,
+                'registration_fee_amount' => $row['registration_fee_amount'] ?? null,
+                'csca_subject' => $row['csca_subject'] ?? null,
                 'sort_order' => $index,
             ]);
         }

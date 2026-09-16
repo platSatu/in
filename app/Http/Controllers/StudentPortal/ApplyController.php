@@ -111,7 +111,15 @@ class ApplyController extends Controller
         // Quiz\UniversityProfileController) -- kalau belum ada yang ditag,
         // tetap fallback null (form tidak error, cuma tidak menampilkan
         // nominalnya).
-        $registrationFee = $profile->payments->firstWhere('fee_type', 'registration_fee');
+        //
+        // FIX v2 (permintaan user, 16 September 2026): Registration Fee
+        // sekarang PRIORITAS diambil dari Course yang di-lock ($lockedCourse,
+        // lihat filter ?course= di atas) -- itu nominal yang BENAR-BENAR akan
+        // di-snapshot ke aplikasi begitu siswa submit (lihat store()). Baris
+        // Payment fee_type='registration_fee' di atas tetap dipertahankan
+        // cuma sebagai fallback tampilan kalau Course-nya belum diisi
+        // Registration Fee sendiri (mis. data lama).
+        $courseRegistrationFeeAmount = optional($lockedCourse)->registration_fee_amount;
 
         $student = Student::where('user_id', $user->id)->first();
 
@@ -121,6 +129,7 @@ class ApplyController extends Controller
             'selectedDegree' => $selectedDegree,
             'lockedCourse' => $lockedCourse,
             'registrationFee' => $registrationFee,
+            'courseRegistrationFeeAmount' => $courseRegistrationFeeAmount,
             'defaultWhatsapp' => $student->handphone ?? $user->handphone ?? '',
         ]);
     }
@@ -185,14 +194,17 @@ class ApplyController extends Controller
                 ->with('apply_conflict', 'Maaf, nomor WhatsApp ini sudah terdaftar di akun lain. Jika ini nomor Anda sendiri, silakan logout lalu login menggunakan akun tersebut untuk melanjutkan Apply. Jika Anda merasa ini bukan Anda, silakan hubungi admin kami.');
         }
 
-        // FASE 2 (Alur Pembayaran 2 Arah) -- registration_fee_amount TIDAK LAGI
-        // di-auto-isi dari UniversityProfilePayment (fee_type='registration_fee')
-        // seperti sebelumnya. Nominal Registration Fee sekarang WAJIB diisi
-        // manual oleh admin per-aplikasi (lihat ApplicationPaymentController::
-        // init(), yang menolak transaksi kalau nominal ini masih kosong/0).
-        // Sengaja dibiarkan null di sini -- diisi admin lewat halaman detail
-        // aplikasi (Quiz\UniversityApplicationController) sebelum siswa bisa
-        // membayar.
+        // FIX v2 (permintaan user, 16 September 2026): registration_fee_amount
+        // TIDAK LAGI diisi manual admin SETELAH siswa submit (alur FASE 2 yang
+        // lama) -- sekarang di-snapshot LANGSUNG dari Registration Fee yang
+        // sudah ditentukan admin DI DEPAN per Course ($degreeRow, lihat
+        // UniversityProfileDegree::registration_fee_amount & form Degree &
+        // Course di Quiz\UniversityProfileController), supaya begitu siswa
+        // submit, langsung bisa lanjut ke halaman pembayaran tanpa nunggu
+        // admin isi nominal dulu. Kalau admin belum sempat isi Registration
+        // Fee Course ini (masih null), ApplicationPaymentController::init()
+        // tetap menolak transaksi dengan pesan jelas -- SAMA seperti perilaku
+        // sebelumnya kalau nominal kosong, cuma sumbernya sekarang dari Course.
         $application = UniversityApplication::create([
             'application_no' => (new ApplicationNumberGenerator())->next(),
             'student_id' => $student->id,
@@ -216,7 +228,7 @@ class ApplyController extends Controller
             'intake_year' => $validated['intake_year'],
             'duration' => $degreeRow->duration,
             'whatsapp' => $validated['whatsapp'],
-            'registration_fee_amount' => null,
+            'registration_fee_amount' => $degreeRow->registration_fee_amount,
             'status' => UniversityApplication::STATUS_SUBMITTED,
             'submitted_at' => now(),
         ]);

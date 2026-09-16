@@ -21,6 +21,12 @@ class UniversityProfileDegree extends Model
     // bareng oleh view create/edit & validasi di UniversityProfileController.
     public const DEGREES = ['Diploma', 'Bachelor', 'Master', 'PhD'];
 
+    // FIX (permintaan user, 16 September 2026): 4 pilihan tetap untuk field
+    // "CSCA Subject" per Course (bukan enum DB, sama polanya dengan DEGREES
+    // di atas) -- dipakai bareng oleh view create/edit & validasi di
+    // UniversityProfileController.
+    public const CSCA_SUBJECTS = ['CSCA Math', 'CSCA Physics', 'CSCA Humanities', 'CSCA Chemistry'];
+
     protected $fillable = [
         'user_id',
         'university_profile_id',
@@ -35,6 +41,13 @@ class UniversityProfileDegree extends Model
         'application_deadline',
         'language',
         'tuition_fee',
+        // FIX (permintaan user, 16 September 2026): Registration Fee &
+        // kategori CSCA Subject sekarang ditentukan DI SINI (per Course),
+        // bukan lagi diisi manual admin per-aplikasi SETELAH siswa submit --
+        // lihat migration add_registration_fee_and_csca_subject_to_
+        // university_profile_degrees_table & ApplyController::store().
+        'registration_fee_amount',
+        'csca_subject',
         'sort_order',
     ];
 
@@ -42,6 +55,7 @@ class UniversityProfileDegree extends Model
         'starting_date' => 'date',
         'application_deadline' => 'date',
         'tuition_fee' => 'integer',
+        'registration_fee_amount' => 'integer',
     ];
 
     /**

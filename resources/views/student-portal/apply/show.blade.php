@@ -130,7 +130,28 @@
             @endif
         </div>
 
-        @if($registrationFee)
+        {{--
+            FIX v2 (permintaan user, 16 September 2026): Registration Fee
+            sekarang PRIORITAS ditampilkan dari Course yang di-lock
+            ($courseRegistrationFeeAmount, selalu Rupiah -- lihat
+            UniversityProfileDegree::registration_fee_amount) -- itu nominal
+            yang BENAR-BENAR di-snapshot ke aplikasi begitu form ini
+            disubmit (lihat ApplyController::store()). Fallback ke
+            $registrationFee (baris Payment fee_type='registration_fee' di
+            level Program, punya pilihan lokasi Indonesia/China) cuma kalau
+            Course-nya belum diisi Registration Fee sendiri.
+        --}}
+        @if($courseRegistrationFeeAmount)
+            <div class="card-box">
+                <div class="fee-box">
+                    <div>
+                        <div class="label">Registration Fee</div>
+                        <div class="text-muted" style="font-size:13px;">Paid separately, our team will guide you after you submit this application.</div>
+                    </div>
+                    <div class="amount">Rp {{ number_format($courseRegistrationFeeAmount, 0, ',', '.') }}</div>
+                </div>
+            </div>
+        @elseif($registrationFee)
             <div class="card-box">
                 <div class="fee-box">
                     <div>

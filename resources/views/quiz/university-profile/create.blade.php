@@ -186,6 +186,17 @@
                                     @enderror
                                 </div>
                             </div>
+                            {{--
+                                FIX (permintaan user, 16 September 2026): 2 kolom baru
+                                ditambahkan di baris yang sama dengan Tuition Fee
+                                (col-md-4 x 3 = pas 12/12) -- Registration Fee (Rp)
+                                sekarang ditentukan DI SINI per Course (bukan lagi
+                                diisi manual admin per-aplikasi SETELAH siswa submit,
+                                lihat ApplyController::store()), dan CSCA Subject
+                                adalah kategori/mata ujian CSCA untuk Course ini
+                                (pilihan tetap, lihat UniversityProfileDegree::
+                                CSCA_SUBJECTS).
+                            --}}
                             <div class="row g-3 mt-1">
                                 <div class="col-md-4">
                                     <label class="form-label">Tuition Fee</label>
@@ -193,6 +204,28 @@
                                         class="form-control @error('degree_intakes.0.tuition_fee') is-invalid @enderror"
                                         value="{{ old('degree_intakes.0.tuition_fee') }}" placeholder="0">
                                     @error('degree_intakes.0.tuition_fee')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">Registration Fee (Rp)</label>
+                                    <input type="number" min="0" name="degree_intakes[0][registration_fee_amount]"
+                                        class="form-control @error('degree_intakes.0.registration_fee_amount') is-invalid @enderror"
+                                        value="{{ old('degree_intakes.0.registration_fee_amount') }}" placeholder="0">
+                                    @error('degree_intakes.0.registration_fee_amount')
+                                        <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label">CSCA Subject</label>
+                                    <select name="degree_intakes[0][csca_subject]"
+                                        class="form-select @error('degree_intakes.0.csca_subject') is-invalid @enderror">
+                                        <option value="">Choose...</option>
+                                        @foreach (\App\Models\UniversityProfileDegree::CSCA_SUBJECTS as $cscaSubjectOption)
+                                            <option value="{{ $cscaSubjectOption }}" {{ old('degree_intakes.0.csca_subject') === $cscaSubjectOption ? 'selected' : '' }}>{{ $cscaSubjectOption }}</option>
+                                        @endforeach
+                                    </select>
+                                    @error('degree_intakes.0.csca_subject')
                                         <div class="invalid-feedback">{{ $message }}</div>
                                     @enderror
                                 </div>
@@ -474,6 +507,19 @@
             <div class="col-md-4">
                 <label class="form-label">Tuition Fee</label>
                 <input type="number" min="0" name="degree_intakes[__INDEX__][tuition_fee]" class="form-control" placeholder="0">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Registration Fee (Rp)</label>
+                <input type="number" min="0" name="degree_intakes[__INDEX__][registration_fee_amount]" class="form-control" placeholder="0">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">CSCA Subject</label>
+                <select name="degree_intakes[__INDEX__][csca_subject]" class="form-select">
+                    <option value="">Choose...</option>
+                    @foreach (\App\Models\UniversityProfileDegree::CSCA_SUBJECTS as $cscaSubjectOption)
+                        <option value="{{ $cscaSubjectOption }}">{{ $cscaSubjectOption }}</option>
+                    @endforeach
+                </select>
             </div>
         </div>
         <div class="row g-3 mt-1">

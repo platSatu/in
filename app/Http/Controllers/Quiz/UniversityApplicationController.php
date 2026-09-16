@@ -261,36 +261,42 @@ class UniversityApplicationController extends Controller
 
     /**
      * FASE 2 (Alur Pembayaran 2 Arah Apply Kampus, 10 September 2026) --
-     * admin isi manual nominal Registration Fee (registration_fee_amount)
+     * dulu admin isi manual nominal Registration Fee (registration_fee_amount)
      * DAN Departure Fee (REUSE kolom deposit_fee_china_amount yang sudah
      * ada, lihat migration add_admission_status_to_university_applications_
-     * table) untuk 1 aplikasi. Sengaja 1 form gabungan (bukan 2 endpoint
-     * terpisah) karena keduanya sama-sama muncul di 1 card "Pembayaran" di
-     * halaman detail aplikasi.
+     * table) untuk 1 aplikasi lewat form gabungan ini.
+     *
+     * FIX v2 (permintaan user, 16 September 2026): Registration Fee TIDAK
+     * LAGI diisi manual di sini -- sekarang otomatis di-snapshot dari
+     * Registration Fee yang sudah ditentukan admin DI DEPAN per Course
+     * (lihat UniversityProfileDegree::registration_fee_amount &
+     * ApplyController::store()), supaya siswa bisa langsung lanjut bayar
+     * begitu submit tanpa nunggu admin isi nominal dulu. Method ini
+     * sekarang HANYA menangani Departure Fee (deposit_fee_china_amount) --
+     * registration_fee_amount ditampilkan read-only saja di halaman detail
+     * aplikasi (lihat blade-nya).
      *
      * Nominal yang sudah pernah dibayar (ada ApplicationPayment berstatus
      * 'paid' untuk purpose itu) SENGAJA tetap boleh diedit di sini -- form
-     * ini cuma mengubah UniversityApplication::registration_fee_amount /
-     * deposit_fee_china_amount (dipakai untuk transaksi BERIKUTNYA kalau
-     * ada), TIDAK menyentuh baris application_payments yang sudah selesai.
+     * ini cuma mengubah UniversityApplication::deposit_fee_china_amount
+     * (dipakai untuk transaksi BERIKUTNYA kalau ada), TIDAK menyentuh baris
+     * application_payments yang sudah selesai.
      */
     public function updateFees(Request $request, string $id): RedirectResponse
     {
         $application = UniversityApplication::findOrFail($id);
 
         $validated = $request->validate([
-            'registration_fee_amount' => 'nullable|integer|min:0',
             'deposit_fee_china_amount' => 'nullable|integer|min:0',
         ]);
 
         $application->update([
-            'registration_fee_amount' => $validated['registration_fee_amount'] ?? null,
             'deposit_fee_china_amount' => $validated['deposit_fee_china_amount'] ?? null,
         ]);
 
         return redirect()
             ->route('quiz.university-application.show', $id)
-            ->with('success', 'Nominal pembayaran berhasil disimpan.');
+            ->with('success', 'Nominal Departure Fee berhasil disimpan.');
     }
 
     /**

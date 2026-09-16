@@ -126,25 +126,36 @@
 
                 {{--
                     FASE 2 (Alur Pembayaran 2 Arah Apply Kampus, 10 September
-                    2026) -- Registration Fee & Departure Fee KEDUANYA diisi
-                    manual oleh admin per-aplikasi lewat form ini (lihat
-                    ApplyController::store(), yang sengaja tidak lagi
-                    mengisi registration_fee_amount otomatis dari data
-                    kampus/major). Departure Fee REUSE kolom
-                    deposit_fee_china_amount yang sudah ada sebelumnya --
-                    lihat migration add_admission_status_to_university_
-                    applications_table untuk penjelasan lengkapnya.
+                    2026) -- dulu Registration Fee & Departure Fee KEDUANYA
+                    diisi manual oleh admin per-aplikasi lewat form ini.
+
+                    FIX v2 (permintaan user, 16 September 2026): Registration
+                    Fee TIDAK LAGI diisi manual di sini -- sekarang otomatis
+                    ter-snapshot dari Registration Fee yang sudah ditentukan
+                    admin DI DEPAN per Course (lihat halaman "Degree &
+                    Course" di form University Profile, kolom
+                    UniversityProfileDegree::registration_fee_amount) begitu
+                    siswa submit Apply (lihat ApplyController::store()),
+                    supaya siswa bisa langsung lanjut bayar tanpa nunggu
+                    admin isi nominal dulu -- makanya di sini SEKARANG cuma
+                    ditampilkan read-only (bukan input lagi). Departure Fee
+                    TETAP diisi manual di sini seperti sebelumnya (REUSE
+                    kolom deposit_fee_china_amount, lihat migration
+                    add_admission_status_to_university_applications_table).
                 --}}
                 <h6 class="fw-bold mb-3">Payment</h6>
 
-                <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="row g-3 mb-4">
-                    @csrf
+                <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="form-label" style="font-size:13px;">Registration Fee (Rp)</label>
-                        <input type="number" min="0" step="1" name="registration_fee_amount" class="form-control"
-                            value="{{ old('registration_fee_amount', $application->registration_fee_amount) }}"
-                            placeholder="Belum diatur">
+                        <input type="text" class="form-control" disabled
+                            value="{{ $application->registration_fee_amount !== null ? 'Rp ' . number_format($application->registration_fee_amount, 0, ',', '.') : 'Belum diatur di Course' }}">
+                        <div class="form-text" style="font-size:12px;">Otomatis dari Registration Fee Course yang dipilih siswa saat Apply -- diatur di halaman Degree &amp; Course pada University Profile, bukan di sini.</div>
                     </div>
+                </div>
+
+                <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="row g-3 mb-4">
+                    @csrf
                     <div class="col-md-6">
                         <label class="form-label" style="font-size:13px;">Departure Fee (Rp)</label>
                         <input type="number" min="0" step="1" name="deposit_fee_china_amount" class="form-control"
@@ -152,7 +163,7 @@
                             placeholder="Belum diatur">
                     </div>
                     <div class="col-12">
-                        <button type="submit" class="btn btn-primary btn-sm">Save Payment Amounts</button>
+                        <button type="submit" class="btn btn-primary btn-sm">Save Payment Amount</button>
                     </div>
                 </form>
 

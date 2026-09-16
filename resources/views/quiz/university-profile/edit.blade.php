@@ -116,6 +116,10 @@
                     <div class="form-text mb-2" style="color:#6c757d;">Boleh dikosongkan, atau isi lebih dari satu Course di bawah Degree yang sama (mis. Bachelor - Teknik Informatika, Bachelor - Bisnis Internasional).</div>
 
                     @php
+                        // FIX (permintaan user, 16 September 2026): 2 field baru
+                        // (registration_fee_amount, csca_subject) ikut dibawa ke
+                        // sini juga -- lihat migration add_registration_fee_and_
+                        // csca_subject_to_university_profile_degrees_table.
                         $existingDegrees = old('degree_intakes', $data->degrees->map(function ($d) {
                             return [
                                 'degree' => $d->degree,
@@ -126,10 +130,12 @@
                                 'application_deadline' => optional($d->application_deadline)->format('Y-m-d'),
                                 'language' => $d->language,
                                 'tuition_fee' => $d->tuition_fee,
+                                'registration_fee_amount' => $d->registration_fee_amount,
+                                'csca_subject' => $d->csca_subject,
                             ];
                         })->toArray());
                         if (empty($existingDegrees)) {
-                            $existingDegrees = [['degree' => null, 'course_name' => null, 'intake' => null, 'duration' => null, 'starting_date' => null, 'application_deadline' => null, 'language' => null, 'tuition_fee' => null]];
+                            $existingDegrees = [['degree' => null, 'course_name' => null, 'intake' => null, 'duration' => null, 'starting_date' => null, 'application_deadline' => null, 'language' => null, 'tuition_fee' => null, 'registration_fee_amount' => null, 'csca_subject' => null]];
                         }
                     @endphp
 
@@ -219,6 +225,35 @@
                                             value="{{ old('degree_intakes.' . $index . '.tuition_fee', $row['tuition_fee'] ?? '') }}"
                                             placeholder="0">
                                         @error('degree_intakes.' . $index . '.tuition_fee')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    {{--
+                                        FIX (permintaan user, 16 September 2026): Registration
+                                        Fee (Rp) & CSCA Subject sekarang ditentukan DI SINI per
+                                        Course, gantinya alur isi manual admin per-aplikasi
+                                        SETELAH siswa submit -- lihat ApplyController::store().
+                                    --}}
+                                    <div class="col-md-4">
+                                        <label class="form-label">Registration Fee (Rp)</label>
+                                        <input type="number" min="0" name="degree_intakes[{{ $index }}][registration_fee_amount]"
+                                            class="form-control @error('degree_intakes.' . $index . '.registration_fee_amount') is-invalid @enderror"
+                                            value="{{ old('degree_intakes.' . $index . '.registration_fee_amount', $row['registration_fee_amount'] ?? '') }}"
+                                            placeholder="0">
+                                        @error('degree_intakes.' . $index . '.registration_fee_amount')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">CSCA Subject</label>
+                                        <select name="degree_intakes[{{ $index }}][csca_subject]"
+                                            class="form-select @error('degree_intakes.' . $index . '.csca_subject') is-invalid @enderror">
+                                            <option value="">Choose...</option>
+                                            @foreach (\App\Models\UniversityProfileDegree::CSCA_SUBJECTS as $cscaSubjectOption)
+                                                <option value="{{ $cscaSubjectOption }}" {{ old('degree_intakes.' . $index . '.csca_subject', $row['csca_subject'] ?? '') === $cscaSubjectOption ? 'selected' : '' }}>{{ $cscaSubjectOption }}</option>
+                                            @endforeach
+                                        </select>
+                                        @error('degree_intakes.' . $index . '.csca_subject')
                                             <div class="invalid-feedback">{{ $message }}</div>
                                         @enderror
                                     </div>
@@ -512,6 +547,19 @@
             <div class="col-md-4">
                 <label class="form-label">Tuition Fee</label>
                 <input type="number" min="0" name="degree_intakes[__INDEX__][tuition_fee]" class="form-control" placeholder="0">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Registration Fee (Rp)</label>
+                <input type="number" min="0" name="degree_intakes[__INDEX__][registration_fee_amount]" class="form-control" placeholder="0">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">CSCA Subject</label>
+                <select name="degree_intakes[__INDEX__][csca_subject]" class="form-select">
+                    <option value="">Choose...</option>
+                    @foreach (\App\Models\UniversityProfileDegree::CSCA_SUBJECTS as $cscaSubjectOption)
+                        <option value="{{ $cscaSubjectOption }}">{{ $cscaSubjectOption }}</option>
+                    @endforeach
+                </select>
             </div>
         </div>
         <div class="row g-3 mt-1">
