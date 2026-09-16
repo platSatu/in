@@ -53,11 +53,15 @@ use App\Http\Controllers\StudentPortal\ApplicationController;
 use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
 use App\Http\Controllers\StudentPortal\ApplicationPaymentController;
 use App\Http\Controllers\StudentPortal\ApplicationFormController;
+use App\Http\Controllers\StudentPortal\ClassSessionController;
 use App\Http\Controllers\StudentPortal\InaStudyController;
 use App\Http\Controllers\StudentPortal\InaYuleController;
 use App\Http\Controllers\StudentPortal\InaYulePackageCheckoutController;
 use App\Http\Controllers\StudentPortal\InaYulePackageController;
 use App\Http\Controllers\StudentPortal\InaYulePackageUpgradeController;
+use App\Http\Controllers\ClassSession\ClassSessionAdminController;
+use App\Http\Controllers\Teacher\ClassSessionApprovalController;
+use App\Http\Controllers\TeacherHonor\TeacherHonorController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
@@ -281,6 +285,45 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // CoursePackagePayment yang sama.
     Route::get('/inayule/packages/{packageId}/upgrade', [InaYulePackageUpgradeController::class, 'show'])->name('inayule.upgrade.show');
     Route::post('/inayule/packages/{packageId}/upgrade', [InaYulePackageUpgradeController::class, 'store'])->name('inayule.upgrade.store');
+
+    // FASE 2 bagian 2 "Absensi" (16 September 2026): sisi SISWA dari alur
+    // "Pengajuan Pemakaian Credit" -- lihat docblock
+    // App\Services\ClassSession\ClassSessionWorkflowService untuk alur
+    // lengkapnya (siswa ajukan -> guru approve -> admin approve final).
+    Route::get('/inayule/class-sessions', [ClassSessionController::class, 'index'])->name('inayule.class-sessions.index');
+    Route::get('/inayule/class-sessions/create', [ClassSessionController::class, 'create'])->name('inayule.class-sessions.create');
+    Route::post('/inayule/class-sessions', [ClassSessionController::class, 'store'])->name('inayule.class-sessions.store');
+});
+
+// FASE 2 bagian 2 "Absensi": sisi PENGAJAR -- digerbangi ROLE 'teacher'
+// (BUKAN sistem permission modul admin, karena ini akun pengajar sendiri).
+// Lihat docblock App\Http\Controllers\Teacher\ClassSessionApprovalController.
+Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->group(function () {
+    Route::get('/class-sessions', [ClassSessionApprovalController::class, 'index'])->name('teacher.class-sessions.index');
+    Route::post('/class-sessions/{id}/approve', [ClassSessionApprovalController::class, 'approve'])->name('teacher.class-sessions.approve');
+    Route::post('/class-sessions/{id}/reject', [ClassSessionApprovalController::class, 'reject'])->name('teacher.class-sessions.reject');
+});
+
+// FASE 2 bagian 2 "Absensi": sisi ADMIN -- gerbang FINAL sebelum credit
+// benar-benar terpotong, lihat docblock ClassSessionAdminController & modul
+// 'class-session' di config/menu.php.
+Route::middleware(['auth', 'permission:class-session'])->prefix('dashboard/class-session')->group(function () {
+    Route::get('/', [ClassSessionAdminController::class, 'index'])->name('class-session.index');
+});
+Route::middleware(['auth', 'permission:class-session,edit'])->prefix('dashboard/class-session')->group(function () {
+    Route::post('/{id}/approve', [ClassSessionAdminController::class, 'approve'])->name('class-session.approve');
+    Route::post('/{id}/reject', [ClassSessionAdminController::class, 'reject'])->name('class-session.reject');
+});
+
+// FASE 3 "Perhitungan Honor Pengajar": laporan + approval payout
+// Manager, lihat docblock App\Http\Controllers\TeacherHonor\TeacherHonorController
+// & modul 'teacher-honor' di config/menu.php.
+Route::middleware(['auth', 'permission:teacher-honor'])->prefix('dashboard/teacher-honor')->group(function () {
+    Route::get('/', [TeacherHonorController::class, 'index'])->name('teacher-honor.index');
+});
+Route::middleware(['auth', 'permission:teacher-honor,edit'])->prefix('dashboard/teacher-honor')->group(function () {
+    Route::post('/{id}/approve-payout', [TeacherHonorController::class, 'approvePayout'])->name('teacher-honor.approve-payout');
+    Route::post('/{id}/mark-paid', [TeacherHonorController::class, 'markPaid'])->name('teacher-honor.mark-paid');
 });
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {

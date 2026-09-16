@@ -80,6 +80,16 @@ return [
     // ================= Zoom =================
     ['key' => 'zoom.meeting', 'label' => 'Kelola Meeting', 'route' => 'zoom.meeting.index', 'group' => 'Zoom', 'icon' => 'list'],
 
+    // ================= Kredit & Honor =================
+    // FASE 2 bagian 2 & Fase 3 (16 September 2026) -- sisi admin/manager
+    // dari alur "Pengajuan Pemakaian Credit" & "Honor Pengajar". Sengaja
+    // grup BARU (bukan digabung ke 'Absensi' yang sudah ada), karena grup
+    // 'Absensi' itu modul absensi staff berbasis QR-code (lihat
+    // App\Http\Controllers\Absensi\*) -- domain BEDA TOTAL dari pemakaian
+    // credit siswa di sini, walau namanya kebetulan mirip.
+    ['key' => 'class-session', 'label' => 'Approval Pemakaian Credit', 'route' => 'class-session.index', 'group' => 'Kredit & Honor', 'icon' => 'list'],
+    ['key' => 'teacher-honor', 'label' => 'Honor Pengajar', 'route' => 'teacher-honor.index', 'group' => 'Kredit & Honor', 'icon' => 'list'],
+
     // ================= Course =================
     // Urutan sesuai dependency: Type -> Class -> Level -> Package (lihat
     // routes/web.php grup 'course.*' & migration 2026_09_07_100000 dst).
