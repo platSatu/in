@@ -279,7 +279,12 @@ public function store(Request $request)
         // `university_profile_degrees` lewat 'degree_intakes' di bawah.
         $validated = $request->validate([
             'university_id' => 'required|string|exists:universities,id',
-            'field' => 'required|string|max:255',
+            // FIX (permintaan user, 16 September 2026): dulu 'required' di sini
+            // padahal di store() field ini malah tidak wajib diisi manual sama
+            // sekali (auto-terisi dari Major University, lihat catatan di
+            // store()) -- disamakan jadi nullable supaya konsisten, tidak
+            // mendadak wajib pas edit.
+            'field' => 'nullable|string|max:255',
             'degree_title' => 'nullable|string|max:255',
             'key_courses' => 'nullable|string',
             'entry_requirements' => 'nullable|string',
@@ -315,6 +320,13 @@ public function store(Request $request)
         if (!$universityOwned) {
             abort(403, 'University tidak valid.');
         }
+
+        // Kolom `field` di tabel `university_profiles` NOT NULL tanpa default
+        // (lihat catatan di store()) -- sekarang divalidasi nullable supaya
+        // tidak mendadak wajib diisi pas edit, jadi di sini dijaga jangan
+        // sampai null ikut dikirim ke DB (disamakan dengan fallback '' yang
+        // dipakai store()).
+        $validated['field'] = $validated['field'] ?? '';
 
         // Buang baris Course/Degree & payment yang semuanya kosong (sama
         // logikanya dengan store()).
