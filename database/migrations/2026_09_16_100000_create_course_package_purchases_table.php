@@ -37,6 +37,15 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // FIX (16 September 2026): jaring pengaman kalau migration ini
+        // sempat gagal di TENGAH jalan (mis. tabelnya sudah kebentuk tapi
+        // index-nya gagal) lalu di-migrate ulang -- Schema::create() kedua
+        // kali akan error "table already exists" kalau tidak dijaga begini.
+        // Pola SAMA PERSIS dengan migration create_class_enrollments_table.
+        if (Schema::hasTable('course_package_purchases')) {
+            return;
+        }
+
         Schema::create('course_package_purchases', function (Blueprint $table) {
             $table->uuid('id')->primary();
 
@@ -61,7 +70,14 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['student_id', 'course_package_id', 'source']);
+            // FIX (16 September 2026): nama index DIPAKSA pendek secara
+            // eksplisit -- kalau dibiarkan auto-generate, namanya
+            // "course_package_purchases_student_id_course_package_id_source_
+            // index" (68 karakter) KEPANJANGAN untuk identifier MySQL (limit
+            // 64 karakter) dan bikin migration ini GAGAL di tengah jalan
+            // (lihat error "Identifier name ... is too long" yang sempat
+            // muncul pas migrate di server).
+            $table->index(['student_id', 'course_package_id', 'source'], 'cpp_student_package_source_idx');
         });
     }
 
