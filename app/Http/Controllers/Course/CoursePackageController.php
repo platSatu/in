@@ -35,6 +35,33 @@ class CoursePackageController extends Controller
      */
     private const STATUSES = ['active', 'inactive'];
 
+    /**
+     * Rate konversi Duration -> Credits (15-16 September 2026, permintaan
+     * user -- "credits ini yang akan dihitung nanti", dipakai sebagai dasar
+     * ledger credit student & absensi kursus InaYule). Definisi 1 credit =
+     * 1 jam kelas, dikonfirmasi user: 1 Month = 8 credit (1 jam x 8 sesi).
+     *
+     * Rate 'week' & 'day' MASIH ASUMSI (diturunkan dari 8/month ÷ 4 minggu,
+     * dan 1 sesi/hari) -- BELUM dikonfirmasi eksplisit oleh user, tolong
+     * sesuaikan begitu ada kepastian. Rate 'session' sengaja 1:1 karena
+     * satuannya sendiri sudah representasi 1 sesi.
+     *
+     * PENTING: nilai Credits yang TERSIMPAN selalu dihitung ulang di sini
+     * (lihat calculateCredits(), dipanggil dari store()/update()) --
+     * SENGAJA TIDAK dipercaya dari input form (field Credits di
+     * create/edit.blade.php dibuat readonly, cuma preview JS di sisi
+     * client), supaya tidak bisa disimpangi & selalu konsisten jadi dasar
+     * perhitungan ledger credit nanti.
+     *
+     * @var array<string, float>
+     */
+    private const CREDITS_PER_DURATION_UNIT = [
+        'day' => 1,
+        'week' => 2,
+        'month' => 8,
+        'session' => 1,
+    ];
+
     public function index(Request $request)
     {
         $search = $request->query('search');
@@ -62,6 +89,7 @@ class CoursePackageController extends Controller
     public function store(Request $request)
     {
         $validated = $this->validated($request);
+        $validated['credits'] = $this->calculateCredits((int) $validated['duration_value'], $validated['duration_unit']);
 
         $userId = Auth::id();
         $validated['user_id'] = $userId !== null ? (string) $userId : null;
@@ -91,6 +119,7 @@ class CoursePackageController extends Controller
         AdminCrud::findOrFail(CoursePackage::class, $id);
 
         $validated = $this->validated($request);
+        $validated['credits'] = $this->calculateCredits((int) $validated['duration_value'], $validated['duration_unit']);
 
         AdminCrud::update(CoursePackage::class, $id, $validated);
 
@@ -121,10 +150,25 @@ class CoursePackageController extends Controller
             'duration_value' => ['required', 'integer', 'min:1', 'max:120'],
             'duration_unit' => ['required', Rule::in(self::DURATION_UNITS)],
             'price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
-            'credits' => ['required', 'numeric', 'min:0.01', 'max:99999.99'],
+            // 'credits' SENGAJA tidak divalidasi/diambil dari input di sini --
+            // selalu dihitung ulang lewat calculateCredits() di store()/update(),
+            // lihat docblock CREDITS_PER_DURATION_UNIT di atas.
             'description' => ['nullable', 'string', 'max:2000'],
             'status' => ['required', Rule::in(self::STATUSES)],
         ]);
+    }
+
+    /**
+     * Hitung Credits dari Duration + Duration Unit (lihat docblock
+     * CREDITS_PER_DURATION_UNIT di atas untuk rate & alasannya). Dibulatkan
+     * 2 desimal supaya konsisten dengan cast 'credits' => 'decimal:2' di
+     * App\Models\CoursePackage.
+     */
+    private function calculateCredits(int $durationValue, string $durationUnit): float
+    {
+        $rate = self::CREDITS_PER_DURATION_UNIT[$durationUnit] ?? 0;
+
+        return round($durationValue * $rate, 2);
     }
 
     /**
