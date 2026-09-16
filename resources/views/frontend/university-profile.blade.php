@@ -210,14 +210,19 @@
         }
 
         /* ---------- PROGRAMS / MAJORS (fitur Apply Kampus) ---------- */
-        .major-block { margin-bottom: 0; }
+        .major-block { margin-bottom: 26px; }
+        .major-block-divider { padding-bottom: 26px; border-bottom: 1px solid #eef1f8; }
 
         /* ---------- PROGRAM TABS (FIX 16 September 2026, permintaan user --
            "supaya tampilannya tidak kebawah apakah bisa dibuat tab jadi akan
-           kesamping"): tiap Major/Program ($profiles) sekarang jadi 1 tab,
-           bukan di-stack vertikal lagi. Pill style disamakan dengan
-           .degree-group-title (warna brand solid untuk tab aktif), scroll
-           horizontal kalau tab-nya banyak & tidak muat di layar sempit. */
+           kesamping"): tiap degree group (Bachelor/Master/dst) DI DALAM 1
+           Program yang sama sekarang jadi 1 tab, bukan di-stack vertikal
+           lagi -- lihat komentar di dekat loop $majorDegreeGroups di
+           bawah. Antar-Program ($majorProfile, jamak) sendiri TETAP
+           dipisah pakai .major-block-divider seperti kode aslinya, BUKAN
+           tab. Pill style disamakan dengan .degree-group-title (warna
+           brand solid untuk tab aktif), scroll horizontal kalau tab-nya
+           banyak & tidak muat di layar sempit. */
         .program-tabs-nav {
             display: flex;
             flex-wrap: nowrap;
@@ -896,47 +901,6 @@
                             Program details for this university are being finalized. Message us on WhatsApp and our team will share the latest list of available majors.
                         </div>
                     @else
-                        {{--
-                            FIX (16 September 2026, permintaan user -- "supaya tampilannya
-                            tidak kebawah apakah bisa dibuat tab jadi akan kesamping"): tiap
-                            Major/Program ($profiles, admin-input lewat halaman University
-                            Profile) DULU di-stack vertikal ke bawah pakai @foreach biasa
-                            (bisa sangat panjang kalau universitynya punya banyak Program).
-                            SEKARANG jadi tab horizontal -- 1 tab = 1 $majorProfile persis
-                            seperti sebelumnya, isinya TIDAK DIUBAH SAMA SEKALI, cuma
-                            dibungkus jadi tab-pane. Label tab dirender dari
-                            $majorDegreeGroups->keys()->first() ($ Master/Bachelor/dst,
-                            sesuai yang sudah ditampilkan sebagai degree-group-title di
-                            dalam kontennya) supaya tab-nya kebaca "Master"/"Bachelor" persis
-                            seperti yang diminta -- fallback ke nama Major/"Program" kalau
-                            profile itu belum punya degree row sama sekali.
-
-                            Vanilla JS (bukan Bootstrap JS -- halaman ini SENGAJA cuma
-                            load bootstrap.min.css, tidak ada bootstrap.bundle.min.js sama
-                            sekali di halaman ini) di bagian bawah file yang mengurus
-                            switch active tab, pola & style-nya disamakan dengan IIFE
-                            lightbox gallery yang sudah ada di halaman ini.
-                        --}}
-                        <div class="program-tabs-nav" role="tablist">
-                            @foreach($profiles as $tabProfile)
-                                @php
-                                    $tabDegreeLabel = $tabProfile->degrees
-                                        ->pluck('degree')
-                                        ->filter()
-                                        ->first();
-                                @endphp
-                                <button
-                                    type="button"
-                                    class="program-tab-btn {{ $loop->first ? 'active' : '' }}"
-                                    data-program-tab-target="program-pane-{{ $tabProfile->id }}"
-                                    role="tab"
-                                >
-                                    {{ $tabDegreeLabel ?: ($tabProfile->field ?: 'Program') }}
-                                </button>
-                            @endforeach
-                        </div>
-
-                        <div class="program-tab-content">
                         @foreach($profiles as $majorProfile)
                             @php
                                 $majorDegreeRows = $majorProfile->degrees;
@@ -961,8 +925,7 @@
                                 $majorPaymentsByLocation = $majorPaymentRows->groupBy(fn ($p) => $p->location ?: 'other');
                             @endphp
 
-                            <div class="program-tab-pane {{ $loop->first ? 'active' : '' }}" id="program-pane-{{ $majorProfile->id }}" role="tabpanel">
-                            <div class="major-block">
+                            <div class="major-block {{ ! $loop->last ? 'major-block-divider' : '' }}">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                                     <div>
                                         <h5 class="mb-1">{{ $majorProfile->field ?: 'Program' }}</h5>
@@ -976,13 +939,43 @@
                                 </div>
 
                                 @if($majorDegreeGroups->isNotEmpty())
+                                    {{--
+                                        FIX (16 September 2026, permintaan user -- "supaya
+                                        tampilannya tidak kebawah apakah bisa dibuat tab jadi
+                                        akan kesamping"): degree group (Bachelor/Master/dst) DI
+                                        DALAM 1 Program yang sama DULU di-stack vertikal ke
+                                        bawah. SEKARANG jadi tab horizontal -- 1 tab = 1 degree
+                                        group ($degreeLabel), isi course-item di dalamnya TIDAK
+                                        DIUBAH SAMA SEKALI. Budget/Key Courses/Entry
+                                        Requirements/Payment di bawah ini TETAP di luar tab
+                                        (berlaku utk seluruh Program, bukan per-degree) --
+                                        SENGAJA TIDAK ikut ditabkan, sesuai kode aslinya.
+
+                                        ID tab & pane disisipi $majorProfile->id supaya tidak
+                                        bentrok kalau 1 university punya lebih dari 1 Program
+                                        ($profiles, di-loop di luar sini) yang sama-sama punya
+                                        degree "Bachelor". Vanilla JS (bukan Bootstrap JS --
+                                        halaman ini tidak load bootstrap.bundle.min.js) di
+                                        bagian bawah file, pola sama persis dengan IIFE
+                                        lightbox yang sudah ada.
+                                    --}}
                                     <div class="mb-3">
-                                        @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
-                                            <div class="degree-group">
-                                                <span class="degree-group-title">
-                                                    <i class="bi bi-mortarboard-fill"></i>
+                                        <div class="program-tabs-nav" role="tablist">
+                                            @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
+                                                <button
+                                                    type="button"
+                                                    class="program-tab-btn {{ $loop->first ? 'active' : '' }}"
+                                                    data-program-tab-target="degree-pane-{{ $majorProfile->id }}-{{ \Illuminate\Support\Str::slug($degreeLabel) }}"
+                                                    role="tab"
+                                                >
                                                     {{ $degreeLabel === 'Other' ? 'Degree not specified' : $degreeLabel }}
-                                                </span>
+                                                </button>
+                                            @endforeach
+                                        </div>
+
+                                        <div class="program-tab-content">
+                                        @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
+                                            <div class="program-tab-pane {{ $loop->first ? 'active' : '' }}" id="degree-pane-{{ $majorProfile->id }}-{{ \Illuminate\Support\Str::slug($degreeLabel) }}" role="tabpanel">
                                                 @foreach($courseRows as $courseRow)
                                                     <div class="course-item">
                                                         <div class="course-name">{{ $courseRow->course_name ?: ($majorProfile->field ?: 'Program') }}</div>
@@ -1012,6 +1005,7 @@
                                                 @endforeach
                                             </div>
                                         @endforeach
+                                        </div>
                                     </div>
                                 @else
                                     <div class="placeholder-note mb-3">
@@ -1087,9 +1081,7 @@
                                     </div>
                                 @endif
                             </div>
-                            </div>
                         @endforeach
-                        </div>
                     @endif
                 </div>
 
