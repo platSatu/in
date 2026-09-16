@@ -90,12 +90,13 @@
                                     FIX (16 September 2026, permintaan user):
                                     kolom "Kontak" digabung ke sini -- Nama,
                                     lalu Email & Handphone sebagai small text
-                                    center di bawahnya.
+                                    di bawahnya, rata kiri (samain dengan
+                                    kolom Package).
                                 --}}
                                 <td class="fw-bold">
                                     <div>{{ trim((optional($purchase->student)->first_name ?? '') . ' ' . (optional($purchase->student)->last_name ?? '')) ?: '-' }}</div>
-                                    <div class="text-center text-muted fw-normal" style="font-size:12px;">{{ optional($purchase->student)->email ?? '-' }}</div>
-                                    <div class="text-center text-muted fw-normal" style="font-size:12px;">{{ optional($purchase->student)->handphone ?? '-' }}</div>
+                                    <div class="text-muted fw-normal" style="font-size:12px;">{{ optional($purchase->student)->email ?? '-' }}</div>
+                                    <div class="text-muted fw-normal" style="font-size:12px;">{{ optional($purchase->student)->handphone ?? '-' }}</div>
                                 </td>
 
                                 {{--
