@@ -237,42 +237,20 @@
                                                     FIX (permintaan user, 16 September 2026): dulu password
                                                     akun login-nya di-generate acak (Str::random) begitu
                                                     tombol ini diklik, terus ditampilkan sekali lewat flash
-                                                    message. Sekarang admin isi sendiri password-nya lewat
-                                                    modal ini -- yang lain (status langsung active, email
-                                                    langsung terverifikasi) TIDAK berubah, lihat
+                                                    message. Sekarang admin isi sendiri password-nya lewat 1
+                                                    modal yang dipakai bersama (BUKAN 1 modal per baris lagi
+                                                    -- versi awal sempat begitu, tapi tampilannya jadi rusak
+                                                    karena modal-nya ke-nest terlalu dalam di struktur flex
+                                                    tabel, jadi ganti ke 1 modal + JS isi action/nama
+                                                    dinamis, lihat script #addUserModal di bawah tabel) --
+                                                    yang lain (status langsung active, email langsung
+                                                    terverifikasi) TIDAK berubah, lihat
                                                     StudentController::addUser().
                                                 --}}
-                                                <button type="button" class="btn btn-sm btn-outline-success text-nowrap flex-shrink-0"
-                                                    data-bs-toggle="modal" data-bs-target="#addUserModal-{{ $item->id }}">+ User</button>
-
-                                                <div class="modal fade" id="addUserModal-{{ $item->id }}" tabindex="-1" aria-hidden="true">
-                                                    <div class="modal-dialog">
-                                                        <div class="modal-content text-start">
-                                                            <form action="{{ route('student.student.add-user', $item->id) }}" method="POST">
-                                                                @csrf
-                                                                <div class="modal-header">
-                                                                    <h6 class="modal-title mb-0">Buat Akun Login untuk {{ $item->first_name }} {{ $item->last_name }}</h6>
-                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                                </div>
-                                                                <div class="modal-body">
-                                                                    <p class="text-muted small mb-3">
-                                                                        Akun ini langsung aktif dan email-nya otomatis
-                                                                        dianggap terverifikasi, jadi {{ $item->first_name }}
-                                                                        bisa langsung login pakai email &amp; password ini.
-                                                                    </p>
-                                                                    <label class="form-label">Password</label>
-                                                                    <input type="password" name="password" class="form-control"
-                                                                        minlength="8" required placeholder="Minimal 8 karakter">
-                                                                    <div class="form-text">Sampaikan password ini ke student secara manual (WhatsApp/email) -- sistem tidak mengirimkannya otomatis.</div>
-                                                                </div>
-                                                                <div class="modal-footer">
-                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
-                                                                    <button type="submit" class="btn btn-success btn-sm">Buat Akun</button>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                    </div>
-                                                </div>
+                                                <button type="button" class="btn btn-sm btn-outline-success text-nowrap flex-shrink-0 js-add-user-btn"
+                                                    data-bs-toggle="modal" data-bs-target="#addUserModal"
+                                                    data-add-user-url="{{ route('student.student.add-user', $item->id) }}"
+                                                    data-student-name="{{ $item->first_name }} {{ $item->last_name }}">+ User</button>
                                             @endunless
 
                                             <form action="{{ route('student.student.destroy', $item->id) }}"
@@ -300,6 +278,70 @@
             </div>
         </div>
     </div>
+
+    {{--
+        FIX (permintaan user, 16 September 2026): 1 modal saja dipakai
+        bersama untuk semua tombol "+ User" di tabel (bukan 1 modal
+        per-baris) -- action form & nama student-nya diisi lewat JS
+        (event show.bs.modal) tiap kali modal ini dibuka, dibaca dari
+        data-add-user-url/data-student-name di tombol yang diklik (lihat
+        class js-add-user-btn di atas). Ini bikin markup jauh lebih ringan
+        (1 modal vs bisa puluhan tergantung jumlah baris per halaman) dan
+        menghindari modal ke-nest terlalu dalam di struktur flex tabel yang
+        bikin tampilannya rusak di percobaan pertama.
+    --}}
+    <div class="modal fade" id="addUserModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content text-start">
+                <form id="addUserForm" method="POST" action="">
+                    @csrf
+                    <div class="modal-header">
+                        <h6 class="modal-title mb-0">Buat Akun Login untuk <span id="addUserStudentName"></span></h6>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p class="text-muted small mb-3">
+                            Akun ini langsung aktif dan email-nya otomatis dianggap
+                            terverifikasi, jadi <span id="addUserStudentNameInline"></span>
+                            bisa langsung login pakai email &amp; password ini.
+                        </p>
+                        <label class="form-label">Password</label>
+                        <input type="password" name="password" id="addUserPasswordInput" class="form-control"
+                            minlength="8" required placeholder="Minimal 8 karakter">
+                        <div class="form-text">Sampaikan password ini ke student secara manual (WhatsApp/email) -- sistem tidak mengirimkannya otomatis.</div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                        <button type="submit" class="btn btn-success btn-sm">Buat Akun</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var modal = document.getElementById('addUserModal');
+            if (!modal) return;
+
+            modal.addEventListener('show.bs.modal', function (event) {
+                var trigger = event.relatedTarget;
+                if (!trigger) return;
+
+                var form = document.getElementById('addUserForm');
+                var nameEl = document.getElementById('addUserStudentName');
+                var nameInlineEl = document.getElementById('addUserStudentNameInline');
+                var passwordInput = document.getElementById('addUserPasswordInput');
+
+                var studentName = trigger.getAttribute('data-student-name') || '';
+
+                form.setAttribute('action', trigger.getAttribute('data-add-user-url') || '');
+                nameEl.textContent = studentName;
+                nameInlineEl.textContent = studentName;
+                passwordInput.value = '';
+            });
+        })();
+    </script>
 
 </div>
 
