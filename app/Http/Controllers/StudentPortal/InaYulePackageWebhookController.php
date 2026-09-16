@@ -231,6 +231,7 @@ class InaYulePackageWebhookController extends Controller
             CourseCredit::create([
                 'student_id' => $studentId,
                 'course_package_purchase_id' => $purchase->id,
+                'source_type' => CourseCredit::SOURCE_PURCHASE,
                 'debit' => 0,
                 'kredit' => $lockedPayment->credits_granted,
                 'balance' => $newCreditBalance,
