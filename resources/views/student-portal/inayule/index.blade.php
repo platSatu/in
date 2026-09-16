@@ -213,7 +213,10 @@
                                     <th>Package</th>
                                     <th>Tanggal Beli</th>
                                     <th>Credits</th>
+                                    <th>Terpakai</th>
+                                    <th>Sisa</th>
                                     <th>Status</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -222,6 +225,8 @@
                                         <td>{{ optional($purchase->coursePackage)->name ?? '-' }}</td>
                                         <td>{{ $purchase->created_at?->translatedFormat('d M Y, H:i') ?? '-' }}</td>
                                         <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_granted, 2, ',', '.'), '0'), ',') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_used, 2, ',', '.'), '0'), ',') }}</td>
+                                        <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_remaining, 2, ',', '.'), '0'), ',') }}</td>
                                         <td>
                                             @if($purchase->status === 'completed')
                                                 <span class="badge bg-success">Completed</span>
@@ -229,10 +234,24 @@
                                                 <span class="badge bg-secondary">{{ ucfirst($purchase->status) }}</span>
                                             @endif
                                         </td>
+                                        <td>
+                                            {{--
+                                                STEP 5 (16 September 2026, permintaan user): tombol
+                                                "Upgrade / Topup" -- belum ada logic upgrade/topup
+                                                sungguhan (masih tahap diskusi konsep pembelian berbayar),
+                                                jadi SENGAJA cuma pindah ke tab "Buy Packages" yang
+                                                sudah beneran jalan (klik tombol nav tab-nya langsung
+                                                lewat JS) -- daripada tombol mati/disabled tanpa tujuan.
+                                            --}}
+                                            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
+                                                onclick="document.getElementById('inayule-buy-tab').click()">
+                                                Upgrade / Topup
+                                            </button>
+                                        </td>
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="4" class="text-center text-muted py-4">Data not found</td>
+                                        <td colspan="7" class="text-center text-muted py-4">Data not found</td>
                                     </tr>
                                 @endforelse
                             </tbody>

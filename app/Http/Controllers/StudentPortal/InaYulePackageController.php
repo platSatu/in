@@ -103,12 +103,45 @@ class InaYulePackageController extends Controller
                 ->all()
             : [];
 
+        // STEP 5 (16 September 2026, permintaan user -- tambah kolom
+        // "Terpakai"/"Sisa" di tab History): saldo credit TETAP 1 pool
+        // bersama per student (lihat App\Models\CourseCredit, TIDAK diubah
+        // jadi per-package-locked) -- breakdown "terpakai"/"sisa" PER BARIS
+        // purchase di bawah ini MURNI hasil hitungan tampilan (FIFO: total
+        // credit yang sudah kepakai dialokasikan ke purchase yang PALING
+        // LAMA dulu, konvensi "yang didapat duluan, dipakai duluan"), BUKAN
+        // sumber kebenaran baru -- kalau nanti absensi/booking sesi
+        // (course_session_attendances, belum dibangun) motong credit, itu
+        // tetap motong dari pool bersama ini, bukan dari 1 purchase
+        // tertentu. Perhitungan ini aman diulang kapan saja karena cuma
+        // baca data, tidak menyimpan apapun.
         $purchases = $student
             ? CoursePackagePurchase::where('student_id', $student->id)
                 ->with('coursePackage')
-                ->latest()
+                ->orderBy('created_at') // ASC dulu -- FIFO alokasi di bawah
                 ->get()
             : collect();
+
+        $totalUsed = $student ? (float) CourseCredit::where('student_id', $student->id)->sum('debit') : 0.0;
+        $remainingToAllocate = $totalUsed;
+
+        foreach ($purchases as $purchase) {
+            $granted = (float) $purchase->credits_granted;
+            $usedForThis = $purchase->status === CoursePackagePurchase::STATUS_COMPLETED
+                ? min($remainingToAllocate, $granted)
+                : 0.0;
+
+            // Attribute dinamis, cuma buat tampilan -- TIDAK ada kolom
+            // credits_used/credits_remaining di tabel course_package_
+            // purchases, sengaja tidak disimpan (lihat docblock di atas).
+            $purchase->credits_used = $usedForThis;
+            $purchase->credits_remaining = max($granted - $usedForThis, 0.0);
+
+            $remainingToAllocate -= $usedForThis;
+        }
+
+        // Balik ke urutan terbaru dulu buat tampilan (sama seperti sebelumnya).
+        $purchases = $purchases->sortByDesc('created_at')->values();
 
         return view('student-portal.inayule.index', [
             'packages' => $packages,
