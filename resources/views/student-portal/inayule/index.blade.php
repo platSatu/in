@@ -12,13 +12,19 @@
     katalog CoursePackage sungguhan (filter Type/Class/Level + search, gaya
     "catalog product"), datanya dikirim dari
     App\Http\Controllers\StudentPortal\InaYulePackageController (lihat
-    docblock-nya). Tombol "Beli" SENGAJA masih non-aktif (disabled) --
-    logic pembelian (potong deposit, catat credit) belum dibangun, masih
+    docblock-nya).
+
+    STEP 4 (16 September 2026, permintaan user -- "knp angka nol disable
+    juga ya button nya kan tidak ada pembayaran ya"): package dengan harga
+    EFEKTIF Rp 0 (trial) sekarang tombolnya AKTIF ("Klaim Gratis") dan
+    langsung klaim credit lewat InaYulePackageController::claimTrial() --
+    lihat docblock method itu untuk pengamanannya. Package BERBAYAR tetap
+    "Beli" disabled -- logic potong saldo Deposit belum dibangun, masih
     tahap diskusi konsep.
 
-    Tab History & Schedule MASIH placeholder "Data not found" -- History
-    baru bisa diisi setelah tabel riwayat pembelian (course_package_
-    purchases, lihat diskusi konsep InaYule) dibangun.
+    Tab History SEKARANG diisi data sungguhan dari CoursePackagePurchase.
+    Tab Schedule MASIH placeholder "Data not found" -- baru bisa diisi
+    setelah jadwal kelas/booking sesi terhubung ke student (belum dibangun).
 
     Pola widget (widget-content-area br-8) & style tabel disamakan dengan
     resources/views/student-portal/inastudy/index.blade.php supaya
@@ -29,6 +35,19 @@
     <div class="col-12">
         <div class="widget-content widget-content-area br-8 mb-4">
             <h4 class="mb-3">InaYule</h4>
+
+            {{--
+                STEP 4 (16 September 2026): tampilkan sisa saldo credit
+                student ($creditBalance dari CourseCredit::currentBalanceFor(),
+                dikirim InaYulePackageController::index()) -- 0 untuk staff/
+                admin yang tidak punya Student, atau student yang belum
+                pernah klaim/beli apapun.
+            --}}
+            <div class="mb-3">
+                <span class="badge bg-primary" style="font-size:14px;">
+                    Sisa Credit: {{ rtrim(rtrim(number_format((float) $creditBalance, 2, ',', '.'), '0'), ',') }} Sesi
+                </span>
+            </div>
 
             <div style="overflow-x:auto;">
                 <ul class="nav nav-tabs flex-nowrap text-nowrap" id="inayuleTab" role="tablist">
@@ -137,12 +156,41 @@
                                                 @endif
                                             </div>
 
-                                            {{-- Tombol Beli SENGAJA disabled -- logic pembelian belum
-                                                 dibangun, lihat docblock di atas file ini. --}}
-                                            <button type="button" class="btn btn-primary w-100" disabled
-                                                title="Fitur pembelian akan segera hadir">
-                                                Beli
-                                            </button>
+                                            @php
+                                                $isFreeTrial = $package->effectivePrice() <= 0.0;
+                                                $alreadyClaimedTrial = in_array($package->id, $claimedTrialPackageIds, true);
+                                            @endphp
+
+                                            @if($isFreeTrial && $alreadyClaimedTrial)
+                                                <button type="button" class="btn btn-outline-secondary w-100" disabled>
+                                                    Sudah Diklaim
+                                                </button>
+                                            @elseif($isFreeTrial)
+                                                {{--
+                                                    STEP 4 (16 September 2026, permintaan user -- "knp angka
+                                                    nol disable juga ya button nya kan tidak ada pembayaran
+                                                    ya"): package harga efektif Rp 0 (trial) -- tombol AKTIF,
+                                                    langsung klaim credit lewat
+                                                    InaYulePackageController::claimTrial() (TIDAK lewat
+                                                    Deposit sama sekali, tidak ada uang berpindah). Harga
+                                                    tetap dihitung ULANG di server (bukan percaya tombol ini
+                                                    aktif di browser) -- lihat docblock claimTrial().
+                                                --}}
+                                                <form action="{{ route('inayule.claim-trial', $package->id) }}" method="POST" class="m-0" onsubmit="return confirm('Klaim trial package ini sekarang?')">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-success w-100">
+                                                        Klaim Gratis
+                                                    </button>
+                                                </form>
+                                            @else
+                                                {{-- Tombol Beli SENGAJA disabled -- logic pembelian
+                                                     (potong saldo Deposit) belum dibangun, lihat docblock
+                                                     di atas file ini. --}}
+                                                <button type="button" class="btn btn-primary w-100" disabled
+                                                    title="Fitur pembelian akan segera hadir">
+                                                    Beli
+                                                </button>
+                                            @endif
                                         </div>
                                     </div>
                                 </div>
@@ -169,9 +217,24 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-4">Data not found</td>
-                                </tr>
+                                @forelse ($purchases as $purchase)
+                                    <tr>
+                                        <td>{{ optional($purchase->coursePackage)->name ?? '-' }}</td>
+                                        <td>{{ $purchase->created_at?->translatedFormat('d M Y, H:i') ?? '-' }}</td>
+                                        <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_granted, 2, ',', '.'), '0'), ',') }}</td>
+                                        <td>
+                                            @if($purchase->status === 'completed')
+                                                <span class="badge bg-success">Completed</span>
+                                            @else
+                                                <span class="badge bg-secondary">{{ ucfirst($purchase->status) }}</span>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="4" class="text-center text-muted py-4">Data not found</td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
                     </div>

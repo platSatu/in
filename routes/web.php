@@ -249,6 +249,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // resources/views/layouts/partials/sidebar.blade.php), tidak ada yang
     // perlu diubah di sana.
     Route::get('/inayule', [InaYulePackageController::class, 'index'])->name('inayule.index');
+
+    // STEP 4 (16 September 2026, permintaan user -- "knp angka nol disable
+    // juga ya button nya kan tidak ada pembayaran ya" -> "okey boleh tolong
+    // dibangun ya"): klaim package trial (harga efektif Rp 0), lihat
+    // docblock InaYulePackageController::claimTrial().
+    Route::post('/inayule/packages/{packageId}/claim-trial', [InaYulePackageController::class, 'claimTrial'])->name('inayule.claim-trial');
 });
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {
