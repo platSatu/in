@@ -5,12 +5,20 @@
     Halaman "InaYule" (modul kursus Mandarin: Buy Packages / History /
     Schedule).
 
-    STEP 1 (15 September 2026, permintaan user): baru TAMPILANNYA saja --
-    3 tab di bawah ini SEMUA sengaja masih placeholder "Data not found",
-    belum ada query/data apapun yang dikirim dari InaYuleController. Data
-    model di baliknya (kepemilikan package per student, jadwal + pengajar,
-    dst) masih tahap diskusi konsep, belum diputuskan strukturnya -- jangan
-    isi tab-tab ini dengan data sungguhan sebelum ada keputusan lanjutan.
+    STEP 1 (15 September 2026): baru tampilan skeleton, 3 tab semua
+    placeholder "Data not found".
+
+    STEP 2 (16 September 2026, permintaan user): tab "Buy Packages" sekarang
+    katalog CoursePackage sungguhan (filter Type/Class/Level + search, gaya
+    "catalog product"), datanya dikirim dari
+    App\Http\Controllers\StudentPortal\InaYulePackageController (lihat
+    docblock-nya). Tombol "Beli" SENGAJA masih non-aktif (disabled) --
+    logic pembelian (potong deposit, catat credit) belum dibangun, masih
+    tahap diskusi konsep.
+
+    Tab History & Schedule MASIH placeholder "Data not found" -- History
+    baru bisa diisi setelah tabel riwayat pembelian (course_package_
+    purchases, lihat diskusi konsep InaYule) dibangun.
 
     Pola widget (widget-content-area br-8) & style tabel disamakan dengan
     resources/views/student-portal/inastudy/index.blade.php supaya
@@ -46,13 +54,94 @@
                 {{-- Tab 1: Buy Packages --}}
                 <div class="tab-pane fade show active" id="inayule-buy" role="tabpanel"
                     aria-labelledby="inayule-buy-tab">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <div class="text-center text-muted py-5">
-                                <div>Data not found</div>
-                            </div>
+
+                    {{-- Filter: Type / Class / Level + Search -- GET ke route yang
+                         sama, jadi bisa di-bookmark/refresh & tetap kepake sama
+                         withQueryString() di pagination-nya. --}}
+                    <form method="GET" action="{{ route('inayule.index') }}" class="row g-2 mb-4">
+                        <div class="col-6 col-md-3">
+                            <select name="course_type_id" class="form-select">
+                                <option value="">-- Semua Type --</option>
+                                @foreach ($types as $type)
+                                    <option value="{{ $type->id }}" @selected($filters['course_type_id'] == $type->id)>{{ $type->name }}</option>
+                                @endforeach
+                            </select>
                         </div>
-                    </div>
+                        <div class="col-6 col-md-3">
+                            <select name="course_class_id" class="form-select">
+                                <option value="">-- Semua Class --</option>
+                                @foreach ($classes as $class)
+                                    <option value="{{ $class->id }}" @selected($filters['course_class_id'] == $class->id)>{{ $class->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-2">
+                            <select name="course_level_id" class="form-select">
+                                <option value="">-- Semua Level --</option>
+                                @foreach ($levels as $level)
+                                    <option value="{{ $level->id }}" @selected($filters['course_level_id'] == $level->id)>{{ $level->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-6 col-md-3">
+                            <input type="text" name="search" class="form-control" placeholder="Cari nama package..."
+                                value="{{ $filters['search'] }}">
+                        </div>
+                        <div class="col-12 col-md-1 d-grid">
+                            <button class="btn btn-outline-primary">Cari</button>
+                        </div>
+                    </form>
+
+                    @if($packages->isEmpty())
+                        <div class="text-center text-muted py-5">
+                            <div>Data not found</div>
+                        </div>
+                    @else
+                        <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
+                            @foreach ($packages as $package)
+                                <div class="col">
+                                    <div class="card h-100 shadow-sm">
+                                        <div class="card-body d-flex flex-column">
+                                            <h6 class="card-title fw-bold mb-2">{{ $package->name }}</h6>
+
+                                            <div class="mb-2">
+                                                <span class="badge bg-primary me-1">{{ optional($package->type)->name ?? '-' }}</span>
+                                                <span class="badge bg-info text-dark me-1">{{ optional($package->courseClass)->name ?? '-' }}</span>
+                                                <span class="badge bg-secondary">{{ optional($package->level)->name ?? '-' }}</span>
+                                            </div>
+
+                                            <div class="text-muted mb-2" style="font-size:13px;">
+                                                {{ $package->duration_value }} {{ ucfirst($package->duration_unit) }}{{ $package->duration_value > 1 ? 's' : '' }}
+                                                &middot;
+                                                {{ rtrim(rtrim(number_format((float) $package->credits, 2, ',', '.'), '0'), ',') }} Sesi/Credit
+                                            </div>
+
+                                            @if($package->description)
+                                                <p class="text-muted small mb-3" style="flex-grow:1;">{{ \Illuminate\Support\Str::limit($package->description, 100) }}</p>
+                                            @else
+                                                <div style="flex-grow:1;"></div>
+                                            @endif
+
+                                            <div class="fw-bold mb-3" style="font-size:18px;">
+                                                Rp {{ number_format((float) $package->price, 0, ',', '.') }}
+                                            </div>
+
+                                            {{-- Tombol Beli SENGAJA disabled -- logic pembelian belum
+                                                 dibangun, lihat docblock di atas file ini. --}}
+                                            <button type="button" class="btn btn-primary w-100" disabled
+                                                title="Fitur pembelian akan segera hadir">
+                                                Beli
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <div class="mt-4">
+                            {{ $packages->links('pagination::bootstrap-5') }}
+                        </div>
+                    @endif
                 </div>
 
                 {{-- Tab 2: History --}}

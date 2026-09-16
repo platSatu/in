@@ -55,6 +55,7 @@ use App\Http\Controllers\StudentPortal\ApplicationPaymentController;
 use App\Http\Controllers\StudentPortal\ApplicationFormController;
 use App\Http\Controllers\StudentPortal\InaStudyController;
 use App\Http\Controllers\StudentPortal\InaYuleController;
+use App\Http\Controllers\StudentPortal\InaYulePackageController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
@@ -232,13 +233,22 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/inastudy', [InaStudyController::class, 'index'])->name('inastudy.index');
     Route::post('/inastudy/register', [InaStudyController::class, 'registerApplication'])->name('inastudy.register');
 
-    // STEP 1 (15 September 2026, permintaan user): halaman "InaYule" (modul
-    // kursus Mandarin: Buy Packages / History / Schedule) -- baru
-    // tampilannya saja dulu (semua tab masih placeholder "Data not found"),
-    // lihat docblock App\Http\Controllers\StudentPortal\InaYuleController.
-    // Menu "InaYule" di sidebar diarahkan ke 'inayule.index' (lihat
-    // resources/views/layouts/partials/sidebar.blade.php).
-    Route::get('/inayule', [InaYuleController::class, 'index'])->name('inayule.index');
+    // STEP 1 (15 September 2026): halaman "InaYule" (modul kursus Mandarin:
+    // Buy Packages / History / Schedule) awalnya cuma tampilan skeleton,
+    // lihat docblock App\Http\Controllers\StudentPortal\InaYuleController
+    // (file itu dibiarkan ada, TIDAK dihapus, tapi sudah tidak dipakai
+    // lagi mulai STEP 2 di bawah).
+    //
+    // STEP 2 (16 September 2026, permintaan user -- "sebaiknya dipisahkan
+    // controllernya karena ini nanti akan ada pembelian dll nya"): tab "Buy
+    // Packages" sekarang menampilkan katalog CoursePackage sungguhan
+    // (filter Type/Class/Level + search), jadi route ini dipindah ke
+    // App\Http\Controllers\StudentPortal\InaYulePackageController -- lihat
+    // docblock-nya untuk alasan lengkap. Menu "InaYule" di sidebar tetap
+    // diarahkan ke 'inayule.index' yang sama (lihat
+    // resources/views/layouts/partials/sidebar.blade.php), tidak ada yang
+    // perlu diubah di sana.
+    Route::get('/inayule', [InaYulePackageController::class, 'index'])->name('inayule.index');
 });
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {
