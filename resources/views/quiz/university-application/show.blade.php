@@ -63,6 +63,20 @@
                                 <td>{{ optional($application->universityProfile)->field ?? '-' }}</td>
                             </tr>
                             <tr>
+                                {{--
+                                    FIX (permintaan user, 16 September 2026): sebelum ini,
+                                    jurusan (Course) yang dipilih siswa di form Apply TIDAK
+                                    PERNAH disimpan/ditampilkan di sini -- cuma Degree/
+                                    Intake/Duration, yang bisa sama persis untuk beberapa
+                                    Course berbeda dalam 1 Major/Program (lihat migration
+                                    add_course_snapshot_to_university_applications_table).
+                                    "-" berarti aplikasi ini disubmit SEBELUM fix ini ada,
+                                    jadi jurusan persisnya sudah tidak bisa direkonstruksi.
+                                --}}
+                                <td class="text-muted">Jurusan (Course)</td>
+                                <td class="fw-bold">{{ $application->course_name ?: '-' }}</td>
+                            </tr>
+                            <tr>
                                 <td class="text-muted">Degree / Intake / Duration</td>
                                 <td>{{ collect([$application->degree, $application->intake . ' ' . $application->intake_year, $application->duration])->filter()->implode(' - ') }}</td>
                             </tr>

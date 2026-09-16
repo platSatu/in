@@ -47,6 +47,16 @@ class UniversityApplication extends Model
         'application_no',
         'student_id',
         'university_profile_id',
+        // FIX (permintaan user, 16 September 2026): snapshot Course
+        // (jurusan) yang dipilih siswa saat Apply -- lihat catatan lengkap
+        // di migration add_course_snapshot_to_university_applications_table.
+        // Sebelum ini, degree_intake_id cuma dipakai buat VALIDASI saat
+        // submit (exists:university_profile_degrees,id) lalu dibuang --
+        // tidak pernah ikut disimpan, jadi kalau 1 Program punya lebih dari
+        // 1 Course dengan Degree/Intake/Duration yang sama, admin tidak
+        // bisa tahu jurusan mana persisnya yang dipilih siswa.
+        'degree_intake_id',
+        'course_name',
         'university_id',
         'degree',
         'language',
