@@ -89,6 +89,10 @@ return [
     // credit siswa di sini, walau namanya kebetulan mirip.
     ['key' => 'class-session', 'label' => 'Approval Pemakaian Credit', 'route' => 'class-session.index', 'group' => 'Kredit & Honor', 'icon' => 'list'],
     ['key' => 'teacher-honor', 'label' => 'Honor Pengajar', 'route' => 'teacher-honor.index', 'group' => 'Kredit & Honor', 'icon' => 'list'],
+    // FASE 2 bagian 3 "Jadwal" (16 September 2026) -- lihat docblock
+    // App\Http\Controllers\Schedule\ScheduleAdminController untuk keputusan
+    // scope (laporan dari ClassSession yang sudah ada, bukan booking baru).
+    ['key' => 'schedule', 'label' => 'Jadwal', 'route' => 'schedule.index', 'group' => 'Kredit & Honor', 'icon' => 'list'],
 
     // ================= Course =================
     // Urutan sesuai dependency: Type -> Class -> Level -> Package (lihat

@@ -24,6 +24,61 @@
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
 
+    {{--
+        FASE 2 bagian 3 "Jadwal" (16 September 2026) -- "hari ini saya
+        ngajar siapa saja", lihat docblock ClassSessionApprovalController.
+        Ditampilkan apa adanya termasuk status (bisa saja masih menunggu
+        approval siapa pun), TIDAK menyaring status tertentu -- tujuannya
+        murni "siapa yang terjadwal hari ini", bukan "siapa yang sudah
+        pasti approved".
+    --}}
+    <div class="row layout-top-spacing">
+        <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
+            <div class="widget-content widget-content-area br-8">
+                <h6 class="mb-3">Jadwal Hari Ini</h6>
+                <div class="table-responsive">
+                    <table class="table dt-table-hover" style="width:100%">
+                        <thead>
+                            <tr>
+                                <th>Jam</th>
+                                <th>Siswa</th>
+                                <th>Package</th>
+                                <th>Credit</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse ($today as $session)
+                                <tr>
+                                    <td>{{ optional($session->requested_at)->format('H:i') }}</td>
+                                    <td>{{ optional($session->student)->name ?? '-' }}</td>
+                                    <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
+                                    <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
+                                    <td>
+                                        @php
+                                            $todayStatusLabel = [
+                                                'menunggu_guru' => ['Menunggu Anda', 'badge-warning'],
+                                                'ditolak_guru' => ['Ditolak Anda', 'badge-danger'],
+                                                'menunggu_admin' => ['Menunggu Admin', 'badge-warning'],
+                                                'disetujui' => ['Disetujui', 'badge-success'],
+                                                'ditolak_admin' => ['Ditolak Admin', 'badge-danger'],
+                                            ][$session->status] ?? [$session->status, 'badge-secondary'];
+                                        @endphp
+                                        <span class="badge {{ $todayStatusLabel[1] }}">{{ $todayStatusLabel[0] }}</span>
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">Tidak ada jadwal hari ini.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">

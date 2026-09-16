@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClassSession;
 use App\Models\CourseClass;
 use App\Models\CourseCredit;
 use App\Models\CourseLevel;
@@ -51,10 +52,16 @@ use Illuminate\View\View;
  * itu untuk alur mix saldo Deposit + payment gateway otomatis.
  *
  * Tab "History" SEKARANG diisi data sungguhan dari CoursePackagePurchase
- * (sebelumnya placeholder "Data not found" karena tabelnya belum ada). Tab
- * "Schedule" MASIH placeholder -- baru bisa diisi setelah jadwal kelas
- * (course_session_attendances / booking sesi, BELUM dibangun) terhubung ke
- * student.
+ * (sebelumnya placeholder "Data not found" karena tabelnya belum ada).
+ *
+ * Tab "Schedule" (FASE 2 bagian 3 "Jadwal", 16 September 2026) SEKARANG
+ * diisi dari App\Models\ClassSession -- KEPUTUSAN SADAR (bukan tabel jadwal
+ * baru/booking-ke-depan): "Jadwal" di sini adalah tampilan kalender/laporan
+ * dari data pengajuan pemakaian credit yang SUDAH ada (Fase 2 bagian 2),
+ * BUKAN sistem rencana ke depan (belum ada konsep "booking slot sebelum
+ * kelas terjadi" di manapun di sistem ini). Menampilkan SEMUA status
+ * (termasuk yang masih menunggu approval) supaya siswa tetap bisa lihat apa
+ * yang sudah diajukan, bukan cuma yang sudah final disetujui.
  *
  * Tab "Saldo Saya" (STEP 6, 16 September 2026) menampilkan saldo Deposit
  * (BUKAN CourseCredit -- ini uang, bukan sesi kursus) + ledger topup/
@@ -153,6 +160,18 @@ class InaYulePackageController extends Controller
         // Balik ke urutan terbaru dulu buat tampilan (sama seperti sebelumnya).
         $purchases = $purchases->sortByDesc('created_at')->values();
 
+        // FASE 2 bagian 3 "Jadwal" -- lihat docblock class di atas. Cuma
+        // milik student INI SENDIRI (tidak bisa lihat student lain, sesuai
+        // requirement "siswa bisa lihat jadwalnya kapan saja tapi tidak
+        // bisa lihat nama student lain").
+        $scheduleSessions = $student
+            ? ClassSession::where('student_id', $student->id)
+                ->with('teacher')
+                ->orderByDesc('requested_at')
+                ->limit(50)
+                ->get()
+            : collect();
+
         // STEP 6 (16 September 2026, permintaan user -- checkout package
         // berbayar pakai saldo Deposit / gateway / campuran): tab baru
         // "Saldo Saya" -- saldo Deposit di-key oleh user_id (BUKAN
@@ -183,6 +202,7 @@ class InaYulePackageController extends Controller
             'creditBalance' => $creditBalance,
             'claimedTrialPackageIds' => $claimedTrialPackageIds,
             'purchases' => $purchases,
+            'scheduleSessions' => $scheduleSessions,
             'depositBalance' => $depositBalance,
             'depositLedger' => $depositLedger,
         ]);

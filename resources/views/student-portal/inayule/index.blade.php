@@ -200,6 +200,25 @@
                                                 <a href="{{ route('inayule.checkout.show', $package->id) }}" class="btn btn-primary w-100">
                                                     Beli
                                                 </a>
+
+                                                @if ($creditBalance > 0)
+                                                    {{--
+                                                        FASE 4 bagian 3 (16 September 2026, entry-point Upgrade
+                                                        Paket) -- tombol ini CUMA muncul kalau student punya sisa
+                                                        credit (dari package MANA PUN, pool bersama, lihat
+                                                        docblock CourseCredit) untuk ditukar (trade-in). Sengaja
+                                                        DITAMPILKAN BERDAMPINGAN dengan "Beli" (bukan
+                                                        menggantikannya) -- "Beli" tetap pembelian baru biasa
+                                                        (credit lama TIDAK disentuh), "Upgrade" menukar SELURUH
+                                                        sisa credit lama dulu baru sisanya Deposit/gateway, lihat
+                                                        docblock App\Services\CoursePackagePayment\
+                                                        PackageUpgradeCalculator. Harga & nilai trade-in DIHITUNG
+                                                        ULANG di server di halaman upgrade itu sendiri.
+                                                    --}}
+                                                    <a href="{{ route('inayule.upgrade.show', $package->id) }}" class="btn btn-outline-primary w-100 mt-2">
+                                                        Upgrade (Pakai Sisa Credit)
+                                                    </a>
+                                                @endif
                                             @endif
                                         </div>
                                     </div>
@@ -269,7 +288,14 @@
                     </div>
                 </div>
 
-                {{-- Tab 3: Schedule --}}
+                {{--
+                    Tab 3: Schedule (FASE 2 bagian 3 "Jadwal", 16 September
+                    2026) -- diisi dari App\Models\ClassSession, lihat
+                    docblock App\Http\Controllers\StudentPortal\
+                    InaYulePackageController untuk alasan kenapa ini BUKAN
+                    sistem booking ke depan, murni laporan dari data
+                    pengajuan pemakaian credit yang sudah ada.
+                --}}
                 <div class="tab-pane fade" id="inayule-schedule" role="tabpanel"
                     aria-labelledby="inayule-schedule-tab">
                     <div class="table-responsive">
@@ -279,15 +305,41 @@
                                     <th>Tanggal</th>
                                     <th>Jam</th>
                                     <th>Pengajar</th>
+                                    <th>Credit</th>
                                     <th>Status</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr>
-                                    <td colspan="4" class="text-center text-muted py-4">Data not found</td>
-                                </tr>
+                                @forelse ($scheduleSessions as $session)
+                                    <tr>
+                                        <td>{{ optional($session->requested_at)->format('d/m/Y') }}</td>
+                                        <td>{{ optional($session->requested_at)->format('H:i') }}</td>
+                                        <td>{{ optional($session->teacher)->name ?? '-' }}</td>
+                                        <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
+                                        <td>
+                                            @php
+                                                $scheduleStatusLabel = [
+                                                    'menunggu_guru' => ['Menunggu Pengajar', 'badge-warning'],
+                                                    'ditolak_guru' => ['Ditolak Pengajar', 'badge-danger'],
+                                                    'menunggu_admin' => ['Menunggu Admin', 'badge-warning'],
+                                                    'disetujui' => ['Disetujui', 'badge-success'],
+                                                    'ditolak_admin' => ['Ditolak Admin', 'badge-danger'],
+                                                ][$session->status] ?? [$session->status, 'badge-secondary'];
+                                            @endphp
+                                            <span class="badge {{ $scheduleStatusLabel[1] }}">{{ $scheduleStatusLabel[0] }}</span>
+                                        </td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">Belum ada jadwal/pengajuan pemakaian credit.</td>
+                                    </tr>
+                                @endforelse
                             </tbody>
                         </table>
+                    </div>
+
+                    <div class="mt-3">
+                        <a href="{{ route('inayule.class-sessions.create') }}" class="btn btn-primary btn-sm">+ Ajukan Pemakaian Credit</a>
                     </div>
                 </div>
 

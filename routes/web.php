@@ -60,6 +60,7 @@ use App\Http\Controllers\StudentPortal\InaYulePackageCheckoutController;
 use App\Http\Controllers\StudentPortal\InaYulePackageController;
 use App\Http\Controllers\StudentPortal\InaYulePackageUpgradeController;
 use App\Http\Controllers\ClassSession\ClassSessionAdminController;
+use App\Http\Controllers\Schedule\ScheduleAdminController;
 use App\Http\Controllers\Teacher\ClassSessionApprovalController;
 use App\Http\Controllers\TeacherHonor\TeacherHonorController;
 use App\Http\Controllers\InvoiceController;
@@ -324,6 +325,13 @@ Route::middleware(['auth', 'permission:teacher-honor'])->prefix('dashboard/teach
 Route::middleware(['auth', 'permission:teacher-honor,edit'])->prefix('dashboard/teacher-honor')->group(function () {
     Route::post('/{id}/approve-payout', [TeacherHonorController::class, 'approvePayout'])->name('teacher-honor.approve-payout');
     Route::post('/{id}/mark-paid', [TeacherHonorController::class, 'markPaid'])->name('teacher-honor.mark-paid');
+});
+
+// FASE 2 bagian 3 "Jadwal": sisi ADMIN/MANAGER, laporan dari data
+// ClassSession yang sudah ada -- lihat docblock ScheduleAdminController
+// untuk keputusan scope lengkapnya & modul 'schedule' di config/menu.php.
+Route::middleware(['auth', 'permission:schedule'])->prefix('dashboard/schedule')->group(function () {
+    Route::get('/', [ScheduleAdminController::class, 'index'])->name('schedule.index');
 });
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {

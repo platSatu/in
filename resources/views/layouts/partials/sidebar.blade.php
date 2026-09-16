@@ -173,6 +173,49 @@
             @endforeach
 
             {{--
+                FASE 2 bagian 2 "Absensi" (16 September 2026) -- akses cepat
+                untuk PENGAJAR (role 'teacher'). SENGAJA blok statis terpisah
+                (pola sama dengan $studentMenuGroups di atas), BUKAN lewat
+                sistem permission config/menu.php di bawah -- karena ini akun
+                pengajar sendiri (role, bukan permission modul yang di-grant
+                admin ke staff tertentu). Lihat docblock
+                App\Http\Controllers\Teacher\ClassSessionApprovalController.
+            --}}
+            @if (auth()->check() && auth()->user()->hasRole('teacher'))
+                <li class="menu">
+                    <a href="#menuTeacherClassSessions" data-bs-toggle="collapse" aria-expanded="false"
+                        class="dropdown-toggle">
+                        <div class="">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="feather feather-list">
+                                <line x1="8" y1="6" x2="21" y2="6"></line>
+                                <line x1="8" y1="12" x2="21" y2="12"></line>
+                                <line x1="8" y1="18" x2="21" y2="18"></line>
+                                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                            </svg>
+                            <span>Pengajar</span>
+                        </div>
+                        <div>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
+                                viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                stroke-linecap="round" stroke-linejoin="round" class="feather feather-chevron-right">
+                                <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                        </div>
+                    </a>
+                    <ul class="collapse submenu list-unstyled" id="menuTeacherClassSessions"
+                        data-bs-parent="#accordionExample">
+                        <li>
+                            <a href="{{ route('teacher.class-sessions.index') }}">Approval Pemakaian Credit</a>
+                        </li>
+                    </ul>
+                </li>
+            @endif
+
+            {{--
                 Menu "Invitations" yang tadinya statis (hardcoded di sini, tanpa
                 pengecekan permission apa pun sehingga tampil ke SEMUA user yang
                 login) sudah dipindah masuk sistem permission dinamis di bawah

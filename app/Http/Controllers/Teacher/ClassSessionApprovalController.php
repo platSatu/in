@@ -21,6 +21,12 @@ use InvalidArgumentException;
  * Pengajar approve PERSIS saat kelas dimulai (lihat docblock
  * App\Services\ClassSession\ClassSessionWorkflowService) -- SENGAJA belum
  * memotong credit sama sekali, cuma memindahkan ke antrian admin.
+ *
+ * FASE 2 bagian 3 "Jadwal" (16 September 2026): index() SEKARANG juga
+ * menyertakan $today ("hari ini saya ngajar siapa saja", requirement
+ * eksplisit dari diskusi Jadwal) -- SAMA seperti tab Schedule di sisi
+ * siswa (lihat docblock InaYulePackageController), ini laporan dari data
+ * ClassSession yang sudah ada, BUKAN sistem booking ke depan.
  */
 class ClassSessionApprovalController extends Controller
 {
@@ -32,6 +38,12 @@ class ClassSessionApprovalController extends Controller
     public function index(Request $request): View
     {
         $teacher = $request->user();
+
+        $today = ClassSession::where('teacher_user_id', $teacher->id)
+            ->whereBetween('requested_at', [now()->startOfDay(), now()->endOfDay()])
+            ->with(['student', 'coursePackage'])
+            ->orderBy('requested_at')
+            ->get();
 
         $pending = ClassSession::where('teacher_user_id', $teacher->id)
             ->where('status', ClassSession::STATUS_WAITING_TEACHER)
@@ -45,7 +57,7 @@ class ClassSessionApprovalController extends Controller
             ->orderByDesc('requested_at')
             ->paginate(15);
 
-        return view('teacher.class-sessions.index', compact('pending', 'history'));
+        return view('teacher.class-sessions.index', compact('today', 'pending', 'history'));
     }
 
     public function approve(Request $request, string $id): RedirectResponse
