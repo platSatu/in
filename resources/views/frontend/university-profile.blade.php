@@ -210,12 +210,49 @@
         }
 
         /* ---------- PROGRAMS / MAJORS (fitur Apply Kampus) ---------- */
-        .major-block { margin-bottom: 26px; }
-        .major-block:last-child { margin-bottom: 0; }
-        .major-block-divider {
-            padding-bottom: 24px;
+        .major-block { margin-bottom: 0; }
+
+        /* ---------- PROGRAM TABS (FIX 16 September 2026, permintaan user --
+           "supaya tampilannya tidak kebawah apakah bisa dibuat tab jadi akan
+           kesamping"): tiap Major/Program ($profiles) sekarang jadi 1 tab,
+           bukan di-stack vertikal lagi. Pill style disamakan dengan
+           .degree-group-title (warna brand solid untuk tab aktif), scroll
+           horizontal kalau tab-nya banyak & tidak muat di layar sempit. */
+        .program-tabs-nav {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 8px;
+            padding-bottom: 4px;
+            margin-bottom: 18px;
             border-bottom: 1px solid #eef1f8;
         }
+
+        .program-tab-btn {
+            flex: 0 0 auto;
+            background: #f8f9fc;
+            color: #6b7186;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px 20px 0 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+
+        .program-tab-btn:hover { background: #eef1f8; color: #4a4f5c; }
+
+        .program-tab-btn.active {
+            background: var(--brand);
+            color: #fff;
+        }
+
+        .program-tab-pane { display: none; }
+        .program-tab-pane.active { display: block; }
 
         /* ---------- DEGREE & COURSE (flow "pilih kampus -> degree -> jurusan",
            FIX 15 September 2026) -- tiap Major/Profile bisa punya beberapa baris
@@ -859,6 +896,47 @@
                             Program details for this university are being finalized. Message us on WhatsApp and our team will share the latest list of available majors.
                         </div>
                     @else
+                        {{--
+                            FIX (16 September 2026, permintaan user -- "supaya tampilannya
+                            tidak kebawah apakah bisa dibuat tab jadi akan kesamping"): tiap
+                            Major/Program ($profiles, admin-input lewat halaman University
+                            Profile) DULU di-stack vertikal ke bawah pakai @foreach biasa
+                            (bisa sangat panjang kalau universitynya punya banyak Program).
+                            SEKARANG jadi tab horizontal -- 1 tab = 1 $majorProfile persis
+                            seperti sebelumnya, isinya TIDAK DIUBAH SAMA SEKALI, cuma
+                            dibungkus jadi tab-pane. Label tab dirender dari
+                            $majorDegreeGroups->keys()->first() ($ Master/Bachelor/dst,
+                            sesuai yang sudah ditampilkan sebagai degree-group-title di
+                            dalam kontennya) supaya tab-nya kebaca "Master"/"Bachelor" persis
+                            seperti yang diminta -- fallback ke nama Major/"Program" kalau
+                            profile itu belum punya degree row sama sekali.
+
+                            Vanilla JS (bukan Bootstrap JS -- halaman ini SENGAJA cuma
+                            load bootstrap.min.css, tidak ada bootstrap.bundle.min.js sama
+                            sekali di halaman ini) di bagian bawah file yang mengurus
+                            switch active tab, pola & style-nya disamakan dengan IIFE
+                            lightbox gallery yang sudah ada di halaman ini.
+                        --}}
+                        <div class="program-tabs-nav" role="tablist">
+                            @foreach($profiles as $tabProfile)
+                                @php
+                                    $tabDegreeLabel = $tabProfile->degrees
+                                        ->pluck('degree')
+                                        ->filter()
+                                        ->first();
+                                @endphp
+                                <button
+                                    type="button"
+                                    class="program-tab-btn {{ $loop->first ? 'active' : '' }}"
+                                    data-program-tab-target="program-pane-{{ $tabProfile->id }}"
+                                    role="tab"
+                                >
+                                    {{ $tabDegreeLabel ?: ($tabProfile->field ?: 'Program') }}
+                                </button>
+                            @endforeach
+                        </div>
+
+                        <div class="program-tab-content">
                         @foreach($profiles as $majorProfile)
                             @php
                                 $majorDegreeRows = $majorProfile->degrees;
@@ -883,7 +961,8 @@
                                 $majorPaymentsByLocation = $majorPaymentRows->groupBy(fn ($p) => $p->location ?: 'other');
                             @endphp
 
-                            <div class="major-block {{ ! $loop->last ? 'major-block-divider' : '' }}">
+                            <div class="program-tab-pane {{ $loop->first ? 'active' : '' }}" id="program-pane-{{ $majorProfile->id }}" role="tabpanel">
+                            <div class="major-block">
                                 <div class="d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
                                     <div>
                                         <h5 class="mb-1">{{ $majorProfile->field ?: 'Program' }}</h5>
@@ -1008,7 +1087,9 @@
                                     </div>
                                 @endif
                             </div>
+                            </div>
                         @endforeach
+                        </div>
                     @endif
                 </div>
 
@@ -1198,6 +1279,31 @@
                 if (e.key === 'Escape') close();
                 if (e.key === 'ArrowLeft') show(currentIndex - 1);
                 if (e.key === 'ArrowRight') show(currentIndex + 1);
+            });
+        })();
+
+        // FIX (16 September 2026, permintaan user -- tab Programs / Majors
+        // Available): vanilla JS (bukan Bootstrap JS -- halaman ini tidak
+        // load bootstrap.bundle.min.js sama sekali), pola sama persis
+        // dengan IIFE lightbox di atas.
+        (function () {
+            var tabButtons = Array.prototype.slice.call(document.querySelectorAll('.program-tab-btn'));
+            if (!tabButtons.length) return;
+
+            tabButtons.forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    var targetId = btn.getAttribute('data-program-tab-target');
+                    var targetPane = document.getElementById(targetId);
+                    if (!targetPane) return;
+
+                    tabButtons.forEach(function (b) { b.classList.remove('active'); });
+                    document.querySelectorAll('.program-tab-pane').forEach(function (pane) {
+                        pane.classList.remove('active');
+                    });
+
+                    btn.classList.add('active');
+                    targetPane.classList.add('active');
+                });
             });
         })();
     </script>
