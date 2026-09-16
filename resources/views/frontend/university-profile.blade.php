@@ -945,7 +945,9 @@
                                     --}}
                                     <div class="program-tabs-nav" role="tablist">
                                         @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
-                                            @php($tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel))
+                                            @php
+                                                $tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel);
+                                            @endphp
                                             <button type="button"
                                                 class="program-tab-btn{{ $loop->first ? ' active' : '' }}"
                                                 data-program-tab-target="{{ $tabId }}"
@@ -954,7 +956,9 @@
                                     </div>
                                     <div class="program-tab-content">
                                         @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
-                                            @php($tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel))
+                                            @php
+                                                $tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel);
+                                            @endphp
                                             <div class="program-tab-pane{{ $loop->first ? ' active' : '' }}" id="{{ $tabId }}" role="tabpanel">
                                                 @foreach($courseRows as $courseRow)
                                                     <div class="course-item">
