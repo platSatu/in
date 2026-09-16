@@ -2,6 +2,7 @@
 
 namespace App\Services\CourseCredit;
 
+use App\Helpers\MoneyMath;
 use App\Models\CourseCredit;
 use App\Models\CourseCreditAllocation;
 use App\Models\CoursePackagePurchase;
@@ -27,13 +28,12 @@ use InvalidArgumentException;
  * SUDAH tercatat di course_credit_allocations untuk tiap purchase (bukan
  * menaksir ulang dari kolom debit/kredit yang sudah tercampur jadi 1 pool).
  *
- * PRESISI: sengaja TIDAK pakai ekstensi bcmath (tidak ada satupun pemakaian
- * bcmath di codebase ini & belum bisa dipastikan aktif di server produksi).
- * Pembulatan SELALU ke bawah (supaya sistem tidak pernah "menciptakan" nilai
- * lebih dari yang sebenarnya pernah dibayar, sesuai kesepakatan diskusi
- * Konversi Paket) dilakukan lewat floorToScale() dengan epsilon kecil untuk
- * meredam representasi float yang tidak presisi (mis. 2.0 tersimpan sebagai
- * 1.9999999999998).
+ * PRESISI: pembulatan SELALU ke bawah (supaya sistem tidak pernah
+ * "menciptakan" nilai lebih dari yang sebenarnya pernah dibayar, sesuai
+ * kesepakatan diskusi Konversi Paket) dilakukan lewat App\Helpers\MoneyMath
+ * -- lihat docblock di sana untuk alasan lengkap kenapa tidak pakai bcmath.
+ * Dipakai sebagai utilitas BERSAMA supaya kebijakan pembulatan ini konsisten
+ * dengan App\Services\TeacherHonor\TeacherHonorService (Fase 3).
  *
  * KEAMANAN: row-locking (Student, semua CoursePackagePurchase student itu,
  * baris CourseCredit terakhir) SEMUA di dalam 1 DB transaction -- pola SAMA
@@ -91,20 +91,20 @@ class CourseCreditDebitService
                 }
 
                 $alreadyAllocated = (float) CourseCreditAllocation::where('course_package_purchase_id', $purchase->id)->sum('amount');
-                $availableInBatch = $this->floorToScale($creditsGranted - $alreadyAllocated, 2);
+                $availableInBatch = MoneyMath::floorToScale($creditsGranted - $alreadyAllocated, 2);
 
                 if ($availableInBatch <= 0.0) {
                     continue;
                 }
 
-                $takeFromBatch = $this->floorToScale(min($availableInBatch, $remaining), 2);
+                $takeFromBatch = MoneyMath::floorToScale(min($availableInBatch, $remaining), 2);
 
                 if ($takeFromBatch <= 0.0) {
                     continue;
                 }
 
-                $unitPrice = $this->floorToScale(((float) $purchase->price_paid) / $creditsGranted, 4);
-                $value = $this->floorToScale($takeFromBatch * $unitPrice, 2);
+                $unitPrice = MoneyMath::floorToScale(((float) $purchase->price_paid) / $creditsGranted, 4);
+                $value = MoneyMath::floorToScale($takeFromBatch * $unitPrice, 2);
 
                 $allocationRows[] = [
                     'course_package_purchase_id' => $purchase->id,
@@ -113,7 +113,7 @@ class CourseCreditDebitService
                     'value' => $value,
                 ];
 
-                $remaining = $this->floorToScale($remaining - $takeFromBatch, 2);
+                $remaining = MoneyMath::floorToScale($remaining - $takeFromBatch, 2);
             }
 
             // Jaring pengaman -- kalau ternyata FIFO di atas TIDAK bisa
@@ -126,7 +126,7 @@ class CourseCreditDebitService
                 );
             }
 
-            $balanceAfter = $this->floorToScale($balanceBefore - $amount, 2);
+            $balanceAfter = MoneyMath::floorToScale($balanceBefore - $amount, 2);
 
             $debit = CourseCredit::create([
                 'student_id' => $lockedStudent->id,
@@ -144,18 +144,5 @@ class CourseCreditDebitService
 
             return $debit->load('allocations');
         });
-    }
-
-    /**
-     * Bulatkan SELALU ke bawah ke $scale angka desimal -- epsilon kecil
-     * ditambahkan dulu untuk meredam representasi float yang tidak presisi
-     * (mis. 2.0 yang sebenarnya tersimpan sebagai 1.9999999999998 di memori)
-     * supaya tidak salah kepotong 1 angka lebih rendah dari yang seharusnya.
-     */
-    private function floorToScale(float $value, int $scale): float
-    {
-        $factor = 10 ** $scale;
-
-        return floor(($value * $factor) + 1e-6) / $factor;
     }
 }
