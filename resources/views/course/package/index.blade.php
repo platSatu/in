@@ -70,7 +70,7 @@
                                 <th>Promo</th>
                                 <th>Credits</th>
                                 <th>Status</th>
-                                <th width="180" class="text-center">Action</th>
+                                <th width="260" class="text-center">Action</th>
                             </tr>
                         </thead>
 
@@ -116,6 +116,21 @@
                                         <a href="{{ route('course.package.edit', $item->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
                                             Edit
                                         </a>
+
+                                        {{--
+                                            FIX (16 September 2026, permintaan user -- "buatkan fungsi
+                                            copy di packages index, pastikan semuanya tercopy sama
+                                            persis, name-nya tambahkan '- copy'"): duplikat 1 baris
+                                            lewat CoursePackageController::copy() -- lihat docblock
+                                            method tsb, semua kolom produk disalin apa adanya, cuma
+                                            name yang ditambah suffix ' - Copy'.
+                                        --}}
+                                        <form action="{{ route('course.package.copy', $item->id) }}" method="POST" class="m-0" onsubmit="return confirm('Copy course package ini?')">
+                                            @csrf
+                                            <button class="btn btn-sm btn-outline-secondary text-nowrap">
+                                                Copy
+                                            </button>
+                                        </form>
 
                                         <form action="{{ route('course.package.destroy', $item->id) }}" method="POST" class="m-0" onsubmit="return confirm('Delete this course package?')">
                                             @csrf

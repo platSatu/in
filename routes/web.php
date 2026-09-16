@@ -993,6 +993,7 @@ Route::middleware(['auth', 'permission:course.package,edit'])->prefix('dashboard
     Route::get('/{id}/edit', [CoursePackageController::class, 'edit'])->name('course.package.edit');
     Route::put('/{id}', [CoursePackageController::class, 'update'])->name('course.package.update');
     Route::delete('/{id}', [CoursePackageController::class, 'destroy'])->name('course.package.destroy');
+    Route::post('/{id}/copy', [CoursePackageController::class, 'copy'])->name('course.package.copy');
 });
 
 require __DIR__ . '/auth.php';

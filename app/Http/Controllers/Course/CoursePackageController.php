@@ -138,6 +138,50 @@ class CoursePackageController extends Controller
     }
 
     /**
+     * Duplikat 1 Course Package (permintaan user, 16 September 2026 --
+     * "pastikan semuanya tercopy sama persis, name-nya tambahkan '- Copy'").
+     *
+     * SEMUA kolom produk disalin apa adanya dari baris asli (type/class/
+     * level/duration/price/promo_price/description/status) -- cuma `name`
+     * yang diubah (ditambah suffix ' - Copy') dan `user_id` yang diisi
+     * ulang jadi admin yang lagi melakukan copy ini (bukan ikut punya
+     * admin pembuat baris asli). Credits SENGAJA dihitung ULANG lewat
+     * calculateCredits() (bukan sekadar disalin dari $original->credits)
+     * supaya tetap konsisten dengan aturan "credits selalu dihitung ulang
+     * di server" yang sama dipakai di store()/update() -- toh hasilnya
+     * pasti identik selama duration_value/duration_unit ikut disalin
+     * persis, kecuali rate di CREDITS_PER_DURATION_UNIT pernah berubah
+     * setelah baris asli dibuat.
+     */
+    public function copy(string $id)
+    {
+        $original = AdminCrud::findOrFail(CoursePackage::class, $id);
+
+        $userId = Auth::id();
+
+        $data = [
+            'name' => $original->name . ' - Copy',
+            'course_type_id' => $original->course_type_id,
+            'course_class_id' => $original->course_class_id,
+            'course_level_id' => $original->course_level_id,
+            'duration_value' => $original->duration_value,
+            'duration_unit' => $original->duration_unit,
+            'price' => $original->price,
+            'promo_price' => $original->promo_price,
+            'credits' => $this->calculateCredits((int) $original->duration_value, $original->duration_unit),
+            'description' => $original->description,
+            'status' => $original->status,
+            'user_id' => $userId !== null ? (string) $userId : null,
+        ];
+
+        AdminCrud::create(CoursePackage::class, $data);
+
+        return redirect()
+            ->route('course.package.index')
+            ->with('success', 'Course Package berhasil di-copy.');
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function validated(Request $request): array
