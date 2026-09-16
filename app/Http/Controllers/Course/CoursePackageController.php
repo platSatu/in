@@ -150,6 +150,11 @@ class CoursePackageController extends Controller
             'duration_value' => ['required', 'integer', 'min:1', 'max:120'],
             'duration_unit' => ['required', Rule::in(self::DURATION_UNITS)],
             'price' => ['required', 'numeric', 'min:0', 'max:999999999.99'],
+            // FIX (16 September 2026, permintaan user): promo_price OPSIONAL --
+            // kalau diisi, harga asli ditampilkan dicoret & ini yang jadi harga
+            // jual (lihat CoursePackage::hasActivePromo()/effectivePrice()).
+            // 'lt:price' otomatis menolak kalau promo_price >= price.
+            'promo_price' => ['nullable', 'numeric', 'min:0', 'lt:price', 'max:999999999.99'],
             // 'credits' SENGAJA tidak divalidasi/diambil dari input di sini --
             // selalu dihitung ulang lewat calculateCredits() di store()/update(),
             // lihat docblock CREDITS_PER_DURATION_UNIT di atas.

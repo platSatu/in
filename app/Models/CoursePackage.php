@@ -30,6 +30,7 @@ class CoursePackage extends Model
         'duration_value',
         'duration_unit',
         'price',
+        'promo_price',
         'credits',
         'description',
         'status',
@@ -38,8 +39,30 @@ class CoursePackage extends Model
     protected $casts = [
         'duration_value' => 'integer',
         'price' => 'decimal:2',
+        'promo_price' => 'decimal:2',
         'credits' => 'decimal:2',
     ];
+
+    /**
+     * FIX (16 September 2026, permintaan user): package "lagi promo" kalau
+     * promo_price diisi DAN lebih kecil dari price aslinya (dijaga juga di
+     * CoursePackageController lewat rule 'lt:price', ini jaring pengaman
+     * kedua di sisi Model kalau ada baris lama/aneh di DB).
+     */
+    public function hasActivePromo(): bool
+    {
+        return $this->promo_price !== null && (float) $this->promo_price < (float) $this->price;
+    }
+
+    /**
+     * Harga yang SEBENARNYA berlaku -- promo_price kalau lagi promo, price
+     * biasa kalau tidak. Dipakai di tempat manapun butuh "harga jual
+     * sekarang" tanpa perlu tahu logic promonya sendiri.
+     */
+    public function effectivePrice(): float
+    {
+        return $this->hasActivePromo() ? (float) $this->promo_price : (float) $this->price;
+    }
 
     public function user()
     {

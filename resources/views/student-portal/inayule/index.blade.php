@@ -122,8 +122,19 @@
                                                 <div style="flex-grow:1;"></div>
                                             @endif
 
-                                            <div class="fw-bold mb-3" style="font-size:18px;">
-                                                Rp {{ number_format((float) $package->price, 0, ',', '.') }}
+                                            <div class="mb-3">
+                                                @if($package->promo_price !== null && (float) $package->promo_price < (float) $package->price)
+                                                    <div class="text-muted text-decoration-line-through" style="font-size:13px;">
+                                                        Rp {{ number_format((float) $package->price, 0, ',', '.') }}
+                                                    </div>
+                                                    <div class="fw-bold text-danger" style="font-size:18px;">
+                                                        Rp {{ number_format((float) $package->promo_price, 0, ',', '.') }}
+                                                    </div>
+                                                @else
+                                                    <div class="fw-bold" style="font-size:18px;">
+                                                        Rp {{ number_format((float) $package->price, 0, ',', '.') }}
+                                                    </div>
+                                                @endif
                                             </div>
 
                                             {{-- Tombol Beli SENGAJA disabled -- logic pembelian belum

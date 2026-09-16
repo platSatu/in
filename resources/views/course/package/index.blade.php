@@ -67,6 +67,7 @@
                                 <th>Level</th>
                                 <th>Duration</th>
                                 <th>Price</th>
+                                <th>Promo</th>
                                 <th>Credits</th>
                                 <th>Status</th>
                                 <th width="180" class="text-center">Action</th>
@@ -91,6 +92,14 @@
                                 <td>{{ $item->duration_value }} {{ ucfirst($item->duration_unit) }}{{ $item->duration_value > 1 ? 's' : '' }}</td>
 
                                 <td>Rp {{ number_format((float) $item->price, 0, ',', '.') }}</td>
+
+                                <td>
+                                    @if ($item->promo_price !== null)
+                                        <span class="badge bg-danger">Rp {{ number_format((float) $item->promo_price, 0, ',', '.') }}</span>
+                                    @else
+                                        <span class="text-muted">-</span>
+                                    @endif
+                                </td>
 
                                 <td>{{ rtrim(rtrim(number_format((float) $item->credits, 2, ',', '.'), '0'), ',') }}</td>
 
@@ -123,7 +132,7 @@
                         @empty
 
                             <tr>
-                                <td colspan="10" class="text-center">
+                                <td colspan="11" class="text-center">
                                     No data.
                                 </td>
                             </tr>

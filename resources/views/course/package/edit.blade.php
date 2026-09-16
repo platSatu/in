@@ -179,6 +179,29 @@
                 </div>
             </div>
 
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Promo Price (Rp) <span class="text-muted small">(opsional)</span></label>
+
+                    <input
+                        type="number"
+                        name="promo_price"
+                        min="0"
+                        step="0.01"
+                        class="form-control @error('promo_price') is-invalid @enderror"
+                        value="{{ old('promo_price', $data->promo_price) }}"
+                        placeholder="Kosongkan kalau tidak ada promo">
+
+                    <div class="form-text">Kalau diisi, harga asli akan tampil dicoret dan harga ini yang jadi harga jual.</div>
+
+                    @error('promo_price')
+                        <div class="invalid-feedback">
+                            {{ $message }}
+                        </div>
+                    @enderror
+                </div>
+            </div>
+
             <div class="mb-3">
                 <label class="form-label">Description</label>
 

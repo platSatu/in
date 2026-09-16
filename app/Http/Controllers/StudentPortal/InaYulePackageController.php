@@ -52,7 +52,9 @@ class InaYulePackageController extends Controller
             ->when($typeId, fn (Builder $q) => $q->where('course_type_id', $typeId))
             ->when($classId, fn (Builder $q) => $q->where('course_class_id', $classId))
             ->when($levelId, fn (Builder $q) => $q->where('course_level_id', $levelId))
-            ->orderBy('name')
+            // FIX (16 September 2026, permintaan user): package yang TERAKHIR
+            // diinput admin selalu tampil paling atas -- sebelumnya orderBy('name').
+            ->latest()
             ->paginate(9)
             ->withQueryString();
 
