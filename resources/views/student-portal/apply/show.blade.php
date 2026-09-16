@@ -58,6 +58,23 @@
         }
         .btn-submit:hover { background: var(--brand-dark); color: #fff; }
         .alert-heads-up { border-radius: 12px; }
+        /* FIX v2 (permintaan user, 16 September 2026): kotak read-only
+           pengganti <select> saat jurusan sudah pasti dari ?course=...
+           (lihat $lockedCourse) -- tampilannya sengaja dibuat mirip
+           .form-control tapi jelas non-editable (ikon gembok). */
+        .locked-value-box {
+            background: #f8f9fc;
+            border: 1px solid #dfe3ee;
+            border-radius: 10px;
+            padding: 11px 14px;
+            font-weight: 600;
+            font-size: 14.5px;
+            color: #2b2f38;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .locked-value-box i { color: var(--brand); }
     </style>
 </head>
 
@@ -94,14 +111,19 @@
                 @if($profile->field) &middot; {{ $profile->field }} @endif
             </p>
             {{--
-                FIX (permintaan user, 16 September 2026): kalau siswa klik
-                Apply Now dari salah satu Degree tab (Bachelor/Master/dst) di
-                halaman profile, Degree itu dibawa ke sini lewat ?degree=...
-                (lihat StudentPortal\ApplyController::show()) -- badge ini
-                cuma penanda visual supaya siswa tahu jurusan yang tampil di
-                bawah sudah otomatis di-saring sesuai Degree yang dia pilih.
+                FIX v2 (permintaan user, 16 September 2026): kalau siswa klik
+                Apply dari salah satu jurusan (course-item) di halaman
+                profile, jurusan itu dibawa ke sini lewat ?course=... (lihat
+                $lockedCourse di StudentPortal\ApplyController::show()) --
+                badge ini menampilkan nama jurusan + Degree-nya. Fallback ke
+                $selectedDegree kalau yang dibawa cuma ?degree= (link lama,
+                versi sebelum per-jurusan).
             --}}
-            @if($selectedDegree)
+            @if($lockedCourse)
+                <span class="badge-pill" style="display:inline-flex; align-items:center; gap:6px; background:#fbe6ea; color:var(--brand); font-weight:700; font-size:12.5px; padding:6px 12px; border-radius:999px; margin-top:8px;">
+                    <i class="bi bi-mortarboard-fill"></i> Applying for: {{ $lockedCourse->course_name ?: ($profile->field ?: 'Program') }}{{ $lockedCourse->degree ? ' ('.$lockedCourse->degree.')' : '' }}
+                </span>
+            @elseif($selectedDegree)
                 <span class="badge-pill" style="display:inline-flex; align-items:center; gap:6px; background:#fbe6ea; color:var(--brand); font-weight:700; font-size:12.5px; padding:6px 12px; border-radius:999px; margin-top:8px;">
                     <i class="bi bi-mortarboard-fill"></i> Applying for: {{ $selectedDegree }}
                 </span>
@@ -137,49 +159,88 @@
                     @csrf
 
                     <div class="mb-3">
+                        <label class="form-label">Program / Major</label>
                         {{--
-                            FIX (permintaan user, 16 September 2026): dulu label option-nya
-                            gabungan "Degree - Intake - Duration" (mis. "Bachelor -
-                            September - 4 Years") -- kalau 1 Program punya beberapa Course
-                            dengan Degree/Intake/Duration yang SAMA, opsi-opsinya jadi
-                            kelihatan identik/tidak bisa dibedakan (course_name-nya malah
-                            tidak pernah ditampilkan sama sekali). Sekarang select ini
-                            fokus ke JURUSAN (course_name) dulu -- Degree ikut ditulis di
-                            belakang dalam kurung supaya tetap jelas kalau 1 Program ada
-                            campuran Bachelor & Master. Begitu jurusan dipilih, field
+                            FIX v2 (permintaan user, 16 September 2026): kalau siswa
+                            datang dari tombol Apply per-jurusan (course-item) di
+                            halaman profile, jurusannya sudah PASTI (dibawa lewat
+                            ?course=..., lihat $lockedCourse di
+                            StudentPortal\ApplyController::show()) -- jadi
+                            ditampilkan sebagai kotak read-only (BUKAN <select>)
+                            supaya tidak bisa diubah lagi dari sini. Value-nya tetap
+                            dikirim ke server lewat hidden input, name field-nya
+                            SAMA ("degree_intake_id") supaya ApplyController::store()
+                            tidak perlu diubah sama sekali. Kalau siswa mau ganti
+                            jurusan, harus balik dulu ke halaman profile (link
+                            "Back to ..." di atas / tombol back browser).
+
+                            <select> dropdown lama TETAP DIPERTAHANKAN untuk kasus
+                            fallback (?course= tidak ada/tidak valid, mis. link lama
+                            versi per-Degree atau Course sudah dihapus admin) --
+                            dulu label option-nya gabungan "Degree - Intake -
+                            Duration" (mis. "Bachelor - September - 4 Years") -- kalau
+                            1 Program punya beberapa Course dengan Degree/Intake/
+                            Duration yang SAMA, opsi-opsinya jadi kelihatan identik/
+                            tidak bisa dibedakan (course_name-nya malah tidak pernah
+                            ditampilkan sama sekali). Sekarang select ini fokus ke
+                            JURUSAN (course_name) dulu -- Degree ikut ditulis di
+                            belakang dalam kurung. Begitu jurusan dipilih, field
                             Intake & Duration di bawah otomatis muncul (readonly, cuma
                             utk konfirmasi -- bukan diisi manual) mengambil nilai dari
                             Course yang dipilih, lewat data-intake/data-duration di tiap
                             <option> + IIFE vanilla JS di bagian bawah file (pola sama
                             dengan IIFE lain di codebase ini, bukan Bootstrap JS).
                         --}}
-                        <label class="form-label">Program / Major</label>
-                        <select id="degreeIntakeSelect" name="degree_intake_id" class="form-select @error('degree_intake_id') is-invalid @enderror" required>
-                            <option value="">Choose...</option>
-                            @foreach($degreeOptions as $degreeRow)
-                                <option value="{{ $degreeRow->id }}"
-                                    data-intake="{{ $degreeRow->intake }}"
-                                    data-duration="{{ $degreeRow->duration }}"
-                                    {{ old('degree_intake_id') === $degreeRow->id ? 'selected' : '' }}>
-                                    {{ $degreeRow->course_name ?: ($profile->field ?: 'Program') }}{{ $degreeRow->degree ? ' (' . $degreeRow->degree . ')' : '' }}
-                                </option>
-                            @endforeach
-                        </select>
+                        @if($lockedCourse)
+                            <div class="locked-value-box">
+                                <i class="bi bi-lock-fill"></i>
+                                {{ $lockedCourse->course_name ?: ($profile->field ?: 'Program') }}{{ $lockedCourse->degree ? ' (' . $lockedCourse->degree . ')' : '' }}
+                            </div>
+                            <input type="hidden" name="degree_intake_id" value="{{ $lockedCourse->id }}">
+                            <div class="form-text">
+                                Fixed to the course you selected. <a href="{{ route('frontend.university.profile', $profile->university_id) }}">Go back</a> to choose a different one.
+                            </div>
+                        @else
+                            <select id="degreeIntakeSelect" name="degree_intake_id" class="form-select @error('degree_intake_id') is-invalid @enderror" required>
+                                <option value="">Choose...</option>
+                                @foreach($degreeOptions as $degreeRow)
+                                    <option value="{{ $degreeRow->id }}"
+                                        data-intake="{{ $degreeRow->intake }}"
+                                        data-duration="{{ $degreeRow->duration }}"
+                                        {{ old('degree_intake_id') === $degreeRow->id ? 'selected' : '' }}>
+                                        {{ $degreeRow->course_name ?: ($profile->field ?: 'Program') }}{{ $degreeRow->degree ? ' (' . $degreeRow->degree . ')' : '' }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        @endif
                         @error('degree_intake_id')
-                            <div class="invalid-feedback">{{ $message }}</div>
+                            <div class="invalid-feedback d-block">{{ $message }}</div>
                         @enderror
                     </div>
 
-                    <div class="row g-3 mb-3" id="degreeIntakeDetails" style="display:none;">
-                        <div class="col-sm-6">
-                            <label class="form-label">Intake</label>
-                            <input type="text" id="degreeIntakeDetailsIntake" class="form-control" value="" disabled>
+                    @if($lockedCourse)
+                        <div class="row g-3 mb-3">
+                            <div class="col-sm-6">
+                                <label class="form-label">Intake</label>
+                                <input type="text" class="form-control" value="{{ $lockedCourse->intake }}" disabled>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label">Duration</label>
+                                <input type="text" class="form-control" value="{{ $lockedCourse->duration }}" disabled>
+                            </div>
                         </div>
-                        <div class="col-sm-6">
-                            <label class="form-label">Duration</label>
-                            <input type="text" id="degreeIntakeDetailsDuration" class="form-control" value="" disabled>
+                    @else
+                        <div class="row g-3 mb-3" id="degreeIntakeDetails" style="display:none;">
+                            <div class="col-sm-6">
+                                <label class="form-label">Intake</label>
+                                <input type="text" id="degreeIntakeDetailsIntake" class="form-control" value="" disabled>
+                            </div>
+                            <div class="col-sm-6">
+                                <label class="form-label">Duration</label>
+                                <input type="text" id="degreeIntakeDetailsDuration" class="form-control" value="" disabled>
+                            </div>
                         </div>
-                    </div>
+                    @endif
 
                     <div class="mb-3">
                         <label class="form-label">Intake Year</label>

@@ -292,6 +292,16 @@
             border-radius: 8px;
         }
 
+        /* FIX v2 (permintaan user, 16 September 2026): tombol Apply kecil di
+           tiap jurusan (course-item), gantinya tombol per-Degree-tab
+           (.btn-apply-sm di atas, sekarang tidak dipakai lagi di sini). */
+        .btn-apply-course {
+            padding: 6px 14px;
+            font-size: 12px;
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
         /* ---------- DEGREE & COURSE (flow "pilih kampus -> degree -> jurusan",
            FIX 15 September 2026) -- tiap Major/Profile bisa punya beberapa baris
            Course (university_profile_degrees) yang dikelompokkan per Degree
@@ -1029,31 +1039,38 @@
                                                     $tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel);
                                                 @endphp
                                                 <div class="program-tab-pane{{ $loop->first ? ' active' : '' }}" id="{{ $tabId }}" role="tabpanel">
+                                                    {{--
+                                                        FIX v2 (permintaan user, 16 September 2026): tombol
+                                                        Apply Now per Degree tab (versi SEBELUMNYA) DIHAPUS
+                                                        dari sini -- sekarang tombol Apply ada di TIAP jurusan
+                                                        (course-item) di bawah, bukan lagi 1 tombol per tab,
+                                                        supaya form Apply yang dituju langsung terisi PENUH
+                                                        untuk jurusan spesifik yang diklik (bukan cuma
+                                                        ke-filter per Degree). Header ini tinggal judul saja.
+                                                    --}}
                                                     <div class="program-tab-pane-header">
                                                         <div class="program-tab-pane-title">
                                                             <i class="bi bi-journal-bookmark"></i> Available Courses
                                                         </div>
-                                                        {{--
-                                                            FIX (permintaan user, 16 September 2026): Apply Now
-                                                            per Degree tab (bukan lagi 1 tombol di header Program).
-                                                            ?degree=... dibawa ke halaman Apply supaya select
-                                                            "Program / Major" di sana otomatis cuma menampilkan
-                                                            jurusan (Course) yang Degree-nya SAMA dengan tab yang
-                                                            sedang aktif saat tombol ini diklik (lihat filter di
-                                                            StudentPortal\ApplyController::show()).
-                                                        --}}
-                                                        <a href="{{ route('student-portal.apply.show', $majorProfile->id) }}{{ $degreeLabel === 'Other' ? '' : '?degree='.urlencode($degreeLabel) }}" class="btn-apply btn-apply-sm">
-                                                            {{-- Tab "Other" = baris Course lama yang belum ada Degree-nya
-                                                                 (data lama sebelum fitur Degree/Course ada) -- sengaja
-                                                                 TIDAK dikirim ?degree= (tidak ada Degree yang cocok untuk
-                                                                 difilter), jadi otomatis fallback ke tampilan semua
-                                                                 jurusan seperti sebelum perubahan ini. --}}
-                                                            <i class="bi bi-send-check"></i> Apply Now{{ $degreeLabel === 'Other' ? '' : ' - '.$degreeLabel }}
-                                                        </a>
                                                     </div>
                                                     @foreach($courseRows as $courseRow)
                                                         <div class="course-item">
-                                                            <div class="course-name">{{ $courseRow->course_name ?: ($majorProfile->field ?: 'Program') }}</div>
+                                                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-1">
+                                                                <div class="course-name mb-0">{{ $courseRow->course_name ?: ($majorProfile->field ?: 'Program') }}</div>
+                                                                {{--
+                                                                    FIX v2 (permintaan user, 16 September 2026): tombol
+                                                                    Apply Now dipindah ke tiap jurusan (course-item) --
+                                                                    ?course=<id Course ini> dibawa ke halaman Apply
+                                                                    supaya form di sana langsung terisi jurusan ini
+                                                                    (read-only, tidak bisa diganti dari situ -- lihat
+                                                                    $lockedCourse di
+                                                                    StudentPortal\ApplyController::show() &
+                                                                    student-portal.apply.show).
+                                                                --}}
+                                                                <a href="{{ route('student-portal.apply.show', $majorProfile->id) }}?course={{ $courseRow->id }}" class="btn-apply btn-apply-course">
+                                                                    <i class="bi bi-send-check"></i> Apply
+                                                                </a>
+                                                            </div>
                                                             @if($courseRow->intake || $courseRow->duration || $courseRow->starting_date || $courseRow->application_deadline || $courseRow->language)
                                                                 <div class="course-meta">
                                                                     @if($courseRow->intake)

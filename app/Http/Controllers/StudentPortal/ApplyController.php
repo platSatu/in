@@ -46,26 +46,40 @@ class ApplyController extends Controller
             ->where('status', 'active')
             ->findOrFail($universityProfileId);
 
-        // FIX (permintaan user, 16 September 2026): tombol Apply Now di
-        // halaman frontend.university-profile sekarang ada DI DALAM tiap
-        // Degree tab (Bachelor/Master/dst), bukan lagi 1 tombol umum per
-        // Program -- lihat komentar di university-profile.blade.php. Degree
-        // yang lagi aktif saat tombol itu diklik dibawa ke sini lewat query
-        // string ?degree=..., supaya select "Program / Major" di form Apply
-        // otomatis cuma menampilkan jurusan (Course) yang Degree-nya SAMA
-        // dengan yang dipilih siswa dari halaman profile -- bukan
-        // dicampur semua Degree jadi satu dropdown panjang.
+        // FIX v2 (permintaan user, 16 September 2026): tombol Apply Now di
+        // halaman frontend.university-profile sekarang ada DI TIAP JURUSAN
+        // (course-item), bukan lagi di level Degree tab -- begitu diklik,
+        // jurusan (Course) yang dipilih siswa dibawa ke sini lewat query
+        // string ?course=<id Course>, supaya form Apply LANGSUNG terisi
+        // penuh untuk jurusan itu (lihat $lockedCourse & tampilan read-only
+        // di student-portal.apply.show, gantinya <select> dropdown).
+        //
+        // ?degree=... (versi SEBELUMNYA, tombol per Degree tab) TETAP
+        // didukung di sini sebagai fallback untuk kompatibilitas kalau ada
+        // link lama yang masih beredar/di-bookmark -- tapi halaman profile
+        // sekarang tidak pernah generate link seperti itu lagi.
         //
         // SENGAJA cuma filter tampilan (bukan keamanan) -- store() di bawah
         // tetap validasi degree_intake_id itu benar milik $profile ini,
-        // apapun query string-nya. Kalau ?degree= tidak dikirim, kosong,
-        // atau tidak cocok dengan Degree manapun (mis. link lama/salah
-        // ketik), fallback ke SEMUA degree seperti sebelum perubahan ini --
-        // jadi behaviour lama tetap jalan kalau tidak ada ?degree=.
+        // apapun query string-nya. Kalau ?course=/?degree= tidak dikirim,
+        // kosong, atau tidak cocok (mis. link lama/salah ketik/Course sudah
+        // dihapus admin), fallback ke SEMUA degree seperti sebelum
+        // perubahan ini -- jadi behaviour lama tetap jalan.
+        $selectedCourseId = $request->query('course');
         $selectedDegree = $request->query('degree');
         $degreeOptions = $profile->degrees;
+        $lockedCourse = null;
 
-        if (filled($selectedDegree)) {
+        if (filled($selectedCourseId)) {
+            $lockedCourse = $profile->degrees->firstWhere('id', $selectedCourseId);
+
+            if ($lockedCourse) {
+                $degreeOptions = collect([$lockedCourse]);
+                $selectedDegree = $lockedCourse->degree;
+            }
+        }
+
+        if (! $lockedCourse && filled($selectedDegree)) {
             $filtered = $profile->degrees->filter(fn ($row) => $row->degree === $selectedDegree)->values();
 
             if ($filtered->isNotEmpty()) {
@@ -105,6 +119,7 @@ class ApplyController extends Controller
             'profile' => $profile,
             'degreeOptions' => $degreeOptions,
             'selectedDegree' => $selectedDegree,
+            'lockedCourse' => $lockedCourse,
             'registrationFee' => $registrationFee,
             'defaultWhatsapp' => $student->handphone ?? $user->handphone ?? '',
         ]);
