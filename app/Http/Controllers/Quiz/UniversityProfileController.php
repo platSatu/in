@@ -119,7 +119,13 @@ public function store(Request $request)
         // kebutuhan tiap kampus beda-beda, tidak semua profile perlu diisi.
         'degree_title' => 'nullable|string|max:255',
         'key_courses' => 'nullable|string',
-        'entry_requirements' => 'nullable|string',
+        // FIX (permintaan user, 16 September 2026): Entry Requirements
+        // sekarang dikirim sebagai array (1 baris input per syarat, lihat
+        // create.blade.php) -- digabung jadi 1 string dipisah baris baru
+        // sebelum disimpan (lihat blok di bawah setelah validasi), kolom di
+        // DB tetap 1 string, tidak ada migration baru.
+        'entry_requirements' => 'nullable|array',
+        'entry_requirements.*' => 'nullable|string|max:500',
         'min_budget' => 'nullable|integer|min:0',
         'max_budget' => 'nullable|integer|min:0|gte:min_budget',
         'language' => 'nullable|string|max:255',
@@ -242,6 +248,15 @@ public function store(Request $request)
     // di sini; datanya sepenuhnya hidup di tabel `university_profile_degrees`.
     $validated['field'] = optional($university->major)->name ?? '';
 
+    // FIX (permintaan user, 16 September 2026): gabung baris-baris Entry
+    // Requirements (array dari "add row" di create.blade.php) jadi 1 string
+    // dipisah baris baru sebelum disimpan -- kolom `entry_requirements` di
+    // tabel `university_profiles` tetap 1 string, tidak berubah tipenya.
+    $validated['entry_requirements'] = collect($validated['entry_requirements'] ?? [])
+        ->map(fn ($item) => trim((string) $item))
+        ->filter()
+        ->implode("\n");
+
     $profile = AdminCrud::create(UniversityProfile::class, $validated);
 
     foreach ($degreeIntakeRows as $index => $row) {
@@ -333,7 +348,11 @@ public function store(Request $request)
             'field' => 'nullable|string|max:255',
             'degree_title' => 'nullable|string|max:255',
             'key_courses' => 'nullable|string',
-            'entry_requirements' => 'nullable|string',
+            // FIX (permintaan user, 16 September 2026): sama seperti store()
+            // -- Entry Requirements sekarang array (1 baris input per
+            // syarat), digabung jadi 1 string di bawah sebelum disimpan.
+            'entry_requirements' => 'nullable|array',
+            'entry_requirements.*' => 'nullable|string|max:500',
             'min_budget' => 'nullable|integer|min:0',
             'max_budget' => 'nullable|integer|min:0|gte:min_budget',
             'language' => 'nullable|string|max:255',
@@ -383,6 +402,14 @@ public function store(Request $request)
         // sampai null ikut dikirim ke DB (disamakan dengan fallback '' yang
         // dipakai store()).
         $validated['field'] = $validated['field'] ?? '';
+
+        // FIX (permintaan user, 16 September 2026): sama seperti store() --
+        // gabung baris-baris Entry Requirements jadi 1 string dipisah baris
+        // baru sebelum disimpan.
+        $validated['entry_requirements'] = collect($validated['entry_requirements'] ?? [])
+            ->map(fn ($item) => trim((string) $item))
+            ->filter()
+            ->implode("\n");
 
         // Buang baris Course/Degree & payment yang semuanya kosong (sama
         // logikanya dengan store()).

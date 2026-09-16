@@ -96,14 +96,41 @@
 
                     <div class="row mb-4">
                         <div class="col-sm-12">
-                            <label for="entry_requirements" class="mb-2">Entry Requirements</label>
-                            <textarea class="form-control @error('entry_requirements') is-invalid @enderror" id="entry_requirements"
-                                name="entry_requirements" rows="4"
-                                placeholder="Syarat masuk, mis. Master degree students under age 35 / Non-Chinese National">{{ old('entry_requirements') }}</textarea>
+                            <label class="mb-2">Entry Requirements</label>
+                            {{--
+                                FIX (permintaan user, 16 September 2026): Entry
+                                Requirements dulunya 1 textarea bebas (dipisah
+                                "/" atau baris baru secara manual oleh admin) --
+                                sekarang tiap syarat jadi baris input sendiri
+                                (tersusun ke bawah, sama polanya dengan
+                                Payment/Scholarship "add row" di bawah) supaya
+                                tidak salah pisah pas ditampilkan di frontend
+                                (lihat $splitFreeText di
+                                frontend/university-profile.blade.php). Baris-
+                                baris ini digabung jadi 1 string (dipisah baris
+                                baru) di UniversityProfileController sebelum
+                                disimpan -- kolomnya di DB tetap 1 string,
+                                tidak ada migration baru.
+                            --}}
+                            <div class="form-text mb-2" style="color:#6c757d;">Tambahkan tiap syarat sebagai baris terpisah. Boleh dikosongkan.</div>
+                            <div id="entryRequirementRows">
+                                <div class="entry-requirement-row d-flex gap-2 mb-2">
+                                    <input type="text" name="entry_requirements[]"
+                                        class="form-control @error('entry_requirements.0') is-invalid @enderror"
+                                        value="{{ old('entry_requirements.0') }}"
+                                        placeholder="mis. Master degree students under age 35">
+                                    <button type="button" class="btn btn-outline-danger btn-remove-entry-requirement-row">&times;</button>
+                                    @error('entry_requirements.0')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @enderror
+                                </div>
+                            </div>
                             @error('entry_requirements')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
-                            <div class="form-text" style="color:#6c757d;">Boleh dikosongkan.</div>
+                            <button type="button" id="btnAddEntryRequirementRow" class="btn btn-outline-primary btn-sm mt-1">
+                                + Tambah Syarat
+                            </button>
                         </div>
                     </div>
 
@@ -617,6 +644,16 @@
     </div>
 </template>
 
+{{-- FIX (permintaan user, 16 September 2026): template baris baru Entry
+     Requirements, dipakai JS saat klik "+ Tambah Syarat" -- tidak perlu
+     __INDEX__ karena name-nya array polos `entry_requirements[]`. --}}
+<template id="entryRequirementRowTemplate">
+    <div class="entry-requirement-row d-flex gap-2 mb-2">
+        <input type="text" name="entry_requirements[]" class="form-control" placeholder="mis. Master degree students under age 35">
+        <button type="button" class="btn btn-outline-danger btn-remove-entry-requirement-row">&times;</button>
+    </div>
+</template>
+
 <script>
     (function () {
         var rowIndex = 1; // index 0 sudah dipakai baris pertama
@@ -738,6 +775,36 @@
         }
 
         scholarshipSelect.addEventListener('change', toggleScholarshipSection);
+    })();
+
+    (function () {
+        // FIX (permintaan user, 16 September 2026): "add row" untuk Entry
+        // Requirements -- lebih sederhana dari Degree/Intake, Payment &
+        // Scholarship di atas karena cuma 1 input teks per baris, jadi tidak
+        // perlu rowIndex/__INDEX__ (name-nya array polos entry_requirements[]).
+        var container = document.getElementById('entryRequirementRows');
+        var template = document.getElementById('entryRequirementRowTemplate');
+
+        document.getElementById('btnAddEntryRequirementRow').addEventListener('click', function () {
+            var wrapper = document.createElement('div');
+            wrapper.innerHTML = template.innerHTML.trim();
+            container.appendChild(wrapper.firstElementChild);
+        });
+
+        container.addEventListener('click', function (e) {
+            if (e.target && e.target.classList.contains('btn-remove-entry-requirement-row')) {
+                var rows = container.querySelectorAll('.entry-requirement-row');
+                if (rows.length > 1) {
+                    e.target.closest('.entry-requirement-row').remove();
+                } else {
+                    // Baris terakhir tetap dibiarkan ada, cukup dikosongkan saja.
+                    var input = e.target.closest('.entry-requirement-row').querySelector('input');
+                    if (input) {
+                        input.value = '';
+                    }
+                }
+            }
+        });
     })();
 </script>
 

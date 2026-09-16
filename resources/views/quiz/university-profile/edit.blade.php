@@ -79,14 +79,52 @@
 
                     <div class="row mb-4">
                         <div class="col-sm-12">
-                            <label for="entry_requirements" class="mb-2">Entry Requirements</label>
-                            <textarea class="form-control @error('entry_requirements') is-invalid @enderror" id="entry_requirements"
-                                name="entry_requirements" rows="4"
-                                placeholder="Syarat masuk, mis. Master degree students under age 35 / Non-Chinese National">{{ old('entry_requirements', $data->entry_requirements) }}</textarea>
+                            <label class="mb-2">Entry Requirements</label>
+                            {{--
+                                FIX (permintaan user, 16 September 2026): sama
+                                seperti create.blade.php -- Entry Requirements
+                                sekarang jadi baris input terpisah (tersusun ke
+                                bawah), bukan 1 textarea bebas lagi. Data lama
+                                (1 string, dipisah "/" atau baris baru) dipecah
+                                dulu di sini jadi array supaya tiap syaratnya
+                                muncul di baris sendiri-sendiri -- logikanya
+                                SAMA PERSIS dengan $splitFreeText di
+                                frontend/university-profile.blade.php.
+                            --}}
+                            @php
+                                $existingEntryRequirementsRaw = trim((string) $data->entry_requirements);
+                                $existingEntryRequirements = $existingEntryRequirementsRaw === ''
+                                    ? collect()
+                                    : collect(
+                                        str_contains($existingEntryRequirementsRaw, '/')
+                                            ? explode('/', $existingEntryRequirementsRaw)
+                                            : preg_split('/\r\n|\r|\n/', $existingEntryRequirementsRaw)
+                                    )->map('trim')->filter()->values();
+                                if ($existingEntryRequirements->isEmpty()) {
+                                    $existingEntryRequirements = collect(['']);
+                                }
+                            @endphp
+                            <div class="form-text mb-2" style="color:#6c757d;">Tambahkan tiap syarat sebagai baris terpisah. Boleh dikosongkan.</div>
+                            <div id="entryRequirementRows">
+                                @foreach ($existingEntryRequirements as $entryReqIndex => $entryReqValue)
+                                    <div class="entry-requirement-row d-flex gap-2 mb-2">
+                                        <input type="text" name="entry_requirements[]"
+                                            class="form-control @error('entry_requirements.' . $entryReqIndex) is-invalid @enderror"
+                                            value="{{ old('entry_requirements.' . $entryReqIndex, $entryReqValue) }}"
+                                            placeholder="mis. Master degree students under age 35">
+                                        <button type="button" class="btn btn-outline-danger btn-remove-entry-requirement-row">&times;</button>
+                                        @error('entry_requirements.' . $entryReqIndex)
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                @endforeach
+                            </div>
                             @error('entry_requirements')
-                                <div class="invalid-feedback">{{ $message }}</div>
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
                             @enderror
-                            <div class="form-text" style="color:#6c757d;">Boleh dikosongkan.</div>
+                            <button type="button" id="btnAddEntryRequirementRow" class="btn btn-outline-primary btn-sm mt-1">
+                                + Tambah Syarat
+                            </button>
                         </div>
                     </div>
 
@@ -656,6 +694,17 @@
     </div>
 </template>
 
+{{-- FIX (permintaan user, 16 September 2026): template baris baru Entry
+     Requirements, dipakai JS saat klik "+ Tambah Syarat" -- sama seperti
+     create.blade.php, tidak perlu __INDEX__ karena name-nya array polos
+     `entry_requirements[]`. --}}
+<template id="entryRequirementRowTemplate">
+    <div class="entry-requirement-row d-flex gap-2 mb-2">
+        <input type="text" name="entry_requirements[]" class="form-control" placeholder="mis. Master degree students under age 35">
+        <button type="button" class="btn btn-outline-danger btn-remove-entry-requirement-row">&times;</button>
+    </div>
+</template>
+
 <script>
     (function () {
         // rowIndex dimulai dari jumlah baris Degree/Intake yang sudah ada
@@ -780,6 +829,35 @@
         }
 
         scholarshipSelect.addEventListener('change', toggleScholarshipSection);
+    })();
+
+    (function () {
+        // FIX (permintaan user, 16 September 2026): sama persis dengan
+        // create.blade.php -- "add row" Entry Requirements, cuma 1 input
+        // teks per baris jadi tidak perlu rowIndex/__INDEX__.
+        var container = document.getElementById('entryRequirementRows');
+        var template = document.getElementById('entryRequirementRowTemplate');
+
+        document.getElementById('btnAddEntryRequirementRow').addEventListener('click', function () {
+            var wrapper = document.createElement('div');
+            wrapper.innerHTML = template.innerHTML.trim();
+            container.appendChild(wrapper.firstElementChild);
+        });
+
+        container.addEventListener('click', function (e) {
+            if (e.target && e.target.classList.contains('btn-remove-entry-requirement-row')) {
+                var rows = container.querySelectorAll('.entry-requirement-row');
+                if (rows.length > 1) {
+                    e.target.closest('.entry-requirement-row').remove();
+                } else {
+                    // Baris terakhir tetap dibiarkan ada, cukup dikosongkan saja.
+                    var input = e.target.closest('.entry-requirement-row').querySelector('input');
+                    if (input) {
+                        input.value = '';
+                    }
+                }
+            }
+        });
     })();
 </script>
 
