@@ -8,6 +8,7 @@ use App\Models\University;
 use App\Models\UniversityProfile;
 use App\Models\UniversityProfileDegree;
 use App\Models\UniversityProfilePayment;
+use App\Models\UniversityProfileScholarship;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -154,6 +155,16 @@ public function store(Request $request)
         'payments.*.name' => 'nullable|string|max:255',
         'payments.*.amount' => 'nullable|integer|min:0',
         'payments.*.fee_type' => 'nullable|in:registration_fee,tuition_fee,dormitory_fee,deposit_china,other',
+        // Scholarship: daftar rincian beasiswa ("add row" juga, sama pola
+        // dengan Payment), ditampilkan di form cuma kalau
+        // scholarship_available dipilih "Yes" -- tapi validasinya tetap
+        // jalan seperti biasa, tidak digantung ke nilai scholarship_available
+        // (kalau browser kirim baris kosong karena section-nya disembunyikan,
+        // baris itu dibuang lewat filter isNotEmpty di bawah).
+        'scholarships' => 'nullable|array',
+        'scholarships.*.name' => 'nullable|string|max:255',
+        'scholarships.*.price' => 'nullable|integer|min:0',
+        'scholarships.*.currency' => ['nullable', 'string', Rule::in(UniversityProfileScholarship::CURRENCIES)],
     ]);
 
     $userId = Auth::id();
@@ -195,6 +206,15 @@ public function store(Request $request)
         ->values();
 
     unset($validated['payments']);
+
+    // Sama seperti degree/intake & payment di atas — buang baris scholarship
+    // yang semuanya kosong (termasuk baris kosong yang ikut terkirim kalau
+    // section-nya sempat disembunyikan JS pas scholarship_available "No").
+    $scholarshipRows = collect($validated['scholarships'] ?? [])
+        ->filter(fn ($row) => filled($row['name'] ?? null) || filled($row['price'] ?? null) || filled($row['currency'] ?? null))
+        ->values();
+
+    unset($validated['scholarships']);
 
     $validated['user_id'] = (string) $userId;
 
@@ -239,6 +259,17 @@ public function store(Request $request)
         ]);
     }
 
+    foreach ($scholarshipRows as $index => $row) {
+        UniversityProfileScholarship::create([
+            'user_id' => (string) $userId,
+            'university_profile_id' => $profile->id,
+            'name' => $row['name'] ?? null,
+            'price' => $row['price'] ?? null,
+            'currency' => $row['currency'] ?? null,
+            'sort_order' => $index,
+        ]);
+    }
+
     // Kembali ke halaman "profile" University (quiz.university.show) — di
     // situ juga sudah ada tombol +Add Album, jadi user tetap bisa lanjut
     // menambahkan album dari sana kalau mau.
@@ -255,7 +286,7 @@ public function store(Request $request)
             abort(401);
         }
 
-        $data = AdminCrud::findOrFail(UniversityProfile::class, $id, null, ['university', 'degrees', 'payments']);
+        $data = AdminCrud::findOrFail(UniversityProfile::class, $id, null, ['university', 'degrees', 'payments', 'scholarships']);
 
         $universities = University::query()
             ->orderBy('name')
@@ -310,6 +341,13 @@ public function store(Request $request)
             'payments.*.name' => 'nullable|string|max:255',
             'payments.*.amount' => 'nullable|integer|min:0',
             'payments.*.fee_type' => 'nullable|in:registration_fee,tuition_fee,dormitory_fee,deposit_china,other',
+            // Scholarship: sama pola "add row" dengan store() -- seluruh
+            // baris lama diganti dengan baris yang dikirim form ini (lihat
+            // sinkronisasi delete+recreate di bawah).
+            'scholarships' => 'nullable|array',
+            'scholarships.*.name' => 'nullable|string|max:255',
+            'scholarships.*.price' => 'nullable|integer|min:0',
+            'scholarships.*.currency' => ['nullable', 'string', Rule::in(UniversityProfileScholarship::CURRENCIES)],
         ]);
 
         // Tidak lagi dibatasi ->where('user_id', ...) -- cukup pastikan id-nya valid.
@@ -345,7 +383,11 @@ public function store(Request $request)
             ->filter(fn ($row) => filled($row['location'] ?? null) || filled($row['name'] ?? null) || filled($row['amount'] ?? null) || filled($row['fee_type'] ?? null))
             ->values();
 
-        unset($validated['degree_intakes'], $validated['payments']);
+        $scholarshipRows = collect($validated['scholarships'] ?? [])
+            ->filter(fn ($row) => filled($row['name'] ?? null) || filled($row['price'] ?? null) || filled($row['currency'] ?? null))
+            ->values();
+
+        unset($validated['degree_intakes'], $validated['payments'], $validated['scholarships']);
 
         $profile = AdminCrud::update(UniversityProfile::class, $id, $validated, null);
 
@@ -379,6 +421,18 @@ public function store(Request $request)
                 'name' => $row['name'] ?? null,
                 'amount' => $row['amount'] ?? null,
                 'fee_type' => $row['fee_type'] ?? null,
+                'sort_order' => $index,
+            ]);
+        }
+
+        $profile->scholarships()->delete();
+        foreach ($scholarshipRows as $index => $row) {
+            UniversityProfileScholarship::create([
+                'user_id' => (string) $userId,
+                'university_profile_id' => $profile->id,
+                'name' => $row['name'] ?? null,
+                'price' => $row['price'] ?? null,
+                'currency' => $row['currency'] ?? null,
                 'sort_order' => $index,
             ]);
         }

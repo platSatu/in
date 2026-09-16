@@ -70,4 +70,16 @@ class UniversityProfile extends Model
         return $this->hasMany(UniversityProfilePayment::class, 'university_profile_id')
             ->orderBy('sort_order');
     }
+
+    /**
+     * Daftar rincian Scholarship (Name/Price/Currency) per University
+     * Profile, sama polanya dengan degrees()/payments() di atas -- child
+     * table lewat fitur "add row", ditampilkan di form admin cuma kalau
+     * "Scholarship Available" dipilih "Yes".
+     */
+    public function scholarships()
+    {
+        return $this->hasMany(UniversityProfileScholarship::class, 'university_profile_id')
+            ->orderBy('sort_order');
+    }
 }

@@ -281,6 +281,65 @@
                         + Tambah Payment
                     </button>
 
+                    <hr>
+                    <label class="form-label">Scholarship</label>
+                    <div class="form-text mb-2" style="color:#6c757d;">Section ini cuma tampil kalau "Scholarship Available" di samping dipilih "Yes". Boleh dikosongkan, atau isi lebih dari satu item scholarship.</div>
+
+                    {{-- Ditampilkan awal cuma kalau scholarship_available sudah "Yes" (mis.
+                         validasi gagal & form reload dengan old input) -- lihat IIFE toggle
+                         di bawah untuk perubahan setelah select diganti. --}}
+                    <div id="scholarshipSection" style="{{ old('scholarship_available') === '1' ? '' : 'display:none;' }}">
+                        <div id="scholarshipRows">
+
+                            {{-- Baris awal (index 0) --}}
+                            <div class="scholarship-row border rounded p-3 mb-3">
+                                <div class="row g-3">
+                                    <div class="col-md-5">
+                                        <label class="form-label">Name</label>
+                                        <input type="text" name="scholarships[0][name]"
+                                            class="form-control @error('scholarships.0.name') is-invalid @enderror"
+                                            value="{{ old('scholarships.0.name') }}" placeholder="mis. Full Scholarship">
+                                        @error('scholarships.0.name')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label">Price</label>
+                                        <input type="number" min="0" name="scholarships[0][price]"
+                                            class="form-control @error('scholarships.0.price') is-invalid @enderror"
+                                            value="{{ old('scholarships.0.price') }}" placeholder="0">
+                                        @error('scholarships.0.price')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label">Currency</label>
+                                        <select name="scholarships[0][currency]"
+                                            class="form-select @error('scholarships.0.currency') is-invalid @enderror">
+                                            <option value="">Choose...</option>
+                                            <option value="rupiah" {{ old('scholarships.0.currency') === 'rupiah' ? 'selected' : '' }}>Rupiah (Rp)</option>
+                                            <option value="yuan" {{ old('scholarships.0.currency') === 'yuan' ? 'selected' : '' }}>Yuan (元)</option>
+                                        </select>
+                                        @error('scholarships.0.currency')
+                                            <div class="invalid-feedback">{{ $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                                <div class="row g-3 mt-1">
+                                    <div class="col-12">
+                                        <button type="button" class="btn btn-outline-danger btn-remove-scholarship-row w-100">
+                                            Hapus
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" id="btnAddScholarshipRow" class="btn btn-outline-primary mb-4">
+                            + Tambah Scholarship
+                        </button>
+                    </div>
+
                     <div class="row mb-4">
                         <div class="col-sm-6">
                             <label for="min_budget" class="mb-2">Min Budget</label>
@@ -469,6 +528,37 @@
     </div>
 </template>
 
+{{-- Template baris baru Scholarship, dipakai JS saat klik "Tambah Scholarship" --}}
+<template id="scholarshipRowTemplate">
+    <div class="scholarship-row border rounded p-3 mb-3">
+        <div class="row g-3">
+            <div class="col-md-5">
+                <label class="form-label">Name</label>
+                <input type="text" name="scholarships[__INDEX__][name]" class="form-control" placeholder="mis. Full Scholarship">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Price</label>
+                <input type="number" min="0" name="scholarships[__INDEX__][price]" class="form-control" placeholder="0">
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Currency</label>
+                <select name="scholarships[__INDEX__][currency]" class="form-select">
+                    <option value="">Choose...</option>
+                    <option value="rupiah">Rupiah (Rp)</option>
+                    <option value="yuan">Yuan (元)</option>
+                </select>
+            </div>
+        </div>
+        <div class="row g-3 mt-1">
+            <div class="col-12">
+                <button type="button" class="btn btn-outline-danger btn-remove-scholarship-row w-100">
+                    Hapus
+                </button>
+            </div>
+        </div>
+    </div>
+</template>
+
 <script>
     (function () {
         var rowIndex = 1; // index 0 sudah dipakai baris pertama
@@ -530,6 +620,51 @@
                 }
             }
         });
+    })();
+
+    (function () {
+        // Sama persis polanya dengan IIFE Degree/Intake & Payment di atas.
+        var rowIndex = 1; // index 0 sudah dipakai baris pertama
+        var container = document.getElementById('scholarshipRows');
+        var template = document.getElementById('scholarshipRowTemplate');
+
+        document.getElementById('btnAddScholarshipRow').addEventListener('click', function () {
+            var html = template.innerHTML.replaceAll('__INDEX__', rowIndex);
+            var wrapper = document.createElement('div');
+            wrapper.innerHTML = html.trim();
+            container.appendChild(wrapper.firstElementChild);
+            rowIndex++;
+        });
+
+        container.addEventListener('click', function (e) {
+            if (e.target && e.target.classList.contains('btn-remove-scholarship-row')) {
+                var rows = container.querySelectorAll('.scholarship-row');
+                if (rows.length > 1) {
+                    e.target.closest('.scholarship-row').remove();
+                } else {
+                    // Baris terakhir tetap dibiarkan ada, tapi boleh kosong
+                    // (semua field scholarship nullable) — jadi cukup dikosongkan saja.
+                    var row = e.target.closest('.scholarship-row');
+                    row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+                    row.querySelectorAll('select').forEach(function (select) { select.value = ''; });
+                }
+            }
+        });
+    })();
+
+    (function () {
+        // FIX (permintaan user, 16 September 2026): section "Scholarship"
+        // (add row Name/Price/Currency) di-toggle tampil/sembunyi mengikuti
+        // pilihan select "Scholarship Available" -- tampil kalau "Yes",
+        // sembunyi kalau "No"/belum dipilih.
+        var scholarshipSelect = document.getElementById('scholarship_available');
+        var scholarshipSection = document.getElementById('scholarshipSection');
+
+        function toggleScholarshipSection() {
+            scholarshipSection.style.display = scholarshipSelect.value === '1' ? '' : 'none';
+        }
+
+        scholarshipSelect.addEventListener('change', toggleScholarshipSection);
     })();
 </script>
 
