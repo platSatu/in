@@ -928,9 +928,23 @@
                                             <div class="text-muted" style="font-size:13.5px;">{{ $majorProfile->degree_title }}</div>
                                         @endif
                                     </div>
-                                    <a href="{{ route('student-portal.apply.show', $majorProfile->id) }}" class="btn-apply">
-                                        <i class="bi bi-send-check"></i> Apply Now
-                                    </a>
+                                    {{--
+                                        FIX (permintaan user, 16 September 2026): tombol Apply Now
+                                        di header Program ini DIHAPUS untuk kasus yang punya Degree
+                                        tab (Bachelor/Master/dst) -- supaya tidak ambigu jurusan mana
+                                        yang mau di-apply. Tombol Apply Now sekarang dipindah ke
+                                        DALAM tiap tab pane (lihat di bawah), jadi ikut ter-scope ke
+                                        Degree tab yang lagi aktif saat diklik, dan otomatis membawa
+                                        Degree itu ke halaman Apply lewat query string ?degree=...
+                                        (dibaca StudentPortal\ApplyController::show()). Tombol di
+                                        header ini cuma tetap tampil untuk kasus fallback (Program
+                                        belum ada Degree/Course sama sekali).
+                                    --}}
+                                    @if($majorDegreeGroups->isEmpty())
+                                        <a href="{{ route('student-portal.apply.show', $majorProfile->id) }}" class="btn-apply">
+                                            <i class="bi bi-send-check"></i> Apply Now
+                                        </a>
+                                    @endif
                                 </div>
 
                                 @if($majorDegreeGroups->isNotEmpty())
@@ -992,6 +1006,24 @@
                                                         @endif
                                                     </div>
                                                 @endforeach
+
+                                                {{--
+                                                    FIX (permintaan user, 16 September 2026): Apply Now
+                                                    per Degree tab (bukan lagi 1 tombol di header Program).
+                                                    ?degree=... dibawa ke halaman Apply supaya select
+                                                    "Program / Major" di sana otomatis cuma menampilkan
+                                                    jurusan (Course) yang Degree-nya SAMA dengan tab yang
+                                                    sedang aktif saat tombol ini diklik (lihat filter di
+                                                    StudentPortal\ApplyController::show()).
+                                                --}}
+                                                <a href="{{ route('student-portal.apply.show', $majorProfile->id) }}{{ $degreeLabel === 'Other' ? '' : '?degree='.urlencode($degreeLabel) }}" class="btn-apply mt-2">
+                                                    {{-- Tab "Other" = baris Course lama yang belum ada Degree-nya
+                                                         (data lama sebelum fitur Degree/Course ada) -- sengaja
+                                                         TIDAK dikirim ?degree= (tidak ada Degree yang cocok untuk
+                                                         difilter), jadi otomatis fallback ke tampilan semua
+                                                         jurusan seperti sebelum perubahan ini. --}}
+                                                    <i class="bi bi-send-check"></i> Apply Now{{ $degreeLabel === 'Other' ? '' : ' - '.$degreeLabel }}
+                                                </a>
                                             </div>
                                         @endforeach
                                     </div>

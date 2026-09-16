@@ -93,6 +93,19 @@
                 {{ $profile->university->name }}
                 @if($profile->field) &middot; {{ $profile->field }} @endif
             </p>
+            {{--
+                FIX (permintaan user, 16 September 2026): kalau siswa klik
+                Apply Now dari salah satu Degree tab (Bachelor/Master/dst) di
+                halaman profile, Degree itu dibawa ke sini lewat ?degree=...
+                (lihat StudentPortal\ApplyController::show()) -- badge ini
+                cuma penanda visual supaya siswa tahu jurusan yang tampil di
+                bawah sudah otomatis di-saring sesuai Degree yang dia pilih.
+            --}}
+            @if($selectedDegree)
+                <span class="badge-pill" style="display:inline-flex; align-items:center; gap:6px; background:#fbe6ea; color:var(--brand); font-weight:700; font-size:12.5px; padding:6px 12px; border-radius:999px; margin-top:8px;">
+                    <i class="bi bi-mortarboard-fill"></i> Applying for: {{ $selectedDegree }}
+                </span>
+            @endif
         </div>
 
         @if($registrationFee)
@@ -114,7 +127,7 @@
         @endif
 
         <div class="card-box">
-            @if($profile->degrees->isEmpty())
+            @if($degreeOptions->isEmpty())
                 <div class="alert alert-warning alert-heads-up mb-0">
                     <i class="bi bi-exclamation-triangle me-1"></i>
                     This program does not have any Degree/Intake/Duration options configured yet. Please contact our team on WhatsApp to continue your application.
@@ -143,7 +156,7 @@
                         <label class="form-label">Program / Major</label>
                         <select id="degreeIntakeSelect" name="degree_intake_id" class="form-select @error('degree_intake_id') is-invalid @enderror" required>
                             <option value="">Choose...</option>
-                            @foreach($profile->degrees as $degreeRow)
+                            @foreach($degreeOptions as $degreeRow)
                                 <option value="{{ $degreeRow->id }}"
                                     data-intake="{{ $degreeRow->intake }}"
                                     data-duration="{{ $degreeRow->duration }}"

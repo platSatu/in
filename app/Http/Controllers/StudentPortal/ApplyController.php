@@ -46,6 +46,35 @@ class ApplyController extends Controller
             ->where('status', 'active')
             ->findOrFail($universityProfileId);
 
+        // FIX (permintaan user, 16 September 2026): tombol Apply Now di
+        // halaman frontend.university-profile sekarang ada DI DALAM tiap
+        // Degree tab (Bachelor/Master/dst), bukan lagi 1 tombol umum per
+        // Program -- lihat komentar di university-profile.blade.php. Degree
+        // yang lagi aktif saat tombol itu diklik dibawa ke sini lewat query
+        // string ?degree=..., supaya select "Program / Major" di form Apply
+        // otomatis cuma menampilkan jurusan (Course) yang Degree-nya SAMA
+        // dengan yang dipilih siswa dari halaman profile -- bukan
+        // dicampur semua Degree jadi satu dropdown panjang.
+        //
+        // SENGAJA cuma filter tampilan (bukan keamanan) -- store() di bawah
+        // tetap validasi degree_intake_id itu benar milik $profile ini,
+        // apapun query string-nya. Kalau ?degree= tidak dikirim, kosong,
+        // atau tidak cocok dengan Degree manapun (mis. link lama/salah
+        // ketik), fallback ke SEMUA degree seperti sebelum perubahan ini --
+        // jadi behaviour lama tetap jalan kalau tidak ada ?degree=.
+        $selectedDegree = $request->query('degree');
+        $degreeOptions = $profile->degrees;
+
+        if (filled($selectedDegree)) {
+            $filtered = $profile->degrees->filter(fn ($row) => $row->degree === $selectedDegree)->values();
+
+            if ($filtered->isNotEmpty()) {
+                $degreeOptions = $filtered;
+            } else {
+                $selectedDegree = null;
+            }
+        }
+
         if (! $request->user()) {
             session(['url.intended' => $request->fullUrl()]);
 
@@ -74,6 +103,8 @@ class ApplyController extends Controller
 
         return view('student-portal.apply.show', [
             'profile' => $profile,
+            'degreeOptions' => $degreeOptions,
+            'selectedDegree' => $selectedDegree,
             'registrationFee' => $registrationFee,
             'defaultWhatsapp' => $student->handphone ?? $user->handphone ?? '',
         ]);
