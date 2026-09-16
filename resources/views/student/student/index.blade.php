@@ -233,11 +233,46 @@
                                             @endif
 
                                             @unless($item->user_id)
-                                                <form action="{{ route('student.student.add-user', $item->id) }}"
-                                                    method="POST" onsubmit="return confirm('Buat akun login untuk {{ $item->first_name }}?');" class="m-0 flex-shrink-0">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">+ User</button>
-                                                </form>
+                                                {{--
+                                                    FIX (permintaan user, 16 September 2026): dulu password
+                                                    akun login-nya di-generate acak (Str::random) begitu
+                                                    tombol ini diklik, terus ditampilkan sekali lewat flash
+                                                    message. Sekarang admin isi sendiri password-nya lewat
+                                                    modal ini -- yang lain (status langsung active, email
+                                                    langsung terverifikasi) TIDAK berubah, lihat
+                                                    StudentController::addUser().
+                                                --}}
+                                                <button type="button" class="btn btn-sm btn-outline-success text-nowrap flex-shrink-0"
+                                                    data-bs-toggle="modal" data-bs-target="#addUserModal-{{ $item->id }}">+ User</button>
+
+                                                <div class="modal fade" id="addUserModal-{{ $item->id }}" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content text-start">
+                                                            <form action="{{ route('student.student.add-user', $item->id) }}" method="POST">
+                                                                @csrf
+                                                                <div class="modal-header">
+                                                                    <h6 class="modal-title mb-0">Buat Akun Login untuk {{ $item->first_name }} {{ $item->last_name }}</h6>
+                                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                                </div>
+                                                                <div class="modal-body">
+                                                                    <p class="text-muted small mb-3">
+                                                                        Akun ini langsung aktif dan email-nya otomatis
+                                                                        dianggap terverifikasi, jadi {{ $item->first_name }}
+                                                                        bisa langsung login pakai email &amp; password ini.
+                                                                    </p>
+                                                                    <label class="form-label">Password</label>
+                                                                    <input type="password" name="password" class="form-control"
+                                                                        minlength="8" required placeholder="Minimal 8 karakter">
+                                                                    <div class="form-text">Sampaikan password ini ke student secara manual (WhatsApp/email) -- sistem tidak mengirimkannya otomatis.</div>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                                                                    <button type="submit" class="btn btn-success btn-sm">Buat Akun</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             @endunless
 
                                             <form action="{{ route('student.student.destroy', $item->id) }}"

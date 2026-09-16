@@ -445,10 +445,18 @@ class StudentController extends Controller
 
     /**
      * Tombol "+ Add User" di index: buat akun login (tabel users + role_user)
-     * otomatis dari data student (name, email, handphone), password random,
-     * user diarahkan pakai fitur "Forgot Password" untuk set password sendiri.
+     * dari data student (name, email, handphone).
+     *
+     * FIX (permintaan user, 16 September 2026): dulu password-nya
+     * di-generate ACAK (Str::random) lalu ditampilkan sekali lewat flash
+     * message, siswa diarahkan pakai "Forgot Password" untuk ganti sendiri.
+     * Sekarang admin isi sendiri password-nya lewat modal di index.blade.php
+     * (input "password", langsung di-hash sama seperti sebelumnya) --
+     * SENGAJA cuma bagian generate password ini yang diubah, sisanya
+     * (status langsung 'active', email langsung dianggap terverifikasi,
+     * role student, link ke Student) TETAP SAMA seperti sebelumnya.
      */
-    public function addUser(string $id): RedirectResponse
+    public function addUser(Request $request, string $id): RedirectResponse
     {
         $student = $this->resolveVisibleStudent($id);
 
@@ -464,14 +472,16 @@ class StudentController extends Controller
                 ->with('error', 'Email ' . $student->email . ' sudah terdaftar sebagai user.');
         }
 
-        $generatedPassword = Str::random(12);
+        $validated = $request->validate([
+            'password' => 'required|string|min:8',
+        ], [], ['password' => 'Password']);
 
-        DB::transaction(function () use ($student, $generatedPassword) {
+        DB::transaction(function () use ($student, $validated) {
             $user = User::create([
                 'name' => trim($student->first_name . ' ' . $student->last_name),
                 'email' => $student->email,
                 'handphone' => $student->handphone,
-                'password' => Hash::make($generatedPassword),
+                'password' => Hash::make($validated['password']),
                 'status' => 'active',
             ]);
 
@@ -500,7 +510,7 @@ class StudentController extends Controller
 
         return redirect()
             ->route('student.student.index')
-            ->with('success', 'User berhasil dibuat untuk ' . $student->first_name . '. Password sementara: ' . $generatedPassword . ' (silakan gunakan fitur "Forgot Password" saat login pertama kali).');
+            ->with('success', 'User berhasil dibuat untuk ' . $student->first_name . ' dengan password yang baru saja Anda tentukan. Akun sudah aktif dan siap dipakai login.');
     }
 
     /**
