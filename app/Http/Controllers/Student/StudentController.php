@@ -326,6 +326,22 @@ class StudentController extends Controller
 
         if ($request->hasFile('images')) {
             $validated['images'] = $this->storeImage($request->file('images'));
+        } else {
+            // FIX (permintaan user, 16 September 2026): validasi 'images'
+            // sudah 'nullable', tapi kalau tidak ada file yang diupload,
+            // key ini SAMA SEKALI tidak ikut ke $validated -- begitu masuk
+            // Student::create(), INSERT-nya tidak menyertakan kolom
+            // 'images' sama sekali. Kolom itu ternyata NOT NULL tanpa
+            // default di database (dibuat manual, bukan lewat migration
+            // Laravel), jadi INSERT gagal:
+            // "SQLSTATE[HY000]: 1364 Field 'images' doesn't have a default
+            // value". Migration
+            // add_default_null_to_students_images_column sudah bikin
+            // kolomnya nullable di DB, tapi baris ini tetap ditambahkan
+            // sebagai jaga-jaga (defense in depth) supaya store() ini
+            // tidak bergantung 100% ke migration itu sudah jalan atau
+            // belum di environment manapun.
+            $validated['images'] = null;
         }
 
         Student::create($validated);

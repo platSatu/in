@@ -70,6 +70,15 @@ class StudentIdentityResolver
                 'email' => $validated['email'],
                 'handphone' => $validated['handphone'],
                 'status' => 'active',
+                // FIX (16 September 2026): kolom `images` di tabel `students`
+                // ternyata NOT NULL tanpa default di database (lihat catatan
+                // lengkap di StudentController::store()) -- kalau key ini
+                // tidak diisi sama sekali, INSERT gagal dengan error
+                // "Field 'images' doesn't have a default value". Migration
+                // add_default_null_to_students_images_column sudah bikin
+                // kolom ini nullable, tapi tetap isi eksplisit null di sini
+                // sebagai jaring pengaman kedua (defense in depth).
+                'images' => null,
             ];
 
             if ($existingStudent) {
