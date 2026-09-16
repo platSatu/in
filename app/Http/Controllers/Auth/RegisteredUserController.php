@@ -122,17 +122,26 @@ class RegisteredUserController extends Controller
     // halaman Roles (mis. tanpa sadar jadi "Sales"), SEMUA pendaftar baru di
     // ketiga jalur itu ikut ke-assign role yang salah, karena ID-nya tidak
     // berubah walau namanya sudah beda. Sekarang dicari dinamis lewat slug
-    // "student", dan sengaja abort(500) yang jelas kalau role-nya sampai
-    // tidak ketemu -- lebih aman daripada diam-diam assign role yang salah.
+    // "student".
+    //
+    // FIX v2 (permintaan user, 16 September 2026 -- BUGFIX): abort(500) di
+    // atas ternyata KEJADIAN beneran -- slug "student" juga bisa hilang
+    // diam-diam kalau admin edit NAMA role itu lewat halaman Roles tanpa
+    // isi field Slug secara eksplisit (slug ikut di-generate ulang dari nama
+    // baru, lihat RoleController::update()), jadi semua pendaftar baru (di
+    // sini, GoogleAuthController, & tombol "+ User" di StudentController)
+    // ikut error 500. Sekarang role-nya di-auto-provision (dibuat sekali
+    // kalau belum/tidak ketemu) supaya ketiga jalur ini tidak lagi
+    // bergantung ke 1 baris role yang bisa berubah sewaktu-waktu.
     private function resolveStudentRoleId(): string
     {
-        $roleId = Role::where('slug', 'student')->value('id');
-
-        if ($roleId === null) {
-            abort(500, 'Role "student" tidak ditemukan (dicari lewat slug "student"). Cek halaman Roles -- pastikan ada role dengan slug persis "student".');
-        }
-
-        return $roleId;
+        return Role::firstOrCreate(
+            ['slug' => 'student'],
+            [
+                'name' => 'Student',
+                'status' => Role::STATUS_ACTIVE,
+            ]
+        )->id;
     }
 
     private function sendWhatsapp($phone, $message)

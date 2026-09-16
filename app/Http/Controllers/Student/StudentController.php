@@ -567,13 +567,33 @@ class StudentController extends Controller
      */
     private function resolveStudentRoleId(): string
     {
-        $roleId = Role::where('slug', 'student')->value('id');
-
-        if ($roleId === null) {
-            abort(500, 'Role "student" tidak ditemukan (dicari lewat slug "student"). Cek halaman Roles -- pastikan ada role dengan slug persis "student" sebelum membuat akun login student lewat tombol "+ Add User".');
-        }
-
-        return $roleId;
+        // FIX (permintaan user, 16 September 2026 -- BUGFIX): dulu di sini
+        // abort(500) kalau role dengan slug "student" belum/tidak ada lagi
+        // di tabel roles, minta admin bikin manual dulu lewat halaman Roles
+        // -- ini persis yang bikin tombol "+ User" di index Student error
+        // begitu diklik "Buat Akun".
+        //
+        // Slug ini ternyata gampang hilang diam-diam TANPA role-nya ikut
+        // dihapus: kalau admin edit nama role "Student" itu di halaman
+        // Roles tanpa isi field Slug secara eksplisit, slug-nya otomatis
+        // di-generate ULANG dari nama baru (Str::slug($name), lihat
+        // RoleController::update()) -- jadi slug "student" bisa berubah
+        // jadi mis. "siswa" kalau namanya diganti "Siswa". Ini pola bug
+        // yang sama persis dengan ROLE_STUDENT_ID hardcoded yang sudah
+        // diperbaiki 14 September 2026 di atas, cuma sekarang lewat slug,
+        // bukan ID.
+        //
+        // Sekarang role-nya di-auto-provision (dibuat sekali kalau
+        // belum/tidak ketemu) supaya fitur "+ User" ini tidak lagi
+        // bergantung ke ada-tidaknya 1 baris role spesifik yang bisa
+        // berubah sewaktu-waktu lewat halaman Roles.
+        return Role::firstOrCreate(
+            ['slug' => 'student'],
+            [
+                'name' => 'Student',
+                'status' => Role::STATUS_ACTIVE,
+            ]
+        )->id;
     }
 
     /**

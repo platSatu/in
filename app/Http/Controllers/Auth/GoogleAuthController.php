@@ -141,12 +141,22 @@ class GoogleAuthController extends Controller
 
     private function resolveStudentRoleId(): string
     {
-        $roleId = Role::where('slug', 'student')->value('id');
-
-        if ($roleId === null) {
-            abort(500, 'Role "student" tidak ditemukan (dicari lewat slug "student"). Cek halaman Roles -- pastikan ada role dengan slug persis "student".');
-        }
-
-        return $roleId;
+        // FIX (permintaan user, 16 September 2026 -- BUGFIX): dulu abort(500)
+        // kalau role "student" tidak ketemu lewat slug -- ternyata slug ini
+        // gampang hilang diam-diam kalau admin edit nama role-nya di halaman
+        // Roles tanpa isi field Slug (slug ikut di-generate ulang dari nama
+        // baru, lihat RoleController::update()), jadi jalur signup Google ini
+        // ikut error 500. Sama seperti StudentController::resolveStudentRoleId()
+        // & RegisteredUserController::resolveStudentRoleId() -- role-nya
+        // sekarang di-auto-provision (dibuat sekali kalau belum/tidak ketemu)
+        // supaya tidak lagi bergantung ke 1 baris role yang bisa berubah
+        // sewaktu-waktu.
+        return Role::firstOrCreate(
+            ['slug' => 'student'],
+            [
+                'name' => 'Student',
+                'status' => Role::STATUS_ACTIVE,
+            ]
+        )->id;
     }
 }
