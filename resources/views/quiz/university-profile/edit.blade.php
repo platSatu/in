@@ -245,16 +245,24 @@
                                         @enderror
                                     </div>
                                     <div class="col-md-4">
-                                        <label class="form-label">CSCA Subject</label>
-                                        <select name="degree_intakes[{{ $index }}][csca_subject]"
-                                            class="form-select @error('degree_intakes.' . $index . '.csca_subject') is-invalid @enderror">
-                                            <option value="">Choose...</option>
-                                            @foreach (\App\Models\UniversityProfileDegree::CSCA_SUBJECTS as $cscaSubjectOption)
-                                                <option value="{{ $cscaSubjectOption }}" {{ old('degree_intakes.' . $index . '.csca_subject', $row['csca_subject'] ?? '') === $cscaSubjectOption ? 'selected' : '' }}>{{ $cscaSubjectOption }}</option>
-                                            @endforeach
-                                        </select>
+                                        {{--
+                                            FIX (permintaan user, 16 September 2026): CSCA Subject
+                                            sekarang checkbox, bisa dicentang LEBIH DARI SATU
+                                            (dulu <select> cuma bisa 1 pilihan).
+                                        --}}
+                                        <label class="form-label d-block">CSCA Subject</label>
+                                        @foreach (\App\Models\UniversityProfileDegree::CSCA_SUBJECTS as $cscaSubjectOption)
+                                            <div class="form-check">
+                                                <input type="checkbox" class="form-check-input"
+                                                    name="degree_intakes[{{ $index }}][csca_subject][]"
+                                                    id="cscaSubject_{{ $index }}_{{ $loop->index }}"
+                                                    value="{{ $cscaSubjectOption }}"
+                                                    {{ in_array($cscaSubjectOption, (array) old('degree_intakes.' . $index . '.csca_subject', $row['csca_subject'] ?? [])) ? 'checked' : '' }}>
+                                                <label class="form-check-label" for="cscaSubject_{{ $index }}_{{ $loop->index }}" style="font-size:13.5px;">{{ $cscaSubjectOption }}</label>
+                                            </div>
+                                        @endforeach
                                         @error('degree_intakes.' . $index . '.csca_subject')
-                                            <div class="invalid-feedback">{{ $message }}</div>
+                                            <div class="invalid-feedback d-block">{{ $message }}</div>
                                         @enderror
                                     </div>
                                 </div>
@@ -553,13 +561,16 @@
                 <input type="number" min="0" name="degree_intakes[__INDEX__][registration_fee_amount]" class="form-control" placeholder="0">
             </div>
             <div class="col-md-4">
-                <label class="form-label">CSCA Subject</label>
-                <select name="degree_intakes[__INDEX__][csca_subject]" class="form-select">
-                    <option value="">Choose...</option>
-                    @foreach (\App\Models\UniversityProfileDegree::CSCA_SUBJECTS as $cscaSubjectOption)
-                        <option value="{{ $cscaSubjectOption }}">{{ $cscaSubjectOption }}</option>
-                    @endforeach
-                </select>
+                <label class="form-label d-block">CSCA Subject</label>
+                @foreach (\App\Models\UniversityProfileDegree::CSCA_SUBJECTS as $cscaSubjectOption)
+                    <div class="form-check">
+                        <input type="checkbox" class="form-check-input"
+                            name="degree_intakes[__INDEX__][csca_subject][]"
+                            id="cscaSubject___INDEX___{{ $loop->index }}"
+                            value="{{ $cscaSubjectOption }}">
+                        <label class="form-check-label" for="cscaSubject___INDEX___{{ $loop->index }}" style="font-size:13.5px;">{{ $cscaSubjectOption }}</label>
+                    </div>
+                @endforeach
             </div>
         </div>
         <div class="row g-3 mt-1">
@@ -671,8 +682,23 @@
                     // Baris terakhir tetap dibiarkan ada, tapi boleh kosong
                     // (semua field degree/course nullable) — jadi cukup
                     // dikosongkan saja (termasuk select Degree).
+                    //
+                    // FIX (permintaan user, 16 September 2026): checkbox CSCA
+                    // Subject (baru, bisa dicentang lebih dari satu) HARUS
+                    // di-uncheck lewat .checked = false, BUKAN input.value = ''
+                    // -- mengosongkan .value milik checkbox tidak meng-uncheck-
+                    // nya sama sekali (cuma bikin value yang terkirim jadi
+                    // string kosong kalau masih tercentang), jadi kalau tidak
+                    // dibedakan di sini, baris "kosong" ini bisa diam-diam
+                    // tetap kirim csca_subject[] terisi string kosong.
                     var row = e.target.closest('.degree-intake-row');
-                    row.querySelectorAll('input').forEach(function (input) { input.value = ''; });
+                    row.querySelectorAll('input').forEach(function (input) {
+                        if (input.type === 'checkbox') {
+                            input.checked = false;
+                        } else {
+                            input.value = '';
+                        }
+                    });
                     row.querySelectorAll('select').forEach(function (select) { select.value = ''; });
                 }
             }

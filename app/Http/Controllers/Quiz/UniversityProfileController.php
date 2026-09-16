@@ -151,7 +151,11 @@ public function store(Request $request)
         // ApplyController::store() & migration add_registration_fee_and_
         // csca_subject_to_university_profile_degrees_table.
         'degree_intakes.*.registration_fee_amount' => 'nullable|integer|min:0',
-        'degree_intakes.*.csca_subject' => ['nullable', 'string', Rule::in(UniversityProfileDegree::CSCA_SUBJECTS)],
+        // FIX (permintaan user, 16 September 2026): CSCA Subject sekarang
+        // checkbox, bisa dicentang LEBIH DARI SATU -- dikirim sebagai array
+        // (degree_intakes[X][csca_subject][]), bukan 1 string lagi.
+        'degree_intakes.*.csca_subject' => 'nullable|array',
+        'degree_intakes.*.csca_subject.*' => ['string', Rule::in(UniversityProfileDegree::CSCA_SUBJECTS)],
         // Payment: daftar rincian biaya ("add row" juga), pilih lokasi bayar
         // (Indonesia / China) + nama item + jumlah — semuanya opsional.
         // 'fee_type' (ditambahkan fase 4, fitur Apply Kampus) dipakai supaya
@@ -348,7 +352,8 @@ public function store(Request $request)
             'degree_intakes.*.language' => 'nullable|string|max:255',
             'degree_intakes.*.tuition_fee' => 'nullable|integer|min:0',
             'degree_intakes.*.registration_fee_amount' => 'nullable|integer|min:0',
-            'degree_intakes.*.csca_subject' => ['nullable', 'string', Rule::in(UniversityProfileDegree::CSCA_SUBJECTS)],
+            'degree_intakes.*.csca_subject' => 'nullable|array',
+            'degree_intakes.*.csca_subject.*' => ['string', Rule::in(UniversityProfileDegree::CSCA_SUBJECTS)],
             'payments' => 'nullable|array',
             'payments.*.location' => 'nullable|in:indonesia,china',
             'payments.*.name' => 'nullable|string|max:255',

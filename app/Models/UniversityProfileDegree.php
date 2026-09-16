@@ -56,6 +56,12 @@ class UniversityProfileDegree extends Model
         'application_deadline' => 'date',
         'tuition_fee' => 'integer',
         'registration_fee_amount' => 'integer',
+        // FIX (permintaan user, 16 September 2026): CSCA Subject sekarang
+        // bisa dipilih LEBIH DARI SATU (checkbox, bukan dropdown single lagi)
+        // -- disimpan sebagai JSON array di kolom string yang sama (cast
+        // 'array' otomatis json_encode/json_decode, tidak perlu migration
+        // baru karena VARCHAR(255) cukup untuk sampai 4 nilai CSCA_SUBJECTS).
+        'csca_subject' => 'array',
     ];
 
     /**
