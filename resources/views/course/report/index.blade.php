@@ -33,8 +33,15 @@
     <div class="row g-3 mb-3">
         <div class="col-md-4">
             <div class="widget-content widget-content-area br-8 h-100">
-                <div class="text-muted mb-1" style="font-size:13px;">Total Pembelian Bulan Ini</div>
-                <div class="fw-bold" style="font-size:28px;">{{ $totalPurchasesThisMonth }}</div>
+                {{--
+                    FIX (16 September 2026, permintaan user -- "total
+                    pembelian itu harusnya 0 karena omset penjualan
+                    packages"): kartu ini OMSET (jumlah Rupiah), bukan
+                    jumlah transaksi -- trial gratis (harga Rp 0) otomatis
+                    tidak menambah angka ini.
+                --}}
+                <div class="text-muted mb-1" style="font-size:13px;">Omset Penjualan Bulan Ini</div>
+                <div class="fw-bold" style="font-size:24px;">Rp {{ number_format($totalRevenueThisMonth, 0, ',', '.') }}</div>
             </div>
         </div>
 

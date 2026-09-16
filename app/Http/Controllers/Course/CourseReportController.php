@@ -118,7 +118,7 @@ class CourseReportController extends Controller
         $packages = CoursePackage::orderBy('name')->get(['id', 'name']);
 
         // FIX (16 September 2026, permintaan user -- tambah 3 kartu ringkasan):
-        // "Total Pembelian Bulan Ini", "Student Beli Bulan Ini", & "Package
+        // "Omset Penjualan Bulan Ini", "Student Beli Bulan Ini", & "Package
         // Terlaris Bulan Ini". SENGAJA selalu scope "bulan berjalan" (bukan
         // ikut filter pencarian/tanggal tabel di atas) -- 3 kartu ini snapshot
         // tetap, tabel di bawahnya yang bisa difilter bebas. Cuma hitung
@@ -131,7 +131,12 @@ class CourseReportController extends Controller
         $thisMonthQuery = fn () => CoursePackagePurchase::whereBetween('created_at', [$monthStart, $monthEnd])
             ->where('status', CoursePackagePurchase::STATUS_COMPLETED);
 
-        $totalPurchasesThisMonth = $thisMonthQuery()->count();
+        // FIX (16 September 2026, permintaan user -- "total pembelian itu
+        // harusnya 0 karena omset penjualan packages"): kartu pertama BUKAN
+        // jumlah transaksi, tapi OMSET (total price_paid sungguhan) bulan
+        // ini -- trial gratis (price_paid = 0) otomatis tidak menambah
+        // angka ini sama sekali, sesuai maksudnya.
+        $totalRevenueThisMonth = (float) $thisMonthQuery()->sum('price_paid');
         $totalStudentsThisMonth = $thisMonthQuery()->distinct('student_id')->count('student_id');
 
         $topPackageRow = $thisMonthQuery()
@@ -155,7 +160,7 @@ class CourseReportController extends Controller
                 'date_from' => $dateFrom,
                 'date_to' => $dateTo,
             ],
-            'totalPurchasesThisMonth' => $totalPurchasesThisMonth,
+            'totalRevenueThisMonth' => $totalRevenueThisMonth,
             'totalStudentsThisMonth' => $totalStudentsThisMonth,
             'topPackage' => $topPackage,
             'topPackageCount' => $topPackageCount,
