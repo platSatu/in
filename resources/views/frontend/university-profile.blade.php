@@ -213,6 +213,47 @@
         .major-block { margin-bottom: 26px; }
         .major-block-divider { padding-bottom: 26px; border-bottom: 1px solid #eef1f8; }
 
+        /* ---------- PROGRAM TABS v3 (16 September 2026): tab per Degree group
+           (Bachelor/Master/dst) DI DALAM 1 Program yang sama, supaya daftar
+           course yang panjang tidak bikin halaman kepanjangan ke bawah. Pill
+           style disamakan dengan .degree-group-title (warna brand solid utk
+           tab aktif). */
+        .program-tabs-nav {
+            display: flex;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            gap: 8px;
+            padding-bottom: 4px;
+            margin-bottom: 18px;
+            border-bottom: 1px solid #eef1f8;
+        }
+
+        .program-tab-btn {
+            flex: 0 0 auto;
+            background: #f8f9fc;
+            color: #6b7186;
+            border: none;
+            padding: 8px 18px;
+            border-radius: 20px 20px 0 0;
+            font-size: 13px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            white-space: nowrap;
+            cursor: pointer;
+            transition: all .2s ease;
+        }
+
+        .program-tab-btn:hover { background: #eef1f8; color: #4a4f5c; }
+
+        .program-tab-btn.active {
+            background: var(--brand);
+            color: #fff;
+        }
+
+        .program-tab-pane { display: none; }
+        .program-tab-pane.active { display: block; }
+
         /* ---------- DEGREE & COURSE (flow "pilih kampus -> degree -> jurusan",
            FIX 15 September 2026) -- tiap Major/Profile bisa punya beberapa baris
            Course (university_profile_degrees) yang dikelompokkan per Degree
@@ -893,38 +934,58 @@
                                 </div>
 
                                 @if($majorDegreeGroups->isNotEmpty())
-                                    @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
-                                        <div class="degree-group">
-                                            <div class="degree-group-title">{{ $degreeLabel === 'Other' ? 'Degree not specified' : $degreeLabel }}</div>
-                                            @foreach($courseRows as $courseRow)
-                                                <div class="course-item">
-                                                    <div class="course-name">{{ $courseRow->course_name ?: ($majorProfile->field ?: 'Program') }}</div>
-                                                    @if($courseRow->intake || $courseRow->duration || $courseRow->starting_date || $courseRow->application_deadline || $courseRow->language)
-                                                        <div class="course-meta">
-                                                            @if($courseRow->intake)
-                                                                <span class="course-chip"><i class="bi bi-calendar-event"></i> {{ $courseRow->intake }}</span>
-                                                            @endif
-                                                            @if($courseRow->duration)
-                                                                <span class="course-chip"><i class="bi bi-hourglass-split"></i> {{ $courseRow->duration }}</span>
-                                                            @endif
-                                                            @if($courseRow->starting_date)
-                                                                <span class="course-chip"><i class="bi bi-play-circle"></i> Starts {{ $courseRow->starting_date->format('d M Y') }}</span>
-                                                            @endif
-                                                            @if($courseRow->application_deadline)
-                                                                <span class="course-chip"><i class="bi bi-hourglass-bottom"></i> Deadline {{ $courseRow->application_deadline->format('d M Y') }}</span>
-                                                            @endif
-                                                            @if($courseRow->language)
-                                                                <span class="course-chip"><i class="bi bi-translate"></i> {{ $courseRow->language }}</span>
-                                                            @endif
-                                                        </div>
-                                                    @endif
-                                                    @if($courseRow->tuition_fee !== null)
-                                                        <div class="course-fee">Tuition Fee: Rp {{ number_format($courseRow->tuition_fee, 0, ',', '.') }}</div>
-                                                    @endif
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @endforeach
+                                    {{--
+                                        FIX v3 (16 September 2026): tab per Degree group
+                                        (Bachelor/Master/dst) DI DALAM 1 Program yang sama.
+                                        Dibuktikan benar lewat simulasi PHP terpisah sebelum
+                                        ditempel di sini (grouping/slug/ID matching), supaya
+                                        tidak keliru lagi seperti percobaan sebelumnya. Isi
+                                        course-item TIDAK diubah sama sekali dari versi
+                                        vertikal aslinya, cuma dibungkus tab.
+                                    --}}
+                                    <div class="program-tabs-nav" role="tablist">
+                                        @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
+                                            @php($tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel))
+                                            <button type="button"
+                                                class="program-tab-btn{{ $loop->first ? ' active' : '' }}"
+                                                data-program-tab-target="{{ $tabId }}"
+                                                role="tab">{{ $degreeLabel === 'Other' ? 'Degree not specified' : $degreeLabel }}</button>
+                                        @endforeach
+                                    </div>
+                                    <div class="program-tab-content">
+                                        @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
+                                            @php($tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel))
+                                            <div class="program-tab-pane{{ $loop->first ? ' active' : '' }}" id="{{ $tabId }}" role="tabpanel">
+                                                @foreach($courseRows as $courseRow)
+                                                    <div class="course-item">
+                                                        <div class="course-name">{{ $courseRow->course_name ?: ($majorProfile->field ?: 'Program') }}</div>
+                                                        @if($courseRow->intake || $courseRow->duration || $courseRow->starting_date || $courseRow->application_deadline || $courseRow->language)
+                                                            <div class="course-meta">
+                                                                @if($courseRow->intake)
+                                                                    <span class="course-chip"><i class="bi bi-calendar-event"></i> {{ $courseRow->intake }}</span>
+                                                                @endif
+                                                                @if($courseRow->duration)
+                                                                    <span class="course-chip"><i class="bi bi-hourglass-split"></i> {{ $courseRow->duration }}</span>
+                                                                @endif
+                                                                @if($courseRow->starting_date)
+                                                                    <span class="course-chip"><i class="bi bi-play-circle"></i> Starts {{ $courseRow->starting_date->format('d M Y') }}</span>
+                                                                @endif
+                                                                @if($courseRow->application_deadline)
+                                                                    <span class="course-chip"><i class="bi bi-hourglass-bottom"></i> Deadline {{ $courseRow->application_deadline->format('d M Y') }}</span>
+                                                                @endif
+                                                                @if($courseRow->language)
+                                                                    <span class="course-chip"><i class="bi bi-translate"></i> {{ $courseRow->language }}</span>
+                                                                @endif
+                                                            </div>
+                                                        @endif
+                                                        @if($courseRow->tuition_fee !== null)
+                                                            <div class="course-fee">Tuition Fee: Rp {{ number_format($courseRow->tuition_fee, 0, ',', '.') }}</div>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 @else
                                     <div class="placeholder-note mb-3">
                                         <i class="bi bi-hourglass-split me-1"></i>
@@ -1189,6 +1250,35 @@
                 if (e.key === 'Escape') close();
                 if (e.key === 'ArrowLeft') show(currentIndex - 1);
                 if (e.key === 'ArrowRight') show(currentIndex + 1);
+            });
+        })();
+
+        // FIX v3 (16 September 2026): tab per Degree group (Bachelor/Master/dst),
+        // vanilla JS (halaman ini tidak load bootstrap.bundle.min.js), pola sama
+        // persis dengan IIFE lightbox di atas. Event delegation di document supaya
+        // 1 listener saja meng-cover semua tombol tab di semua Program pada halaman.
+        (function () {
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('.program-tab-btn');
+                if (!btn) return;
+
+                var nav = btn.closest('.program-tabs-nav');
+                var content = nav ? nav.nextElementSibling : null;
+                if (!content || !content.classList.contains('program-tab-content')) return;
+
+                var targetId = btn.getAttribute('data-program-tab-target');
+                var targetPane = document.getElementById(targetId);
+                if (!targetPane) return;
+
+                nav.querySelectorAll('.program-tab-btn').forEach(function (b) {
+                    b.classList.remove('active');
+                });
+                content.querySelectorAll('.program-tab-pane').forEach(function (pane) {
+                    pane.classList.remove('active');
+                });
+
+                btn.classList.add('active');
+                targetPane.classList.add('active');
             });
         })();
     </script>
