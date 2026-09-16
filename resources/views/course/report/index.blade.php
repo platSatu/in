@@ -23,13 +23,52 @@
         </div>
     </div>
 
+    {{--
+        FIX (16 September 2026, permintaan user): 3 kartu ringkasan "bulan
+        ini" -- lihat docblock App\Http\Controllers\Course\
+        CourseReportController::index() untuk cara hitungnya. SENGAJA tidak
+        ikut filter tabel di bawah (search/package/tanggal) -- ini snapshot
+        tetap bulan berjalan.
+    --}}
+    <div class="row g-3 mb-3">
+        <div class="col-md-4">
+            <div class="widget-content widget-content-area br-8 h-100">
+                <div class="text-muted mb-1" style="font-size:13px;">Total Pembelian Bulan Ini</div>
+                <div class="fw-bold" style="font-size:28px;">{{ $totalPurchasesThisMonth }}</div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="widget-content widget-content-area br-8 h-100">
+                <div class="text-muted mb-1" style="font-size:13px;">Student Beli Bulan Ini</div>
+                <div class="fw-bold" style="font-size:28px;">{{ $totalStudentsThisMonth }}</div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="widget-content widget-content-area br-8 h-100">
+                <div class="text-muted mb-1" style="font-size:13px;">Package Terlaris Bulan Ini</div>
+
+                @if($topPackage)
+                    <div class="fw-bold">{{ $topPackage->name }}</div>
+                    <div class="text-muted" style="font-size:12px;">{{ optional($topPackage->type)->name ?? '-' }}</div>
+                    <div class="text-muted" style="font-size:12px;">{{ optional($topPackage->courseClass)->name ?? '-' }}</div>
+                    <div class="text-muted" style="font-size:12px;">{{ optional($topPackage->level)->name ?? '-' }}</div>
+                    <span class="badge bg-primary mt-2">Dibeli {{ $topPackageCount }}x</span>
+                @else
+                    <div class="text-muted">Belum ada data</div>
+                @endif
+            </div>
+        </div>
+    </div>
+
     <div class="row layout-top-spacing">
         <div class="col-xl-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('course.report.index') }}" class="row g-2">
-                        <div class="col-md-5">
+                        <div class="col-md-4">
                             <input
                                 type="text"
                                 name="search"
@@ -47,15 +86,18 @@
                             </select>
                         </div>
 
+                        {{-- FIX (16 September 2026, permintaan user -- "tambahkan
+                             filter dari tanggal berapa sampai dengan tanggal
+                             berapa"): filter rentang tanggal beli. --}}
                         <div class="col-md-2">
-                            <select name="source" class="form-select">
-                                <option value="">-- Semua Sumber --</option>
-                                <option value="trial_claim" @selected($filters['source'] === 'trial_claim')>Trial (Gratis)</option>
-                                <option value="deposit_purchase" @selected($filters['source'] === 'deposit_purchase')>Pembelian (Deposit)</option>
-                            </select>
+                            <input type="date" name="date_from" class="form-control" value="{{ $filters['date_from'] }}" title="Dari tanggal">
                         </div>
 
-                        <div class="col-md-2 d-grid">
+                        <div class="col-md-2">
+                            <input type="date" name="date_to" class="form-control" value="{{ $filters['date_to'] }}" title="Sampai tanggal">
+                        </div>
+
+                        <div class="col-md-1 d-grid">
                             <button class="btn btn-outline-primary">
                                 Cari
                             </button>
