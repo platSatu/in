@@ -254,6 +254,44 @@
         .program-tab-pane { display: none; }
         .program-tab-pane.active { display: block; }
 
+        /* DESIGN POLISH (permintaan user, 16 September 2026): bungkus
+           tabs-nav + daftar course jadi 1 card supaya kelihatan 1 area yang
+           menyatu, bukan nempel lepas begitu saja di body Program. */
+        .program-tabs-card {
+            background: #fbfcfe;
+            border: 1px solid #eef1f8;
+            border-radius: 14px;
+            padding: 16px 16px 4px;
+            margin-bottom: 4px;
+        }
+        .program-tabs-card .program-tabs-nav { margin-bottom: 16px; }
+
+        .program-tab-pane-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .program-tab-pane-title {
+            font-weight: 700;
+            font-size: 13px;
+            color: #6b7186;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .program-tab-pane-title i { color: var(--brand); }
+
+        .btn-apply-sm {
+            padding: 8px 16px;
+            font-size: 12.5px;
+            border-radius: 8px;
+        }
+
         /* ---------- DEGREE & COURSE (flow "pilih kampus -> degree -> jurusan",
            FIX 15 September 2026) -- tiap Major/Profile bisa punya beberapa baris
            Course (university_profile_degrees) yang dikelompokkan per Degree
@@ -281,14 +319,20 @@
         .course-item {
             border: 1px solid #eef1f8;
             border-radius: 12px;
-            padding: 12px 14px;
-            margin-bottom: 10px;
+            padding: 10px 12px;
+            margin-bottom: 8px;
         }
         .course-item:last-child { margin-bottom: 0; }
 
+        {{--
+            DESIGN POLISH (permintaan user, 16 September 2026): teks jurusan
+            & chip meta-nya diperkecil dikit + jarak antar chip dirapatkan,
+            supaya baris September/Duration/Starts/Deadline/Language lebih
+            gampang muat dalam 1 baris (rapi), bukan pecah ke beberapa baris.
+        --}}
         .course-name {
             font-weight: 700;
-            font-size: 14.5px;
+            font-size: 13.5px;
             color: #1d2333;
             margin-bottom: 6px;
             word-break: break-word;
@@ -297,7 +341,7 @@
         .course-meta {
             display: flex;
             flex-wrap: wrap;
-            gap: 6px 10px;
+            gap: 5px 8px;
         }
 
         .course-chip {
@@ -306,9 +350,9 @@
             gap: 4px;
             background: #f8f9fc;
             color: #6b7186;
-            padding: 4px 10px;
+            padding: 3px 9px;
             border-radius: 8px;
-            font-size: 12.5px;
+            font-size: 11.5px;
             font-weight: 600;
         }
         .course-chip i { color: var(--brand); }
@@ -956,76 +1000,92 @@
                                         tidak keliru lagi seperti percobaan sebelumnya. Isi
                                         course-item TIDAK diubah sama sekali dari versi
                                         vertikal aslinya, cuma dibungkus tab.
-                                    --}}
-                                    <div class="program-tabs-nav" role="tablist">
-                                        @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
-                                            @php
-                                                $tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel);
-                                            @endphp
-                                            <button type="button"
-                                                class="program-tab-btn{{ $loop->first ? ' active' : '' }}"
-                                                data-program-tab-target="{{ $tabId }}"
-                                                role="tab">{{ $degreeLabel === 'Other' ? 'Degree not specified' : $degreeLabel }}</button>
-                                        @endforeach
-                                    </div>
-                                    <div class="program-tab-content">
-                                        @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
-                                            @php
-                                                $tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel);
-                                            @endphp
-                                            <div class="program-tab-pane{{ $loop->first ? ' active' : '' }}" id="{{ $tabId }}" role="tabpanel">
-                                                @foreach($courseRows as $courseRow)
-                                                    <div class="course-item">
-                                                        <div class="course-name">{{ $courseRow->course_name ?: ($majorProfile->field ?: 'Program') }}</div>
-                                                        @if($courseRow->intake || $courseRow->duration || $courseRow->starting_date || $courseRow->application_deadline || $courseRow->language)
-                                                            <div class="course-meta">
-                                                                @if($courseRow->intake)
-                                                                    <span class="course-chip"><i class="bi bi-calendar-event"></i> {{ $courseRow->intake }}</span>
-                                                                @endif
-                                                                @if($courseRow->duration)
-                                                                    <span class="course-chip"><i class="bi bi-hourglass-split"></i> {{ $courseRow->duration }}</span>
-                                                                @endif
-                                                                @if($courseRow->starting_date)
-                                                                    <span class="course-chip"><i class="bi bi-play-circle"></i> Starts {{ $courseRow->starting_date->format('d M Y') }}</span>
-                                                                @endif
-                                                                @if($courseRow->application_deadline)
-                                                                    <span class="course-chip"><i class="bi bi-hourglass-bottom"></i> Deadline {{ $courseRow->application_deadline->format('d M Y') }}</span>
-                                                                @endif
-                                                                @if($courseRow->language)
-                                                                    <span class="course-chip"><i class="bi bi-translate"></i> {{ $courseRow->language }}</span>
-                                                                @endif
-                                                            </div>
-                                                        @endif
-                                                        @if($courseRow->tuition_fee !== null)
-                                                            {{-- FIX (permintaan user, 16 September 2026): tuition fee per
-                                                                 Course (university_profile_degrees) ini nilainya
-                                                                 memang dalam Yuan (Tuition Fee kampus China), jadi
-                                                                 simbolnya disamakan dengan 元 yang sudah dipakai di
-                                                                 section "Payment in China" -- BUKAN Rupiah. --}}
-                                                            <div class="course-fee">Tuition Fee: 元 {{ number_format($courseRow->tuition_fee, 0, ',', '.') }}</div>
-                                                        @endif
-                                                    </div>
-                                                @endforeach
 
-                                                {{--
-                                                    FIX (permintaan user, 16 September 2026): Apply Now
-                                                    per Degree tab (bukan lagi 1 tombol di header Program).
-                                                    ?degree=... dibawa ke halaman Apply supaya select
-                                                    "Program / Major" di sana otomatis cuma menampilkan
-                                                    jurusan (Course) yang Degree-nya SAMA dengan tab yang
-                                                    sedang aktif saat tombol ini diklik (lihat filter di
-                                                    StudentPortal\ApplyController::show()).
-                                                --}}
-                                                <a href="{{ route('student-portal.apply.show', $majorProfile->id) }}{{ $degreeLabel === 'Other' ? '' : '?degree='.urlencode($degreeLabel) }}" class="btn-apply mt-2">
-                                                    {{-- Tab "Other" = baris Course lama yang belum ada Degree-nya
-                                                         (data lama sebelum fitur Degree/Course ada) -- sengaja
-                                                         TIDAK dikirim ?degree= (tidak ada Degree yang cocok untuk
-                                                         difilter), jadi otomatis fallback ke tampilan semua
-                                                         jurusan seperti sebelum perubahan ini. --}}
-                                                    <i class="bi bi-send-check"></i> Apply Now{{ $degreeLabel === 'Other' ? '' : ' - '.$degreeLabel }}
-                                                </a>
-                                            </div>
-                                        @endforeach
+                                        DESIGN POLISH (permintaan user, 16 September 2026):
+                                        tabs-nav + daftar course + tombol Apply sekarang
+                                        dibungkus 1 card (.program-tabs-card) supaya kelihatan
+                                        1 area yang menyatu (bukan nempel lepas di body Program).
+                                        Tombol Apply juga dipindah dari BAWAH daftar course ke
+                                        header ATAS tiap pane (kanan, sejajar judul "Available
+                                        Courses") supaya langsung kelihatan tanpa perlu scroll,
+                                        tapi tetap per-Degree-tab (bukan balik ke 1 tombol
+                                        umum) -- href/label-nya tetap sama seperti sebelumnya.
+                                    --}}
+                                    <div class="program-tabs-card">
+                                        <div class="program-tabs-nav" role="tablist">
+                                            @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
+                                                @php
+                                                    $tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel);
+                                                @endphp
+                                                <button type="button"
+                                                    class="program-tab-btn{{ $loop->first ? ' active' : '' }}"
+                                                    data-program-tab-target="{{ $tabId }}"
+                                                    role="tab">{{ $degreeLabel === 'Other' ? 'Degree not specified' : $degreeLabel }}</button>
+                                            @endforeach
+                                        </div>
+                                        <div class="program-tab-content">
+                                            @foreach($majorDegreeGroups as $degreeLabel => $courseRows)
+                                                @php
+                                                    $tabId = 'degree-pane-'.$majorProfile->id.'-'.\Illuminate\Support\Str::slug($degreeLabel);
+                                                @endphp
+                                                <div class="program-tab-pane{{ $loop->first ? ' active' : '' }}" id="{{ $tabId }}" role="tabpanel">
+                                                    <div class="program-tab-pane-header">
+                                                        <div class="program-tab-pane-title">
+                                                            <i class="bi bi-journal-bookmark"></i> Available Courses
+                                                        </div>
+                                                        {{--
+                                                            FIX (permintaan user, 16 September 2026): Apply Now
+                                                            per Degree tab (bukan lagi 1 tombol di header Program).
+                                                            ?degree=... dibawa ke halaman Apply supaya select
+                                                            "Program / Major" di sana otomatis cuma menampilkan
+                                                            jurusan (Course) yang Degree-nya SAMA dengan tab yang
+                                                            sedang aktif saat tombol ini diklik (lihat filter di
+                                                            StudentPortal\ApplyController::show()).
+                                                        --}}
+                                                        <a href="{{ route('student-portal.apply.show', $majorProfile->id) }}{{ $degreeLabel === 'Other' ? '' : '?degree='.urlencode($degreeLabel) }}" class="btn-apply btn-apply-sm">
+                                                            {{-- Tab "Other" = baris Course lama yang belum ada Degree-nya
+                                                                 (data lama sebelum fitur Degree/Course ada) -- sengaja
+                                                                 TIDAK dikirim ?degree= (tidak ada Degree yang cocok untuk
+                                                                 difilter), jadi otomatis fallback ke tampilan semua
+                                                                 jurusan seperti sebelum perubahan ini. --}}
+                                                            <i class="bi bi-send-check"></i> Apply Now{{ $degreeLabel === 'Other' ? '' : ' - '.$degreeLabel }}
+                                                        </a>
+                                                    </div>
+                                                    @foreach($courseRows as $courseRow)
+                                                        <div class="course-item">
+                                                            <div class="course-name">{{ $courseRow->course_name ?: ($majorProfile->field ?: 'Program') }}</div>
+                                                            @if($courseRow->intake || $courseRow->duration || $courseRow->starting_date || $courseRow->application_deadline || $courseRow->language)
+                                                                <div class="course-meta">
+                                                                    @if($courseRow->intake)
+                                                                        <span class="course-chip"><i class="bi bi-calendar-event"></i> {{ $courseRow->intake }}</span>
+                                                                    @endif
+                                                                    @if($courseRow->duration)
+                                                                        <span class="course-chip"><i class="bi bi-hourglass-split"></i> {{ $courseRow->duration }}</span>
+                                                                    @endif
+                                                                    @if($courseRow->starting_date)
+                                                                        <span class="course-chip"><i class="bi bi-play-circle"></i> Starts {{ $courseRow->starting_date->format('d M Y') }}</span>
+                                                                    @endif
+                                                                    @if($courseRow->application_deadline)
+                                                                        <span class="course-chip"><i class="bi bi-hourglass-bottom"></i> Deadline {{ $courseRow->application_deadline->format('d M Y') }}</span>
+                                                                    @endif
+                                                                    @if($courseRow->language)
+                                                                        <span class="course-chip"><i class="bi bi-translate"></i> {{ $courseRow->language }}</span>
+                                                                    @endif
+                                                                </div>
+                                                            @endif
+                                                            @if($courseRow->tuition_fee !== null)
+                                                                {{-- FIX (permintaan user, 16 September 2026): tuition fee per
+                                                                     Course (university_profile_degrees) ini nilainya
+                                                                     memang dalam Yuan (Tuition Fee kampus China), jadi
+                                                                     simbolnya disamakan dengan 元 yang sudah dipakai di
+                                                                     section "Payment in China" -- BUKAN Rupiah. --}}
+                                                                <div class="course-fee">Tuition Fee: 元 {{ number_format($courseRow->tuition_fee, 0, ',', '.') }}</div>
+                                                            @endif
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                            @endforeach
+                                        </div>
                                     </div>
                                 @else
                                     <div class="placeholder-note mb-3">
