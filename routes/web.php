@@ -68,6 +68,7 @@ use App\Http\Controllers\Zoom\MeetingController as ZoomMeetingController;
 use App\Http\Controllers\Course\CourseClassController;
 use App\Http\Controllers\Course\CourseLevelController;
 use App\Http\Controllers\Course\CoursePackageController;
+use App\Http\Controllers\Course\CourseReportController;
 use App\Http\Controllers\Course\CourseTypeController;
 use App\Http\Controllers\Payment\FormPaymentController;
 use Illuminate\Support\Facades\Route;
@@ -1000,6 +1001,15 @@ Route::middleware(['auth', 'permission:course.package,edit'])->prefix('dashboard
     Route::put('/{id}', [CoursePackageController::class, 'update'])->name('course.package.update');
     Route::delete('/{id}', [CoursePackageController::class, 'destroy'])->name('course.package.destroy');
     Route::post('/{id}/copy', [CoursePackageController::class, 'copy'])->name('course.package.copy');
+});
+
+// FIX (16 September 2026, permintaan user -- "buatkan 1 menu baru di dalam
+// course namanya laporan, tampilkan siapa yang beli packages"): READ ONLY,
+// lihat docblock App\Http\Controllers\Course\CourseReportController --
+// SENGAJA permission-nya sendiri ('course.report', bukan numpang ke
+// 'course.package') supaya bisa di-grant terpisah lewat halaman Role.
+Route::middleware(['auth', 'permission:course.report'])->prefix('dashboard/superadmin/course/report')->group(function () {
+    Route::get('/', [CourseReportController::class, 'index'])->name('course.report.index');
 });
 
 require __DIR__ . '/auth.php';

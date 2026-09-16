@@ -87,6 +87,10 @@ return [
     ['key' => 'course.class', 'label' => 'Course Class', 'route' => 'course.class.index', 'group' => 'Course', 'icon' => 'list'],
     ['key' => 'course.level', 'label' => 'Course Level', 'route' => 'course.level.index', 'group' => 'Course', 'icon' => 'list'],
     ['key' => 'course.package', 'label' => 'Course Package', 'route' => 'course.package.index', 'group' => 'Course', 'icon' => 'list'],
+    // FIX (16 September 2026, permintaan user -- "buatkan 1 menu baru di
+    // dalam course namanya laporan, tampilkan siapa yang beli packages"):
+    // READ ONLY, lihat App\Http\Controllers\Course\CourseReportController.
+    ['key' => 'course.report', 'label' => 'Laporan', 'route' => 'course.report.index', 'group' => 'Course', 'icon' => 'list'],
 
     // ================= Settings =================
     ['key' => 'settings.zoom', 'label' => 'Setting Zoom', 'route' => 'settings.zoom.index', 'group' => 'Settings', 'icon' => 'list'],
