@@ -1086,7 +1086,7 @@
                                                                     <i class="bi bi-send-check"></i> Apply
                                                                 </a>
                                                             </div>
-                                                            @if($courseRow->intake || $courseRow->duration || $courseRow->starting_date || $courseRow->application_deadline || $courseRow->language)
+                                                            @if($courseRow->intake || $courseRow->duration || $courseRow->starting_date || $courseRow->application_deadline || $courseRow->language || !empty($courseRow->csca_subject))
                                                                 <div class="course-meta">
                                                                     @if($courseRow->intake)
                                                                         <span class="course-chip"><i class="bi bi-calendar-event"></i> {{ $courseRow->intake }}</span>
@@ -1102,6 +1102,18 @@
                                                                     @endif
                                                                     @if($courseRow->language)
                                                                         <span class="course-chip"><i class="bi bi-translate"></i> {{ $courseRow->language }}</span>
+                                                                    @endif
+                                                                    {{--
+                                                                        FIX (permintaan user, 16 September 2026): tampilkan
+                                                                        CSCA Subject di sebelah chip "English Taught" --
+                                                                        csca_subject sekarang array (cast 'array' di model,
+                                                                        bisa lebih dari 1 pilihan lewat checkbox admin), jadi
+                                                                        di-loop supaya tiap pilihan jadi chip sendiri.
+                                                                    --}}
+                                                                    @if(!empty($courseRow->csca_subject))
+                                                                        @foreach((array) $courseRow->csca_subject as $cscaSubjectItem)
+                                                                            <span class="course-chip"><i class="bi bi-mortarboard"></i> {{ $cscaSubjectItem }}</span>
+                                                                        @endforeach
                                                                     @endif
                                                                 </div>
                                                             @endif
