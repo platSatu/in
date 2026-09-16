@@ -55,6 +55,7 @@ use App\Http\Controllers\StudentPortal\ApplicationPaymentController;
 use App\Http\Controllers\StudentPortal\ApplicationFormController;
 use App\Http\Controllers\StudentPortal\InaStudyController;
 use App\Http\Controllers\StudentPortal\InaYuleController;
+use App\Http\Controllers\StudentPortal\InaYulePackageCheckoutController;
 use App\Http\Controllers\StudentPortal\InaYulePackageController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
@@ -256,6 +257,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // dibangun ya"): klaim package trial (harga efektif Rp 0), lihat
     // docblock InaYulePackageController::claimTrial().
     Route::post('/inayule/packages/{packageId}/claim-trial', [InaYulePackageController::class, 'claimTrial'])->name('inayule.claim-trial');
+
+    // STEP 6 (16 September 2026, permintaan user -- checkout package
+    // berbayar: saldo Deposit / payment gateway / campuran otomatis
+    // keduanya): lihat docblock InaYulePackageCheckoutController untuk alur
+    // lengkap kedua jalur penyelesaiannya.
+    Route::get('/inayule/packages/{packageId}/checkout', [InaYulePackageCheckoutController::class, 'show'])->name('inayule.checkout.show');
+    Route::post('/inayule/packages/{packageId}/checkout', [InaYulePackageCheckoutController::class, 'store'])->name('inayule.checkout.store');
+    Route::get('/inayule/packages/checkout/{orderId}/select-method', [InaYulePackageCheckoutController::class, 'selectMethodForm'])->name('inayule.checkout.select-method');
+    Route::post('/inayule/packages/checkout/{orderId}/select-method', [InaYulePackageCheckoutController::class, 'selectMethod'])->name('inayule.checkout.select-method.store');
+    Route::get('/inayule/packages/checkout/return', [InaYulePackageCheckoutController::class, 'return'])->name('inayule.checkout.return');
+    Route::get('/inayule/packages/checkout/{orderId}/status', [InaYulePackageCheckoutController::class, 'status'])->name('inayule.checkout.status');
 });
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {
@@ -519,6 +531,7 @@ Route::middleware(['auth', 'permission:quiz.whatsapp-template,edit'])->prefix('d
     Route::get('/{id}/edit', [WhatsappTemplateController::class, 'edit'])->name('quiz.whatsapp-template.edit');
     Route::put('/{id}', [WhatsappTemplateController::class, 'update'])->name('quiz.whatsapp-template.update');
     Route::delete('/{id}', [WhatsappTemplateController::class, 'destroy'])->name('quiz.whatsapp-template.destroy');
+    Route::post('/{id}/activate-course-package-purchase', [WhatsappTemplateController::class, 'activateForCoursePackagePurchase'])->name('quiz.whatsapp-template.activate-course-package-purchase');
 });
 
 

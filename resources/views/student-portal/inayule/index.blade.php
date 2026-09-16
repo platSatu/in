@@ -66,6 +66,11 @@
                             data-bs-target="#inayule-schedule" type="button" role="tab"
                             aria-controls="inayule-schedule" aria-selected="false">Schedule</button>
                     </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="inayule-saldo-tab" data-bs-toggle="tab"
+                            data-bs-target="#inayule-saldo" type="button" role="tab"
+                            aria-controls="inayule-saldo" aria-selected="false">Saldo Saya</button>
+                    </li>
                 </ul>
             </div>
 
@@ -183,13 +188,18 @@
                                                     </button>
                                                 </form>
                                             @else
-                                                {{-- Tombol Beli SENGAJA disabled -- logic pembelian
-                                                     (potong saldo Deposit) belum dibangun, lihat docblock
-                                                     di atas file ini. --}}
-                                                <button type="button" class="btn btn-primary w-100" disabled
-                                                    title="Fitur pembelian akan segera hadir">
+                                                {{--
+                                                    STEP 6 (16 September 2026, permintaan user --
+                                                    checkout package berbayar): tombol Beli SEKARANG
+                                                    aktif, mengarah ke halaman checkout terpisah
+                                                    (bukan submit langsung dari sini) -- harga & split
+                                                    saldo/gateway dihitung ULANG di server pada halaman
+                                                    checkout itu, lihat docblock
+                                                    InaYulePackageCheckoutController.
+                                                --}}
+                                                <a href="{{ route('inayule.checkout.show', $package->id) }}" class="btn btn-primary w-100">
                                                     Beli
-                                                </button>
+                                                </a>
                                             @endif
                                         </div>
                                     </div>
@@ -278,6 +288,68 @@
                                 </tr>
                             </tbody>
                         </table>
+                    </div>
+                </div>
+
+                {{--
+                    Tab 4: Saldo Saya (STEP 6, 16 September 2026, permintaan
+                    user -- "ada 1 tab lagi untuk history pembelian, sisa
+                    saldo, saldo awal"): ini saldo Deposit (UANG, key-nya
+                    user_id), BEDA dari "Sisa Credit" (SESI kursus, key-nya
+                    student_id) yang badge-nya di atas tab-tab ini. Ledger di
+                    bawah SEKALIGUS menjawab ketiga poin permintaan: setiap
+                    baris = 1 transaksi ("history pembelian" -- topup maupun
+                    potongan beli package), kolom Saldo tiap baris = running
+                    balance ("saldo awal" ada di baris paling lama, kalau
+                    scroll ke halaman terakhir), dan card di atas = "sisa
+                    saldo" (saldo terkini).
+                --}}
+                <div class="tab-pane fade" id="inayule-saldo" role="tabpanel"
+                    aria-labelledby="inayule-saldo-tab">
+
+                    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+                        <div>
+                            <div class="text-muted" style="font-size:13px;">Sisa Saldo</div>
+                            <div class="fw-bold" style="font-size:24px;">
+                                Rp {{ number_format((float) $depositBalance, 0, ',', '.') }}
+                            </div>
+                        </div>
+                        <a href="{{ route('dashboard.deposit.create') }}" class="btn btn-outline-primary">
+                            + Topup Saldo
+                        </a>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Tanggal</th>
+                                    <th>Keterangan</th>
+                                    <th>Debit</th>
+                                    <th>Kredit</th>
+                                    <th>Saldo</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @forelse ($depositLedger as $ledger)
+                                    <tr>
+                                        <td>{{ ($ledger->payment_date ?? $ledger->created_at)?->translatedFormat('d M Y, H:i') ?? '-' }}</td>
+                                        <td>{{ $ledger->description ?? '-' }}</td>
+                                        <td>{{ (float) $ledger->debit > 0 ? 'Rp ' . number_format((float) $ledger->debit, 0, ',', '.') : '-' }}</td>
+                                        <td>{{ (float) $ledger->kredit > 0 ? 'Rp ' . number_format((float) $ledger->kredit, 0, ',', '.') : '-' }}</td>
+                                        <td>Rp {{ number_format((float) $ledger->balance, 0, ',', '.') }}</td>
+                                    </tr>
+                                @empty
+                                    <tr>
+                                        <td colspan="5" class="text-center text-muted py-4">Data not found</td>
+                                    </tr>
+                                @endforelse
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="mt-4">
+                        {{ $depositLedger->links('pagination::bootstrap-5') }}
                     </div>
                 </div>
             </div>

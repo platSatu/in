@@ -9,6 +9,7 @@ use App\Models\CourseLevel;
 use App\Models\CoursePackage;
 use App\Models\CoursePackagePurchase;
 use App\Models\CourseType;
+use App\Models\Deposit;
 use App\Models\Student;
 use App\Services\StudentIdentityResolver;
 use Illuminate\Database\Eloquent\Builder;
@@ -41,15 +42,24 @@ use Illuminate\View\View;
  * sekarang bisa langsung "diklaim" lewat claimTrial() -- membuat baris
  * CoursePackagePurchase (source='trial_claim') + CourseCredit (nambah
  * saldo credit student), TANPA nyentuh Deposit sama sekali karena tidak
- * ada uang berpindah. Package berbayar (effectivePrice() > 0) TETAP
- * disabled di Blade -- logic potong saldo Deposit belum dibangun, masih
- * nunggu integrasi Deposit menyusul (lihat diskusi konsep InaYule).
+ * ada uang berpindah.
+ *
+ * STEP 6 (16 September 2026, permintaan user -- checkout package berbayar):
+ * package dengan effectivePrice() > 0 sekarang tombol "Beli"-nya AKTIF,
+ * mengarah ke InaYulePackageCheckoutController::show() (halaman checkout
+ * terpisah, bukan submit langsung dari sini) -- lihat docblock controller
+ * itu untuk alur mix saldo Deposit + payment gateway otomatis.
  *
  * Tab "History" SEKARANG diisi data sungguhan dari CoursePackagePurchase
  * (sebelumnya placeholder "Data not found" karena tabelnya belum ada). Tab
  * "Schedule" MASIH placeholder -- baru bisa diisi setelah jadwal kelas
  * (course_session_attendances / booking sesi, BELUM dibangun) terhubung ke
  * student.
+ *
+ * Tab "Saldo Saya" (STEP 6, 16 September 2026) menampilkan saldo Deposit
+ * (BUKAN CourseCredit -- ini uang, bukan sesi kursus) + ledger topup/
+ * pemakaiannya, supaya student bisa lihat "history pembelian, sisa saldo,
+ * saldo awal" tanpa pindah halaman ke dashboard.deposit.*.
  */
 class InaYulePackageController extends Controller
 {
@@ -143,6 +153,22 @@ class InaYulePackageController extends Controller
         // Balik ke urutan terbaru dulu buat tampilan (sama seperti sebelumnya).
         $purchases = $purchases->sortByDesc('created_at')->values();
 
+        // STEP 6 (16 September 2026, permintaan user -- checkout package
+        // berbayar pakai saldo Deposit / gateway / campuran): tab baru
+        // "Saldo Saya" -- saldo Deposit di-key oleh user_id (BUKAN
+        // student_id, beda dari CourseCredit) makanya diambil langsung dari
+        // Auth::id(), tidak perlu $student. Ledger di bawah pakai
+        // paginator BERNAMA ('saldo_page') supaya tidak bentrok dengan
+        // paginator $packages di tab "Buy Packages" (keduanya sama-sama
+        // tampil di 1 halaman).
+        $depositBalance = Deposit::currentBalanceFor((string) Auth::id());
+
+        $depositLedger = Deposit::where('user_id', (string) Auth::id())
+            ->orderByDesc('payment_date')
+            ->orderByDesc('created_at')
+            ->paginate(15, ['*'], 'saldo_page')
+            ->withQueryString();
+
         return view('student-portal.inayule.index', [
             'packages' => $packages,
             'types' => $types,
@@ -157,6 +183,8 @@ class InaYulePackageController extends Controller
             'creditBalance' => $creditBalance,
             'claimedTrialPackageIds' => $claimedTrialPackageIds,
             'purchases' => $purchases,
+            'depositBalance' => $depositBalance,
+            'depositLedger' => $depositLedger,
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Payment\FormPaymentController;
 use App\Http\Controllers\Dashboard\DepositWebhookController;
+use App\Http\Controllers\StudentPortal\InaYulePackageWebhookController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -29,3 +30,12 @@ Route::post('/payment/webhook/ipaymu', [FormPaymentController::class, 'ipaymuWeb
 Route::post('/deposit/webhook/midtrans', [DepositWebhookController::class, 'midtransWebhook'])->name('deposit.webhook.midtrans');
 Route::post('/deposit/webhook/duitku', [DepositWebhookController::class, 'duitkuWebhook'])->name('deposit.webhook.duitku');
 Route::post('/deposit/webhook/ipaymu', [DepositWebhookController::class, 'ipaymuWebhook'])->name('deposit.webhook.ipaymu');
+
+// Webhook checkout package berbayar -- jalur TERPISAH lagi dari 2 webhook di
+// atas (lihat App\Services\CoursePackagePayment\* &
+// App\Http\Controllers\StudentPortal\InaYulePackageWebhookController), pola
+// & alasan SAMA PERSIS: system "api" tidak pakai middleware CSRF, signature
+// tiap gateway tetap diverifikasi manual sebelum credit/saldo diproses.
+Route::post('/course-package/webhook/midtrans', [InaYulePackageWebhookController::class, 'midtransWebhook'])->name('course-package.webhook.midtrans');
+Route::post('/course-package/webhook/duitku', [InaYulePackageWebhookController::class, 'duitkuWebhook'])->name('course-package.webhook.duitku');
+Route::post('/course-package/webhook/ipaymu', [InaYulePackageWebhookController::class, 'ipaymuWebhook'])->name('course-package.webhook.ipaymu');

@@ -21,6 +21,11 @@ class WhatsappTemplate extends Model
         'content',
         'description',
         'status',
+        'is_course_package_purchase_template',
+    ];
+
+    protected $casts = [
+        'is_course_package_purchase_template' => 'boolean',
     ];
 
     /**
@@ -43,5 +48,19 @@ class WhatsappTemplate extends Model
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
+    }
+
+    /**
+     * Template yang ditandai admin (lewat menu Quiz > WhatsApp Template,
+     * tombol "Aktifkan utk Notifikasi Package") untuk dipakai saat kirim
+     * notifikasi WA "pembelian package berhasil" -- lihat
+     * App\Http\Controllers\Quiz\WhatsappTemplateController::activateForCoursePackagePurchase()
+     * & App\Http\Controllers\StudentPortal\InaYulePackageWebhookController.
+     * Cuma 1 baris yang boleh true di satu waktu (deactivateOthers() saat
+     * mengaktifkan yang baru), pola SAMA PERSIS dengan PaymentGateway::is_active.
+     */
+    public function scopeForCoursePackagePurchase($query)
+    {
+        return $query->where('is_course_package_purchase_template', true);
     }
 }

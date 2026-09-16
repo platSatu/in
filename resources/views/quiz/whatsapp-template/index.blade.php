@@ -141,6 +141,10 @@
                                 </th>
 
                                 <th>
+                                    Notif Pembelian Package
+                                </th>
+
+                                <th>
                                     Created At
                                 </th>
 
@@ -217,6 +221,34 @@
 
                                 </td>
 
+                                <td>
+
+                                    @if($template->is_course_package_purchase_template)
+
+                                        <span class="badge bg-success">
+                                            Aktif
+                                        </span>
+
+                                    @else
+
+                                        <form
+                                            action="{{ route('quiz.whatsapp-template.activate-course-package-purchase', $template->id) }}"
+                                            method="POST"
+                                            class="m-0"
+                                            onsubmit="return confirm('Pakai template ini untuk notifikasi pembelian package?')">
+
+                                            @csrf
+
+                                            <button class="btn btn-sm btn-outline-secondary text-nowrap">
+                                                Aktifkan
+                                            </button>
+
+                                        </form>
+
+                                    @endif
+
+                                </td>
+
 
 
 
@@ -280,7 +312,7 @@
 
                             <tr>
 
-                                <td colspan="6"
+                                <td colspan="7"
                                     class="text-center">
 
                                     No data.

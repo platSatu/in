@@ -30,6 +30,12 @@ class CoursePackagePurchase extends Model
     public const SOURCE_TRIAL_CLAIM = 'trial_claim';
     public const SOURCE_DEPOSIT_PURCHASE = 'deposit_purchase';
 
+    // Ditambah bersama fitur checkout package berbayar (16 September 2026) --
+    // lihat docblock migration extend_course_package_purchase_source_and_wa_template.
+    // 'deposit_purchase' TETAP dipakai kalau 100% tertutup saldo Deposit.
+    public const SOURCE_GATEWAY_PURCHASE = 'gateway_purchase';
+    public const SOURCE_MIXED_PURCHASE = 'mixed_purchase';
+
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 

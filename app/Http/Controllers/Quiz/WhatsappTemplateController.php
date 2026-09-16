@@ -105,4 +105,33 @@ class WhatsappTemplateController extends Controller
             ->route('quiz.whatsapp-template.index')
             ->with('success', 'Template WhatsApp berhasil dihapus.');
     }
+
+    /**
+     * Jadikan template ini yang dipakai untuk notifikasi WA "pembelian
+     * package berhasil" (lihat App\Services\CoursePackagePayment\
+     * CoursePackagePurchaseNotifier & WhatsappTemplate::scopeForCoursePackagePurchase()).
+     *
+     * SENGAJA system-wide (deactivateOthers() TIDAK di-scope ke user_id) --
+     * pola sama persis dengan PaymentGateway.is_active /
+     * WhatsappGateway.is_active (lihat
+     * Settings\PaymentGatewayController::deactivateOthers()): ini setting
+     * "template mana yang dipakai sistem", bukan preferensi per-admin.
+     */
+    public function activateForCoursePackagePurchase(string $id)
+    {
+        $userId = Auth::id();
+        if ($userId === null) {
+            abort(401);
+        }
+
+        AdminCrud::findOrFail(WhatsappTemplate::class, $id, (string) $userId);
+
+        WhatsappTemplate::query()->update(['is_course_package_purchase_template' => false]);
+
+        AdminCrud::update(WhatsappTemplate::class, $id, ['is_course_package_purchase_template' => true], (string) $userId);
+
+        return redirect()
+            ->route('quiz.whatsapp-template.index')
+            ->with('success', 'Template ini sekarang dipakai untuk notifikasi pembelian package.');
+    }
 }

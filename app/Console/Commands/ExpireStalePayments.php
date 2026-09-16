@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Models\CoursePackagePayment;
 use App\Models\DepositPayment;
 use App\Models\FormPayment;
 use Illuminate\Console\Command;
@@ -54,6 +55,20 @@ class ExpireStalePayments extends Command
 
         if ($affectedDeposits > 0) {
             $this->info("{$affectedDeposits} transaksi topup saldo ditandai expired.");
+        }
+
+        // Sapuan yang sama untuk checkout package berbayar
+        // (course_package_payments) -- jalur TERPISAH lagi dari 2 sapuan di
+        // atas (lihat App\Services\CoursePackagePayment\*), alasan self-heal
+        // sama persis: menangkap transaksi yang browsernya ditutup sebelum
+        // sempat di-poll lagi oleh InaYulePackageCheckoutController::status().
+        $affectedCoursePackagePayments = CoursePackagePayment::where('status', 'pending')
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now())
+            ->update(['status' => 'expired']);
+
+        if ($affectedCoursePackagePayments > 0) {
+            $this->info("{$affectedCoursePackagePayments} transaksi checkout package ditandai expired.");
         }
 
         return self::SUCCESS;
