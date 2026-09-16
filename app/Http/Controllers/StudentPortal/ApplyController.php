@@ -116,9 +116,15 @@ class ApplyController extends Controller
         // sekarang PRIORITAS diambil dari Course yang di-lock ($lockedCourse,
         // lihat filter ?course= di atas) -- itu nominal yang BENAR-BENAR akan
         // di-snapshot ke aplikasi begitu siswa submit (lihat store()). Baris
-        // Payment fee_type='registration_fee' di atas tetap dipertahankan
-        // cuma sebagai fallback tampilan kalau Course-nya belum diisi
-        // Registration Fee sendiri (mis. data lama).
+        // Payment fee_type='registration_fee' di atas ($registrationFee)
+        // tetap dipertahankan & tetap dihitung di sini sebagai fallback
+        // tampilan kalau Course-nya belum diisi Registration Fee sendiri
+        // (mis. data lama) -- BUG (16 September 2026): baris $registrationFee
+        // ini sempat KE-HAPUS tidak sengaja saat menambahkan
+        // $courseRegistrationFeeAmount, menyebabkan "Undefined variable
+        // $registrationFee" & 500 di production begitu siswa klik Apply dari
+        // course manapun. Dikembalikan di sini.
+        $registrationFee = $profile->payments->firstWhere('fee_type', 'registration_fee');
         $courseRegistrationFeeAmount = optional($lockedCourse)->registration_fee_amount;
 
         $student = Student::where('user_id', $user->id)->first();
