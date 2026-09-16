@@ -57,6 +57,7 @@ use App\Http\Controllers\StudentPortal\InaStudyController;
 use App\Http\Controllers\StudentPortal\InaYuleController;
 use App\Http\Controllers\StudentPortal\InaYulePackageCheckoutController;
 use App\Http\Controllers\StudentPortal\InaYulePackageController;
+use App\Http\Controllers\StudentPortal\InaYulePackageUpgradeController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
@@ -268,6 +269,18 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/inayule/packages/checkout/{orderId}/select-method', [InaYulePackageCheckoutController::class, 'selectMethod'])->name('inayule.checkout.select-method.store');
     Route::get('/inayule/packages/checkout/return', [InaYulePackageCheckoutController::class, 'return'])->name('inayule.checkout.return');
     Route::get('/inayule/packages/checkout/{orderId}/status', [InaYulePackageCheckoutController::class, 'status'])->name('inayule.checkout.status');
+
+    // FASE 4 bagian 2 "Konversi/Upgrade Paket" (16 September 2026): upgrade
+    // ke package lain, sisa saldo credit lama ditukar (trade-in) dulu
+    // SEBELUM saldo Deposit/payment gateway -- lihat docblock
+    // App\Services\CoursePackagePayment\PackageUpgradeCalculator &
+    // App\Http\Controllers\StudentPortal\InaYulePackageUpgradeController
+    // untuk alur lengkapnya. Route select-method/return/status TIDAK perlu
+    // duplikat -- dipakai BERSAMA dengan checkout package biasa di atas,
+    // karena sama-sama beroperasi murni lewat order_id pada 1 tabel
+    // CoursePackagePayment yang sama.
+    Route::get('/inayule/packages/{packageId}/upgrade', [InaYulePackageUpgradeController::class, 'show'])->name('inayule.upgrade.show');
+    Route::post('/inayule/packages/{packageId}/upgrade', [InaYulePackageUpgradeController::class, 'store'])->name('inayule.upgrade.store');
 });
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {
