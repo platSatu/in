@@ -45,6 +45,8 @@ class CoursePackagePayment extends Model
         'price_total',
         'deposit_portion',
         'gateway_portion',
+        'credit_trade_in_portion',
+        'trade_in_course_credit_id',
         'credits_granted',
         'status',
         'payment_method',
@@ -60,6 +62,7 @@ class CoursePackagePayment extends Model
         'price_total' => 'decimal:2',
         'deposit_portion' => 'decimal:2',
         'gateway_portion' => 'decimal:2',
+        'credit_trade_in_portion' => 'decimal:2',
         'credits_granted' => 'decimal:2',
         'raw_response' => 'array',
         'raw_callback' => 'array',
@@ -90,6 +93,17 @@ class CoursePackagePayment extends Model
     public function purchase(): BelongsTo
     {
         return $this->belongsTo(CoursePackagePurchase::class, 'course_package_purchase_id');
+    }
+
+    /**
+     * FASE 4 "Konversi/Upgrade Paket" -- baris CourseCredit (source_type=
+     * TRADE_IN_DEBIT) yang jadi bukti "credit lama yang mana persis yang
+     * ditukar" untuk checkout upgrade ini. Null kalau checkout ini BUKAN
+     * upgrade (pembelian package biasa, tidak ada trade-in).
+     */
+    public function tradeInCourseCredit(): BelongsTo
+    {
+        return $this->belongsTo(CourseCredit::class, 'trade_in_course_credit_id');
     }
 
     public function isPaid(): bool

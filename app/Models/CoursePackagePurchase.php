@@ -36,6 +36,14 @@ class CoursePackagePurchase extends Model
     public const SOURCE_GATEWAY_PURCHASE = 'gateway_purchase';
     public const SOURCE_MIXED_PURCHASE = 'mixed_purchase';
 
+    // FASE 4 "Konversi/Upgrade Paket" (16 September 2026) -- checkout upgrade
+    // ke package lain, sisa saldo CourseCredit lama ditukar (trade-in) jadi
+    // nilai rupiah untuk menutup sebagian/seluruh harga package baru, lihat
+    // App\Services\CoursePackagePayment\PackageUpgradeCalculator. TIDAK
+    // butuh migration tambahan -- kolom `source` sudah VARCHAR(30) bebas
+    // nilai sejak migration extend_course_package_purchase_source_and_wa_template.
+    public const SOURCE_UPGRADE_PURCHASE = 'upgrade_purchase';
+
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 
