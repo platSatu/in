@@ -180,6 +180,12 @@
                 pengajar sendiri (role, bukan permission modul yang di-grant
                 admin ke staff tertentu). Lihat docblock
                 App\Http\Controllers\Teacher\ClassSessionApprovalController.
+
+                FIX (17 September 2026, permintaan owner): label "Approval
+                Pemakaian Credit" disingkat jadi "Approval" (kepanjangan), dan
+                ditambah item "Jadwal" (halaman tersendiri, lihat docblock
+                App\Http\Controllers\Teacher\ScheduleController) supaya menu
+                "Pengajar" ini persis 2 item: Approval & Jadwal.
             --}}
             @if (auth()->check() && auth()->user()->hasRole('teacher'))
                 <li class="menu">
@@ -209,7 +215,10 @@
                     <ul class="collapse submenu list-unstyled" id="menuTeacherClassSessions"
                         data-bs-parent="#accordionExample">
                         <li>
-                            <a href="{{ route('teacher.class-sessions.index') }}">Approval Pemakaian Credit</a>
+                            <a href="{{ route('teacher.class-sessions.index') }}">Approval</a>
+                        </li>
+                        <li>
+                            <a href="{{ route('teacher.schedule.index') }}">Jadwal</a>
                         </li>
                     </ul>
                 </li>

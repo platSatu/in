@@ -62,6 +62,7 @@ use App\Http\Controllers\StudentPortal\InaYulePackageUpgradeController;
 use App\Http\Controllers\ClassSession\ClassSessionAdminController;
 use App\Http\Controllers\Schedule\ScheduleAdminController;
 use App\Http\Controllers\Teacher\ClassSessionApprovalController;
+use App\Http\Controllers\Teacher\ScheduleController as TeacherScheduleController;
 use App\Http\Controllers\TeacherHonor\TeacherHonorController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\Quiz\UniversityApplicationController;
@@ -303,6 +304,10 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->group(function (
     Route::get('/class-sessions', [ClassSessionApprovalController::class, 'index'])->name('teacher.class-sessions.index');
     Route::post('/class-sessions/{id}/approve', [ClassSessionApprovalController::class, 'approve'])->name('teacher.class-sessions.approve');
     Route::post('/class-sessions/{id}/reject', [ClassSessionApprovalController::class, 'reject'])->name('teacher.class-sessions.reject');
+    // FIX (17 September 2026, permintaan owner): "Jadwal" dipisah dari
+    // halaman Approval jadi menu tersendiri -- lihat docblock
+    // App\Http\Controllers\Teacher\ScheduleController.
+    Route::get('/jadwal', [TeacherScheduleController::class, 'index'])->name('teacher.schedule.index');
 });
 
 // FASE 2 bagian 2 "Absensi": sisi ADMIN -- gerbang FINAL sebelum credit
