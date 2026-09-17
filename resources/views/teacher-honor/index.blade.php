@@ -83,7 +83,7 @@
                                 <tr>
                                     <td>{{ optional($honor->created_at)->format('d/m/Y H:i') }}</td>
                                     <td>{{ optional($honor->teacher)->name ?? '-' }}</td>
-                                    <td>{{ optional($honor->student)->name ?? '-' }}</td>
+                                    <td>{{ $honor->student ? trim($honor->student->first_name . ' ' . $honor->student->last_name) : '-' }}</td>
                                     <td>{{ optional(optional($honor->classSession)->coursePackage)->name ?? '-' }}</td>
                                     <td>{{ number_format((float) $honor->commission_percentage, 2, ',', '.') }}%</td>
                                     <td>Rp {{ number_format((float) $honor->credit_value, 0, ',', '.') }}</td>

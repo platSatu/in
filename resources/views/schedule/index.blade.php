@@ -61,7 +61,7 @@
                                 @foreach ($dateSessions as $session)
                                     <tr>
                                         <td>{{ optional($session->requested_at)->format('H:i') }}</td>
-                                        <td>{{ optional($session->student)->name ?? '-' }}</td>
+                                        <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
                                         <td>{{ optional($session->teacher)->name ?? '-' }}</td>
                                         <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
                                         <td>{{ optional($session->branch)->name ?? '-' }}</td>
