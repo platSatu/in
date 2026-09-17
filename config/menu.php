@@ -23,15 +23,23 @@
 
 return [
     // ================= Pembayaran =================
-    ['key' => 'pembayaran.category', 'label' => 'Category', 'route' => 'pembayaran.category.index', 'group' => 'Pembayaran', 'icon' => 'list'],
-    ['key' => 'pembayaran.form', 'label' => 'Setting Forms', 'route' => 'pembayaran.form.index', 'group' => 'Pembayaran', 'icon' => 'list'],
-    ['key' => 'pembayaran.form-link', 'label' => 'Form to Users', 'route' => 'pembayaran.form-link.index', 'group' => 'Pembayaran', 'icon' => 'list'],
+    // Dinonaktifkan sementara dari sidebar/registry (17 September 2026,
+    // permintaan owner) -- SENGAJA dikomentari, bukan dihapus, supaya
+    // gampang diaktifkan lagi. Route & permission DB yang sudah ada tidak
+    // terganggu (App\Models\Permission::syncFromRegistry() cuma
+    // update-or-create dari yang ADA di sini, tidak menghapus yang hilang).
+    // ['key' => 'pembayaran.category', 'label' => 'Category', 'route' => 'pembayaran.category.index', 'group' => 'Pembayaran', 'icon' => 'list'],
+    // ['key' => 'pembayaran.form', 'label' => 'Setting Forms', 'route' => 'pembayaran.form.index', 'group' => 'Pembayaran', 'icon' => 'list'],
+    // ['key' => 'pembayaran.form-link', 'label' => 'Form to Users', 'route' => 'pembayaran.form-link.index', 'group' => 'Pembayaran', 'icon' => 'list'],
 
     // ================= Absensi =================
-    ['key' => 'absensi.attendance', 'label' => 'Absensi', 'route' => 'absensi.attendance.index', 'group' => 'Absensi', 'icon' => 'list'],
-    ['key' => 'absensi.attendance-setting', 'label' => 'Settings', 'route' => 'absensi.attendance-setting.index', 'group' => 'Absensi', 'icon' => 'list'],
-    ['key' => 'absensi.attendance-user-qr-code', 'label' => 'QrCode User', 'route' => 'absensi.attendance-user-qr-code.index', 'group' => 'Absensi', 'icon' => 'list'],
-    ['key' => 'absensi.academic-calendar', 'label' => 'Academic Calendar', 'route' => 'absensi.academic-calendar.index', 'group' => 'Absensi', 'icon' => 'list'],
+    // Dinonaktifkan sementara dari sidebar/registry (17 September 2026,
+    // permintaan owner) -- SENGAJA dikomentari, bukan dihapus, sama seperti
+    // grup Pembayaran di atas.
+    // ['key' => 'absensi.attendance', 'label' => 'Absensi', 'route' => 'absensi.attendance.index', 'group' => 'Absensi', 'icon' => 'list'],
+    // ['key' => 'absensi.attendance-setting', 'label' => 'Settings', 'route' => 'absensi.attendance-setting.index', 'group' => 'Absensi', 'icon' => 'list'],
+    // ['key' => 'absensi.attendance-user-qr-code', 'label' => 'QrCode User', 'route' => 'absensi.attendance-user-qr-code.index', 'group' => 'Absensi', 'icon' => 'list'],
+    // ['key' => 'absensi.academic-calendar', 'label' => 'Academic Calendar', 'route' => 'absensi.academic-calendar.index', 'group' => 'Absensi', 'icon' => 'list'],
 
     // ================= Students =================
     ['key' => 'student.student', 'label' => 'Data Student', 'route' => 'student.student.index', 'group' => 'Students', 'icon' => 'list'],
