@@ -8,13 +8,14 @@
         <h4 class="mb-0">Data Student</h4>
 
         <div class="d-flex flex-wrap gap-2">
-            {{-- Export ikut filter (search/branch_id/form_id) yang lagi aktif di
-                 halaman ini — kosongkan filter dulu (klik &times; di sebelah
+            {{-- Export ikut filter (search/branch_id/form_id/date) yang lagi aktif
+                 di halaman ini — kosongkan filter dulu (klik &times; di sebelah
                  tombol Filter) kalau mau export SEMUA student, atau isi
-                 Branch/Form dulu kalau mau export per branch/per form. File-nya
-                 .csv, langsung bisa dibuka di Excel atau di-import ke Google
-                 Sheets (menu File > Import di Google Sheets). --}}
-            <a href="{{ route('student.student.export', request()->only(['search', 'branch_id', 'form_id'])) }}"
+                 Branch/Form/Tanggal dulu kalau mau export per branch/per
+                 form/per tanggal dibuat. File-nya .csv, langsung bisa dibuka di
+                 Excel atau di-import ke Google Sheets (menu File > Import di
+                 Google Sheets). --}}
+            <a href="{{ route('student.student.export', request()->only(['search', 'branch_id', 'form_id', 'date'])) }}"
                 class="btn btn-outline-success"
                 title="Export sesuai filter yang sedang aktif. Kosongkan filter untuk export semua student.">
                 <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
@@ -42,24 +43,44 @@
 
     {{-- === RINGKASAN === --}}
     <div class="row layout-top-spacing g-3 mb-1">
-        <div class="col-md-4 col-sm-6">
+        <div class="col-md-3 col-sm-6">
             <div class="widget-content widget-content-area br-8 text-center py-3" style="border-left: 4px solid #22c55e;">
                 <div class="fs-4 fw-bold text-success">{{ $data->total() }}</div>
                 <div class="text-muted small">Total Student</div>
             </div>
         </div>
 
-        <div class="col-md-4 col-sm-6">
+        <div class="col-md-3 col-sm-6">
             <div class="widget-content widget-content-area br-8 text-center py-3" style="border-left: 4px solid #f59e0b;">
                 <div class="fs-4 fw-bold text-warning">{{ $totalBranches }}</div>
                 <div class="text-muted small">Total Branch</div>
             </div>
         </div>
 
-        <div class="col-md-4 col-sm-6">
+        <div class="col-md-3 col-sm-6">
             <div class="widget-content widget-content-area br-8 text-center py-3" style="border-left: 4px solid #6259ca;">
                 <div class="fs-4 fw-bold text-primary">{{ $totalForms }}</div>
                 <div class="text-muted small">Total Form</div>
+            </div>
+        </div>
+
+        {{-- Ikut filter Tanggal (input "date" di form filter di bawah): jumlah
+             student yang CREATED_AT-nya jatuh tepat di tanggal itu. Tidak ikut
+             filter search/branch/form lain -- lihat komentar
+             $studentsCreatedOnDate di StudentController::index(). Selama
+             filter Tanggal belum diisi, kartu ini tampil "-" (bukan 0), supaya
+             tidak disangka "0 student dibuat hari ini". --}}
+        <div class="col-md-3 col-sm-6">
+            <div class="widget-content widget-content-area br-8 text-center py-3" style="border-left: 4px solid #ef4444;">
+                <div class="fs-4 fw-bold text-danger">{{ $date ? $studentsCreatedOnDate : '-' }}</div>
+                <div class="text-muted small">
+                    Student Dibuat
+                    @if($date)
+                        pada {{ \Carbon\Carbon::parse($date)->translatedFormat('d M Y') }}
+                    @else
+                        (pilih Tanggal)
+                    @endif
+                </div>
             </div>
         </div>
     </div>
@@ -70,7 +91,7 @@
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('student.student.index') }}" class="row g-2 align-items-end">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <label class="form-label small text-muted mb-1">Cari</label>
                             <input
                                 type="text"
@@ -80,7 +101,7 @@
                                 value="{{ request('search') }}">
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label small text-muted mb-1">Branch</label>
                             <select name="branch_id" class="form-select">
                                 <option value="">-- Semua Branch --</option>
@@ -92,7 +113,7 @@
                             </select>
                         </div>
 
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label small text-muted mb-1">Form</label>
                             <select name="form_id" class="form-select">
                                 <option value="">-- Semua Form --</option>
@@ -104,7 +125,16 @@
                             </select>
                         </div>
 
-                        <div class="col-md-2 d-flex gap-2">
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted mb-1">Tanggal Dibuat</label>
+                            <input
+                                type="date"
+                                name="date"
+                                class="form-control"
+                                value="{{ $date }}">
+                        </div>
+
+                        <div class="col-md-3 d-flex gap-2">
                             {{-- Padding vertikal disamakan manual dengan .form-control/.form-select
                                  (padding: 0.75rem 1.25rem di main.css) karena style .btn bawaan tema
                                  cuma punya padding 0.4375rem, jadi tanpa ini tombolnya kelihatan lebih
@@ -115,7 +145,7 @@
                                 </button>
                             </div>
 
-                            @if(request('search') || request('branch_id') || request('form_id'))
+                            @if(request('search') || request('branch_id') || request('form_id') || request('date'))
                                 <a href="{{ route('student.student.index') }}" class="btn btn-outline-danger" title="Reset filter" style="padding-top: 0.75rem; padding-bottom: 0.75rem;">
                                     &times;
                                 </a>

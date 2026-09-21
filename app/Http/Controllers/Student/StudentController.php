@@ -45,6 +45,7 @@ class StudentController extends Controller
         $search = $request->query('search');
         $branchId = $request->query('branch_id');
         $formId = $request->query('form_id');
+        $date = $request->query('date');
 
         $user = Auth::user();
         if ($user === null) {
@@ -88,6 +89,12 @@ class StudentController extends Controller
             })
             ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
             ->when($formId, fn ($query) => $query->where('form_id', $formId))
+            // Filter tanggal (kolom "created_at", format input date: YYYY-MM-DD dari
+            // <input type="date"> di index.blade.php). whereDate() dipakai (bukan
+            // where('created_at', $date) polos) supaya cocok biarpun created_at
+            // punya jam:menit:detik -- whereDate() otomatis membandingkan cuma
+            // bagian tanggalnya saja.
+            ->when($date, fn ($query) => $query->whereDate('created_at', $date))
             // Urutkan data masuk TERBARU di paling atas. `created_at` saja kadang
             // punya beberapa baris dengan detik yang sama persis (mis. input
             // berturut-turut cepat / data lama yang di-import sekaligus), dan untuk
@@ -114,14 +121,33 @@ class StudentController extends Controller
         $totalBranches = $companyBranches->count();
         $totalForms = $forms->count();
 
+        // Ringkasan "Student Baru pada Tanggal Ini": total student yang dibuat
+        // (created_at) tepat di tanggal yang dipilih lewat filter Tanggal. Ikut
+        // scope akses user (DataScope) sama seperti $data di atas -- staff dengan
+        // cakupan terbatas tetap cuma lihat jumlah miliknya sendiri -- tapi
+        // SENGAJA TIDAK ikut filter search/branch_id/form_id lainnya, supaya
+        // angka ini selalu mewakili "berapa yang masuk di tanggal itu" secara
+        // utuh, terlepas dari filter lain yang lagi dipakai untuk menyaring tabel.
+        // null (bukan 0) kalau filter Tanggal belum dipakai, supaya
+        // index.blade.php bisa membedakan "belum difilter" vs "difilter tapi 0".
+        $studentsCreatedOnDate = null;
+        if ($date) {
+            $studentsCreatedOnDate = Student::query()
+                ->tap(fn ($query) => DataScope::applyBranchDivisionScope($query, $user, 'handled_by_user_id'))
+                ->whereDate('created_at', $date)
+                ->count();
+        }
+
         return view('student.student.index', compact(
             'data',
             'companyBranches',
             'forms',
             'branchId',
             'formId',
+            'date',
             'totalBranches',
-            'totalForms'
+            'totalForms',
+            'studentsCreatedOnDate'
         ));
     }
 
@@ -131,7 +157,7 @@ class StudentController extends Controller
      * yang menerima file .csv langsung).
      *
      * Filter-nya SENGAJA persis sama dengan index() di atas (search/
-     * branch_id/form_id, dari query string yang sama) — jadi tombol Export
+     * branch_id/form_id/date, dari query string yang sama) — jadi tombol Export
      * di halaman index tinggal "ikut" filter yang lagi aktif saat itu:
      * tidak isi filter apa-apa = export semua student, isi Branch = export
      * per branch, isi Form = export per form (atau kombinasi keduanya).
@@ -143,6 +169,7 @@ class StudentController extends Controller
         $search = $request->query('search');
         $branchId = $request->query('branch_id');
         $formId = $request->query('form_id');
+        $date = $request->query('date');
 
         $user = Auth::user();
         if ($user === null) {
@@ -170,9 +197,10 @@ class StudentController extends Controller
                 });
             })
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
-            ->when($formId, fn ($q) => $q->where('form_id', $formId));
+            ->when($formId, fn ($q) => $q->where('form_id', $formId))
+            ->when($date, fn ($q) => $q->whereDate('created_at', $date));
 
-        $filename = $this->buildExportFilename($branchId, $formId);
+        $filename = $this->buildExportFilename($branchId, $formId, $date);
 
         return response()->streamDownload(function () use ($query) {
             $handle = fopen('php://output', 'w');
@@ -249,7 +277,7 @@ class StudentController extends Controller
      * file-nya saja sudah kelihatan itu "export semua" atau "per branch/
      * form" — tanpa perlu buka dulu buat tahu isinya.
      */
-    private function buildExportFilename(?string $branchId, ?string $formId): string
+    private function buildExportFilename(?string $branchId, ?string $formId, ?string $date = null): string
     {
         $parts = ['students'];
 
@@ -261,6 +289,10 @@ class StudentController extends Controller
         if ($formId) {
             $formName = optional(Form::find($formId))->name;
             $parts[] = 'form-' . Str::slug($formName ?: $formId);
+        }
+
+        if ($date) {
+            $parts[] = 'date-' . Str::slug($date);
         }
 
         $parts[] = now()->format('Y-m-d_His');
