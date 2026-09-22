@@ -19,7 +19,7 @@ class UniversityProfileDegree extends Model
     // dipilih di dropdown form (bukan enum DB, lihat catatan di migration
     // add_course_fields_to_university_profile_degrees_table) -- dipakai
     // bareng oleh view create/edit & validasi di UniversityProfileController.
-    public const DEGREES = ['Diploma', 'Bachelor', 'Master', 'PhD'];
+    public const DEGREES = ['Diploma', 'Bachelor', 'Master', 'PhD', 'Non-Degree'];
 
     // FIX (permintaan user, 16 September 2026): 4 pilihan tetap untuk field
     // "CSCA Subject" per Course (bukan enum DB, sama polanya dengan DEGREES
