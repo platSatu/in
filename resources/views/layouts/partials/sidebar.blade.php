@@ -23,9 +23,15 @@
                         // (bukan versi lama yang ke-cache) tanpa perlu hard refresh manual.
                         $logoDiskPath = public_path('frontend/img/Logo-icon.png');
                         $logoVersion = file_exists($logoDiskPath) ? filemtime($logoDiskPath) : time();
+                        //
+                        // SENGAJA bukan class "navbar-logo": app.js & loader.js
+                        // bawaan template mengganti src elemen .navbar-logo ke
+                        // ../src/assets/img/logo*.svg (tidak ada) setiap ganti
+                        // tema terang/gelap. Ukuran tetap dari structure.css
+                        // (#sidebar .theme-brand div.theme-logo img).
                     @endphp
                     <a href="{{ route('dashboard') }}">
-                        <img src="{{ asset('frontend/img/Logo-icon.png') }}?v={{ $logoVersion }}" class="navbar-logo"
+                        <img src="{{ asset('frontend/img/Logo-icon.png') }}?v={{ $logoVersion }}" class="sidebar-logo"
                             alt="InaStudy New Logo">
                     </a>
                 </div>

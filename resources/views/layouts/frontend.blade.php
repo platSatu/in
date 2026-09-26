@@ -39,12 +39,12 @@
         }
 
         /* FIX (10 September 2026): CSS bawaan template (structure.css) memaksa
-           .navbar-logo jadi persis 40x40px tanpa object-fit, jadi kalau
+           logo sidebar jadi persis 40x40px tanpa object-fit, jadi kalau
            gambarnya bukan bujur sangkar (Logo-icon.png hasil crop, lihat
            layouts/partials/sidebar.blade.php) akan gepeng/terdistorsi.
            object-fit: contain menjaga proporsi asli gambar di dalam kotak
            40x40 itu tanpa memotong atau meregangkannya. */
-        .navbar-logo {
+        .sidebar-logo {
             object-fit: contain;
         }
     </style>
