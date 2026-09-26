@@ -31,10 +31,10 @@
     konsisten satu payung produk InaStudy/InaYule.
 --}}
 
-<div class="row">
+<div class="row inayule-page">
     <div class="col-12">
         <div class="widget-content widget-content-area br-8 mb-4">
-            <h4 class="mb-3">InaYule</h4>
+            <h4 class="mb-3 ina-title">InaYule</h4>
 
             {{--
                 STEP 4 (16 September 2026): tampilkan sisa saldo credit
@@ -44,21 +44,51 @@
                 pernah klaim/beli apapun.
             --}}
             <div class="mb-3">
-                <span class="badge bg-primary" style="font-size:14px;">
+                <span class="badge ina-credit">
                     Sisa Credit: {{ rtrim(rtrim(number_format((float) $creditBalance, 2, ',', '.'), '0'), ',') }} Sesi
                 </span>
             </div>
 
-            {{-- Tab bergaya "simple-tab" (garis bawah + ikon), warna merah
-                 mengikuti logo InaStudy. Gaya di-scope ke .inayule-tabs. --}}
+            {{-- Tema InaYule: nuansa merah logo InaStudy (senada frontend Quiz &
+                 University Partner). Semua gaya di-scope ke .inayule-page supaya
+                 halaman lain tidak ikut berubah. --}}
             <style>
+                .inayule-page { --ina-red: #d71920; --ina-red-dark: #b3121a; --ina-red-soft: #fdecec; --ina-ink: #1f2340; }
+                .inayule-page .ina-title { color: var(--ina-ink); font-weight: 800; }
+
+                /* Tab: garis bawah + ikon */
                 .inayule-tabs .nav-tabs { border-bottom: 1px solid #e0e6ed; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
                 .inayule-tabs .nav-tabs .nav-link { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
                     border: 0; border-bottom: 2px solid transparent; background: transparent; color: #515365;
-                    font-weight: 500; padding: 10px 16px; margin-bottom: -1px; }
-                .inayule-tabs .nav-tabs .nav-link:hover { color: #dc1414; }
-                .inayule-tabs .nav-tabs .nav-link.active { color: #dc1414; border-bottom-color: #dc1414; background: transparent; }
+                    font-weight: 600; padding: 10px 16px; margin-bottom: -1px; }
+                .inayule-tabs .nav-tabs .nav-link:hover { color: var(--ina-red); }
+                .inayule-tabs .nav-tabs .nav-link.active { color: var(--ina-red); border-bottom-color: var(--ina-red); background: transparent; }
                 .inayule-tabs .nav-tabs .nav-link svg { flex-shrink: 0; }
+
+                /* Tombol */
+                .inayule-page .btn { border-radius: 10px; font-weight: 700; }
+                .inayule-page .btn-primary { background: linear-gradient(135deg, var(--ina-red), var(--ina-red-dark)); border-color: var(--ina-red);
+                    color: #fff; box-shadow: 0 6px 16px rgba(215, 25, 32, .25); }
+                .inayule-page .btn-primary:hover, .inayule-page .btn-primary:focus { background: var(--ina-red-dark); border-color: var(--ina-red-dark); color: #fff; }
+                .inayule-page .btn-outline-primary { color: var(--ina-red); border-color: var(--ina-red); background: #fff; box-shadow: none; }
+                .inayule-page .btn-outline-primary:hover, .inayule-page .btn-outline-primary:focus { background: var(--ina-red); border-color: var(--ina-red); color: #fff; }
+                .inayule-page .btn-success { background: linear-gradient(135deg, var(--ina-red), var(--ina-red-dark)); border-color: var(--ina-red); color: #fff; }
+
+                /* Badge */
+                .inayule-page .ina-credit { background: var(--ina-red-soft); color: var(--ina-red); font-weight: 700; font-size: 14px;
+                    border-radius: 999px; padding: 8px 16px; }
+                .inayule-page .ina-badge { display: inline-block; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 700; }
+                .inayule-page .ina-badge--type { background: var(--ina-red); color: #fff; }
+                .inayule-page .ina-badge--class { background: var(--ina-red-soft); color: var(--ina-red); }
+                .inayule-page .ina-badge--level { background: #f1f2f6; color: var(--ina-ink); }
+
+                /* Kartu paket */
+                .inayule-page .ina-card { border: 1px solid #eef0f5; border-radius: 16px; box-shadow: 0 8px 24px rgba(31, 35, 64, .06);
+                    transition: transform .2s ease, box-shadow .2s ease; }
+                .inayule-page .ina-card:hover { transform: translateY(-4px); box-shadow: 0 14px 30px rgba(31, 35, 64, .1); }
+                .inayule-page .ina-card .card-title { color: var(--ina-ink); font-weight: 800; }
+                .inayule-page .ina-price { color: var(--ina-ink); font-weight: 800; font-size: 20px; }
+                .inayule-page .ina-price--promo { color: var(--ina-red); }
             </style>
             <div class="simple-tab inayule-tabs">
                 <ul class="nav nav-tabs" id="inayuleTab" role="tablist">
@@ -147,14 +177,14 @@
                         <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 g-3">
                             @foreach ($packages as $package)
                                 <div class="col">
-                                    <div class="card h-100 shadow-sm">
+                                    <div class="card h-100 ina-card">
                                         <div class="card-body d-flex flex-column">
                                             <h6 class="card-title fw-bold mb-2">{{ $package->name }}</h6>
 
                                             <div class="mb-2">
-                                                <span class="badge bg-primary me-1">{{ optional($package->type)->name ?? '-' }}</span>
-                                                <span class="badge bg-info text-dark me-1">{{ optional($package->courseClass)->name ?? '-' }}</span>
-                                                <span class="badge bg-secondary">{{ optional($package->level)->name ?? '-' }}</span>
+                                                <span class="ina-badge ina-badge--type me-1">{{ optional($package->type)->name ?? '-' }}</span>
+                                                <span class="ina-badge ina-badge--class me-1">{{ optional($package->courseClass)->name ?? '-' }}</span>
+                                                <span class="ina-badge ina-badge--level">{{ optional($package->level)->name ?? '-' }}</span>
                                             </div>
 
                                             <div class="text-muted mb-2" style="font-size:13px;">
@@ -174,11 +204,11 @@
                                                     <div class="text-muted text-decoration-line-through" style="font-size:13px;">
                                                         Rp {{ number_format((float) $package->price, 0, ',', '.') }}
                                                     </div>
-                                                    <div class="fw-bold text-danger" style="font-size:18px;">
+                                                    <div class="ina-price ina-price--promo">
                                                         Rp {{ number_format((float) $package->promo_price, 0, ',', '.') }}
                                                     </div>
                                                 @else
-                                                    <div class="fw-bold" style="font-size:18px;">
+                                                    <div class="ina-price">
                                                         Rp {{ number_format((float) $package->price, 0, ',', '.') }}
                                                     </div>
                                                 @endif
