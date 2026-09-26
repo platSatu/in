@@ -49,27 +49,50 @@
                 </span>
             </div>
 
-            <div style="overflow-x:auto;">
-                <ul class="nav nav-tabs flex-nowrap text-nowrap" id="inayuleTab" role="tablist">
+            {{-- Tab bergaya "simple-tab" (garis bawah + ikon), warna merah
+                 mengikuti logo InaStudy. Gaya di-scope ke .inayule-tabs. --}}
+            <style>
+                .inayule-tabs .nav-tabs { border-bottom: 1px solid #e0e6ed; flex-wrap: nowrap; overflow-x: auto; overflow-y: hidden; }
+                .inayule-tabs .nav-tabs .nav-link { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+                    border: 0; border-bottom: 2px solid transparent; background: transparent; color: #515365;
+                    font-weight: 500; padding: 10px 16px; margin-bottom: -1px; }
+                .inayule-tabs .nav-tabs .nav-link:hover { color: #dc1414; }
+                .inayule-tabs .nav-tabs .nav-link.active { color: #dc1414; border-bottom-color: #dc1414; background: transparent; }
+                .inayule-tabs .nav-tabs .nav-link svg { flex-shrink: 0; }
+            </style>
+            <div class="simple-tab inayule-tabs">
+                <ul class="nav nav-tabs" id="inayuleTab" role="tablist">
                     <li class="nav-item" role="presentation">
                         <button class="nav-link active" id="inayule-buy-tab" data-bs-toggle="tab"
                             data-bs-target="#inayule-buy" type="button" role="tab"
-                            aria-controls="inayule-buy" aria-selected="true">Buy Packages</button>
+                            aria-controls="inayule-buy" aria-selected="true">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                            Buy Packages
+                        </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="inayule-history-tab" data-bs-toggle="tab"
                             data-bs-target="#inayule-history" type="button" role="tab"
-                            aria-controls="inayule-history" aria-selected="false">Status</button>
+                            aria-controls="inayule-history" aria-selected="false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            Status
+                        </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="inayule-schedule-tab" data-bs-toggle="tab"
                             data-bs-target="#inayule-schedule" type="button" role="tab"
-                            aria-controls="inayule-schedule" aria-selected="false">History</button>
+                            aria-controls="inayule-schedule" aria-selected="false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            History
+                        </button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="inayule-saldo-tab" data-bs-toggle="tab"
                             data-bs-target="#inayule-saldo" type="button" role="tab"
-                            aria-controls="inayule-saldo" aria-selected="false">Saldo Saya</button>
+                            aria-controls="inayule-saldo" aria-selected="false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
+                            Saldo Saya
+                        </button>
                     </li>
                 </ul>
             </div>
