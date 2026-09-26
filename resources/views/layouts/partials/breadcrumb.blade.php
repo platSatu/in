@@ -50,6 +50,7 @@
         'pembayaran.form' => 'Payment Form',
         'pembayaran.form-link' => 'Payment Form Link',
         'absensi.attendance-user-qr-code' => 'Attendance QR Code',
+        'teacher-honor' => 'Honor Pengajar',
     ];
 
     $segments = $routeName ? explode('.', $routeName) : [];

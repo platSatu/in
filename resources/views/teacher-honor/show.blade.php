@@ -21,8 +21,7 @@
 
     <div class="page-meta mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
         <div>
-            <a href="{{ route('teacher-honor.index') }}" class="small text-muted">&larr; Kembali ke daftar periode</a>
-            <h5 class="mb-1 mt-1">{{ $period->name }} &middot; {{ optional($period->branch)->name ?? '-' }}</h5>
+            <h5 class="mb-1">{{ $period->name }} &middot; {{ optional($period->branch)->name ?? '-' }}</h5>
             <p class="text-muted mb-0">
                 {{ $period->start_date->translatedFormat('d F Y') }} &ndash; {{ $period->end_date->translatedFormat('d F Y') }}
                 @if ($period->isOpen())

@@ -8,12 +8,8 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <div>
-            <h5 class="mb-1">Honor Pengajar</h5>
-            <p class="text-muted mb-0">Buat periode per cabang, honor pengajar akan terhitung otomatis dari kelas yang mereka ajar.</p>
-        </div>
-    </div>
+    {{-- Judul halaman sudah tampil di breadcrumb layout (Dashboard / Honor Pengajar). --}}
+    <p class="text-muted mb-3">Buat periode per cabang, honor pengajar akan terhitung otomatis dari kelas yang mereka ajar.</p>
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
