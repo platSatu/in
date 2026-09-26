@@ -59,12 +59,12 @@
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="inayule-history-tab" data-bs-toggle="tab"
                             data-bs-target="#inayule-history" type="button" role="tab"
-                            aria-controls="inayule-history" aria-selected="false">History</button>
+                            aria-controls="inayule-history" aria-selected="false">Status</button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="inayule-schedule-tab" data-bs-toggle="tab"
                             data-bs-target="#inayule-schedule" type="button" role="tab"
-                            aria-controls="inayule-schedule" aria-selected="false">Schedule</button>
+                            aria-controls="inayule-schedule" aria-selected="false">History</button>
                     </li>
                     <li class="nav-item" role="presentation">
                         <button class="nav-link" id="inayule-saldo-tab" data-bs-toggle="tab"
