@@ -38,18 +38,14 @@
             min-height: calc(100vh - 155px) !important;
         }
 
-        /* Logo sidebar (Logo.png lengkap, lihat layouts/partials/sidebar.blade.php):
-           menimpa ukuran 40x40 bawaan structure.css supaya logo utuh & tidak
-           gepeng. Saat sidebar diciutkan, kembali ke kotak kecil. */
-        #sidebar .theme-brand div.theme-logo img.sidebar-logo {
-            width: auto;
-            height: 56px;
-            max-width: 190px;
+        /* FIX (10 September 2026): CSS bawaan template (structure.css) memaksa
+           logo sidebar jadi persis 40x40px tanpa object-fit, jadi kalau
+           gambarnya bukan bujur sangkar (Logo-icon.png hasil crop, lihat
+           layouts/partials/sidebar.blade.php) akan gepeng/terdistorsi.
+           object-fit: contain menjaga proporsi asli gambar di dalam kotak
+           40x40 itu tanpa memotong atau meregangkannya. */
+        .sidebar-logo {
             object-fit: contain;
-        }
-        .sidebar-closed > .sidebar-wrapper:not(:hover) #sidebar .theme-brand div.theme-logo img.sidebar-logo {
-            height: 40px;
-            max-width: 40px;
         }
     </style>
 
