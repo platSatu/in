@@ -4,9 +4,6 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <h4>Edit University Album Photo</h4>
-    </div>
 
 
     <div class="widget-content widget-content-area">
@@ -248,7 +245,8 @@
             </button>
 
 
-            <a href="{{ route('quiz.university-album-photo.index') }}"
+            {{-- Back kembali ke index foto yang scoped ke album foto ini. --}}
+            <a href="{{ route('quiz.university-album-photo.index', ['album_id' => $data->album_id]) }}"
                 class="btn btn-secondary">
 
                 Back

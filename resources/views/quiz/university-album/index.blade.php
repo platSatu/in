@@ -5,20 +5,13 @@
 <div class="middle-content container-xxl p-0">
 
     <div class="page-meta mb-3">
-        {{-- Breadcrumb + "Back to Profile" hanya muncul kalau index ini dibuka
-             scoped dari halaman profile University (query ?university_id=...). --}}
-        @if($university)
-            <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-                <ol class="breadcrumb">
-                    <li class="breadcrumb-item"><a href="{{ route('quiz.university.index') }}">University</a></li>
-                    <li class="breadcrumb-item"><a href="{{ route('quiz.university.show', $university->id) }}">{{ $university->name }}</a></li>
-                    <li class="breadcrumb-item active" aria-current="page">Album</li>
-                </ol>
-            </nav>
-        @endif
 
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <h4 class="mb-0">University Album</h4>
+            @if($university)
+                <p class="text-muted mb-0">Album milik <strong>{{ $university->name }}</strong></p>
+            @else
+                <span></span>
+            @endif
 
             <div class="d-flex flex-wrap gap-2">
                 @if($university)

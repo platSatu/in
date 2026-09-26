@@ -38,6 +38,7 @@
     $sectionLabelOverrides = [
         'quiz.form' => 'Quiz Form', // "Form" saja terlalu umum/ambigu
         'student.student' => 'Data Student',
+        'student' => 'Data Student', // route student.student.* setelah dedupe segmen
         'settings.whatsapp-gateway' => 'WhatsApp Gateway',
         'roleuser' => 'Role User',
         'historyuserlogin' => 'History User Login',
@@ -58,6 +59,7 @@
         'class-session' => 'Approval Pemakaian Credit',
         'schedule' => 'Jadwal',
         'teacher-honor' => 'Honor Pengajar',
+        'quiz.university-application' => 'University Applications',
     ];
 
     $segments = $routeName ? explode('.', $routeName) : [];

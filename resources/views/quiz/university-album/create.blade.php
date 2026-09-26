@@ -1,9 +1,6 @@
 @extends('layouts.frontend')
 @section('content')
 <div class="middle-content container-xxl p-0">
-    <div class="page-meta mb-3">
-        <h4>Add University Album</h4>
-    </div>
     <div class="widget-content widget-content-area">
         <form action="{{ route('quiz.university-album.store') }}" method="POST">
             @csrf

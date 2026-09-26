@@ -5,13 +5,6 @@
 <div class="middle-content container-xxl p-0">
 
 
-    <div class="page-meta mb-3">
-
-        <h4>
-            Edit Setting University
-        </h4>
-
-    </div>
 
 
     <div class="widget-content widget-content-area">

@@ -3,21 +3,12 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta">
-        <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ route('quiz.university.index') }}">University</a></li>
-                {{-- $cityModel dikirim terpisah dari controller (lihat catatan di
-                     UniversityController::show()) — kalau kolom `city` data lama
-                     berisi teks bebas (bukan UUID kota yang valid), $cityModel
-                     akan null dan breadcrumb link ini otomatis disembunyikan
-                     (bukan crash), teks kotanya tetap tampil di bawah. --}}
-                @if($cityModel)
-                    <li class="breadcrumb-item"><a href="{{ route('city.show', $cityModel->id) }}">{{ $cityModel->name }}</a></li>
-                @endif
-                <li class="breadcrumb-item active" aria-current="page">{{ $data->name }}</li>
-            </ol>
-        </nav>
+    <div class="page-meta mb-3">
+        <h5 class="mb-0">{{ $data->name }}</h5>
+        {{-- $cityModel null kalau kolom `city` data lama berisi teks bebas, lihat UniversityController::show(). --}}
+        @if($cityModel)
+            <a href="{{ route('city.show', $cityModel->id) }}" class="small">{{ $cityModel->name }}</a>
+        @endif
     </div>
 
     <div class="row layout-top-spacing">

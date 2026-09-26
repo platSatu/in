@@ -4,9 +4,6 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <h4>Add University Album Photo</h4>
-    </div>
     <div class="widget-content widget-content-area">
         <form action="{{ route('quiz.university-album-photo.store') }}"
             method="POST"
@@ -127,7 +124,9 @@
             </button>
             <br>
             <button class="btn btn-primary"> Save </button>
-            <a href="{{ $lockedAlbum ? route('quiz.university-album.index') : route('quiz.university-album-photo.index') }}"
+            {{-- Kalau album-nya sudah terkunci, Back tetap bawa konteksnya balik
+                 ke index foto yang scoped ke album itu (bukan ke list album). --}}
+            <a href="{{ $lockedAlbum ? route('quiz.university-album-photo.index', ['album_id' => $lockedAlbum->id]) : route('quiz.university-album-photo.index') }}"
                 class="btn btn-secondary">Back </a>
         </form>
     </div>

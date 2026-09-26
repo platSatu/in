@@ -4,8 +4,7 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h4 class="mb-0">Add Student</h4>
+    <div class="page-meta mb-3 d-flex flex-wrap justify-content-end align-items-center gap-2">
         <a href="{{ route('student.student.index') }}" class="btn btn-outline-secondary">&larr; Kembali ke daftar student</a>
     </div>
 

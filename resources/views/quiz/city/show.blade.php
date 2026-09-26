@@ -3,14 +3,6 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item"><a href="{{ route('city.index') }}">City</a></li>
-                <li class="breadcrumb-item active" aria-current="page">{{ $data->name }}</li>
-            </ol>
-        </nav>
-    </div>
 
     <div class="row layout-top-spacing">
         <div class="col-xl-12 layout-spacing">

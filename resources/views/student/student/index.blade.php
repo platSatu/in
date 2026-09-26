@@ -4,8 +4,7 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-        <h4 class="mb-0">Data Student</h4>
+    <div class="page-meta mb-3 d-flex flex-wrap justify-content-end align-items-center gap-2">
 
         <div class="d-flex flex-wrap gap-2">
             {{-- Export ikut filter (search/branch_id/form_id/date) yang lagi aktif
