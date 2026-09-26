@@ -10,9 +10,6 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <h5 class="mb-0">Jadwal</h5>
-    </div>
 
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">

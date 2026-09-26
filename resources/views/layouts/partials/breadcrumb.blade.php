@@ -50,6 +50,13 @@
         'pembayaran.form' => 'Payment Form',
         'pembayaran.form-link' => 'Payment Form Link',
         'absensi.attendance-user-qr-code' => 'Attendance QR Code',
+        'course.type' => 'Course Type',
+        'course.class' => 'Course Class',
+        'course.level' => 'Course Level',
+        'course.package' => 'Course Package',
+        'course.report' => 'Laporan Course',
+        'class-session' => 'Approval Pemakaian Credit',
+        'schedule' => 'Jadwal',
         'teacher-honor' => 'Honor Pengajar',
     ];
 

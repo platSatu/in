@@ -11,9 +11,6 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <h5 class="mb-0">Approval Pemakaian Credit -- Admin</h5>
-    </div>
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">

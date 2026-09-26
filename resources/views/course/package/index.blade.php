@@ -4,16 +4,8 @@
 <div class="middle-content container-xxl p-0">
 
     <div class="page-meta mb-3">
-        <div class="row justify-content-between align-items-center">
-            <div class="col-md-6">
-                <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><span>Course</span></li>
-                        <li class="breadcrumb-item active" aria-current="page">Course Package</li>
-                    </ol>
-                </nav>
-            </div>
-            <div class="col-md-6 text-md-end mt-3 mt-md-0">
+        <div class="row justify-content-end align-items-center">
+            <div class="col-md-6 text-md-end">
                 <a href="{{ route('course.package.create') }}" class="btn btn-primary">+ Add Course Package</a>
             </div>
         </div>

@@ -10,18 +10,6 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <div class="row justify-content-between align-items-center">
-            <div class="col-md-6">
-                <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-                    <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><span>Course</span></li>
-                        <li class="breadcrumb-item active" aria-current="page">Laporan</li>
-                    </ol>
-                </nav>
-            </div>
-        </div>
-    </div>
 
     {{--
         FIX (16 September 2026, permintaan user): 3 kartu ringkasan "bulan
