@@ -4,39 +4,25 @@
             <div class="nav-logo">
                 <div class="nav-item theme-logo">
                     @php
-                        // FIX (10 September 2026): slot logo di sidebar ini kecil
-                        // (dipaksa 40x40px lewat CSS structure.css bawaan template,
-                        // #sidebar .theme-brand div.theme-logo img), sedangkan
-                        // Logo.png adalah logo LENGKAP (ikon + tulisan "INA STUDY"
-                        // + teks Mandarin + tagline "China Education Consultant").
-                        // Dipaksa masuk kotak 40x40 tanpa object-fit, hasilnya jadi
-                        // gepeng & tidak jelas kelihatan seperti tidak ada logo
-                        // sama sekali. Sekarang pakai Logo-icon.png -- hasil crop
-                        // cuma bagian ikon topi wisuda-nya saja (dibuat dari
-                        // Logo.png yang sama, lihat public/frontend/img/) -- supaya
-                        // pas ditampilkan kecil di sidebar tetap jelas kelihatan.
-                        // Logo.png yang asli/lengkap TETAP dipakai apa adanya di
-                        // tempat lain (favicon, halaman register, dst) -- tidak
-                        // disentuh sama sekali.
-                        // Cache-busting: tempel query string berisi waktu-modifikasi file logo,
-                        // supaya begitu Logo-icon.png diganti, browser otomatis ambil versi baru
-                        // (bukan versi lama yang ke-cache) tanpa perlu hard refresh manual.
-                        $logoDiskPath = public_path('frontend/img/Logo-icon.png');
-                        $logoVersion = file_exists($logoDiskPath) ? filemtime($logoDiskPath) : time();
+                        // Logo lengkap InaStudy (Logo.png) tanpa teks "INASTUDY"
+                        // di sebelahnya. Ukurannya diatur .sidebar-logo di
+                        // layouts/frontend.blade.php (menimpa 40x40 bawaan
+                        // structure.css).
                         //
                         // SENGAJA bukan class "navbar-logo": app.js & loader.js
                         // bawaan template mengganti src elemen .navbar-logo ke
                         // ../src/assets/img/logo*.svg (tidak ada) setiap ganti
-                        // tema terang/gelap. Ukuran tetap dari structure.css
-                        // (#sidebar .theme-brand div.theme-logo img).
+                        // tema terang/gelap.
+                        //
+                        // Cache-busting: ?v= waktu-modifikasi file, supaya logo
+                        // baru langsung terambil tanpa hard refresh.
+                        $logoDiskPath = public_path('frontend/img/Logo.png');
+                        $logoVersion = file_exists($logoDiskPath) ? filemtime($logoDiskPath) : time();
                     @endphp
                     <a href="{{ route('dashboard') }}">
-                        <img src="{{ asset('frontend/img/Logo-icon.png') }}?v={{ $logoVersion }}" class="sidebar-logo"
-                            alt="InaStudy New Logo">
+                        <img src="{{ asset('frontend/img/Logo.png') }}?v={{ $logoVersion }}" class="sidebar-logo"
+                            alt="InaStudy">
                     </a>
-                </div>
-                <div class="nav-item theme-text">
-                    <a href="{{ route('dashboard') }}" class="nav-link"> INASTUDY </a>
                 </div>
             </div>
             <div class="nav-item sidebar-toggle">
