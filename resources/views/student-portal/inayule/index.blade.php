@@ -232,7 +232,7 @@
                     @endif
                 </div>
 
-                {{-- Tab 2: History --}}
+                {{-- Tab 2: Status (paket yang dibeli) --}}
                 <div class="tab-pane fade" id="inayule-history" role="tabpanel"
                     aria-labelledby="inayule-history-tab">
                     <div class="table-responsive">
@@ -251,7 +251,7 @@
                             <tbody>
                                 @forelse ($purchases as $purchase)
                                     <tr>
-                                        <td>{{ optional($purchase->coursePackage)->name ?? '-' }}</td>
+                                        <td>@include('student-portal.inayule._package-info', ['package' => $purchase->coursePackage])</td>
                                         <td>{{ $purchase->created_at?->translatedFormat('d M Y, H:i') ?? '-' }}</td>
                                         <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_granted, 2, ',', '.'), '0'), ',') }}</td>
                                         <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_used, 2, ',', '.'), '0'), ',') }}</td>
@@ -289,7 +289,7 @@
                 </div>
 
                 {{--
-                    Tab 3: Schedule (FASE 2 bagian 3 "Jadwal", 16 September
+                    Tab 3: History (FASE 2 bagian 3 "Jadwal", 16 September
                     2026) -- diisi dari App\Models\ClassSession, lihat
                     docblock App\Http\Controllers\StudentPortal\
                     InaYulePackageController untuk alasan kenapa ini BUKAN
@@ -304,6 +304,7 @@
                                 <tr>
                                     <th>Tanggal</th>
                                     <th>Jam</th>
+                                    <th>Package</th>
                                     <th>Pengajar</th>
                                     <th>Credit</th>
                                     <th>Status</th>
@@ -314,6 +315,7 @@
                                     <tr>
                                         <td>{{ optional($session->requested_at)->format('d/m/Y') }}</td>
                                         <td>{{ optional($session->requested_at)->format('H:i') }}</td>
+                                        <td>@include('student-portal.inayule._package-info', ['package' => $session->coursePackage])</td>
                                         <td>{{ optional($session->teacher)->name ?? '-' }}</td>
                                         <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
                                         <td>
@@ -331,7 +333,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="5" class="text-center text-muted py-4">Belum ada jadwal/pengajuan pemakaian credit.</td>
+                                        <td colspan="6" class="text-center text-muted py-4">Belum ada jadwal/pengajuan pemakaian credit.</td>
                                     </tr>
                                 @endforelse
                             </tbody>

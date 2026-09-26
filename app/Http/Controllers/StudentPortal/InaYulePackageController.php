@@ -134,7 +134,7 @@ class InaYulePackageController extends Controller
         // baca data, tidak menyimpan apapun.
         $purchases = $student
             ? CoursePackagePurchase::where('student_id', $student->id)
-                ->with('coursePackage')
+                ->with(['coursePackage.type', 'coursePackage.courseClass', 'coursePackage.level'])
                 ->orderBy('created_at') // ASC dulu -- FIFO alokasi di bawah
                 ->get()
             : collect();
@@ -166,7 +166,7 @@ class InaYulePackageController extends Controller
         // bisa lihat nama student lain").
         $scheduleSessions = $student
             ? ClassSession::where('student_id', $student->id)
-                ->with('teacher')
+                ->with(['teacher', 'coursePackage.type', 'coursePackage.courseClass', 'coursePackage.level'])
                 ->orderByDesc('requested_at')
                 ->limit(50)
                 ->get()
