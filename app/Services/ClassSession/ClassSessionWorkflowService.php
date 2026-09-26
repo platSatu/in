@@ -9,7 +9,6 @@ use App\Models\CompanyBranch;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\CourseCredit\CourseCreditDebitService;
-use App\Services\TeacherHonor\TeacherHonorService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -42,16 +41,14 @@ use InvalidArgumentException;
  * lewat CourseCreditDebitService (dengan pelacakan asal pembelian FIFO,
  * lihat Fase 1).
  *
- * FASE 3 (Honor Pengajar): adminApprove() SEKALIGUS memanggil
- * TeacherHonorService::recordForSession() di DALAM transaction yang sama
- * dengan pemotongan credit -- supaya credit terpotong & honor pengajar
- * tercatat selalu sepasang, tidak mungkin salah satu doang berhasil.
+ * Honor Pengajar TIDAK dicatat per sesi di sini -- dihitung per periode
+ * dari sesi yang disetujui (1 kelas = 1 credit x fee Course Class), lihat
+ * App\Services\TeacherHonor\TeacherHonorService.
  */
 class ClassSessionWorkflowService
 {
     public function __construct(
-        private readonly CourseCreditDebitService $debitService = new CourseCreditDebitService(),
-        private readonly TeacherHonorService $honorService = new TeacherHonorService()
+        private readonly CourseCreditDebitService $debitService = new CourseCreditDebitService()
     ) {
     }
 
@@ -163,9 +160,7 @@ class ClassSessionWorkflowService
                 'notes' => $notes ?? $session->notes,
             ]);
 
-            $this->honorService->recordForSession($session->fresh());
-
-            return $session->fresh(['courseCredit.allocations', 'teacherHonor']);
+            return $session->fresh(['courseCredit.allocations']);
         });
     }
 

@@ -63,6 +63,7 @@
                                 <th>No</th>
                                 <th>Name</th>
                                 <th>Description</th>
+                                <th>Fee Pengajar</th>
                                 <th>Status</th>
                                 <th>Created At</th>
                                 <th width="220" class="text-center">Action</th>
@@ -82,6 +83,10 @@
 
                                 <td>
                                     {{ $item->description ?? '-' }}
+                                </td>
+
+                                <td class="text-nowrap">
+                                    Rp {{ number_format((float) $item->teacher_fee, 0, ',', '.') }}
                                 </td>
 
                                 <td>
@@ -121,7 +126,7 @@
                         @empty
 
                             <tr>
-                                <td colspan="6" class="text-center">
+                                <td colspan="7" class="text-center">
                                     No data.
                                 </td>
                             </tr>

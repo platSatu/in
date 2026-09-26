@@ -71,7 +71,7 @@ class ClassSessionAdminController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', 'Pengajuan disetujui, credit sudah terpotong & honor pengajar tercatat.');
+        return back()->with('success', 'Pengajuan disetujui dan credit sudah terpotong. Honor pengajar otomatis masuk ke rekap periodenya.');
     }
 
     public function reject(Request $request, string $id): RedirectResponse

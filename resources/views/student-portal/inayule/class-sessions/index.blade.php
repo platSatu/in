@@ -53,7 +53,11 @@
                                 <tr>
                                     <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
                                     <td>{{ optional($session->teacher)->name ?? '-' }}</td>
-                                    <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
+                                    <td>{{ optional($session->coursePackage)->name ?? '-' }}
+                                        @if (optional(optional($session->coursePackage)->courseClass)->name)
+                                            <div class="text-muted small">Kelas {{ $session->coursePackage->courseClass->name }}</div>
+                                        @endif
+                                    </td>
                                     <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
                                     <td>{{ $session->credit_amount_final !== null ? number_format((float) $session->credit_amount_final, 2, ',', '.') : '-' }}</td>
                                     <td>

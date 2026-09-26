@@ -6,9 +6,8 @@ use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 
 /**
- * Master data program/subjek kursus (mis. Chinese Adult, Chinese Kids,
- * Conversation Master Class). Dirujuk oleh CoursePackage lewat
- * course_class_id.
+ * Jenis kelas kursus (mis. Private, Semi-Private, Group) + Fee Pengajar
+ * (Rp) per kelas. Dirujuk oleh CoursePackage lewat course_class_id.
  */
 class CourseClass extends Model
 {
@@ -24,7 +23,13 @@ class CourseClass extends Model
         'user_id',
         'name',
         'description',
+        'teacher_fee',
         'status',
+    ];
+
+    /** Fee pengajar (Rp) per kelas per periode -- lihat TeacherHonorService. */
+    protected $casts = [
+        'teacher_fee' => 'decimal:2',
     ];
 
     public function user()

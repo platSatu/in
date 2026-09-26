@@ -39,7 +39,7 @@ class ClassSessionController extends Controller
         }
 
         $sessions = ClassSession::where('student_id', $student->id)
-            ->with(['teacher', 'coursePackage'])
+            ->with(['teacher', 'coursePackage.courseClass'])
             ->orderByDesc('requested_at')
             ->paginate(15);
 

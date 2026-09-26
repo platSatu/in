@@ -4,6 +4,9 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
+use App\Models\TeacherHonor;
+use App\Models\TeacherHonorPeriod;
+use App\Services\TeacherHonor\TeacherHonorService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -38,12 +41,30 @@ class ScheduleController extends Controller
 
         $sessions = ClassSession::where('teacher_user_id', $teacher->id)
             ->whereBetween('requested_at', [$from, $to])
-            ->with(['student', 'coursePackage', 'branch'])
+            ->with(['student', 'coursePackage.courseClass', 'branch'])
             ->orderBy('requested_at')
             ->get()
             ->groupBy(fn (ClassSession $session) => optional($session->requested_at)->format('Y-m-d'));
 
+        // Honor saya: periode yang sedang berjalan (dihitung langsung) +
+        // beberapa periode terakhir yang sudah ditutup.
+        $honorService = new TeacherHonorService();
+        $runningHonors = TeacherHonorPeriod::where('status', TeacherHonorPeriod::STATUS_OPEN)
+            ->with('branch')
+            ->orderByDesc('start_date')
+            ->get()
+            ->map(fn (TeacherHonorPeriod $period) => ['period' => $period, 'row' => $honorService->recap($period, $teacher->id)->first()])
+            ->filter(fn (array $item) => $item['row'] !== null)
+            ->values();
+        $closedHonors = TeacherHonor::where('teacher_user_id', $teacher->id)
+            ->with('period.branch')
+            ->latest()
+            ->limit(3)
+            ->get();
+
         return view('teacher.schedule.index', [
+            'runningHonors' => $runningHonors,
+            'closedHonors' => $closedHonors,
             'sessions' => $sessions,
             'from' => $from,
             'to' => $to,

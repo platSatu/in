@@ -47,6 +47,30 @@
             </div>
 
             <div class="mb-3">
+                <label class="form-label">Fee Pengajar (Rp)</label>
+
+                <div class="input-group">
+                    <span class="input-group-text">Rp</span>
+                    <input
+                        type="number"
+                        name="teacher_fee"
+                        min="0"
+                        step="1"
+                        class="form-control @error('teacher_fee') is-invalid @enderror"
+                        value="{{ old('teacher_fee', (float) $data->teacher_fee) }}"
+                        placeholder="20000">
+                </div>
+
+                <div class="form-text">Honor yang diterima pengajar untuk setiap kelas jenis ini dalam satu periode, berapa pun jumlah pertemuan dan siswanya.</div>
+
+                @error('teacher_fee')
+                    <div class="text-danger small">
+                        {{ $message }}
+                    </div>
+                @enderror
+            </div>
+
+            <div class="mb-3">
                 <label class="form-label">Status</label>
 
                 <select name="status" class="form-select @error('status') is-invalid @enderror">

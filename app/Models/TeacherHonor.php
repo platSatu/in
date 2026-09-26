@@ -7,10 +7,10 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
- * 1 baris honor pengajar dari 1 ClassSession -- lihat docblock migration
- * create_teacher_honors_table & App\Services\TeacherHonor\TeacherHonorService
- * untuk alur lengkapnya. JANGAN ubah kolom `status` langsung di luar
- * service itu.
+ * Honor 1 pengajar dalam 1 periode -- dibuat saat periode ditutup, dengan
+ * rekap per kelas yang dikunci di kolom `classes` (fee tidak ikut berubah
+ * kalau Course Class diedit belakangan). JANGAN ubah kolom `status`
+ * langsung di luar App\Services\TeacherHonor\TeacherHonorService.
  */
 class TeacherHonor extends Model
 {
@@ -29,13 +29,11 @@ class TeacherHonor extends Model
     public const STATUS_PAID = 'paid';
 
     protected $fillable = [
-        'class_session_id',
+        'teacher_honor_period_id',
         'teacher_user_id',
-        'student_id',
-        'branch_id',
-        'commission_percentage',
-        'credit_value',
+        'class_count',
         'honor_amount',
+        'classes',
         'status',
         'approved_by_user_id',
         'approved_at',
@@ -43,31 +41,21 @@ class TeacherHonor extends Model
     ];
 
     protected $casts = [
-        'commission_percentage' => 'decimal:2',
-        'credit_value' => 'decimal:2',
+        'class_count' => 'integer',
         'honor_amount' => 'decimal:2',
+        'classes' => 'array',
         'approved_at' => 'datetime',
         'paid_at' => 'datetime',
     ];
 
-    public function classSession(): BelongsTo
+    public function period(): BelongsTo
     {
-        return $this->belongsTo(ClassSession::class, 'class_session_id');
+        return $this->belongsTo(TeacherHonorPeriod::class, 'teacher_honor_period_id');
     }
 
     public function teacher(): BelongsTo
     {
         return $this->belongsTo(User::class, 'teacher_user_id');
-    }
-
-    public function student(): BelongsTo
-    {
-        return $this->belongsTo(Student::class, 'student_id');
-    }
-
-    public function branch(): BelongsTo
-    {
-        return $this->belongsTo(CompanyBranch::class, 'branch_id');
     }
 
     public function approvedBy(): BelongsTo

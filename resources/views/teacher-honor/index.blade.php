@@ -2,17 +2,17 @@
 @section('content')
 
 {{--
-    FASE 3 "Perhitungan Honor Pengajar" -- baris di sini SUDAH otomatis
-    tercatat sejak admin approve pengajuan credit (Fase 2), lihat docblock
-    TeacherHonorController. Halaman ini cuma laporan + 2 tombol transisi
-    status (approve payout oleh Manager, tandai sudah dibayar) -- SISTEM
-    TIDAK melakukan transfer uang apa pun.
+    Honor Pengajar -- daftar periode per cabang. Honor = jumlah kelas x fee
+    Course Class (1 kelas = 1 credit/paket), lihat TeacherHonorService.
 --}}
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="page-meta mb-3">
-        <h5 class="mb-0">Honor Pengajar</h5>
+    <div class="page-meta mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div>
+            <h5 class="mb-1">Honor Pengajar</h5>
+            <p class="text-muted mb-0">Buat periode per cabang, honor pengajar akan terhitung otomatis dari kelas yang mereka ajar.</p>
+        </div>
     </div>
 
     @if (session('success'))
@@ -27,96 +27,93 @@
     @endif
 
     <div class="row layout-top-spacing">
-        <div class="col-md-4 layout-spacing">
+        <div class="col-xl-4 col-lg-5 layout-spacing">
             <div class="widget-content widget-content-area br-8">
-                <p class="text-muted mb-1">Belum Disetujui (Pending)</p>
-                <h5 class="mb-0">Rp {{ number_format((float) $summary['pending'], 0, ',', '.') }}</h5>
-            </div>
-        </div>
-        <div class="col-md-4 layout-spacing">
-            <div class="widget-content widget-content-area br-8">
-                <p class="text-muted mb-1">Disetujui, Menunggu Dibayar</p>
-                <h5 class="mb-0">Rp {{ number_format((float) $summary['approved_for_payout'], 0, ',', '.') }}</h5>
-            </div>
-        </div>
-        <div class="col-md-4 layout-spacing">
-            <div class="widget-content widget-content-area br-8">
-                <p class="text-muted mb-1">Sudah Dibayar</p>
-                <h5 class="mb-0">Rp {{ number_format((float) $summary['paid'], 0, ',', '.') }}</h5>
-            </div>
-        </div>
-    </div>
+                <h6 class="mb-1">Buat Periode Baru</h6>
+                <p class="text-muted small mb-3">Tentukan tanggal cut-off-nya. Semua kelas yang diajar di rentang ini masuk ke honor periode tersebut.</p>
 
-    <div class="row layout-top-spacing">
-        <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
-            <div class="widget-content widget-content-area br-8">
-                <div class="mb-4">
-                    <form method="GET" action="{{ route('teacher-honor.index') }}" class="row g-2">
-                        <div class="col-md-4">
-                            <select name="status" class="form-select" onchange="this.form.submit()">
-                                <option value="">-- Semua Status --</option>
-                                <option value="pending" @selected($status === 'pending')>Pending</option>
-                                <option value="approved_for_payout" @selected($status === 'approved_for_payout')>Disetujui, Menunggu Dibayar</option>
-                                <option value="paid" @selected($status === 'paid')>Sudah Dibayar</option>
-                            </select>
+                <form method="POST" action="{{ route('teacher-honor.store') }}">
+                    @csrf
+                    <div class="mb-3">
+                        <label class="form-label">Cabang</label>
+                        <select name="branch_id" class="form-select @error('branch_id') is-invalid @enderror" required>
+                            <option value="">Pilih cabang</option>
+                            @foreach ($branches as $branch)
+                                <option value="{{ $branch->id }}" @selected(old('branch_id', $branchId) === $branch->id)>{{ $branch->name }}</option>
+                            @endforeach
+                        </select>
+                        @error('branch_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nama Periode</label>
+                        <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
+                            value="{{ old('name', now()->translatedFormat('F Y')) }}" placeholder="September 2026" required>
+                        @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
+                    </div>
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label">Tanggal Mulai</label>
+                            <input type="date" name="start_date" class="form-control @error('start_date') is-invalid @enderror"
+                                value="{{ old('start_date', now()->startOfMonth()->format('Y-m-d')) }}" required>
                         </div>
-                    </form>
-                </div>
+                        <div class="col-6">
+                            <label class="form-label">Tanggal Tutup</label>
+                            <input type="date" name="end_date" class="form-control @error('end_date') is-invalid @enderror"
+                                value="{{ old('end_date', now()->endOfMonth()->format('Y-m-d')) }}" required>
+                        </div>
+                        @error('end_date') <div class="text-danger small">{{ $message }}</div> @enderror
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Buat Periode</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="col-xl-8 col-lg-7 layout-spacing">
+            <div class="widget-content widget-content-area br-8">
+                <form method="GET" action="{{ route('teacher-honor.index') }}" class="row g-2 mb-3">
+                    <div class="col-md-6">
+                        <select name="branch_id" class="form-select" onchange="this.form.submit()">
+                            <option value="">Semua cabang</option>
+                            @foreach ($branches as $branch)
+                                <option value="{{ $branch->id }}" @selected($branchId === $branch->id)>{{ $branch->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </form>
 
                 <div class="table-responsive">
                     <table class="table dt-table-hover" style="width:100%">
                         <thead>
                             <tr>
+                                <th>Periode</th>
+                                <th>Cabang</th>
                                 <th>Tanggal</th>
-                                <th>Pengajar</th>
-                                <th>Siswa</th>
-                                <th>Package</th>
-                                <th>Komisi</th>
-                                <th>Nilai Credit</th>
-                                <th>Honor</th>
+                                <th>Total Honor</th>
                                 <th>Status</th>
-                                <th class="no-content text-center">Action</th>
+                                <th class="no-content text-center">Aksi</th>
                             </tr>
                         </thead>
                         <tbody>
-                            @forelse ($honors as $honor)
+                            @forelse ($periods as $period)
                                 <tr>
-                                    <td>{{ optional($honor->created_at)->format('d/m/Y H:i') }}</td>
-                                    <td>{{ optional($honor->teacher)->name ?? '-' }}</td>
-                                    <td>{{ $honor->student ? trim($honor->student->first_name . ' ' . $honor->student->last_name) : '-' }}</td>
-                                    <td>{{ optional(optional($honor->classSession)->coursePackage)->name ?? '-' }}</td>
-                                    <td>{{ number_format((float) $honor->commission_percentage, 2, ',', '.') }}%</td>
-                                    <td>Rp {{ number_format((float) $honor->credit_value, 0, ',', '.') }}</td>
-                                    <td class="fw-bold">Rp {{ number_format((float) $honor->honor_amount, 0, ',', '.') }}</td>
+                                    <td class="fw-bold">{{ $period->name }}</td>
+                                    <td>{{ optional($period->branch)->name ?? '-' }}</td>
+                                    <td class="text-nowrap">{{ $period->start_date->format('d/m/Y') }} - {{ $period->end_date->format('d/m/Y') }}</td>
+                                    <td class="text-nowrap">Rp {{ number_format((float) ($period->isOpen() ? ($openTotals[$period->id] ?? 0) : $period->honors_sum_honor_amount), 0, ',', '.') }}</td>
                                     <td>
-                                        @php
-                                            $statusLabel = [
-                                                'pending' => ['Pending', 'badge-warning'],
-                                                'approved_for_payout' => ['Menunggu Dibayar', 'badge-info'],
-                                                'paid' => ['Sudah Dibayar', 'badge-success'],
-                                            ][$honor->status] ?? [$honor->status, 'badge-secondary'];
-                                        @endphp
-                                        <span class="badge {{ $statusLabel[1] }}">{{ $statusLabel[0] }}</span>
+                                        @if ($period->isOpen())
+                                            <span class="badge badge-info">Sedang berjalan</span>
+                                        @else
+                                            <span class="badge badge-secondary">Ditutup</span>
+                                        @endif
                                     </td>
                                     <td class="text-center">
-                                        @if ($honor->status === 'pending')
-                                            <form method="POST" action="{{ route('teacher-honor.approve-payout', $honor->id) }}">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">Approve Payout</button>
-                                            </form>
-                                        @elseif ($honor->status === 'approved_for_payout')
-                                            <form method="POST" action="{{ route('teacher-honor.mark-paid', $honor->id) }}">
-                                                @csrf
-                                                <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Tandai Dibayar</button>
-                                            </form>
-                                        @else
-                                            <span class="text-muted">-</span>
-                                        @endif
+                                        <a href="{{ route('teacher-honor.show', $period->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">Lihat Detail</a>
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center text-muted">Belum ada data honor pengajar.</td>
+                                    <td colspan="6" class="text-center text-muted py-4">Belum ada periode. Yuk buat periode pertama di sebelah kiri!</td>
                                 </tr>
                             @endforelse
                         </tbody>
@@ -124,7 +121,7 @@
                 </div>
 
                 <div class="mt-3">
-                    {{ $honors->links() }}
+                    {{ $periods->links() }}
                 </div>
             </div>
         </div>

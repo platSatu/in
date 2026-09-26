@@ -321,13 +321,17 @@ Route::middleware(['auth', 'permission:class-session,edit'])->prefix('dashboard/
     Route::post('/{id}/reject', [ClassSessionAdminController::class, 'reject'])->name('class-session.reject');
 });
 
-// FASE 3 "Perhitungan Honor Pengajar": laporan + approval payout
-// Manager, lihat docblock App\Http\Controllers\TeacherHonor\TeacherHonorController
-// & modul 'teacher-honor' di config/menu.php.
+// Honor Pengajar: periode per cabang -> rekap (jumlah kelas x fee Course
+// Class) -> tutup -> setujui -> dibayar. Lihat TeacherHonorController &
+// modul 'teacher-honor' di config/menu.php.
 Route::middleware(['auth', 'permission:teacher-honor'])->prefix('dashboard/teacher-honor')->group(function () {
     Route::get('/', [TeacherHonorController::class, 'index'])->name('teacher-honor.index');
+    Route::get('/period/{id}', [TeacherHonorController::class, 'show'])->name('teacher-honor.show');
 });
 Route::middleware(['auth', 'permission:teacher-honor,edit'])->prefix('dashboard/teacher-honor')->group(function () {
+    Route::post('/period', [TeacherHonorController::class, 'store'])->name('teacher-honor.store');
+    Route::post('/period/{id}/close', [TeacherHonorController::class, 'close'])->name('teacher-honor.close');
+    Route::delete('/period/{id}', [TeacherHonorController::class, 'destroy'])->name('teacher-honor.destroy');
     Route::post('/{id}/approve-payout', [TeacherHonorController::class, 'approvePayout'])->name('teacher-honor.approve-payout');
     Route::post('/{id}/mark-paid', [TeacherHonorController::class, 'markPaid'])->name('teacher-honor.mark-paid');
 });

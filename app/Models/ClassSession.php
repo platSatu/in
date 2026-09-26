@@ -5,7 +5,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 
 /**
  * 1 pengajuan pemakaian credit untuk 1 kelas -- lihat docblock migration
@@ -86,15 +85,5 @@ class ClassSession extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(User::class, 'admin_user_id');
-    }
-
-    /**
-     * Honor pengajar hasil sesi ini -- lihat App\Models\TeacherHonor &
-     * App\Services\TeacherHonor\TeacherHonorService (Fase 3). Cuma terisi
-     * SETELAH status jadi 'disetujui'.
-     */
-    public function teacherHonor(): HasOne
-    {
-        return $this->hasOne(TeacherHonor::class, 'class_session_id');
     }
 }

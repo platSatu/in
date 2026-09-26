@@ -10,8 +10,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 
 /**
- * CRUD "Course Class" (menu Course > Course Class): master program/subjek
- * kursus (mis. Chinese Adult, Chinese Kids, Conversation Master Class).
+ * CRUD "Course Class" (menu Course > Course Class): jenis kelas (mis.
+ * Private, Semi-Private, Group) beserta Fee Pengajar (Rp) per kelas --
+ * dasar hitung Honor Pengajar, lihat App\Services\TeacherHonor\TeacherHonorService.
  */
 class CourseClassController extends Controller
 {
@@ -40,6 +41,7 @@ class CourseClassController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('course_class', 'name')],
             'description' => ['nullable', 'string', 'max:2000'],
+            'teacher_fee' => ['required', 'numeric', 'min:0', 'max:999999999'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
 
@@ -67,6 +69,7 @@ class CourseClassController extends Controller
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255', Rule::unique('course_class', 'name')->ignore($id)],
             'description' => ['nullable', 'string', 'max:2000'],
+            'teacher_fee' => ['required', 'numeric', 'min:0', 'max:999999999'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
 

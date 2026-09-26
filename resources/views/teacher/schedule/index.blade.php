@@ -12,8 +12,62 @@
 <div class="middle-content container-xxl p-0">
 
     <div class="page-meta mb-3">
-        <h5 class="mb-0">Jadwal</h5>
+        <h5 class="mb-1">Jadwal</h5>
+        <p class="text-muted mb-0">Halo {{ auth()->user()->name }}, ini kelas dan jadwal mengajar kamu.</p>
     </div>
+
+    {{-- Honor saya -- lihat TeacherHonorService (1 kelas = 1 credit x fee Course Class). --}}
+    @foreach ($runningHonors as $item)
+        <div class="widget-content widget-content-area br-8 mb-3">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+                <div>
+                    <h6 class="mb-1">Kelas kamu di periode {{ $item['period']->name }} &middot; {{ optional($item['period']->branch)->name }}</h6>
+                    <p class="text-muted small mb-0">{{ $item['period']->start_date->translatedFormat('d M') }} &ndash; {{ $item['period']->end_date->translatedFormat('d M Y') }} &middot; masih berjalan, angka bisa bertambah</p>
+                </div>
+                <div class="text-end">
+                    <div class="text-muted small">Honor sementara</div>
+                    <h5 class="mb-0">Rp {{ number_format((float) $item['row']['honor_amount'], 0, ',', '.') }}</h5>
+                    <div class="small">{{ $item['row']['class_count'] }} kelas</div>
+                </div>
+            </div>
+            @include('teacher-honor._classes', ['classes' => $item['row']['classes']])
+        </div>
+    @endforeach
+
+    @if ($closedHonors->isNotEmpty())
+        <div class="widget-content widget-content-area br-8 mb-3">
+            <h6 class="mb-3">Riwayat honor kamu</h6>
+            <div class="table-responsive">
+                <table class="table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Periode</th>
+                            <th>Kelas</th>
+                            <th>Honor</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($closedHonors as $honor)
+                            @php
+                                $honorStatus = [
+                                    'pending' => ['Sedang dicek', 'badge-warning'],
+                                    'approved_for_payout' => ['Disetujui, segera dibayar', 'badge-info'],
+                                    'paid' => ['Sudah dibayar', 'badge-success'],
+                                ][$honor->status] ?? [$honor->status, 'badge-secondary'];
+                            @endphp
+                            <tr>
+                                <td>{{ optional($honor->period)->name ?? '-' }} &middot; {{ optional(optional($honor->period)->branch)->name }}</td>
+                                <td>{{ $honor->class_count }} kelas</td>
+                                <td class="text-nowrap">Rp {{ number_format((float) $honor->honor_amount, 0, ',', '.') }}</td>
+                                <td><span class="badge {{ $honorStatus[1] }}">{{ $honorStatus[0] }}</span></td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    @endif
 
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
@@ -53,7 +107,11 @@
                                     <tr>
                                         <td>{{ optional($session->requested_at)->format('H:i') }}</td>
                                         <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
-                                        <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
+                                        <td>{{ optional($session->coursePackage)->name ?? '-' }}
+                                        @if (optional(optional($session->coursePackage)->courseClass)->name)
+                                            <div class="text-muted small">Kelas {{ $session->coursePackage->courseClass->name }}</div>
+                                        @endif
+                                    </td>
                                         <td>{{ optional($session->branch)->name ?? '-' }}</td>
                                         <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
                                         <td>
@@ -74,7 +132,7 @@
                         </table>
                     </div>
                 @empty
-                    <p class="text-center text-muted py-4">Tidak ada jadwal pada rentang tanggal ini.</p>
+                    <p class="text-center text-muted py-4">Belum ada jadwal di rentang tanggal ini. Coba ubah tanggalnya ya.</p>
                 @endforelse
             </div>
         </div>

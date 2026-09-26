@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\TeacherHonor;
 
 use App\Http\Controllers\Controller;
+use App\Models\CompanyBranch;
 use App\Models\TeacherHonor;
+use App\Models\TeacherHonorPeriod;
 use App\Services\TeacherHonor\InvalidTeacherHonorStateException;
 use App\Services\TeacherHonor\TeacherHonorService;
 use Illuminate\Http\RedirectResponse;
@@ -11,19 +13,10 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * FASE 3 "Perhitungan Honor Pengajar" (16 September 2026) -- laporan &
- * approval payout honor pengajar. Baris TeacherHonor sendiri SUDAH tercatat
- * otomatis lewat App\Services\TeacherHonor\TeacherHonorService::recordForSession()
- * (dipanggil ClassSessionWorkflowService::adminApprove(), lihat docblocknya)
- * -- controller ini HANYA menampilkan & menjalankan 2 transisi status
- * berikutnya:
- *
- *   pending -> approved_for_payout (approvePayout, oleh Manager)
- *   approved_for_payout -> paid (markPaid, setelah honor benar-benar
- *   ditransfer di luar sistem -- SISTEM INI TIDAK melakukan transfer uang
- *   apa pun, cuma mencatat statusnya)
- *
- * Digerbangi permission modul 'teacher-honor' (lihat config/menu.php).
+ * Menu Honor Pengajar: periode per cabang -> rekap per pengajar (jumlah
+ * kelas x fee Course Class) -> tutup periode -> setujui -> tandai dibayar.
+ * Aturan hitungnya ada di TeacherHonorService. Sistem ini TIDAK mentransfer
+ * uang, hanya mencatat statusnya. Digerbangi permission 'teacher-honor'.
  */
 class TeacherHonorController extends Controller
 {
@@ -34,52 +27,112 @@ class TeacherHonorController extends Controller
 
     public function index(Request $request): View
     {
-        $status = $request->query('status');
+        $branchId = $request->query('branch_id');
 
-        $honors = TeacherHonor::query()
-            ->when($status, fn ($query) => $query->where('status', $status))
-            ->with(['teacher', 'student', 'classSession.coursePackage', 'branch'])
-            ->orderByDesc('created_at')
-            ->paginate(20)
+        $periods = TeacherHonorPeriod::query()
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->with('branch')
+            ->withSum('honors', 'honor_amount')
+            ->orderByDesc('start_date')
+            ->paginate(15)
             ->withQueryString();
 
-        $summary = [
-            'pending' => TeacherHonor::where('status', TeacherHonor::STATUS_PENDING)->sum('honor_amount'),
-            'approved_for_payout' => TeacherHonor::where('status', TeacherHonor::STATUS_APPROVED_FOR_PAYOUT)->sum('honor_amount'),
-            'paid' => TeacherHonor::where('status', TeacherHonor::STATUS_PAID)->sum('honor_amount'),
-        ];
+        // Periode terbuka dihitung langsung supaya angka di daftar sama
+        // dengan halaman detailnya.
+        $openTotals = $periods->getCollection()
+            ->filter->isOpen()
+            ->mapWithKeys(fn (TeacherHonorPeriod $period) => [
+                $period->id => $this->honorService->recap($period)->sum('honor_amount'),
+            ]);
 
-        return view('teacher-honor.index', compact('honors', 'summary', 'status'));
+        $branches = CompanyBranch::orderBy('name')->get(['id', 'name']);
+
+        return view('teacher-honor.index', compact('periods', 'openTotals', 'branches', 'branchId'));
     }
 
-    /**
-     * Approval FINANSIAL oleh Manager -- BUKAN approval per ClassSession
-     * (itu sudah selesai di admin, Fase 2). Lihat docblock
-     * TeacherHonorService::approveForPayout().
-     */
+    public function store(Request $request): RedirectResponse
+    {
+        $validated = $request->validate([
+            'branch_id' => ['required', 'uuid', 'exists:company_branch,id'],
+            'name' => ['required', 'string', 'max:100'],
+            'start_date' => ['required', 'date'],
+            'end_date' => ['required', 'date', 'after_or_equal:start_date'],
+        ], [
+            'end_date.after_or_equal' => 'Tanggal tutup tidak boleh sebelum tanggal mulai.',
+        ]);
+
+        $overlaps = TeacherHonorPeriod::where('branch_id', $validated['branch_id'])
+            ->where('start_date', '<=', $validated['end_date'])
+            ->where('end_date', '>=', $validated['start_date'])
+            ->exists();
+
+        if ($overlaps) {
+            return back()->withInput()->with('error', 'Tanggalnya bentrok dengan periode lain di cabang yang sama. Coba pilih rentang tanggal lain ya.');
+        }
+
+        $period = TeacherHonorPeriod::create($validated + [
+            'status' => TeacherHonorPeriod::STATUS_OPEN,
+            'created_by_user_id' => $request->user()->id,
+        ]);
+
+        return redirect()->route('teacher-honor.show', $period->id)
+            ->with('success', 'Periode berhasil dibuat. Honor pengajar akan terhitung otomatis dari sesi yang disetujui.');
+    }
+
+    public function show(Request $request, string $id): View
+    {
+        $period = TeacherHonorPeriod::with('branch')->findOrFail($id);
+        $recap = $this->honorService->recap($period);
+
+        return view('teacher-honor.show', compact('period', 'recap'));
+    }
+
+    public function close(Request $request, string $id): RedirectResponse
+    {
+        $period = TeacherHonorPeriod::findOrFail($id);
+
+        try {
+            $this->honorService->close($period, $request->user());
+        } catch (InvalidTeacherHonorStateException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Periode ditutup dan rekapnya sudah dikunci. Sekarang honor tiap pengajar bisa disetujui.');
+    }
+
+    public function destroy(string $id): RedirectResponse
+    {
+        $period = TeacherHonorPeriod::findOrFail($id);
+
+        if (! $period->isOpen()) {
+            return back()->with('error', 'Periode yang sudah ditutup tidak bisa dihapus.');
+        }
+
+        $period->delete();
+
+        return redirect()->route('teacher-honor.index')->with('success', 'Periode berhasil dihapus.');
+    }
+
     public function approvePayout(Request $request, string $id): RedirectResponse
     {
-        $honor = TeacherHonor::findOrFail($id);
-
-        try {
-            $this->honorService->approveForPayout($honor, $request->user());
-        } catch (InvalidTeacherHonorStateException $e) {
-            return back()->with('error', $e->getMessage());
-        }
-
-        return back()->with('success', 'Honor disetujui untuk payout.');
+        return $this->transition(fn () => $this->honorService->approveForPayout(TeacherHonor::findOrFail($id), $request->user()),
+            'Honor disetujui. Tinggal ditandai setelah dibayar ya.');
     }
 
-    public function markPaid(Request $request, string $id): RedirectResponse
+    public function markPaid(string $id): RedirectResponse
     {
-        $honor = TeacherHonor::findOrFail($id);
+        return $this->transition(fn () => $this->honorService->markPaid(TeacherHonor::findOrFail($id)),
+            'Honor ditandai sudah dibayar. Terima kasih!');
+    }
 
+    private function transition(callable $action, string $message): RedirectResponse
+    {
         try {
-            $this->honorService->markPaid($honor);
+            $action();
         } catch (InvalidTeacherHonorStateException $e) {
             return back()->with('error', $e->getMessage());
         }
 
-        return back()->with('success', 'Honor ditandai sudah dibayar.');
+        return back()->with('success', $message);
     }
 }

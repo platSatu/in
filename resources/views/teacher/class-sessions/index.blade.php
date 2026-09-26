@@ -45,7 +45,11 @@
                                 <tr>
                                     <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
                                     <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
-                                    <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
+                                    <td>{{ optional($session->coursePackage)->name ?? '-' }}
+                                        @if (optional(optional($session->coursePackage)->courseClass)->name)
+                                            <div class="text-muted small">Kelas {{ $session->coursePackage->courseClass->name }}</div>
+                                        @endif
+                                    </td>
                                     <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
                                     <td>{{ $session->notes ?? '-' }}</td>
                                     <td class="text-center">
@@ -112,7 +116,11 @@
                                 <tr>
                                     <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
                                     <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
-                                    <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
+                                    <td>{{ optional($session->coursePackage)->name ?? '-' }}
+                                        @if (optional(optional($session->coursePackage)->courseClass)->name)
+                                            <div class="text-muted small">Kelas {{ $session->coursePackage->courseClass->name }}</div>
+                                        @endif
+                                    </td>
                                     <td>{{ $session->credit_amount_final !== null ? number_format((float) $session->credit_amount_final, 2, ',', '.') : '-' }}</td>
                                     <td>
                                         @php
