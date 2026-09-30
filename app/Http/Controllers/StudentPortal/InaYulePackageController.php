@@ -187,6 +187,10 @@ class InaYulePackageController extends Controller
             'scheduleSessions' => $scheduleSessions,
             'depositBalance' => $depositBalance,
             'depositLedger' => $depositLedger,
+            // Tab "Riwayat Credit": semua mutasi credit siswa ini (hanya baca).
+            'creditLedger' => $student
+                ? CourseCredit::ledgerFor($student->id)->paginate(15, ['*'], 'credit_page')->withQueryString()
+                : null,
         ]);
     }
 

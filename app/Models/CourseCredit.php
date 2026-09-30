@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -71,6 +72,25 @@ class CourseCredit extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(CourseCreditAllocation::class, 'course_credit_id');
+    }
+
+    /** Riwayat mutasi credit 1 student (terbaru dulu), sudah memuat nama paketnya. */
+    public static function ledgerFor(string $studentId): Builder
+    {
+        return static::query()
+            ->where('student_id', $studentId)
+            ->with(['purchase.coursePackage:id,name', 'allocations.purchase.coursePackage:id,name'])
+            ->orderByDesc('created_at');
+    }
+
+    /** Nama paket yang terkena mutasi ini (beli: paketnya; potong/refund: paket asal credit-nya). */
+    public function packageLabel(): string
+    {
+        $names = $this->purchase
+            ? collect([$this->purchase->coursePackage?->name])
+            : $this->allocations->map(fn ($allocation) => $allocation->purchase?->coursePackage?->name);
+
+        return $names->filter()->unique()->implode(', ') ?: '-';
     }
 
     /**

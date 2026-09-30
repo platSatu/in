@@ -117,6 +117,14 @@
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="inayule-credit-tab" data-bs-toggle="tab"
+                            data-bs-target="#inayule-credit" type="button" role="tab"
+                            aria-controls="inayule-credit" aria-selected="false">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                            Riwayat Credit
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
                         <button class="nav-link" id="inayule-saldo-tab" data-bs-toggle="tab"
                             data-bs-target="#inayule-saldo" type="button" role="tab"
                             aria-controls="inayule-saldo" aria-selected="false">
@@ -380,6 +388,15 @@
                     </div>
                 </div>
 
+                {{-- Tab: Riwayat Credit -- semua mutasi credit (beli, kelas, refund, potong admin, tukar). --}}
+                <div class="tab-pane fade" id="inayule-credit" role="tabpanel" aria-labelledby="inayule-credit-tab">
+                    @if ($creditLedger)
+                        @include('course-credit._ledger', ['ledger' => $creditLedger])
+                    @else
+                        <p class="text-center text-muted py-4">Belum ada riwayat credit.</p>
+                    @endif
+                </div>
+
                 {{--
                     Tab 4: Saldo Saya (STEP 6, 16 September 2026, permintaan
                     user -- "ada 1 tab lagi untuk history pembelian, sisa
@@ -445,5 +462,17 @@
         </div>
     </div>
 </div>
+
+<script>
+    // Pindah halaman riwayat credit/saldo tetap membuka tab yang sama.
+    document.addEventListener('DOMContentLoaded', function () {
+        var params = new URLSearchParams(window.location.search);
+        var tabId = params.has('credit_page') ? 'inayule-credit-tab' : (params.has('saldo_page') ? 'inayule-saldo-tab' : null);
+        var tab = tabId && document.getElementById(tabId);
+        if (tab && window.bootstrap) {
+            bootstrap.Tab.getOrCreateInstance(tab).show();
+        }
+    });
+</script>
 
 @endsection

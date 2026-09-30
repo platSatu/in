@@ -11,6 +11,9 @@
 
 <div class="middle-content container-xxl p-0">
 
+    <div class="d-flex justify-content-end mb-2">
+        <a href="{{ route('class-session.credit-history') }}" class="btn btn-sm btn-outline-secondary">Riwayat Credit Siswa</a>
+    </div>
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">

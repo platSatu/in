@@ -4,6 +4,7 @@ namespace App\Http\Controllers\ClassSession;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
+use App\Models\CourseCredit;
 use App\Models\CoursePackage;
 use App\Models\CoursePackagePurchase;
 use App\Models\Role;
@@ -64,6 +65,37 @@ class ClassSessionAdminController extends Controller
             'chargeOptions' => $this->chargeOptions(),
             'teachers' => User::whereHas('roles', fn ($query) => $query->where('slug', 'teacher')->where('roles.status', Role::STATUS_ACTIVE))
                 ->orderBy('name')->get(['id', 'name']),
+        ]);
+    }
+
+    /** Riwayat mutasi credit per siswa (hanya baca). */
+    public function creditHistory(Request $request): View
+    {
+        $students = Student::whereIn('id', CoursePackagePurchase::select('student_id'))
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name']);
+
+        $studentId = $request->query('student');
+        $student = is_string($studentId) ? $students->firstWhere('id', $studentId) : null;
+        $packages = [];
+
+        if ($student) {
+            $purchases = CoursePackagePurchase::where('student_id', $student->id)
+                ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
+                ->with('coursePackage:id,name')
+                ->get();
+            $remaining = (new CourseCreditDebitService())->remainingByPurchase($purchases);
+            $packages = $purchases->groupBy('course_package_id')->map(fn ($rows) => [
+                'name' => $rows->first()->coursePackage->name ?? '-',
+                'remaining' => $rows->sum(fn ($purchase) => $remaining[$purchase->id] ?? 0.0),
+            ])->values()->all();
+        }
+
+        return view('class-session.credit-history', [
+            'students' => $students,
+            'student' => $student,
+            'packages' => $packages,
+            'ledger' => $student ? CourseCredit::ledgerFor($student->id)->paginate(20)->withQueryString() : null,
         ]);
     }
 

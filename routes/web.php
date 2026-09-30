@@ -317,6 +317,7 @@ Route::middleware(['auth', 'role:teacher'])->prefix('teacher')->group(function (
 // 'class-session' di config/menu.php.
 Route::middleware(['auth', 'permission:class-session'])->prefix('dashboard/class-session')->group(function () {
     Route::get('/', [ClassSessionAdminController::class, 'index'])->name('class-session.index');
+    Route::get('/credit-history', [ClassSessionAdminController::class, 'creditHistory'])->name('class-session.credit-history');
 });
 Route::middleware(['auth', 'permission:class-session,edit'])->prefix('dashboard/class-session')->group(function () {
     Route::post('/{id}/approve', [ClassSessionAdminController::class, 'approve'])->name('class-session.approve');
