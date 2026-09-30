@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\ClassSession\ClassSessionWorkflowService;
+use App\Services\CourseCredit\CourseCreditDebitService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -63,12 +64,17 @@ class ClassSessionController extends Controller
         // berarti "kelas jenis apa yang dipakai", BUKAN "credit-nya dari
         // pembelian package yang mana" -- itu urusan FIFO allocation di
         // Fase 1, terpisah total dari pilihan ini).
-        $packages = CoursePackage::whereIn('id', CoursePackagePurchase::where('student_id', $student->id)
+        $purchases = CoursePackagePurchase::where('student_id', $student->id)
             ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
-            ->distinct()
-            ->pluck('course_package_id'))->orderBy('name')->get();
+            ->get();
+        $packages = CoursePackage::whereIn('id', $purchases->pluck('course_package_id')->unique())->orderBy('name')->get();
 
-        return view('student-portal.inayule.class-sessions.create', compact('teachers', 'packages'));
+        // Credit terpisah per paket -- tampilkan sisa tiap paket di pilihan.
+        $remainingByPurchase = (new CourseCreditDebitService())->remainingByPurchase($purchases);
+        $remainingByPackage = $purchases->groupBy('course_package_id')
+            ->map(fn ($rows) => $rows->sum(fn ($purchase) => $remainingByPurchase[$purchase->id] ?? 0.0));
+
+        return view('student-portal.inayule.class-sessions.create', compact('teachers', 'packages', 'remainingByPackage'));
     }
 
     public function store(Request $request): RedirectResponse

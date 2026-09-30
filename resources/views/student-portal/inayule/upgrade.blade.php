@@ -2,95 +2,139 @@
 @section('content')
 
 {{--
-    Upgrade/Konversi Paket (FASE 4 bagian 2, 16 September 2026) -- lihat
-    docblock App\Services\CoursePackagePayment\PackageUpgradeCalculator
-    untuk urutan lengkap penutupan harga: trade-in saldo credit lama dulu,
-    baru saldo Deposit, baru payment gateway. Halaman ini MURNI tampilan
-    (GET, tidak mengubah data apa pun) -- semua angka DIHITUNG ULANG lagi
-    di server saat submit (store()), jadi kalaupun saldo/credit berubah
-    tepat setelah halaman ini dibuka, angka yang benar-benar diproses
-    tetap yang terbaru.
+    Upgrade / Convert dari 1 baris paket (lihat PackageUpgradeCalculator).
+    Halaman ini hanya tampilan; semua angka dihitung ulang di server saat submit.
 --}}
+@php
+    $rp = fn ($value) => 'Rp ' . number_format((float) $value, 0, ',', '.');
+    $num = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',');
+@endphp
 
 <div class="col-lg-6 mx-auto layout-spacing">
     <div class="statbox widget box box-shadow">
         <div class="widget-content widget-content-area">
-            <h4 class="mb-1">Upgrade Package</h4>
-            <p class="text-muted mb-4">{{ $package->name }}</p>
+            <h4 class="mb-1">Upgrade / Convert Paket</h4>
+            <p class="text-muted mb-3">
+                Dari: <strong>{{ $source->coursePackage->name ?? '-' }}</strong>
+                ({{ $source->coursePackage->courseClass->name ?? '-' }}) &middot; sisa {{ $num($remaining) }} credit
+            </p>
 
             @if (session('error'))
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
-
-            <div class="mb-4">
-                <div class="d-flex justify-content-between py-1">
-                    <span>Harga Package Baru</span>
-                    <span class="fw-bold">Rp {{ number_format($preview['target_price'], 0, ',', '.') }}</span>
-                </div>
-
-                <hr>
-
-                <div class="d-flex justify-content-between py-1 text-muted">
-                    <span>Sisa Credit Anda Sekarang</span>
-                    <span>{{ number_format($preview['credit_balance'], 2, ',', '.') }} credit</span>
-                </div>
-                <div class="d-flex justify-content-between py-1 text-muted">
-                    <span>Nilai Tukar (Trade-in) Credit Lama</span>
-                    <span>Rp {{ number_format($preview['credit_trade_in_value'], 0, ',', '.') }}</span>
-                </div>
-                <div class="d-flex justify-content-between py-1">
-                    <span>Dipakai Menutup Harga Package Baru</span>
-                    <span>Rp {{ number_format($preview['trade_in_applied_to_price'], 0, ',', '.') }}</span>
-                </div>
-
-                @if ($preview['trade_in_leftover_to_deposit'] > 0)
-                    <div class="d-flex justify-content-between py-1 text-success">
-                        <span>Sisa Trade-in Masuk Saldo Anda</span>
-                        <span>Rp {{ number_format($preview['trade_in_leftover_to_deposit'], 0, ',', '.') }}</span>
-                    </div>
-                @endif
-
-                <hr>
-
-                <div class="d-flex justify-content-between py-1 text-muted">
-                    <span>Sisa Harga Setelah Trade-in</span>
-                    <span>Rp {{ number_format($preview['remaining_price_after_trade_in'], 0, ',', '.') }}</span>
-                </div>
-                <div class="d-flex justify-content-between py-1">
-                    <span>Dibayar pakai Saldo</span>
-                    <span>Rp {{ number_format($preview['deposit_portion'], 0, ',', '.') }}</span>
-                </div>
-                <div class="d-flex justify-content-between py-1">
-                    <span>Sisa via Payment Gateway</span>
-                    <span class="fw-bold">Rp {{ number_format($preview['gateway_portion'], 0, ',', '.') }}</span>
-                </div>
-            </div>
-
-            @if ($gatewayMissing)
-                <div class="alert alert-warning">
-                    Payment gateway belum diaktifkan oleh admin, jadi sisa tagihan di atas tidak bisa diproses. Silakan hubungi admin.
-                </div>
-            @else
-                <p class="text-muted small">
-                    @if ($preview['gateway_portion'] <= 0)
-                        Upgrade ini 100% tertutup trade-in credit lama + saldo Anda -- diproses instan tanpa perlu ke halaman pembayaran lain.
-                    @else
-                        Trade-in credit lama & saldo Anda otomatis dipakai dulu, sisanya akan diarahkan ke halaman pembayaran gateway.
-                    @endif
-                </p>
+            @if ($blockedReason)
+                <div class="alert alert-warning">{{ $blockedReason }}</div>
             @endif
 
-            <div class="alert alert-info small">
-                Sisa credit lama Anda akan ditukar (trade-in) sepenuhnya untuk upgrade ini -- tidak dicairkan tunai, tetap tersimpan sebagai nilai rupiah yang dipakai menutup harga package baru (kelebihannya masuk saldo Anda untuk pembelian berikutnya).
-            </div>
-
-            <form method="POST" action="{{ route('inayule.upgrade.store', $package->id) }}">
-                @csrf
-                <div class="d-flex gap-2">
-                    <button type="submit" class="btn btn-primary" @disabled($gatewayMissing)>Upgrade Sekarang</button>
-                    <a href="{{ route('inayule.index') }}" class="btn btn-outline-secondary">Batal</a>
+            {{-- Langkah 1: pilih paket tujuan & cara --}}
+            <form method="GET" action="{{ route('inayule.upgrade.show', $source->id) }}" class="mb-4">
+                <div class="mb-3">
+                    <label class="form-label">Paket Tujuan</label>
+                    <select name="package" class="form-select" required onchange="this.form.submit()">
+                        <option value="">-- Pilih Paket --</option>
+                        @foreach ($packages as $package)
+                            <option value="{{ $package->id }}" @selected($target?->id === $package->id)>
+                                {{ $package->name }} ({{ $package->courseClass->name ?? '-' }}) &middot; {{ $rp($package->effectivePrice()) }} / {{ $num($package->credits) }} credit
+                            </option>
+                        @endforeach
+                    </select>
                 </div>
+
+                <div class="mb-3">
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="mode" id="mode-upgrade" value="upgrade" @checked($mode === 'upgrade') onchange="this.form.submit()">
+                        <label class="form-check-label" for="mode-upgrade">
+                            <strong>Upgrade paket penuh</strong> &mdash; semua sisa credit ditukar, kekurangannya dibayar saldo lalu payment gateway.
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="mode" id="mode-convert" value="convert" @checked($mode === 'convert') onchange="this.form.submit()">
+                        <label class="form-check-label" for="mode-convert">
+                            <strong>Convert sebagian credit</strong> &mdash; pilih mau ambil berapa credit paket tujuan.
+                        </label>
+                    </div>
+                </div>
+
+                @if ($mode === 'convert' && $target)
+                    <div class="mb-3">
+                        <label class="form-label">Mau ambil berapa credit?</label>
+                        <div class="input-group">
+                            <input type="number" name="quantity" class="form-control" min="1" step="1"
+                                @if (isset($preview['max_quantity'])) max="{{ $preview['max_quantity'] }}" @endif
+                                value="{{ $quantity }}" required>
+                            <button type="submit" class="btn btn-outline-secondary">Hitung</button>
+                        </div>
+                        @if (isset($preview['max_quantity']))
+                            <div class="form-text">Anda bisa mengambil maksimal <strong>{{ $preview['max_quantity'] }} credit</strong> dari sisa credit paket ini.</div>
+                        @endif
+                    </div>
+                @endif
             </form>
+
+            @if ($preview)
+                {{-- Langkah 2: rincian --}}
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between py-1">
+                        <span>{{ $mode === 'convert' ? 'Credit yang diambil' : 'Paket baru' }}</span>
+                        <span class="fw-bold">{{ $num($preview['quantity']) }} credit &middot; {{ $rp($preview['price']) }}</span>
+                    </div>
+                    <hr>
+                    <div class="d-flex justify-content-between py-1 text-muted">
+                        <span>Credit lama yang ditukar</span>
+                        <span>{{ $num($preview['credits_used']) }} dari {{ $num($preview['source_remaining']) }} credit</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1">
+                        <span>Nilai tukar credit lama</span>
+                        <span>{{ $rp($preview['trade_in_value']) }}</span>
+                    </div>
+                    @if ($preview['leftover_to_deposit'] > 0)
+                        <div class="d-flex justify-content-between py-1 text-success">
+                            <span>Kelebihan masuk saldo Anda</span>
+                            <span>{{ $rp($preview['leftover_to_deposit']) }}</span>
+                        </div>
+                    @endif
+                    @if ($preview['shortfall'] > 0)
+                        <hr>
+                        <div class="d-flex justify-content-between py-1">
+                            <span>Dibayar pakai saldo</span>
+                            <span>{{ $rp($preview['deposit_portion']) }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between py-1">
+                            <span>Sisa via payment gateway</span>
+                            <span class="fw-bold">{{ $rp($preview['gateway_portion']) }}</span>
+                        </div>
+                    @endif
+                </div>
+
+                <div class="alert alert-info small">
+                    Credit lama tidak dicairkan tunai. Kelebihan nilainya masuk ke saldo Anda dan hanya bisa dipakai untuk membeli paket lagi.
+                    @if ($mode === 'convert' && $preview['source_remaining'] > $preview['credits_used'])
+                        Sisa {{ $num($preview['source_remaining'] - $preview['credits_used']) }} credit paket lama tetap bisa Anda pakai.
+                    @endif
+                </div>
+
+                @if ($gatewayMissing)
+                    <div class="alert alert-warning">Payment gateway belum diaktifkan oleh admin, jadi sisa tagihan di atas tidak bisa diproses. Silakan hubungi admin.</div>
+                @endif
+
+                <form method="POST" action="{{ route('inayule.upgrade.store', $source->id) }}"
+                    onsubmit="return confirm('Lanjutkan {{ $mode === 'convert' ? 'convert' : 'upgrade' }}? Credit lama yang ditukar tidak bisa dikembalikan.')">
+                    @csrf
+                    <input type="hidden" name="package" value="{{ $target->id }}">
+                    <input type="hidden" name="mode" value="{{ $mode }}">
+                    @if ($mode === 'convert')
+                        <input type="hidden" name="quantity" value="{{ $quantity }}">
+                    @endif
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary" @disabled($gatewayMissing || $blockedReason)>
+                            {{ $mode === 'convert' ? 'Convert Sekarang' : ($preview['gateway_portion'] > 0 ? 'Lanjut ke Pembayaran' : 'Upgrade Sekarang') }}
+                        </button>
+                        <a href="{{ route('inayule.index') }}" class="btn btn-outline-secondary">Batal</a>
+                    </div>
+                </form>
+            @else
+                <a href="{{ route('inayule.index') }}" class="btn btn-outline-secondary">Kembali</a>
+            @endif
         </div>
     </div>
 </div>

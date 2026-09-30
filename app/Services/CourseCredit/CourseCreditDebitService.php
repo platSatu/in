@@ -7,6 +7,7 @@ use App\Models\CourseCredit;
 use App\Models\CourseCreditAllocation;
 use App\Models\CoursePackagePurchase;
 use App\Models\Student;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
@@ -54,157 +55,150 @@ use InvalidArgumentException;
  *   dipakai PackageUpgradeCalculator::preview() untuk menghitung breakdown
  *   harga SEBELUM commit, pola "preview di luar lock, cek ulang di dalam
  *   lock" sama seperti InaYulePackageCheckoutController::store().
+ *
+ * CREDIT TERPISAH PER PAKET (30 September 2026): credit tidak lagi 1 pool
+ * lintas paket. Sesi kelas hanya memotong dari pembelian paket yang sama
+ * (debit() dengan $coursePackageId), dan upgrade/convert hanya menukar
+ * credit dari 1 baris pembelian yang dipilih siswa (debitPurchase()).
+ * Sisa per pembelian = credits_granted - total alokasi (remainingByPurchase()).
+ * Kolom balance di course_credits tetap total semua paket (ringkasan).
  */
 class CourseCreditDebitService
 {
     /**
-     * @throws InsufficientCourseCreditException kalau saldo credit student
-     *         ternyata kurang dari $amount -- dicek ULANG di dalam lock,
-     *         bukan cuma preview dari luar transaction.
+     * Potong $amount credit, FIFO hanya dari pembelian paket $coursePackageId
+     * (null = semua paket, untuk data lama tanpa paket).
+     *
+     * @throws InsufficientCourseCreditException kalau sisa credit paket itu kurang -- dicek di dalam lock.
      */
-    public function debit(Student $student, float $amount, string $sourceType, string $description): CourseCredit
+    public function debit(Student $student, float $amount, string $sourceType, string $description, ?string $coursePackageId = null): CourseCredit
     {
         if ($amount <= 0.0) {
             throw new InvalidArgumentException('Jumlah credit yang dipotong harus lebih besar dari 0.');
         }
 
-        return DB::transaction(function () use ($student, $amount, $sourceType, $description) {
+        return DB::transaction(function () use ($student, $amount, $sourceType, $description, $coursePackageId) {
             $lockedStudent = Student::where('id', $student->id)->lockForUpdate()->first();
-            $balanceBefore = $this->lockedBalance($lockedStudent);
+            $purchases = $this->lockedPurchases($lockedStudent->id, coursePackageId: $coursePackageId);
 
-            if ($balanceBefore < $amount) {
-                throw new InsufficientCourseCreditException(
-                    "Saldo credit student tidak cukup (tersedia {$balanceBefore}, butuh {$amount})."
-                );
-            }
-
-            return $this->allocateAndCreateDebit($lockedStudent, $balanceBefore, $amount, $sourceType, $description);
+            return $this->createDebit($lockedStudent, $purchases, $amount, $sourceType, $description);
         });
     }
 
     /**
-     * FASE 4 -- menukar (trade-in) SELURUH sisa saldo credit student jadi 1
-     * baris debit, dengan asal (allocations) tetap terlacak FIFO persis
-     * seperti debit() biasa. Dipakai saat siswa upgrade paket: sisa credit
-     * lama "dicairkan" ke nilai rupiah untuk dipakai menutup harga paket
-     * baru -- BUKAN dikembalikan tunai (lihat diskusi: "tidak ada proses
-     * mencairkan tapi harus dipergunakan untuk membeli paket lagi").
-     *
-     * SELALU dipanggil di DALAM 1 DB transaction yang sama dengan pembuatan
-     * CoursePackagePurchase & CoursePackagePayment baru (lihat
-     * PackageUpgradeCalculator::completeInstant()) supaya trade-in & checkout
-     * package baru selalu sepasang, tidak mungkin salah satu doang berhasil.
-     *
-     * @return CourseCredit|null null kalau saldo credit student ternyata
-     *         sudah 0 saat dicek ulang di dalam lock -- BUKAN exception,
-     *         supaya pemanggil bisa lanjut checkout seperti pembelian baru
-     *         biasa (tanpa trade-in) tanpa perlu try/catch.
+     * Potong credit dari SATU baris pembelian (trade-in upgrade/convert).
+     * $amount null = seluruh sisa pembelian itu. Balik null kalau sisanya 0.
      */
-    public function debitEntireBalance(Student $student, string $sourceType, string $description): ?CourseCredit
+    public function debitPurchase(Student $student, CoursePackagePurchase $purchase, ?float $amount, string $sourceType, string $description): ?CourseCredit
     {
-        return DB::transaction(function () use ($student, $sourceType, $description) {
+        return DB::transaction(function () use ($student, $purchase, $amount, $sourceType, $description) {
             $lockedStudent = Student::where('id', $student->id)->lockForUpdate()->first();
-            $balanceBefore = $this->lockedBalance($lockedStudent);
+            $purchases = $this->lockedPurchases($lockedStudent->id, purchaseId: $purchase->id);
+            $remaining = $this->available($purchases)[$purchase->id] ?? 0.0;
+            $amount ??= $remaining;
 
-            if ($balanceBefore <= 0.0) {
+            if ($amount <= 0.0) {
                 return null;
             }
 
-            return $this->allocateAndCreateDebit($lockedStudent, $balanceBefore, $balanceBefore, $sourceType, $description);
+            return $this->createDebit($lockedStudent, $purchases, $amount, $sourceType, $description);
         });
     }
 
     /**
-     * FASE 4 -- preview TANPA lock, TANPA menulis apa pun: menghitung nilai
-     * rupiah (kalau ditukar/trade-in) dari SELURUH sisa saldo credit student
-     * saat ini, dipakai PackageUpgradeCalculator::preview() untuk memutuskan
-     * breakdown harga (trade-in menutup berapa, sisanya Deposit lalu
-     * gateway) SEBELUM commit sungguhan.
+     * Sisa credit per pembelian (baca-saja).
      *
-     * Angka di sini BISA berubah oleh transaksi lain sampai commit
-     * sungguhan lewat debitEntireBalance() -- itu sebabnya
-     * debitEntireBalance() SELALU mengecek ulang saldo dari 0 di dalam
-     * lock-nya sendiri, TIDAK percaya angka preview ini.
-     *
-     * @return array{balance: float, value: float}
+     * @param  iterable<CoursePackagePurchase>  $purchases
+     * @return array<string, float> purchase_id => sisa credit
      */
-    public function previewTradeInValue(Student $student): array
+    public function remainingByPurchase(iterable $purchases): array
     {
-        $balance = MoneyMath::floorToScale(
-            (float) (CourseCredit::where('student_id', $student->id)
-                ->orderByDesc('created_at')
-                ->value('balance') ?? 0),
-            2
-        );
+        return $this->available(collect($purchases)->where('status', CoursePackagePurchase::STATUS_COMPLETED));
+    }
 
-        if ($balance <= 0.0) {
-            return ['balance' => 0.0, 'value' => 0.0];
-        }
+    /** Harga per credit sebuah pembelian (snapshot saat dibeli), dibulatkan ke bawah. */
+    public static function unitPrice(CoursePackagePurchase $purchase): float
+    {
+        $credits = (float) $purchase->credits_granted;
 
-        $purchases = CoursePackagePurchase::where('student_id', $student->id)
+        return $credits > 0 ? MoneyMath::floorToScale(((float) $purchase->price_paid) / $credits, 4) : 0.0;
+    }
+
+    /** Pembelian completed milik student (opsional 1 paket / 1 baris), urut FIFO, dikunci. */
+    private function lockedPurchases(string $studentId, ?string $coursePackageId = null, ?string $purchaseId = null): Collection
+    {
+        return CoursePackagePurchase::where('student_id', $studentId)
             ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
+            ->when($coursePackageId, fn ($query) => $query->where('course_package_id', $coursePackageId))
+            ->when($purchaseId, fn ($query) => $query->whereKey($purchaseId))
             ->orderBy('created_at')
+            ->lockForUpdate()
             ->get();
-
-        $result = $this->allocateFromPurchases($purchases, $balance);
-
-        $value = MoneyMath::floorToScale(
-            array_sum(array_column($result['allocations'], 'value')),
-            2
-        );
-
-        return ['balance' => $balance, 'value' => $value];
     }
 
     /**
-     * Saldo credit TERKINI 1 student, diambil DI DALAM lock (baris
-     * CourseCredit terakhirnya) -- caller WAJIB sudah lockForUpdate() baris
-     * Student itu sendiri lebih dulu (urutan lock: Student baru CourseCredit,
-     * sama di debit() & debitEntireBalance()).
+     * Sisa credit per pembelian = credits_granted - total alokasi (1 query).
+     *
+     * @return array<string, float>
      */
-    private function lockedBalance(Student $lockedStudent): float
+    private function available(iterable $purchases): array
     {
+        $purchases = collect($purchases);
+        $allocated = CourseCreditAllocation::whereIn('course_package_purchase_id', $purchases->pluck('id'))
+            ->groupBy('course_package_purchase_id')
+            ->selectRaw('course_package_purchase_id, SUM(amount) as total')
+            ->pluck('total', 'course_package_purchase_id');
+
+        return $purchases->mapWithKeys(fn (CoursePackagePurchase $purchase) => [
+            $purchase->id => max(0.0, MoneyMath::floorToScale((float) $purchase->credits_granted - (float) ($allocated[$purchase->id] ?? 0), 2)),
+        ])->all();
+    }
+
+    /**
+     * Tulis 1 baris debit + alokasinya. Dipanggil di dalam transaction yang
+     * sudah lock Student & $purchases. Semua angka dicek ulang di sini.
+     *
+     * @throws InsufficientCourseCreditException
+     */
+    private function createDebit(Student $lockedStudent, Collection $purchases, float $amount, string $sourceType, string $description): CourseCredit
+    {
+        $amount = MoneyMath::floorToScale($amount, 2);
         $lastCredit = CourseCredit::where('student_id', $lockedStudent->id)
             ->orderByDesc('created_at')
             ->lockForUpdate()
             ->first();
+        $balanceBefore = MoneyMath::floorToScale((float) ($lastCredit?->balance ?? 0), 2);
 
-        return MoneyMath::floorToScale((float) ($lastCredit?->balance ?? 0), 2);
-    }
+        $available = $this->available($purchases);
+        $remaining = $amount;
+        $allocationRows = [];
 
-    /**
-     * Inti pemotongan: lock semua CoursePackagePurchase student, jalankan
-     * FIFO (allocateFromPurchases()), lalu tulis 1 baris CourseCredit debit
-     * + baris-baris CourseCreditAllocation-nya. Dipanggil dari DALAM
-     * transaction yang sudah lock Student & CourseCredit terakhir
-     * (lockedBalance()) -- $balanceBefore WAJIB angka yang sudah dicek di
-     * dalam lock itu, bukan angka preview dari luar.
-     *
-     * @throws InsufficientCourseCreditException lihat allocateFromPurchases().
-     */
-    private function allocateAndCreateDebit(Student $lockedStudent, float $balanceBefore, float $amount, string $sourceType, string $description): CourseCredit
-    {
-        $purchases = CoursePackagePurchase::where('student_id', $lockedStudent->id)
-            ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
-            ->orderBy('created_at')
-            ->lockForUpdate()
-            ->get();
+        foreach ($purchases as $purchase) {
+            $take = MoneyMath::floorToScale(min($available[$purchase->id] ?? 0.0, $remaining), 2);
 
-        $result = $this->allocateFromPurchases($purchases, $amount);
-        $allocationRows = $result['allocations'];
-        $remaining = $result['remaining'];
+            if ($take <= 0.0) {
+                continue;
+            }
 
-        // Jaring pengaman -- kalau ternyata FIFO di atas TIDAK bisa
-        // menutup $amount penuh (mis. data allocations & balance sempat
-        // tidak sinkron), batalkan semuanya daripada membuat baris debit
-        // yang asal-usulnya tidak lengkap terlacak.
-        if ($remaining > 0.0) {
-            throw new InsufficientCourseCreditException(
-                "Riwayat pembelian credit student tidak cukup untuk menutup {$amount} credit (kurang {$remaining})."
-            );
+            $unitPrice = self::unitPrice($purchase);
+            $allocationRows[] = [
+                'course_package_purchase_id' => $purchase->id,
+                'amount' => $take,
+                'unit_price' => $unitPrice,
+                'value' => MoneyMath::floorToScale($take * $unitPrice, 2),
+            ];
+            $remaining = MoneyMath::floorToScale($remaining - $take, 2);
+
+            if ($remaining <= 0.0) {
+                break;
+            }
         }
 
-        $balanceAfter = MoneyMath::floorToScale($balanceBefore - $amount, 2);
+        if ($remaining > 0.0 || $balanceBefore < $amount) {
+            throw new InsufficientCourseCreditException(
+                "Sisa credit paket ini tidak cukup (butuh {$amount}, kurang {$remaining})."
+            );
+        }
 
         $debit = CourseCredit::create([
             'student_id' => $lockedStudent->id,
@@ -212,7 +206,7 @@ class CourseCreditDebitService
             'source_type' => $sourceType,
             'debit' => $amount,
             'kredit' => 0,
-            'balance' => $balanceAfter,
+            'balance' => MoneyMath::floorToScale($balanceBefore - $amount, 2),
             'description' => $description,
         ]);
 
@@ -221,61 +215,5 @@ class CourseCreditDebitService
         }
 
         return $debit->load('allocations');
-    }
-
-    /**
-     * Jalan FIFO murni (tanpa lock, tanpa tulis apa pun) atas 1 koleksi
-     * CoursePackagePurchase yang SUDAH diambil pemanggil (locked atau tidak,
-     * tergantung tujuannya -- lihat allocateAndCreateDebit() vs
-     * previewTradeInValue()): tentukan dari batch mana saja $amount credit
-     * ini "berasal", beserta nilai rupiah tiap batch berdasarkan
-     * price_paid/credits_granted snapshot batch itu.
-     *
-     * @param iterable<CoursePackagePurchase> $purchases
-     * @return array{allocations: array<int, array{course_package_purchase_id: string, amount: float, unit_price: float, value: float}>, remaining: float}
-     */
-    private function allocateFromPurchases(iterable $purchases, float $amount): array
-    {
-        $remaining = $amount;
-        $allocationRows = [];
-
-        foreach ($purchases as $purchase) {
-            if ($remaining <= 0.0) {
-                break;
-            }
-
-            $creditsGranted = (float) $purchase->credits_granted;
-
-            if ($creditsGranted <= 0.0) {
-                continue;
-            }
-
-            $alreadyAllocated = (float) CourseCreditAllocation::where('course_package_purchase_id', $purchase->id)->sum('amount');
-            $availableInBatch = MoneyMath::floorToScale($creditsGranted - $alreadyAllocated, 2);
-
-            if ($availableInBatch <= 0.0) {
-                continue;
-            }
-
-            $takeFromBatch = MoneyMath::floorToScale(min($availableInBatch, $remaining), 2);
-
-            if ($takeFromBatch <= 0.0) {
-                continue;
-            }
-
-            $unitPrice = MoneyMath::floorToScale(((float) $purchase->price_paid) / $creditsGranted, 4);
-            $value = MoneyMath::floorToScale($takeFromBatch * $unitPrice, 2);
-
-            $allocationRows[] = [
-                'course_package_purchase_id' => $purchase->id,
-                'amount' => $takeFromBatch,
-                'unit_price' => $unitPrice,
-                'value' => $value,
-            ];
-
-            $remaining = MoneyMath::floorToScale($remaining - $takeFromBatch, 2);
-        }
-
-        return ['allocations' => $allocationRows, 'remaining' => $remaining];
     }
 }

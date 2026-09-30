@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers\StudentPortal;
 
-use App\Helpers\MoneyMath;
 use App\Http\Controllers\Controller;
 use App\Models\CourseCredit;
 use App\Models\CoursePackage;
@@ -11,9 +10,9 @@ use App\Models\CoursePackagePurchase;
 use App\Models\Deposit;
 use App\Models\Student;
 use App\Models\Transaction;
-use App\Services\CourseCredit\CourseCreditDebitService;
 use App\Services\CoursePackagePayment\CoursePackagePaymentGatewayFactory;
 use App\Services\CoursePackagePayment\CoursePackagePurchaseNotifier;
+use App\Services\CoursePackagePayment\PackageUpgradeCalculator;
 use App\Services\CoursePackagePayment\UpgradeConfirmationFailedException;
 use App\Services\Payment\PaymentSignatureMismatchException;
 use Closure;
@@ -58,7 +57,7 @@ use Illuminate\Support\Str;
 class InaYulePackageWebhookController extends Controller
 {
     public function __construct(
-        private readonly CourseCreditDebitService $debitService = new CourseCreditDebitService()
+        private readonly PackageUpgradeCalculator $upgradeCalculator = new PackageUpgradeCalculator()
     ) {
     }
 
@@ -146,7 +145,7 @@ class InaYulePackageWebhookController extends Controller
         // === TITIK PALING SENSITIF: pengkreditan credit + (kalau ada) pendebitan Deposit ===
         // FASE 4 bagian 2: order upgrade (credit_trade_in_portion > 0)
         // diproses lewat alur TERPISAH -- lihat docblock class di atas.
-        $isUpgrade = (float) $payment->credit_trade_in_portion > 0.0;
+        $isUpgrade = $payment->source_course_package_purchase_id !== null || (float) $payment->credit_trade_in_portion > 0.0;
 
         $outcome = $isUpgrade
             ? $this->processUpgradeConfirmation($payment, $result)
@@ -185,8 +184,9 @@ class InaYulePackageWebhookController extends Controller
             $userId = $lockedPayment->user_id;
             $studentId = $lockedPayment->student_id;
 
-            DB::table('users')->where('id', $userId)->lockForUpdate()->first();
+            // Urutan lock sama dengan jalur checkout/upgrade instan: student lalu users.
             $lockedStudent = Student::where('id', $studentId)->lockForUpdate()->first();
+            DB::table('users')->where('id', $userId)->lockForUpdate()->first();
 
             $depositPortion = (float) $lockedPayment->deposit_portion;
             $depositBalanceBefore = null;
@@ -319,10 +319,11 @@ class InaYulePackageWebhookController extends Controller
      * credit TIDAK PERNAH dikreditkan/dipotong dari request browser, HANYA
      * dari webhook server-to-server yang sudah diverifikasi signature-nya").
      *
-     * FAIL-SAFE TAMBAHAN (khusus upgrade): nilai trade-in BISA MENGECIL
-     * antara checkout dibuat & gateway konfirmasi (mis. sisa credit lama
-     * sempat terpakai buat sesi kelas lewat
-     * App\Services\ClassSession\ClassSessionWorkflowService di antaranya).
+     * FAIL-SAFE TAMBAHAN (khusus upgrade): sejak 30 September 2026 credit
+     * baris asal dikunci selama pembayaran menunggu (CoursePackagePayment::
+     * awaitingTradeIn()), jadi nilai trade-in seharusnya tidak berubah --
+     * tapi tetap dicek ulang (mis. pembayaran telat melewati expires_at).
+     * Hitungan & pencatatannya di PackageUpgradeCalculator::confirmGatewayUpgrade().
      * Kalau nilai trade-in AKTUAL saat konfirmasi ternyata lebih kecil dari
      * yang direncanakan saat checkout (credit_trade_in_portion), berarti
      * porsi gateway yang SUDAH terbayar tidak lagi cukup menutup harga
@@ -344,164 +345,46 @@ class InaYulePackageWebhookController extends Controller
                     return ['status' => 'already_processed'];
                 }
 
-                $userId = $lockedPayment->user_id;
-                $studentId = $lockedPayment->student_id;
-
-                DB::table('users')->where('id', $userId)->lockForUpdate()->first();
-                $lockedStudent = Student::where('id', $studentId)->lockForUpdate()->first();
-
-                $package = CoursePackage::find($lockedPayment->course_package_id);
-                $packageName = $package->name ?? 'Package';
-                $price = (float) $lockedPayment->price_total;
-
-                // Trade-in dieksekusi DI SINI -- kali pertama saldo credit
-                // lama benar-benar disentuh untuk order ini.
-                $tradeInDebit = $this->debitService->debitEntireBalance(
-                    $lockedStudent,
-                    CourseCredit::SOURCE_TRADE_IN_DEBIT,
-                    'Trade-in saldo credit lama untuk upgrade ke package: ' . $packageName
-                );
-
-                $actualTradeInValue = $tradeInDebit
-                    ? MoneyMath::floorToScale((float) $tradeInDebit->allocations->sum(fn ($allocation) => (float) $allocation->value), 2)
-                    : 0.0;
-
-                $actualTradeInApplied = MoneyMath::floorToScale(min($actualTradeInValue, $price), 2);
-                $plannedTradeInApplied = (float) $lockedPayment->credit_trade_in_portion;
-
-                if (($actualTradeInApplied + 0.000001) < $plannedTradeInApplied) {
-                    Log::critical('[COURSE-PACKAGE][UPGRADE] Nilai trade-in credit mengecil saat konfirmasi -- porsi gateway SUDAH terbayar tapi upgrade TIDAK di-grant, BUTUH REKONSILIASI MANUAL ADMIN', [
-                        'order_id' => $lockedPayment->order_id,
-                        'user_id' => $userId,
-                        'student_id' => $studentId,
-                        'trade_in_direncanakan' => $plannedTradeInApplied,
-                        'trade_in_aktual' => $actualTradeInApplied,
-                        'gateway_portion_sudah_dibayar' => (float) $lockedPayment->gateway_portion,
-                    ]);
-
-                    throw new UpgradeConfirmationFailedException('insufficient_trade_in');
+                if (!$lockedPayment->source_course_package_purchase_id) {
+                    throw new UpgradeConfirmationFailedException('missing_source_purchase');
                 }
 
-                $tradeInLeftover = MoneyMath::floorToScale($actualTradeInValue - $actualTradeInApplied, 2);
-                $depositPortion = (float) $lockedPayment->deposit_portion;
-
-                $depositBalanceBefore = null;
-                $depositBalanceAfter = null;
-
-                if ($depositPortion > 0 || $tradeInLeftover > 0.0) {
-                    $lastDeposit = Deposit::where('user_id', $userId)
-                        ->orderByDesc('payment_date')
-                        ->orderByDesc('created_at')
-                        ->lockForUpdate()
-                        ->first();
-
-                    $depositBalanceBefore = (float) ($lastDeposit?->balance ?? 0);
-
-                    if ($depositBalanceBefore < $depositPortion) {
-                        Log::critical('[COURSE-PACKAGE][UPGRADE] Saldo Deposit tidak cukup saat webhook konfirmasi upgrade -- porsi gateway SUDAH terbayar tapi upgrade TIDAK di-grant, BUTUH REKONSILIASI MANUAL ADMIN', [
-                            'order_id' => $lockedPayment->order_id,
-                            'user_id' => $userId,
-                            'student_id' => $studentId,
-                            'deposit_portion_dibutuhkan' => $depositPortion,
-                            'saldo_deposit_tersedia' => $depositBalanceBefore,
-                            'gateway_portion_sudah_dibayar' => (float) $lockedPayment->gateway_portion,
-                        ]);
-
-                        throw new UpgradeConfirmationFailedException('insufficient_deposit');
-                    }
-
-                    // Leftover trade-in (nilai credit lama LEBIH BESAR dari
-                    // harga package baru) masuk ke saldo Deposit -- BUKAN
-                    // dicairkan tunai, sesuai kesepakatan diskusi.
-                    $depositBalanceAfter = MoneyMath::floorToScale($depositBalanceBefore - $depositPortion + $tradeInLeftover, 2);
-
-                    Deposit::create([
-                        'user_id' => $userId,
-                        'debit' => $depositPortion,
-                        'kredit' => $tradeInLeftover,
-                        'balance' => $depositBalanceAfter,
-                        'description' => "Upgrade package: {$packageName} (order {$lockedPayment->order_id})",
-                        'payment_status' => 'success',
-                        'payment_method' => $depositPortion > 0 ? 'saldo' : 'trade_in_credit',
-                        'payment_date' => now(),
-                    ]);
-
-                    if ($depositPortion > 0) {
-                        Transaction::create([
-                            'transaction_code' => 'TRX-' . now()->format('YmdHisv') . '-' . strtoupper(Str::random(6)),
-                            'user_id' => $userId,
-                            'type' => 'debit',
-                            'amount' => $depositPortion,
-                            'balance_before' => $depositBalanceBefore,
-                            'balance_after' => $depositBalanceAfter,
-                            'description' => "Upgrade package: {$packageName} (porsi saldo)",
-                            'reference_type' => 'course_package_payment',
-                            'reference_id' => $lockedPayment->order_id,
-                            'status' => 'success',
-                            'channel' => 'saldo',
-                            'metadata' => [
-                                'order_id' => $lockedPayment->order_id,
-                                'course_package_id' => $lockedPayment->course_package_id,
-                                'gateway_portion' => (float) $lockedPayment->gateway_portion,
-                                'source' => 'inayule.upgrade.webhook',
-                            ],
-                            'created_by' => $userId,
-                            'transaction_date' => now(),
-                        ]);
-                    }
-                }
-
-                $purchase = CoursePackagePurchase::create([
-                    'student_id' => $studentId,
-                    'course_package_id' => $lockedPayment->course_package_id,
-                    'price_paid' => $price,
-                    'credits_granted' => $lockedPayment->credits_granted,
-                    'source' => CoursePackagePurchase::SOURCE_UPGRADE_PURCHASE,
-                    'status' => CoursePackagePurchase::STATUS_COMPLETED,
-                ]);
-
-                $newCreditBalance = MoneyMath::floorToScale(
-                    CourseCredit::currentBalanceFor($studentId) + (float) $lockedPayment->credits_granted,
-                    2
-                );
-
-                CourseCredit::create([
-                    'student_id' => $studentId,
-                    'course_package_purchase_id' => $purchase->id,
-                    'source_type' => CourseCredit::SOURCE_PURCHASE,
-                    'debit' => 0,
-                    'kredit' => $lockedPayment->credits_granted,
-                    'balance' => $newCreditBalance,
-                    'description' => 'Upgrade package: ' . $packageName,
-                ]);
+                // Semua hitungan & pencatatan (trade-in, saldo, credit baru)
+                // ada di PackageUpgradeCalculator -- sama persis dengan jalur instan.
+                $settled = $this->upgradeCalculator->confirmGatewayUpgrade($lockedPayment);
 
                 $lockedPayment->update([
                     'gateway_reference' => $result['reference'] ?? $lockedPayment->gateway_reference,
                     'raw_callback' => $result['raw'] ?? null,
                     'status' => CoursePackagePayment::STATUS_PAID,
                     'paid_at' => now(),
-                    'course_package_purchase_id' => $purchase->id,
-                    'credit_trade_in_portion' => $actualTradeInApplied,
-                    'trade_in_course_credit_id' => $tradeInDebit?->id,
+                    'course_package_purchase_id' => $settled['purchase']->id,
+                    'credit_trade_in_portion' => $settled['trade_in_applied'],
+                    'trade_in_course_credit_id' => $settled['trade_in_debit']->id,
                 ]);
 
                 Log::info('[COURSE-PACKAGE][UPGRADE] Upgrade package berhasil diproses lewat webhook', [
                     'order_id' => $lockedPayment->order_id,
-                    'user_id' => $userId,
-                    'student_id' => $studentId,
-                    'trade_in_applied' => $actualTradeInApplied,
-                    'deposit_portion' => $depositPortion,
+                    'user_id' => $lockedPayment->user_id,
+                    'student_id' => $lockedPayment->student_id,
+                    'trade_in_applied' => $settled['trade_in_applied'],
+                    'deposit_portion' => (float) $lockedPayment->deposit_portion,
                     'gateway_portion' => (float) $lockedPayment->gateway_portion,
-                    'purchase_id' => $purchase->id,
+                    'purchase_id' => $settled['purchase']->id,
                 ]);
 
                 return ['status' => 'paid', 'payment_id' => $lockedPayment->id];
             });
         } catch (UpgradeConfirmationFailedException $e) {
-            // Transaction di atas SUDAH di-rollback otomatis oleh
-            // DB::transaction() (termasuk trade-in debit-nya) -- update
-            // status 'failed' ini SENGAJA di LUAR transaction yang
-            // di-rollback itu, lewat query baru.
+            // Transaction di atas SUDAH di-rollback (termasuk trade-in) --
+            // status 'failed' dicatat di luar transaksi itu. Porsi gateway
+            // sudah terbayar, jadi perlu rekonsiliasi manual admin.
+            Log::critical('[COURSE-PACKAGE][UPGRADE] Upgrade gagal saat konfirmasi gateway -- porsi gateway SUDAH terbayar, BUTUH REKONSILIASI MANUAL ADMIN', [
+                'order_id' => $payment->order_id,
+                'reason' => $e->getMessage(),
+                'gateway_portion_sudah_dibayar' => (float) $payment->gateway_portion,
+            ]);
+
             CoursePackagePayment::where('id', $payment->id)
                 ->where('status', '!=', CoursePackagePayment::STATUS_PAID)
                 ->update([

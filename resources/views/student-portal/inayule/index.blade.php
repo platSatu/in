@@ -254,24 +254,6 @@
                                                     Beli
                                                 </a>
 
-                                                @if ($creditBalance > 0)
-                                                    {{--
-                                                        FASE 4 bagian 3 (16 September 2026, entry-point Upgrade
-                                                        Paket) -- tombol ini CUMA muncul kalau student punya sisa
-                                                        credit (dari package MANA PUN, pool bersama, lihat
-                                                        docblock CourseCredit) untuk ditukar (trade-in). Sengaja
-                                                        DITAMPILKAN BERDAMPINGAN dengan "Beli" (bukan
-                                                        menggantikannya) -- "Beli" tetap pembelian baru biasa
-                                                        (credit lama TIDAK disentuh), "Upgrade" menukar SELURUH
-                                                        sisa credit lama dulu baru sisanya Deposit/gateway, lihat
-                                                        docblock App\Services\CoursePackagePayment\
-                                                        PackageUpgradeCalculator. Harga & nilai trade-in DIHITUNG
-                                                        ULANG di server di halaman upgrade itu sendiri.
-                                                    --}}
-                                                    <a href="{{ route('inayule.upgrade.show', $package->id) }}" class="btn btn-outline-primary w-100 mt-2">
-                                                        Upgrade (Pakai Sisa Credit)
-                                                    </a>
-                                                @endif
                                             @endif
                                         </div>
                                     </div>
@@ -317,18 +299,17 @@
                                             @endif
                                         </td>
                                         <td>
-                                            {{--
-                                                STEP 5 (16 September 2026, permintaan user): tombol
-                                                "Upgrade / Topup" -- belum ada logic upgrade/topup
-                                                sungguhan (masih tahap diskusi konsep pembelian berbayar),
-                                                jadi SENGAJA cuma pindah ke tab "Buy Packages" yang
-                                                sudah beneran jalan (klik tombol nav tab-nya langsung
-                                                lewat JS) -- daripada tombol mati/disabled tanpa tujuan.
-                                            --}}
-                                            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
-                                                onclick="document.getElementById('inayule-buy-tab').click()">
-                                                Upgrade / Topup
-                                            </button>
+                                            {{-- Upgrade paket penuh / convert sebagian credit dari baris ini saja. --}}
+                                            @if ($purchase->status === 'completed' && $purchase->credits_remaining > 0)
+                                                <a href="{{ route('inayule.upgrade.show', $purchase->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                                                    Upgrade / Convert
+                                                </a>
+                                            @else
+                                                <button type="button" class="btn btn-sm btn-outline-primary text-nowrap"
+                                                    onclick="document.getElementById('inayule-buy-tab').click()">
+                                                    Beli Lagi
+                                                </button>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty

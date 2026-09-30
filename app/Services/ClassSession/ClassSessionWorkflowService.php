@@ -4,6 +4,8 @@ namespace App\Services\ClassSession;
 
 use App\Models\ClassSession;
 use App\Models\CoursePackage;
+use App\Models\CoursePackagePayment;
+use App\Models\CoursePackagePurchase;
 use App\Models\CourseCredit;
 use App\Models\CompanyBranch;
 use App\Models\Student;
@@ -67,6 +69,20 @@ class ClassSessionWorkflowService
     ): ClassSession {
         if ($creditAmountRequested <= 0.0) {
             throw new InvalidArgumentException('Jumlah credit yang diajukan harus lebih besar dari 0.');
+        }
+
+        $this->assertNoPendingTradeIn($student, $package->id);
+
+        // Credit terpisah per paket: sisa paket ini dikurangi pengajuan lain yang belum selesai.
+        $purchases = CoursePackagePurchase::where('student_id', $student->id)->where('course_package_id', $package->id)->get();
+        $reserved = (float) ClassSession::where('student_id', $student->id)
+            ->where('course_package_id', $package->id)
+            ->whereIn('status', [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN])
+            ->sum('credit_amount_requested');
+        $available = array_sum($this->debitService->remainingByPurchase($purchases)) - $reserved;
+
+        if ($available + 0.000001 < $creditAmountRequested) {
+            throw new InvalidArgumentException('Sisa credit paket "'.$package->name.'" tidak cukup (tersedia '.max(0, $available).' credit, termasuk yang sedang diajukan).');
         }
 
         return ClassSession::create([
@@ -141,7 +157,13 @@ class ClassSessionWorkflowService
         }
 
         return DB::transaction(function () use ($session, $admin, $finalAmount, $notes) {
-            $student = $session->student()->firstOrFail();
+            // Kunci sesi & siswa lalu cek ulang: dua admin yang menekan approve
+            // bersamaan tidak boleh memotong credit dua kali, dan credit yang
+            // sedang dikunci upgrade tidak boleh terpakai.
+            $session = ClassSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            $this->assertStatus($session, ClassSession::STATUS_WAITING_ADMIN);
+            $student = Student::whereKey($session->student_id)->lockForUpdate()->firstOrFail();
+            $this->assertNoPendingTradeIn($student, $session->course_package_id);
 
             $description = sprintf(
                 'Pemakaian kelas (%s) -- pengajuan #%s',
@@ -149,7 +171,8 @@ class ClassSessionWorkflowService
                 Str::limit($session->id, 8, '')
             );
 
-            $debit = $this->debitService->debit($student, $finalAmount, CourseCredit::SOURCE_SESSION_DEBIT, $description);
+            // Credit terpisah per paket: hanya dipotong dari pembelian paket kelas ini.
+            $debit = $this->debitService->debit($student, $finalAmount, CourseCredit::SOURCE_SESSION_DEBIT, $description, $session->course_package_id);
 
             $session->update([
                 'status' => ClassSession::STATUS_APPROVED,
@@ -172,15 +195,32 @@ class ClassSessionWorkflowService
      */
     public function adminReject(ClassSession $session, User $admin, ?string $reason = null): ClassSession
     {
-        $this->assertStatus($session, [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN]);
+        return DB::transaction(function () use ($session, $admin, $reason) {
+            // Dikunci supaya tidak bisa menimpa sesi yang barusan disetujui (credit sudah terpotong).
+            $session = ClassSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            $this->assertStatus($session, [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN]);
 
-        $session->update([
-            'status' => ClassSession::STATUS_REJECTED_BY_ADMIN,
-            'notes' => $reason,
-            'admin_user_id' => $admin->id,
-        ]);
+            $session->update([
+                'status' => ClassSession::STATUS_REJECTED_BY_ADMIN,
+                'notes' => $reason,
+                'admin_user_id' => $admin->id,
+            ]);
 
-        return $session->fresh();
+            return $session->fresh();
+        });
+    }
+
+    /** Credit paket ini sedang dipakai upgrade yang menunggu pembayaran. */
+    private function assertNoPendingTradeIn(Student $student, ?string $coursePackageId): void
+    {
+        $pending = CoursePackagePayment::awaitingTradeIn()
+            ->where('student_id', $student->id)
+            ->whereHas('sourcePurchase', fn ($query) => $query->where('course_package_id', $coursePackageId))
+            ->exists();
+
+        if ($pending) {
+            throw new InvalidArgumentException('Credit paket ini sedang dipakai untuk upgrade yang menunggu pembayaran. Selesaikan atau tunggu pembayaran itu kedaluwarsa dulu.');
+        }
     }
 
     /** @param string|array<int, string> $expectedStatus */

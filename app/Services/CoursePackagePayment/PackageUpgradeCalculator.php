@@ -3,41 +3,35 @@
 namespace App\Services\CoursePackagePayment;
 
 use App\Helpers\MoneyMath;
+use App\Models\ClassSession;
 use App\Models\CourseCredit;
 use App\Models\CoursePackage;
 use App\Models\CoursePackagePayment;
 use App\Models\CoursePackagePurchase;
 use App\Models\Deposit;
 use App\Models\Student;
+use App\Models\Transaction;
 use App\Services\CourseCredit\CourseCreditDebitService;
+use App\Services\CourseCredit\InsufficientCourseCreditException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * FASE 4 "Konversi/Upgrade Paket" (16 September 2026, bagian 1 -- lihat
- * catatan scope di bawah) -- satu-satunya pintu untuk menghitung & (untuk
- * jalur instan) mengeksekusi upgrade package seorang student, dengan urutan
- * penutupan harga: TRADE-IN saldo credit lama dulu, baru sisanya lewat
- * saldo Deposit, baru sisanya lagi lewat payment gateway -- pola waterfall
- * ini persis kesepakatan diskusi:
+ * Upgrade & Convert paket -- satu-satunya tempat aturannya. Credit yang
+ * ditukar SELALU dari 1 baris pembelian yang dipilih siswa di tab Status
+ * ($source), bukan dari semua paket.
  *
- *   "dihitung dulu sisa creditnya dan dihitung ke rupiah, jika kurang mau
- *    sedapatnya saja atau lanjut ke payment gateway, jika kelebihan akan
- *    masuk ke saldo (tidak bisa dicairkan tapi tetap dipergunakan lagi
- *    untuk membeli paket)"
+ * - UPGRADE ($quantity null): beli 1 paket penuh. Seluruh sisa credit baris
+ *   itu ditukar ke rupiah (harga per credit saat dibeli); kurangnya dibayar
+ *   saldo Deposit lalu payment gateway, lebihnya masuk saldo Deposit.
+ * - CONVERT ($quantity N): ambil N credit paket tujuan (harga per credit
+ *   paket tujuan), maksimal senilai credit asal. Credit asal dipotong per
+ *   1 credit utuh; kelebihan nilainya masuk saldo Deposit. Tidak pernah ke
+ *   gateway.
  *
- * SCOPE bagian 1 (yang dibangun sekarang): preview() (breakdown angka,
- * TANPA menyentuh DB apa pun) & completeInstant() (jalur SELESAI SEKARANG
- * JUGA -- trade-in + Deposit sudah cukup menutup 100% harga package baru,
- * TIDAK butuh payment gateway sama sekali).
- *
- * SENGAJA BELUM dibangun di bagian ini (menyusul, sama seperti Fase 2
- * dipecah jadi backend dulu baru controller/UI): jalur GATEWAY (kalau
- * trade-in + Deposit masih kurang) beserta perluasan
- * InaYulePackageWebhookController untuk memprosesnya, dan controller/route/
- * view yang benar-benar memanggil class ini dari halaman student portal --
- * bagian gateway sengaja ditunda karena butuh pengujian end-to-end dengan
- * gateway sungguhan yang tidak bisa dilakukan dari sandbox ini.
+ * Saldo Deposit tidak bisa dicairkan, hanya untuk beli paket lagi. Semua
+ * angka dihitung ulang di dalam lock (settle()); preview() hanya tampilan.
+ * Pembulatan selalu ke bawah (MoneyMath).
  */
 class PackageUpgradeCalculator
 {
@@ -46,196 +40,357 @@ class PackageUpgradeCalculator
     ) {
     }
 
-    /**
-     * Breakdown harga upgrade TANPA menyentuh DB apa pun (baca-saja) --
-     * dipakai untuk menampilkan preview ke student SEBELUM dia konfirmasi,
-     * dan untuk MEMILIH jalur mana yang dipakai (instan vs gateway), pola
-     * "preview di luar lock, cek ulang di dalam lock" sama seperti
-     * InaYulePackageCheckoutController::store(). Angka di sini BISA berubah
-     * sampai commit sungguhan -- completeInstant() SELALU menghitung ulang
-     * semuanya dari 0 di dalam transaction-nya sendiri, tidak percaya hasil
-     * preview ini.
-     *
-     * @return array{
-     *     target_price: float,
-     *     credit_balance: float,
-     *     credit_trade_in_value: float,
-     *     trade_in_applied_to_price: float,
-     *     trade_in_leftover_to_deposit: float,
-     *     remaining_price_after_trade_in: float,
-     *     deposit_balance: float,
-     *     deposit_portion: float,
-     *     gateway_portion: float,
-     * }
-     */
-    public function preview(mixed $user, Student $student, CoursePackage $targetPackage): array
+    /** Alasan baris pembelian ini belum bisa di-upgrade/convert; null = boleh. */
+    public function blockedReason(CoursePackagePurchase $source): ?string
     {
-        $price = $targetPackage->effectivePrice();
+        $pendingSessions = ClassSession::where('student_id', $source->student_id)
+            ->where('course_package_id', $source->course_package_id)
+            ->whereIn('status', [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN])
+            ->exists();
 
-        $tradeIn = $this->debitService->previewTradeInValue($student);
+        if ($pendingSessions) {
+            return 'Masih ada pengajuan kelas untuk paket ini yang belum selesai. Tunggu disetujui/ditolak dulu sebelum upgrade atau convert.';
+        }
 
-        $tradeInApplied = MoneyMath::floorToScale(min($tradeIn['value'], $price), 2);
-        $tradeInLeftoverToDeposit = MoneyMath::floorToScale($tradeIn['value'] - $tradeInApplied, 2);
-        $remainingAfterTradeIn = MoneyMath::floorToScale($price - $tradeInApplied, 2);
+        if (CoursePackagePayment::awaitingTradeIn()->where('source_course_package_purchase_id', $source->id)->exists()) {
+            return 'Credit paket ini sedang dipakai untuk upgrade yang menunggu pembayaran. Selesaikan atau tunggu pembayaran itu kedaluwarsa dulu.';
+        }
 
+        if ($this->remaining($source) <= 0.0) {
+            return 'Credit paket ini sudah habis.';
+        }
+
+        if (CourseCreditDebitService::unitPrice($source) <= 0.0) {
+            return 'Credit dari paket gratis/trial tidak punya nilai tukar, jadi tidak bisa di-upgrade atau convert.';
+        }
+
+        return null;
+    }
+
+    /**
+     * Rincian angka tanpa menulis apa pun.
+     *
+     * @return array<string, mixed> lihat plan() + deposit_balance, deposit_portion, gateway_portion
+     *
+     * @throws UpgradeConfirmationFailedException kalau quantity convert tidak valid
+     */
+    public function preview(mixed $user, CoursePackagePurchase $source, CoursePackage $target, ?int $quantity = null): array
+    {
+        $plan = $this->plan($this->remaining($source), $source, $target, $quantity);
         $depositBalance = Deposit::currentBalanceFor((string) $user->id);
-        $depositPortion = MoneyMath::floorToScale(min($depositBalance, $remainingAfterTradeIn), 2);
-        $gatewayPortion = MoneyMath::floorToScale(max($remainingAfterTradeIn - $depositPortion, 0.0), 2);
+        $depositPortion = MoneyMath::floorToScale(min($depositBalance, $plan['shortfall']), 2);
 
-        return [
-            'target_price' => $price,
-            'credit_balance' => $tradeIn['balance'],
-            'credit_trade_in_value' => $tradeIn['value'],
-            'trade_in_applied_to_price' => $tradeInApplied,
-            'trade_in_leftover_to_deposit' => $tradeInLeftoverToDeposit,
-            'remaining_price_after_trade_in' => $remainingAfterTradeIn,
+        return $plan + [
             'deposit_balance' => $depositBalance,
             'deposit_portion' => $depositPortion,
-            'gateway_portion' => $gatewayPortion,
+            'gateway_portion' => MoneyMath::floorToScale($plan['shortfall'] - $depositPortion, 2),
         ];
     }
 
     /**
-     * Jalur INSTAN -- dipakai HANYA kalau preview() menunjukkan
-     * gateway_portion <= 0 (trade-in + saldo Deposit sudah cukup menutup
-     * 100% harga package baru). SEMUA di dalam 1 DB transaction, urutan
-     * lock SAMA seperti InaYulePackageCheckoutController::
-     * completeWithDepositOnly() (Student, lalu users, lalu Deposit
-     * terakhir) supaya tidak ada risiko deadlock beda urutan lock antara 2
-     * alur checkout yang mirip ini.
+     * Jalur instan (trade-in + saldo cukup; convert selalu lewat sini).
+     * Kalau angka berubah di dalam lock, exception membatalkan SELURUH transaksi.
      *
-     * Re-cek SEMUA angka dari 0 di dalam lock (trade-in lewat
-     * CourseCreditDebitService::debitEntireBalance() yang lock sendiri
-     * baris CourseCredit terakhir, lalu Deposit terakhir) -- TIDAK percaya
-     * hasil preview() yang dipanggil di luar transaction ini. Kalau
-     * ternyata setelah dicek ulang saldo Deposit tidak lagi cukup (race,
-     * atau trade-in ternyata lebih kecil dari sangkaan preview), SELURUH
-     * transaction dibatalkan (termasuk trade-in debit-nya) -- baris
-     * gagal ini tidak meninggalkan efek apa pun.
-     *
-     * @return array{ok: bool, payment?: CoursePackagePayment}
+     * @throws UpgradeConfirmationFailedException
      */
-    public function completeInstant(mixed $user, Student $student, CoursePackage $targetPackage): array
+    public function completeInstant(mixed $user, Student $student, CoursePackagePurchase $source, CoursePackage $target, ?int $quantity = null): CoursePackagePayment
     {
-        return DB::transaction(function () use ($user, $student, $targetPackage): array {
-            $lockedStudent = Student::where('id', $student->id)->lockForUpdate()->first();
-
+        return DB::transaction(function () use ($user, $student, $source, $target, $quantity) {
+            $lockedStudent = Student::where('id', $student->id)->lockForUpdate()->firstOrFail();
             DB::table('users')->where('id', $user->id)->lockForUpdate()->first();
 
-            $price = $targetPackage->effectivePrice();
-
-            // Trade-in dieksekusi lebih dulu -- debitEntireBalance() lock
-            // sendiri baris CourseCredit terakhir DI DALAM transaction yang
-            // sama (savepoint, connection yang sama, tidak mengunci diri
-            // sendiri).
-            $tradeInDebit = $this->debitService->debitEntireBalance(
-                $lockedStudent,
-                CourseCredit::SOURCE_TRADE_IN_DEBIT,
-                'Trade-in saldo credit lama untuk upgrade ke package: ' . $targetPackage->name
-            );
-
-            $tradeInValue = $tradeInDebit
-                ? MoneyMath::floorToScale((float) $tradeInDebit->allocations->sum(fn ($allocation) => (float) $allocation->value), 2)
-                : 0.0;
-
-            $tradeInApplied = MoneyMath::floorToScale(min($tradeInValue, $price), 2);
-            $tradeInLeftover = MoneyMath::floorToScale($tradeInValue - $tradeInApplied, 2);
-            $remainingAfterTradeIn = MoneyMath::floorToScale($price - $tradeInApplied, 2);
-
-            $lastDeposit = Deposit::where('user_id', $user->id)
-                ->orderByDesc('payment_date')
-                ->orderByDesc('created_at')
-                ->lockForUpdate()
-                ->first();
-
-            $depositBalanceBefore = (float) ($lastDeposit?->balance ?? 0);
-
-            // Re-cek DI DALAM lock -- kalau ternyata tidak cukup lagi
-            // (race, atau trade-in ternyata lebih kecil dari sangkaan
-            // preview), batalkan SELURUH transaction (trade-in debit di
-            // atas ikut di-rollback otomatis).
-            if ($depositBalanceBefore < $remainingAfterTradeIn) {
-                return ['ok' => false];
+            if ($reason = $this->blockedReason($source)) {
+                throw new UpgradeConfirmationFailedException($reason);
             }
 
-            // Leftover trade-in (kalau nilai credit lama LEBIH BESAR dari
-            // harga package baru) masuk ke saldo Deposit -- BUKAN dicairkan
-            // tunai, sesuai kesepakatan diskusi ("tidak hangus tapi harus
-            // dipergunakan untuk membeli paket lagi").
-            $depositBalanceAfter = MoneyMath::floorToScale(
-                $depositBalanceBefore - $remainingAfterTradeIn + $tradeInLeftover,
-                2
-            );
-
+            $plan = $this->plan($this->remaining($source), $source, $target, $quantity);
             $orderId = $this->generateOrderId();
+            $result = $this->settle((string) $user->id, $lockedStudent, $source, $target, $plan, $plan['shortfall'], 0.0, $orderId);
 
-            if ($remainingAfterTradeIn > 0.0 || $tradeInLeftover > 0.0) {
-                Deposit::create([
-                    'user_id' => (string) $user->id,
-                    'debit' => $remainingAfterTradeIn,
-                    'kredit' => $tradeInLeftover,
-                    'balance' => $depositBalanceAfter,
-                    'description' => "Upgrade package: {$targetPackage->name} (order {$orderId})",
-                    'payment_status' => 'success',
-                    'payment_method' => $remainingAfterTradeIn > 0.0 ? 'saldo' : 'trade_in_credit',
-                    'payment_date' => now(),
-                ]);
-            }
-
-            $purchase = CoursePackagePurchase::create([
-                'student_id' => $lockedStudent->id,
-                'course_package_id' => $targetPackage->id,
-                'price_paid' => $price,
-                'credits_granted' => $targetPackage->credits,
-                'source' => CoursePackagePurchase::SOURCE_UPGRADE_PURCHASE,
-                'status' => CoursePackagePurchase::STATUS_COMPLETED,
-            ]);
-
-            $newCreditBalance = MoneyMath::floorToScale(
-                CourseCredit::currentBalanceFor($lockedStudent->id) + (float) $targetPackage->credits,
-                2
-            );
-
-            CourseCredit::create([
-                'student_id' => $lockedStudent->id,
-                'course_package_purchase_id' => $purchase->id,
-                'source_type' => CourseCredit::SOURCE_PURCHASE,
-                'debit' => 0,
-                'kredit' => $targetPackage->credits,
-                'balance' => $newCreditBalance,
-                'description' => 'Upgrade package: ' . $targetPackage->name,
-            ]);
-
-            $payment = CoursePackagePayment::create([
+            return CoursePackagePayment::create([
                 'student_id' => $lockedStudent->id,
                 'user_id' => (string) $user->id,
-                'course_package_id' => $targetPackage->id,
-                'course_package_purchase_id' => $purchase->id,
+                'course_package_id' => $target->id,
+                'course_package_purchase_id' => $result['purchase']->id,
+                'source_course_package_purchase_id' => $source->id,
                 'order_id' => $orderId,
                 'gateway' => null,
                 'name' => (string) $user->name,
                 'email' => (string) $user->email,
                 'handphone' => $user->handphone,
-                'price_total' => $price,
-                'deposit_portion' => $remainingAfterTradeIn,
+                'price_total' => $plan['price'],
+                'deposit_portion' => $plan['shortfall'],
                 'gateway_portion' => 0,
-                'credit_trade_in_portion' => $tradeInApplied,
-                'trade_in_course_credit_id' => $tradeInDebit?->id,
-                'credits_granted' => $targetPackage->credits,
+                'credit_trade_in_portion' => $result['trade_in_applied'],
+                'trade_in_course_credit_id' => $result['trade_in_debit']->id,
+                'credits_granted' => $plan['quantity'],
                 'status' => CoursePackagePayment::STATUS_PAID,
                 'paid_at' => now(),
             ]);
-
-            return ['ok' => true, 'payment' => $payment];
         });
     }
 
-    private function generateOrderId(): string
+    /**
+     * Buat CoursePackagePayment 'pending' untuk upgrade lewat gateway, di dalam
+     * lock student + cek ulang blockedReason, supaya dua submit bersamaan
+     * tidak membuat dua pembayaran atas credit yang sama. Credit & saldo
+     * belum disentuh -- baru dieksekusi saat webhook (confirmGatewayUpgrade()).
+     *
+     * @param  array<string, mixed>  $attributes  kolom gateway/kontak dari controller
+     *
+     * @throws UpgradeConfirmationFailedException
+     */
+    public function beginGatewayUpgrade(Student $student, CoursePackagePurchase $source, CoursePackage $target, mixed $user, array $attributes): CoursePackagePayment
+    {
+        return DB::transaction(function () use ($student, $source, $target, $user, $attributes) {
+            Student::where('id', $student->id)->lockForUpdate()->firstOrFail();
+
+            if ($reason = $this->blockedReason($source)) {
+                throw new UpgradeConfirmationFailedException($reason);
+            }
+
+            $preview = $this->preview($user, $source, $target);
+
+            if ($preview['gateway_portion'] <= 0.0) {
+                throw new UpgradeConfirmationFailedException('insufficient_deposit');
+            }
+
+            return CoursePackagePayment::create($attributes + [
+                'student_id' => $student->id,
+                'user_id' => (string) $user->id,
+                'course_package_id' => $target->id,
+                'source_course_package_purchase_id' => $source->id,
+                'order_id' => $this->generateOrderId(),
+                'name' => (string) $user->name,
+                'email' => (string) $user->email,
+                'handphone' => $user->handphone,
+                'price_total' => $preview['price'],
+                'deposit_portion' => $preview['deposit_portion'],
+                'gateway_portion' => $preview['gateway_portion'],
+                // Angka rencana; trade-in sungguhan baru dieksekusi saat webhook.
+                'credit_trade_in_portion' => $preview['trade_in_applied'],
+                'credits_granted' => $preview['quantity'],
+                'status' => CoursePackagePayment::STATUS_PENDING,
+            ]);
+        });
+    }
+
+    /**
+     * Konfirmasi upgrade lewat gateway -- dipanggil webhook di dalam
+     * transaksinya (payment sudah dikunci). Nilai trade-in dihitung ulang dan
+     * tidak boleh lebih kecil dari rencana saat checkout.
+     *
+     * @return array{purchase: CoursePackagePurchase, trade_in_debit: CourseCredit, trade_in_applied: float}
+     *
+     * @throws UpgradeConfirmationFailedException
+     */
+    public function confirmGatewayUpgrade(CoursePackagePayment $lockedPayment): array
+    {
+        // Urutan lock sama dengan jalur instan: student lalu users.
+        $lockedStudent = Student::where('id', $lockedPayment->student_id)->lockForUpdate()->firstOrFail();
+        DB::table('users')->where('id', $lockedPayment->user_id)->lockForUpdate()->first();
+        $source = CoursePackagePurchase::findOrFail($lockedPayment->source_course_package_purchase_id);
+        $target = CoursePackage::findOrFail($lockedPayment->course_package_id);
+
+        $plan = $this->plan($this->remaining($source), $source, $target, null, $lockedPayment);
+
+        if ($plan['trade_in_applied'] + 0.000001 < (float) $lockedPayment->credit_trade_in_portion) {
+            throw new UpgradeConfirmationFailedException('insufficient_trade_in');
+        }
+
+        return $this->settle(
+            (string) $lockedPayment->user_id,
+            $lockedStudent,
+            $source,
+            $target,
+            $plan,
+            (float) $lockedPayment->deposit_portion,
+            (float) $lockedPayment->gateway_portion,
+            $lockedPayment->order_id
+        );
+    }
+
+    /** Paket tujuan harus berbayar & punya credit (paket gratis tidak bisa jadi tujuan tukar). */
+    public static function isSellable(CoursePackage $target): bool
+    {
+        return (float) $target->credits > 0 && $target->effectivePrice() > 0;
+    }
+
+    public function generateOrderId(): string
     {
         do {
-            $orderId = 'CPPU' . now()->format('ymd') . strtoupper(Str::random(8));
+            $orderId = 'CPPU'.now()->format('ymd').strtoupper(Str::random(8));
         } while (CoursePackagePayment::where('order_id', $orderId)->exists());
 
         return $orderId;
+    }
+
+    /**
+     * Hitungan murni.
+     *
+     * @return array{mode: string, price: float, quantity: float, max_quantity: ?int, source_remaining: float, source_unit_price: float, target_unit_price: float, credits_used: float, trade_in_value: float, trade_in_applied: float, leftover_to_deposit: float, shortfall: float}
+     *
+     * @throws UpgradeConfirmationFailedException
+     */
+    private function plan(float $remaining, CoursePackagePurchase $source, CoursePackage $target, ?int $quantity, ?CoursePackagePayment $agreed = null): array
+    {
+        if (! $agreed && ! self::isSellable($target)) {
+            throw new UpgradeConfirmationFailedException('Paket tujuan ini tidak bisa dipakai untuk upgrade/convert.');
+        }
+
+        $sourceUnit = CourseCreditDebitService::unitPrice($source);
+        $targetUnit = self::isSellable($target) ? MoneyMath::floorToScale($target->effectivePrice() / (float) $target->credits, 4) : 0.0;
+        $maxQuantity = $targetUnit > 0 ? (int) floor(MoneyMath::floorToScale($remaining * $sourceUnit, 2) / $targetUnit + 1e-9) : 0;
+
+        if ($quantity === null) {
+            // Gateway: pakai harga & credit yang disepakati saat checkout, bukan harga hari ini.
+            $price = $agreed ? (float) $agreed->price_total : $target->effectivePrice();
+            $grant = $agreed ? (float) $agreed->credits_granted : (float) $target->credits;
+            $used = $remaining;
+        } else {
+            if ($maxQuantity < 1) {
+                throw new UpgradeConfirmationFailedException('Nilai sisa credit ini belum cukup untuk 1 credit paket tujuan.');
+            }
+
+            if ($quantity < 1 || $quantity > $maxQuantity) {
+                throw new UpgradeConfirmationFailedException("Jumlah credit harus antara 1 dan {$maxQuantity}.");
+            }
+
+            $price = MoneyMath::floorToScale($quantity * $targetUnit, 2);
+            $grant = (float) $quantity;
+            // Credit asal dipotong per 1 credit utuh (atau seluruh sisa kalau lebih kecil).
+            $used = $sourceUnit > 0 ? min($remaining, ceil($price / $sourceUnit - 1e-9)) : $remaining;
+        }
+
+        $value = MoneyMath::floorToScale($used * $sourceUnit, 2);
+        $applied = MoneyMath::floorToScale(min($value, $price), 2);
+
+        if ($quantity !== null && $applied < $price) {
+            throw new UpgradeConfirmationFailedException('Nilai sisa credit ini belum cukup untuk jumlah tersebut.');
+        }
+
+        return [
+            'mode' => $quantity === null ? 'upgrade' : 'convert',
+            'price' => $price,
+            'quantity' => $grant,
+            'max_quantity' => $maxQuantity,
+            'source_remaining' => $remaining,
+            'source_unit_price' => $sourceUnit,
+            'target_unit_price' => $targetUnit,
+            'credits_used' => MoneyMath::floorToScale($used, 2),
+            'trade_in_value' => $value,
+            'trade_in_applied' => $applied,
+            'leftover_to_deposit' => MoneyMath::floorToScale($value - $applied, 2),
+            'shortfall' => MoneyMath::floorToScale($price - $applied, 2),
+        ];
+    }
+
+    /**
+     * Eksekusi di dalam transaksi pemanggil (Student & users sudah dikunci):
+     * potong credit asal, catat saldo Deposit, beri credit paket tujuan.
+     *
+     * @return array{purchase: CoursePackagePurchase, trade_in_debit: CourseCredit, trade_in_applied: float}
+     */
+    private function settle(string $userId, Student $lockedStudent, CoursePackagePurchase $source, CoursePackage $target, array $plan, float $depositPortion, float $gatewayPortion, string $orderId): array
+    {
+        $label = ($plan['mode'] === 'convert' ? 'Convert ke ' : 'Upgrade ke ').$target->name;
+
+        try {
+            $tradeInDebit = $this->debitService->debitPurchase($lockedStudent, $source, $plan['credits_used'], CourseCredit::SOURCE_TRADE_IN_DEBIT, "Trade-in credit untuk {$label}");
+        } catch (InsufficientCourseCreditException) {
+            throw new UpgradeConfirmationFailedException('insufficient_trade_in');
+        }
+
+        if (! $tradeInDebit) {
+            throw new UpgradeConfirmationFailedException('insufficient_trade_in');
+        }
+
+        $value = MoneyMath::floorToScale((float) $tradeInDebit->allocations->sum('value'), 2);
+        $applied = MoneyMath::floorToScale(min($value, $plan['price']), 2);
+        $leftover = MoneyMath::floorToScale($value - $applied, 2);
+
+        // Jaring pengaman: trade-in + saldo + gateway harus menutup harga penuh.
+        if ($applied + $depositPortion + $gatewayPortion + 0.000001 < $plan['price']) {
+            throw new UpgradeConfirmationFailedException('insufficient_trade_in');
+        }
+
+        if ($depositPortion > 0.0 || $leftover > 0.0) {
+            $this->recordDeposit($userId, $depositPortion, $leftover, $label, $orderId);
+        }
+
+        $purchase = CoursePackagePurchase::create([
+            'student_id' => $lockedStudent->id,
+            'course_package_id' => $target->id,
+            'price_paid' => $plan['price'],
+            'credits_granted' => $plan['quantity'],
+            'source' => $plan['mode'] === 'convert' ? CoursePackagePurchase::SOURCE_CONVERT_PURCHASE : CoursePackagePurchase::SOURCE_UPGRADE_PURCHASE,
+            'status' => CoursePackagePurchase::STATUS_COMPLETED,
+        ]);
+
+        CourseCredit::create([
+            'student_id' => $lockedStudent->id,
+            'course_package_purchase_id' => $purchase->id,
+            'source_type' => CourseCredit::SOURCE_PURCHASE,
+            'debit' => 0,
+            'kredit' => $plan['quantity'],
+            // Dari baris debit barusan (bukan query "baris terakhir" -- keduanya
+            // bisa ber-created_at sama persis dalam 1 detik).
+            'balance' => MoneyMath::floorToScale((float) $tradeInDebit->balance + $plan['quantity'], 2),
+            'description' => $label,
+        ]);
+
+        return ['purchase' => $purchase, 'trade_in_debit' => $tradeInDebit, 'trade_in_applied' => $applied];
+    }
+
+    /** Saldo Deposit: dipotong $debit (porsi saldo) dan/atau ditambah $kredit (kelebihan trade-in). */
+    private function recordDeposit(string $userId, float $debit, float $kredit, string $label, string $orderId): void
+    {
+        $lastDeposit = Deposit::where('user_id', $userId)
+            ->orderByDesc('payment_date')
+            ->orderByDesc('created_at')
+            ->lockForUpdate()
+            ->first();
+        $before = (float) ($lastDeposit?->balance ?? 0);
+
+        if ($before + 0.000001 < $debit) {
+            throw new UpgradeConfirmationFailedException('insufficient_deposit');
+        }
+
+        $after = MoneyMath::floorToScale($before - $debit + $kredit, 2);
+
+        Deposit::create([
+            'user_id' => $userId,
+            'debit' => $debit,
+            'kredit' => $kredit,
+            'balance' => $after,
+            'description' => "{$label} (order {$orderId})",
+            'payment_status' => 'success',
+            'payment_method' => $debit > 0 ? 'saldo' : 'trade_in_credit',
+            'payment_date' => now(),
+        ]);
+
+        // Satu pesanan hanya salah satu: kurang (dipotong saldo) atau lebih (masuk saldo).
+        Transaction::create([
+            'transaction_code' => 'TRX-'.now()->format('YmdHisv').'-'.strtoupper(Str::random(6)),
+            'user_id' => $userId,
+            'type' => $debit > 0 ? 'debit' : 'credit',
+            'amount' => $debit > 0 ? $debit : $kredit,
+            'balance_before' => $before,
+            'balance_after' => $after,
+            'description' => $debit > 0 ? "{$label} (porsi saldo)" : "{$label} (kelebihan trade-in masuk saldo)",
+            'reference_type' => 'course_package_payment',
+            'reference_id' => $orderId,
+            'status' => 'success',
+            'channel' => $debit > 0 ? 'saldo' : 'trade_in_credit',
+            'metadata' => ['order_id' => $orderId, 'source' => 'inayule.upgrade'],
+            'created_by' => $userId,
+            'transaction_date' => now(),
+        ]);
+    }
+
+    /** Sisa credit 1 baris pembelian. */
+    public function remaining(CoursePackagePurchase $source): float
+    {
+        return $this->debitService->remainingByPurchase([$source])[$source->id] ?? 0.0;
     }
 }

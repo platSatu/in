@@ -285,8 +285,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // duplikat -- dipakai BERSAMA dengan checkout package biasa di atas,
     // karena sama-sama beroperasi murni lewat order_id pada 1 tabel
     // CoursePackagePayment yang sama.
-    Route::get('/inayule/packages/{packageId}/upgrade', [InaYulePackageUpgradeController::class, 'show'])->name('inayule.upgrade.show');
-    Route::post('/inayule/packages/{packageId}/upgrade', [InaYulePackageUpgradeController::class, 'store'])->name('inayule.upgrade.store');
+    // 30 September 2026: dari 1 baris paket di tab Status ({purchaseId}),
+    // bisa upgrade paket penuh atau convert sebagian credit.
+    Route::get('/inayule/purchases/{purchaseId}/upgrade', [InaYulePackageUpgradeController::class, 'show'])->name('inayule.upgrade.show');
+    Route::post('/inayule/purchases/{purchaseId}/upgrade', [InaYulePackageUpgradeController::class, 'store'])->name('inayule.upgrade.store');
 
     // FASE 2 bagian 2 "Absensi" (16 September 2026): sisi SISWA dari alur
     // "Pengajuan Pemakaian Credit" -- lihat docblock

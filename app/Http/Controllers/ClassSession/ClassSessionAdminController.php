@@ -10,6 +10,7 @@ use App\Services\CourseCredit\InsufficientCourseCreditException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
+use InvalidArgumentException;
 
 /**
  * FASE 2 bagian 2 "Absensi" (16 September 2026) -- sisi ADMIN dari alur
@@ -74,7 +75,7 @@ class ClassSessionAdminController extends Controller
             );
         } catch (InsufficientCourseCreditException $e) {
             return back()->with('error', 'Saldo credit student tidak cukup: ' . $e->getMessage());
-        } catch (InvalidClassSessionStateException $e) {
+        } catch (InvalidClassSessionStateException|InvalidArgumentException $e) {
             return back()->with('error', $e->getMessage());
         }
 

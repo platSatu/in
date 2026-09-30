@@ -3,9 +3,10 @@
 namespace App\Http\Controllers\Course;
 
 use App\Http\Controllers\Controller;
-use App\Models\CourseCredit;
 use App\Models\CoursePackage;
+use App\Models\CoursePackagePayment;
 use App\Models\CoursePackagePurchase;
+use App\Services\CourseCredit\CourseCreditDebitService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -61,54 +62,15 @@ class CourseReportController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        // FIX (16 September 2026, permintaan user -- tambah kolom
-        // "Terpakai"/"Sisa"): pola & alasan SAMA PERSIS dengan
-        // InaYulePackageController::index() (baca docblock di sana) -- FIFO
-        // per student, MURNI hitungan tampilan, saldo credit tetap 1 pool
-        // bersama (App\Models\CourseCredit). Bedanya di sini datanya lintas
-        // BANYAK student sekaligus (1 halaman Laporan bisa berisi purchase
-        // dari student yang berbeda-beda), jadi FIFO-nya dihitung PER
-        // student_id yang tampil di halaman ini -- ambil SELURUH riwayat
-        // purchase student2 tsb (bukan cuma yang di halaman ini) supaya
-        // urutan konsumsinya tetap benar, baru dipetakan balik ke baris
-        // yang ditampilkan.
-        $studentIds = $purchases->getCollection()->pluck('student_id')->filter()->unique()->values();
-
-        $creditsMap = [];
-
-        if ($studentIds->isNotEmpty()) {
-            $allPurchasesByStudent = CoursePackagePurchase::whereIn('student_id', $studentIds)
-                ->orderBy('created_at')
-                ->get(['id', 'student_id', 'credits_granted', 'status', 'created_at']);
-
-            $totalUsedByStudent = CourseCredit::whereIn('student_id', $studentIds)
-                ->selectRaw('student_id, SUM(debit) as total_debit')
-                ->groupBy('student_id')
-                ->pluck('total_debit', 'student_id');
-
-            $remainingToAllocateByStudent = [];
-            foreach ($studentIds as $sid) {
-                $remainingToAllocateByStudent[$sid] = (float) ($totalUsedByStudent[$sid] ?? 0);
-            }
-
-            foreach ($allPurchasesByStudent as $p) {
-                $granted = (float) $p->credits_granted;
-                $usedForThis = $p->status === CoursePackagePurchase::STATUS_COMPLETED
-                    ? min($remainingToAllocateByStudent[$p->student_id], $granted)
-                    : 0.0;
-
-                $creditsMap[$p->id] = [
-                    'used' => $usedForThis,
-                    'remaining' => max($granted - $usedForThis, 0.0),
-                ];
-
-                $remainingToAllocateByStudent[$p->student_id] -= $usedForThis;
-            }
-        }
+        // Terpakai/Sisa per baris pembelian dari alokasi yang benar-benar
+        // tercatat (credit terpisah per paket, 30 September 2026) -- sama
+        // dengan tab Status siswa (InaYulePackageController::index()).
+        $remainingByPurchase = (new CourseCreditDebitService())->remainingByPurchase($purchases->getCollection());
 
         foreach ($purchases as $purchase) {
-            $purchase->credits_used = $creditsMap[$purchase->id]['used'] ?? 0.0;
-            $purchase->credits_remaining = $creditsMap[$purchase->id]['remaining'] ?? (float) $purchase->credits_granted;
+            $completed = $purchase->status === CoursePackagePurchase::STATUS_COMPLETED;
+            $purchase->credits_remaining = $remainingByPurchase[$purchase->id] ?? 0.0;
+            $purchase->credits_used = $completed ? max((float) $purchase->credits_granted - $purchase->credits_remaining, 0.0) : 0.0;
         }
 
         // Dropdown filter package -- semua package (aktif/nonaktif) supaya
@@ -136,7 +98,13 @@ class CourseReportController extends Controller
         // jumlah transaksi, tapi OMSET (total price_paid sungguhan) bulan
         // ini -- trial gratis (price_paid = 0) otomatis tidak menambah
         // angka ini sama sekali, sesuai maksudnya.
-        $totalRevenueThisMonth = (float) $thisMonthQuery()->sum('price_paid');
+        // Upgrade/convert dibayar sebagian/seluruhnya dari trade-in credit lama
+        // yang omsetnya sudah terhitung saat paket lama dibeli -- dikurangkan
+        // supaya tidak terhitung dua kali.
+        $tradeInThisMonth = (float) CoursePackagePayment::where('status', CoursePackagePayment::STATUS_PAID)
+            ->whereIn('course_package_purchase_id', $thisMonthQuery()->select('id'))
+            ->sum('credit_trade_in_portion');
+        $totalRevenueThisMonth = (float) $thisMonthQuery()->sum('price_paid') - $tradeInThisMonth;
         $totalStudentsThisMonth = $thisMonthQuery()->distinct('student_id')->count('student_id');
 
         $topPackageRow = $thisMonthQuery()

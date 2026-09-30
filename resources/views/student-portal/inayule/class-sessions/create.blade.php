@@ -48,11 +48,16 @@
                     <select name="course_package_id" class="form-select" required>
                         <option value="">-- Pilih Package --</option>
                         @foreach ($packages as $package)
-                            <option value="{{ $package->id }}" @selected(old('course_package_id') === $package->id)>{{ $package->name }}</option>
+                            @php($sisa = (float) ($remainingByPackage[$package->id] ?? 0))
+                            <option value="{{ $package->id }}" @selected(old('course_package_id') === $package->id) @disabled($sisa <= 0)>
+                                {{ $package->name }} &middot; sisa {{ rtrim(rtrim(number_format($sisa, 2, ',', '.'), '0'), ',') }} credit
+                            </option>
                         @endforeach
                     </select>
                     @if ($packages->isEmpty())
                         <small class="text-muted">Belum ada riwayat pembelian package untuk akun ini.</small>
+                    @else
+                        <small class="text-muted">Credit dipotong dari paket kelas yang dipilih.</small>
                     @endif
                 </div>
 

@@ -12,6 +12,7 @@ use App\Models\CoursePackagePurchase;
 use App\Models\CourseType;
 use App\Models\Deposit;
 use App\Models\Student;
+use App\Services\CourseCredit\CourseCreditDebitService;
 use App\Services\StudentIdentityResolver;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -120,41 +121,22 @@ class InaYulePackageController extends Controller
                 ->all()
             : [];
 
-        // STEP 5 (16 September 2026, permintaan user -- tambah kolom
-        // "Terpakai"/"Sisa" di tab History): saldo credit TETAP 1 pool
-        // bersama per student (lihat App\Models\CourseCredit, TIDAK diubah
-        // jadi per-package-locked) -- breakdown "terpakai"/"sisa" PER BARIS
-        // purchase di bawah ini MURNI hasil hitungan tampilan (FIFO: total
-        // credit yang sudah kepakai dialokasikan ke purchase yang PALING
-        // LAMA dulu, konvensi "yang didapat duluan, dipakai duluan"), BUKAN
-        // sumber kebenaran baru -- kalau nanti absensi/booking sesi
-        // (course_session_attendances, belum dibangun) motong credit, itu
-        // tetap motong dari pool bersama ini, bukan dari 1 purchase
-        // tertentu. Perhitungan ini aman diulang kapan saja karena cuma
-        // baca data, tidak menyimpan apapun.
+        // Terpakai/Sisa per baris pembelian -- credit terpisah per paket
+        // (30 September 2026), dihitung dari alokasi yang benar-benar tercatat
+        // (CourseCreditDebitService::remainingByPurchase()), bukan tebakan FIFO.
         $purchases = $student
             ? CoursePackagePurchase::where('student_id', $student->id)
                 ->with(['coursePackage.type', 'coursePackage.courseClass', 'coursePackage.level'])
-                ->orderBy('created_at') // ASC dulu -- FIFO alokasi di bawah
+                ->orderBy('created_at')
                 ->get()
             : collect();
 
-        $totalUsed = $student ? (float) CourseCredit::where('student_id', $student->id)->sum('debit') : 0.0;
-        $remainingToAllocate = $totalUsed;
+        $remainingByPurchase = (new CourseCreditDebitService())->remainingByPurchase($purchases);
 
         foreach ($purchases as $purchase) {
-            $granted = (float) $purchase->credits_granted;
-            $usedForThis = $purchase->status === CoursePackagePurchase::STATUS_COMPLETED
-                ? min($remainingToAllocate, $granted)
-                : 0.0;
-
-            // Attribute dinamis, cuma buat tampilan -- TIDAK ada kolom
-            // credits_used/credits_remaining di tabel course_package_
-            // purchases, sengaja tidak disimpan (lihat docblock di atas).
-            $purchase->credits_used = $usedForThis;
-            $purchase->credits_remaining = max($granted - $usedForThis, 0.0);
-
-            $remainingToAllocate -= $usedForThis;
+            $completed = $purchase->status === CoursePackagePurchase::STATUS_COMPLETED;
+            $purchase->credits_remaining = $remainingByPurchase[$purchase->id] ?? 0.0;
+            $purchase->credits_used = $completed ? max((float) $purchase->credits_granted - $purchase->credits_remaining, 0.0) : 0.0;
         }
 
         // Balik ke urutan terbaru dulu buat tampilan (sama seperti sebelumnya).

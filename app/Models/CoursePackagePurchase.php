@@ -44,6 +44,10 @@ class CoursePackagePurchase extends Model
     // nilai sejak migration extend_course_package_purchase_source_and_wa_template.
     public const SOURCE_UPGRADE_PURCHASE = 'upgrade_purchase';
 
+    // Convert credit (30 September 2026): sebagian credit 1 pembelian ditukar
+    // jadi N credit paket lain -- lihat PackageUpgradeCalculator::convert().
+    public const SOURCE_CONVERT_PURCHASE = 'convert_purchase';
+
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 

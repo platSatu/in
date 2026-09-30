@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -47,6 +48,7 @@ class CoursePackagePayment extends Model
         'gateway_portion',
         'credit_trade_in_portion',
         'trade_in_course_credit_id',
+        'source_course_package_purchase_id',
         'credits_granted',
         'status',
         'payment_method',
@@ -104,6 +106,24 @@ class CoursePackagePayment extends Model
     public function tradeInCourseCredit(): BelongsTo
     {
         return $this->belongsTo(CourseCredit::class, 'trade_in_course_credit_id');
+    }
+
+    /** Baris pembelian yang credit-nya ditukar (upgrade/convert dari tab Status). */
+    public function sourcePurchase(): BelongsTo
+    {
+        return $this->belongsTo(CoursePackagePurchase::class, 'source_course_package_purchase_id');
+    }
+
+    /**
+     * Upgrade lewat gateway yang masih menunggu pembayaran -- selama ada, credit
+     * pembelian asalnya dikunci (tidak boleh dipakai kelas / ditukar lagi)
+     * supaya nilai trade-in tidak berubah sebelum webhook datang.
+     */
+    public function scopeAwaitingTradeIn(Builder $query): Builder
+    {
+        return $query->where('status', self::STATUS_PENDING)
+            ->whereNotNull('source_course_package_purchase_id')
+            ->where(fn (Builder $q) => $q->whereNull('expires_at')->orWhere('expires_at', '>', now()));
     }
 
     public function isPaid(): bool

@@ -5,161 +5,145 @@ namespace App\Http\Controllers\StudentPortal;
 use App\Http\Controllers\Controller;
 use App\Models\CoursePackage;
 use App\Models\CoursePackagePayment;
+use App\Models\CoursePackagePurchase;
 use App\Models\PaymentGateway;
 use App\Models\Student;
 use App\Services\CoursePackagePayment\CoursePackagePaymentGatewayFactory;
 use App\Services\CoursePackagePayment\CoursePackagePurchaseNotifier;
 use App\Services\CoursePackagePayment\PackageUpgradeCalculator;
+use App\Services\CoursePackagePayment\UpgradeConfirmationFailedException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 use RuntimeException;
 use Throwable;
 
 /**
- * FASE 4 bagian 2 "Konversi/Upgrade Paket" (16 September 2026) -- controller
- * yang benar-benar dipanggil student untuk upgrade ke package lain. SEMUA
- * perhitungan (trade-in, Deposit, gateway) dilakukan
- * App\Services\CoursePackagePayment\PackageUpgradeCalculator -- controller
- * ini murni urusan HTTP (tampilkan halaman, terima submit, redirect ke
- * gateway), pola SAMA PERSIS dengan InaYulePackageCheckoutController.
+ * Upgrade / Convert dari 1 baris paket di tab Status. Semua hitungan di
+ * App\Services\CoursePackagePayment\PackageUpgradeCalculator; controller ini
+ * hanya HTTP. Angka SELALU dihitung ulang di server, tidak pernah dari browser.
  *
- * DUA JALUR PENYELESAIAN (ditentukan preview()->gateway_portion, DIHITUNG
- * ULANG di server tiap request, TIDAK PERNAH percaya angka dari browser):
- *
- * 1. gateway_portion = 0 (trade-in + saldo Deposit sudah cukup) -- diproses
- *    INSTAN lewat PackageUpgradeCalculator::completeInstant().
- * 2. gateway_portion > 0 -- initiateGatewayCheckout() DI SINI cuma membuat
- *    baris CoursePackagePayment 'pending' dengan credit_trade_in_portion
- *    dicatat sebagai ANGKA RENCANA saja (SAMA seperti deposit_portion di
- *    InaYulePackageCheckoutController::initiateGatewayCheckout()) --
- *    credit lama BELUM disentuh sama sekali sampai gateway konfirmasi
- *    'paid' lewat App\Http\Controllers\StudentPortal\
- *    InaYulePackageWebhookController::processUpgradeConfirmation(), yang
- *    RE-CHECK ulang nilai trade-in dari 0 di dalam lock (bisa mengecil
- *    kalau credit lama sempat terpakai untuk sesi kelas di antaranya).
- *
- * Route select-method/return/status SENGAJA memakai yang sudah ada di
- * InaYulePackageCheckoutController -- tidak ada logika di situ yang
- * spesifik ke checkout biasa, keduanya sama-sama beroperasi murni lewat
- * order_id pada CoursePackagePayment.
+ * - convert (quantity N) dan upgrade yang tertutup trade-in + saldo: instan.
+ * - upgrade yang masih kurang: CoursePackagePayment 'pending' ke gateway;
+ *   credit asal dikunci sampai webhook (InaYulePackageWebhookController).
+ * Route select-method/return/status memakai milik InaYulePackageCheckoutController.
  */
 class InaYulePackageUpgradeController extends Controller
 {
+    private const FAILURE_MESSAGES = [
+        'insufficient_trade_in' => 'Sisa credit paket ini baru saja berubah, silakan coba lagi.',
+        'insufficient_deposit' => 'Saldo Anda baru saja berubah, silakan coba lagi.',
+    ];
+
     public function __construct(
         private readonly PackageUpgradeCalculator $calculator = new PackageUpgradeCalculator()
     ) {
     }
 
-    public function show(Request $request, string $packageId): View|RedirectResponse
+    public function show(Request $request, string $purchaseId): View|RedirectResponse
     {
-        $user = $request->user();
-        $student = Student::where('user_id', $user->id)->first();
+        $source = $this->ownedPurchase($request, $purchaseId);
 
-        if (!$student) {
-            return redirect()->route('inayule.index')->with('status', 'Data student untuk akun ini tidak ditemukan.');
+        if (! $source) {
+            return redirect()->route('inayule.index')->with('status', 'Paket tidak ditemukan.');
         }
 
-        $targetPackage = CoursePackage::where('status', 'active')->find($packageId);
+        $mode = $request->query('mode') === 'convert' ? 'convert' : 'upgrade';
+        $packageId = $request->query('package');
+        $target = is_string($packageId) && $packageId !== '' ? $this->activePackage($packageId, $source) : null;
+        $quantity = $mode === 'convert' ? max(1, (int) $request->query('quantity', 1)) : null;
+        $preview = null;
+        $error = $this->calculator->blockedReason($source);
 
-        if (!$targetPackage) {
-            return redirect()->route('inayule.index')->with('status', 'Package tidak ditemukan atau sudah tidak aktif.');
+        if ($target && ! $error) {
+            try {
+                $preview = $this->calculator->preview($request->user(), $source, $target, $quantity);
+            } catch (UpgradeConfirmationFailedException $e) {
+                $error = $e->getMessage();
+            }
         }
-
-        $preview = $this->calculator->preview($user, $student, $targetPackage);
-
-        $activeGateway = $preview['gateway_portion'] > 0
-            ? PaymentGateway::where('is_active', true)->where('status', 'active')->latest('updated_at')->first()
-            : null;
 
         return view('student-portal.inayule.upgrade', [
-            'package' => $targetPackage,
+            'source' => $source->load('coursePackage.courseClass'),
+            'remaining' => $this->calculator->remaining($source),
+            'packages' => CoursePackage::where('status', 'active')->whereKeyNot($source->course_package_id)->with('courseClass')->orderBy('name')->get()
+                ->filter(fn (CoursePackage $package) => PackageUpgradeCalculator::isSellable($package))->values(),
+            'target' => $target,
+            'mode' => $mode,
+            'quantity' => $quantity,
             'preview' => $preview,
-            'gatewayMissing' => $preview['gateway_portion'] > 0 && !$activeGateway,
+            'blockedReason' => $error,
+            'gatewayMissing' => ($preview['gateway_portion'] ?? 0) > 0 && ! $this->activeGateway(),
         ]);
     }
 
-    public function store(Request $request, string $packageId): RedirectResponse
+    public function store(Request $request, string $purchaseId): RedirectResponse
     {
+        $validated = $request->validate([
+            'package' => ['required', 'string'],
+            'mode' => ['required', 'in:upgrade,convert'],
+            'quantity' => ['required_if:mode,convert', 'nullable', 'integer', 'min:1'],
+        ]);
+
         $user = $request->user();
-        $student = Student::where('user_id', $user->id)->first();
+        $source = $this->ownedPurchase($request, $purchaseId);
+        $target = $source ? $this->activePackage($validated['package'], $source) : null;
 
-        if (!$student) {
-            return redirect()->route('inayule.index')->with('status', 'Data student untuk akun ini tidak ditemukan.');
+        if (! $source || ! $target) {
+            return redirect()->route('inayule.index')->with('status', 'Paket tidak ditemukan atau sudah tidak aktif.');
         }
 
-        $targetPackage = CoursePackage::where('status', 'active')->find($packageId);
+        $quantity = $validated['mode'] === 'convert' ? (int) $validated['quantity'] : null;
+        $back = redirect()->route('inayule.upgrade.show', array_filter([
+            'purchaseId' => $source->id,
+            'package' => $target->id,
+            'mode' => $validated['mode'],
+            'quantity' => $quantity,
+        ]));
 
-        if (!$targetPackage) {
-            return redirect()->route('inayule.index')->with('status', 'Package tidak ditemukan atau sudah tidak aktif.');
+        if ($reason = $this->calculator->blockedReason($source)) {
+            return $back->with('error', $reason);
         }
 
-        // Preview (belum di-lock) HANYA untuk memilih jalur -- kebenaran
-        // akhirnya SELALU dicek ulang di dalam lock, di completeInstant()
-        // atau di webhook untuk jalur gateway. Pola sama persis
-        // InaYulePackageCheckoutController::store().
-        $preview = $this->calculator->preview($user, $student, $targetPackage);
+        try {
+            // Preview hanya untuk memilih jalur; kebenarannya dicek ulang di dalam lock.
+            $preview = $this->calculator->preview($user, $source, $target, $quantity);
 
-        if ($preview['gateway_portion'] <= 0.0) {
-            $outcome = $this->calculator->completeInstant($user, $student, $targetPackage);
-
-            if ($outcome['ok']) {
-                (new CoursePackagePurchaseNotifier())->notify($outcome['payment']);
-
-                return redirect()->route('inayule.index')->with('success', 'Upgrade ke package "' . $targetPackage->name . '" berhasil, credit Anda sudah diperbarui.');
+            if ($preview['gateway_portion'] > 0.0) {
+                return $this->initiateGatewayCheckout($user, $source, $target, $back);
             }
 
-            // Saldo/credit berubah tepat di antara preview & lock (race
-            // jarang) -- paling aman minta user coba lagi.
-            return redirect()->route('inayule.upgrade.show', ['packageId' => $targetPackage->id])
-                ->with('error', 'Saldo/credit Anda baru saja berubah, silakan coba lagi.');
+            $payment = $this->calculator->completeInstant($user, $source->student, $source, $target, $quantity);
+        } catch (UpgradeConfirmationFailedException $e) {
+            return $back->with('error', self::FAILURE_MESSAGES[$e->getMessage()] ?? $e->getMessage());
         }
 
-        return $this->initiateGatewayCheckout($user, $student, $targetPackage, $preview);
+        (new CoursePackagePurchaseNotifier())->notify($payment);
+
+        return redirect()->route('inayule.index')->with('success', $quantity
+            ? "Convert berhasil, {$quantity} credit \"{$target->name}\" sudah masuk."
+            : "Upgrade ke paket \"{$target->name}\" berhasil, credit Anda sudah diperbarui.");
     }
 
-    /**
-     * Jalur gateway (trade-in + Deposit belum cukup menutup 100% harga) --
-     * lihat docblock class di atas (poin 2). TIDAK menyentuh CourseCredit
-     * ATAU Deposit sama sekali di sini.
-     *
-     * @param array{target_price: float, deposit_portion: float, gateway_portion: float, trade_in_applied_to_price: float} $preview
-     */
-    private function initiateGatewayCheckout(mixed $user, Student $student, CoursePackage $targetPackage, array $preview): RedirectResponse
+    /** Upgrade yang masih kurang setelah trade-in + saldo. Credit & saldo belum disentuh di sini. */
+    private function initiateGatewayCheckout(mixed $user, CoursePackagePurchase $source, CoursePackage $target, RedirectResponse $back): RedirectResponse
     {
-        $activeGateway = PaymentGateway::where('is_active', true)
-            ->where('status', 'active')
-            ->latest('updated_at')
-            ->first();
+        $activeGateway = $this->activeGateway();
 
-        if (!$activeGateway) {
-            return redirect()->route('inayule.upgrade.show', ['packageId' => $targetPackage->id])
-                ->with('error', 'Payment gateway belum diaktifkan oleh admin. Silakan hubungi penyelenggara.');
+        if (! $activeGateway) {
+            return $back->with('error', 'Payment gateway belum diaktifkan oleh admin. Silakan hubungi penyelenggara.');
         }
 
-        $payment = CoursePackagePayment::create([
-            'student_id' => $student->id,
-            'user_id' => (string) $user->id,
-            'course_package_id' => $targetPackage->id,
-            'payment_gateway_id' => $activeGateway->id,
-            'order_id' => $this->generateOrderId(),
-            'gateway' => $activeGateway->gateway,
-            'name' => (string) $user->name,
-            'email' => (string) $user->email,
-            'handphone' => $user->handphone,
-            'price_total' => $preview['target_price'],
-            'deposit_portion' => $preview['deposit_portion'],
-            'gateway_portion' => $preview['gateway_portion'],
-            // Trade-in DICATAT sebagai ANGKA RENCANA saja di sini -- credit
-            // lama belum disentuh sampai gateway konfirmasi, lihat docblock
-            // InaYulePackageWebhookController::processUpgradeConfirmation().
-            'credit_trade_in_portion' => $preview['trade_in_applied_to_price'],
-            'credits_granted' => $targetPackage->credits,
-            'status' => CoursePackagePayment::STATUS_PENDING,
-            'expires_at' => now()->addMinutes($activeGateway->expiry_minutes ?? 60),
-        ]);
+        try {
+            $payment = $this->calculator->beginGatewayUpgrade($source->student, $source, $target, $user, [
+                'payment_gateway_id' => $activeGateway->id,
+                'gateway' => $activeGateway->gateway,
+                'expires_at' => now()->addMinutes($activeGateway->expiry_minutes ?? 60),
+            ]);
+        } catch (UpgradeConfirmationFailedException $e) {
+            return $back->with('error', self::FAILURE_MESSAGES[$e->getMessage()] ?? $e->getMessage());
+        }
 
         try {
             $driver = CoursePackagePaymentGatewayFactory::make($activeGateway);
@@ -190,17 +174,32 @@ class InaYulePackageUpgradeController extends Controller
 
             $payment->update(['status' => CoursePackagePayment::STATUS_FAILED]);
 
-            return redirect()->route('inayule.upgrade.show', ['packageId' => $targetPackage->id])
-                ->with('error', 'Gagal membuat transaksi pembayaran, silakan coba lagi.');
+            return $back->with('error', 'Gagal membuat transaksi pembayaran, silakan coba lagi.');
         }
     }
 
-    private function generateOrderId(): string
+    /** Baris pembelian milik student yang login saja. */
+    private function ownedPurchase(Request $request, string $purchaseId): ?CoursePackagePurchase
     {
-        do {
-            $orderId = 'CPPU' . now()->format('ymd') . strtoupper(Str::random(8));
-        } while (CoursePackagePayment::where('order_id', $orderId)->exists());
+        $student = Student::where('user_id', $request->user()->id)->first();
 
-        return $orderId;
+        return $student
+            ? CoursePackagePurchase::where('student_id', $student->id)
+                ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
+                ->with('student')
+                ->find($purchaseId)
+            : null;
+    }
+
+    private function activePackage(string $packageId, CoursePackagePurchase $source): ?CoursePackage
+    {
+        $package = CoursePackage::where('status', 'active')->whereKeyNot($source->course_package_id)->find($packageId);
+
+        return $package && PackageUpgradeCalculator::isSellable($package) ? $package : null;
+    }
+
+    private function activeGateway(): ?PaymentGateway
+    {
+        return PaymentGateway::where('is_active', true)->where('status', 'active')->latest('updated_at')->first();
     }
 }
