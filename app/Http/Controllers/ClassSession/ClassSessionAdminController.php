@@ -37,12 +37,19 @@ class ClassSessionAdminController extends Controller
             ->orderBy('requested_at')
             ->get();
 
+        // Belum disetujui pengajar -- admin hanya bisa menolak (mis. pengajar
+        // tidak merespons), supaya periode Honor Pengajar bisa ditutup.
+        $waitingTeacher = ClassSession::where('status', ClassSession::STATUS_WAITING_TEACHER)
+            ->with(['student', 'teacher', 'coursePackage'])
+            ->orderBy('requested_at')
+            ->get();
+
         $history = ClassSession::whereIn('status', [ClassSession::STATUS_APPROVED, ClassSession::STATUS_REJECTED_BY_ADMIN])
             ->with(['student', 'teacher', 'coursePackage'])
             ->orderByDesc('requested_at')
             ->paginate(20);
 
-        return view('class-session.index', compact('pending', 'history'));
+        return view('class-session.index', compact('pending', 'waitingTeacher', 'history'));
     }
 
     /**

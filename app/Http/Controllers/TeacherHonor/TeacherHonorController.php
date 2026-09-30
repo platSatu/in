@@ -10,6 +10,7 @@ use App\Services\TeacherHonor\InvalidTeacherHonorStateException;
 use App\Services\TeacherHonor\TeacherHonorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 
 /**
@@ -46,8 +47,9 @@ class TeacherHonorController extends Controller
             ]);
 
         $branches = CompanyBranch::orderBy('name')->get(['id', 'name']);
+        $nextDates = $this->honorService->nextPeriodDates();
 
-        return view('teacher-honor.index', compact('periods', 'openTotals', 'branches', 'branchId'));
+        return view('teacher-honor.index', compact('periods', 'openTotals', 'branches', 'branchId', 'nextDates'));
     }
 
     public function store(Request $request): RedirectResponse
@@ -61,13 +63,14 @@ class TeacherHonorController extends Controller
             'end_date.after_or_equal' => 'Tanggal tutup tidak boleh sebelum tanggal mulai.',
         ]);
 
-        $overlaps = TeacherHonorPeriod::where('branch_id', $validated['branch_id'])
-            ->where('start_date', '<=', $validated['end_date'])
-            ->where('end_date', '>=', $validated['start_date'])
-            ->exists();
+        $invalid = $this->honorService->validateNewPeriod(
+            $validated['branch_id'],
+            Carbon::parse($validated['start_date']),
+            Carbon::parse($validated['end_date'])
+        );
 
-        if ($overlaps) {
-            return back()->withInput()->with('error', 'Tanggalnya bentrok dengan periode lain di cabang yang sama. Coba pilih rentang tanggal lain ya.');
+        if ($invalid) {
+            return back()->withInput()->with('error', $invalid);
         }
 
         $period = TeacherHonorPeriod::create($validated + [
@@ -83,8 +86,9 @@ class TeacherHonorController extends Controller
     {
         $period = TeacherHonorPeriod::with('branch')->findOrFail($id);
         $recap = $this->honorService->recap($period);
+        $closeBlockedReason = $period->isOpen() ? $this->honorService->closeBlockedReason($period) : null;
 
-        return view('teacher-honor.show', compact('period', 'recap'));
+        return view('teacher-honor.show', compact('period', 'recap', 'closeBlockedReason'));
     }
 
     public function close(Request $request, string $id): RedirectResponse
@@ -106,6 +110,15 @@ class TeacherHonorController extends Controller
 
         if (! $period->isOpen()) {
             return back()->with('error', 'Periode yang sudah ditutup tidak bisa dihapus.');
+        }
+
+        // Menghapus periode di tengah akan menyisakan tanggal bolong.
+        $hasLaterPeriod = TeacherHonorPeriod::where('branch_id', $period->branch_id)
+            ->where('start_date', '>', $period->end_date)
+            ->exists();
+
+        if ($hasLaterPeriod) {
+            return back()->with('error', 'Hanya periode terakhir di cabang ini yang bisa dihapus, supaya tidak ada tanggal yang terlewat.');
         }
 
         $period->delete();

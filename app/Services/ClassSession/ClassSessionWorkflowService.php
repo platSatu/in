@@ -164,9 +164,15 @@ class ClassSessionWorkflowService
         });
     }
 
+    /**
+     * Admin juga boleh menolak pengajuan yang masih menunggu pengajar
+     * (mis. pengajar tidak merespons), supaya periode Honor Pengajar bisa
+     * ditutup -- lihat TeacherHonorService::closeBlockedReason(). Credit
+     * belum terpotong di kedua status ini, jadi aman ditolak.
+     */
     public function adminReject(ClassSession $session, User $admin, ?string $reason = null): ClassSession
     {
-        $this->assertStatus($session, ClassSession::STATUS_WAITING_ADMIN);
+        $this->assertStatus($session, [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN]);
 
         $session->update([
             'status' => ClassSession::STATUS_REJECTED_BY_ADMIN,
@@ -177,11 +183,12 @@ class ClassSessionWorkflowService
         return $session->fresh();
     }
 
-    private function assertStatus(ClassSession $session, string $expectedStatus): void
+    /** @param string|array<int, string> $expectedStatus */
+    private function assertStatus(ClassSession $session, string|array $expectedStatus): void
     {
-        if ($session->status !== $expectedStatus) {
+        if (! in_array($session->status, (array) $expectedStatus, true)) {
             throw new InvalidClassSessionStateException(
-                "Pengajuan ini statusnya '{$session->status}', bukan '{$expectedStatus}' -- aksi tidak bisa dilakukan."
+                "Pengajuan ini statusnya '{$session->status}', bukan '".implode("'/'", (array) $expectedStatus)."' -- aksi tidak bisa dilakukan."
             );
         }
     }

@@ -37,7 +37,7 @@
                 <form method="POST" action="{{ route('teacher-honor.close', $period->id) }}"
                     onsubmit="return confirm('Tutup periode ini? Setelah ditutup, rekap dikunci dan sesi baru tidak masuk lagi ke periode ini.')">
                     @csrf
-                    <button type="submit" class="btn btn-primary">Tutup Periode</button>
+                    <button type="submit" class="btn btn-primary" @disabled($closeBlockedReason) title="{{ $closeBlockedReason }}">Tutup Periode</button>
                 </form>
                 <form method="POST" action="{{ route('teacher-honor.destroy', $period->id) }}"
                     onsubmit="return confirm('Hapus periode ini?')">
@@ -61,9 +61,20 @@
     @endif
 
     @if ($period->isOpen())
-        <div class="alert alert-light border mb-3">
-            Angka di bawah masih bisa bertambah selama periode berjalan. Tutup periode kalau sudah cut-off supaya honornya bisa disetujui.
-        </div>
+        @if (today()->greaterThan($period->end_date) && $closeBlockedReason)
+            {{-- Sudah lewat cut-off tapi masih ada pengajuan kelas yang belum selesai. --}}
+            <div class="alert alert-warning mb-3">
+                ⚠️ {{ $closeBlockedReason }}
+                @if (auth()->user()?->canAccessPermission('class-session'))
+                    <a href="{{ route('class-session.index') }}" class="alert-link ms-1">Lihat pengajuan</a>
+                @endif
+            </div>
+        @else
+            <div class="alert alert-light border mb-3">
+                Angka di bawah masih bisa bertambah selama periode berjalan.
+                {{ $closeBlockedReason ?? 'Periode sudah lewat cut-off dan semua pengajuan kelas sudah selesai, sekarang bisa ditutup supaya honornya bisa disetujui.' }}
+            </div>
+        @endif
     @endif
 
     <div class="row layout-top-spacing">

@@ -28,11 +28,16 @@
                 <h6 class="mb-1">Buat Periode Baru</h6>
                 <p class="text-muted small mb-3">Tentukan tanggal cut-off-nya. Semua kelas yang diajar di rentang ini masuk ke honor periode tersebut.</p>
 
-                <form method="POST" action="{{ route('teacher-honor.store') }}">
+                @php
+                    $next = $nextDates[old('branch_id', $branchId)] ?? null;
+                    $defaultStart = $next['start'] ?? now()->startOfMonth()->format('Y-m-d');
+                    $defaultEnd = $next['end'] ?? now()->endOfMonth()->format('Y-m-d');
+                @endphp
+                <form method="POST" action="{{ route('teacher-honor.store') }}" id="period-form" data-next-dates='@json($nextDates)'>
                     @csrf
                     <div class="mb-3">
                         <label class="form-label">Cabang</label>
-                        <select name="branch_id" class="form-select @error('branch_id') is-invalid @enderror" required>
+                        <select name="branch_id" id="period-branch" class="form-select @error('branch_id') is-invalid @enderror" required>
                             <option value="">Pilih cabang</option>
                             @foreach ($branches as $branch)
                                 <option value="{{ $branch->id }}" @selected(old('branch_id', $branchId) === $branch->id)>{{ $branch->name }}</option>
@@ -42,22 +47,23 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Nama Periode</label>
-                        <input type="text" name="name" class="form-control @error('name') is-invalid @enderror"
+                        <input type="text" name="name" id="period-name" class="form-control @error('name') is-invalid @enderror"
                             value="{{ old('name', now()->translatedFormat('F Y')) }}" placeholder="September 2026" required>
                         @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <label class="form-label">Tanggal Mulai</label>
-                            <input type="date" name="start_date" class="form-control @error('start_date') is-invalid @enderror"
-                                value="{{ old('start_date', now()->startOfMonth()->format('Y-m-d')) }}" required>
+                            <input type="date" name="start_date" id="period-start" class="form-control @error('start_date') is-invalid @enderror"
+                                value="{{ old('start_date', $defaultStart) }}" required>
                         </div>
                         <div class="col-6">
                             <label class="form-label">Tanggal Tutup</label>
-                            <input type="date" name="end_date" class="form-control @error('end_date') is-invalid @enderror"
-                                value="{{ old('end_date', now()->endOfMonth()->format('Y-m-d')) }}" required>
+                            <input type="date" name="end_date" id="period-end" class="form-control @error('end_date') is-invalid @enderror"
+                                value="{{ old('end_date', $defaultEnd) }}" required>
                         </div>
                         @error('end_date') <div class="text-danger small">{{ $message }}</div> @enderror
+                        <div class="form-text" id="period-hint" @if (! $next) hidden @endif>Tanggal otomatis menyambung dari periode sebelumnya di cabang ini, supaya tidak ada tanggal yang terlewat.</div>
                     </div>
                     <button type="submit" class="btn btn-primary w-100">Buat Periode</button>
                 </form>
@@ -123,4 +129,22 @@
         </div>
     </div>
 </div>
+<script>
+    // Pilih cabang -> tanggal otomatis menyambung dari periode terakhir cabang itu.
+    (function () {
+        var form = document.getElementById('period-form');
+        var nextDates = JSON.parse(form.dataset.nextDates || '{}');
+
+        document.getElementById('period-branch').addEventListener('change', function () {
+            var next = nextDates[this.value];
+            document.getElementById('period-hint').hidden = ! next;
+            if (! next) return;
+
+            document.getElementById('period-start').value = next.start;
+            document.getElementById('period-end').value = next.end;
+            document.getElementById('period-name').value = new Date(next.end + 'T00:00:00')
+                .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+        });
+    })();
+</script>
 @endsection

@@ -78,27 +78,7 @@
                                             </div>
                                         </div>
 
-                                        <div class="modal fade" id="rejectModal-{{ $session->id }}" tabindex="-1">
-                                            <div class="modal-dialog">
-                                                <div class="modal-content">
-                                                    <form method="POST" action="{{ route('class-session.reject', $session->id) }}">
-                                                        @csrf
-                                                        <div class="modal-header">
-                                                            <h6 class="modal-title">Tolak Pengajuan</h6>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <label class="form-label">Alasan (opsional)</label>
-                                                            <textarea name="reason" class="form-control" rows="2"></textarea>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
-                                                            <button type="submit" class="btn btn-danger">Tolak Pengajuan</button>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        @include('class-session._reject-modal')
                                     </td>
                                 </tr>
                             @empty
@@ -112,6 +92,46 @@
             </div>
         </div>
     </div>
+
+    @if ($waitingTeacher->isNotEmpty())
+        <div class="row layout-top-spacing">
+            <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
+                <div class="widget-content widget-content-area br-8">
+                    <h6 class="mb-1">Menunggu Pengajar</h6>
+                    <p class="text-muted small mb-3">Belum disetujui pengajar. Kalau pengajar tidak merespons, admin bisa menolaknya (credit belum terpotong) supaya periode Honor Pengajar bisa ditutup.</p>
+                    <div class="table-responsive">
+                        <table class="table dt-table-hover" style="width:100%">
+                            <thead>
+                                <tr>
+                                    <th>Diajukan</th>
+                                    <th>Siswa</th>
+                                    <th>Pengajar</th>
+                                    <th>Package</th>
+                                    <th>Credit Diajukan</th>
+                                    <th class="no-content text-center">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($waitingTeacher as $session)
+                                    <tr>
+                                        <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
+                                        <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
+                                        <td>{{ optional($session->teacher)->name ?? '-' }}</td>
+                                        <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
+                                        <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $session->id }}">Tolak</button>
+                                            @include('class-session._reject-modal')
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endif
 
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
