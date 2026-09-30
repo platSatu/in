@@ -106,6 +106,46 @@ class CourseCreditDebitService
     }
 
     /**
+     * Kembalikan 1 baris debit (refund sesi): baris kredit baru + alokasi
+     * NEGATIF ke pembelian asal yang sama, jadi sisa tiap pembelian kembali
+     * persis seperti sebelum dipotong. Pemanggil wajib memastikan debit ini
+     * belum pernah dikembalikan (dicek di dalam lock sesi).
+     */
+    public function refund(CourseCredit $debit, string $description): CourseCredit
+    {
+        return DB::transaction(function () use ($debit, $description) {
+            Student::where('id', $debit->student_id)->lockForUpdate()->firstOrFail();
+            $lastCredit = CourseCredit::where('student_id', $debit->student_id)
+                ->orderByDesc('created_at')
+                ->lockForUpdate()
+                ->first();
+            $amount = (float) $debit->debit;
+
+            $refund = CourseCredit::create([
+                'student_id' => $debit->student_id,
+                'course_package_purchase_id' => null,
+                'source_type' => CourseCredit::SOURCE_SESSION_REFUND,
+                'debit' => 0,
+                'kredit' => $amount,
+                'balance' => MoneyMath::floorToScale((float) ($lastCredit?->balance ?? 0) + $amount, 2),
+                'description' => $description,
+            ]);
+
+            foreach ($debit->allocations()->get() as $allocation) {
+                CourseCreditAllocation::create([
+                    'course_credit_id' => $refund->id,
+                    'course_package_purchase_id' => $allocation->course_package_purchase_id,
+                    'amount' => -(float) $allocation->amount,
+                    'unit_price' => $allocation->unit_price,
+                    'value' => -(float) $allocation->value,
+                ]);
+            }
+
+            return $refund;
+        });
+    }
+
+    /**
      * Sisa credit per pembelian (baca-saja).
      *
      * @param  iterable<CoursePackagePurchase>  $purchases

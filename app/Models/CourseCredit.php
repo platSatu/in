@@ -38,6 +38,10 @@ class CourseCredit extends Model
 
     public const SOURCE_TRADE_IN_DEBIT = 'trade_in_debit';
 
+    // Pengembalian credit sesi (refund) -- alokasinya negatif, jadi sisa
+    // pembelian asal kembali bertambah.
+    public const SOURCE_SESSION_REFUND = 'session_refund';
+
     protected $fillable = [
         'student_id',
         'course_package_purchase_id',

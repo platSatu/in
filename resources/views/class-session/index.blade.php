@@ -26,6 +26,51 @@
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
+                <h6 class="mb-1">Potong Credit Manual</h6>
+                <p class="text-muted small mb-3">Untuk kelas yang dianggap hadir tanpa pengajuan siswa, mis. siswa tidak hadir lalu diganti video. Pilih pengajar kalau pengajar tetap mendapat honor; kosongkan kalau tidak.</p>
+                <form method="POST" action="{{ route('class-session.charge') }}" class="row g-2 align-items-end">
+                    @csrf
+                    <div class="col-md-4">
+                        <label class="form-label">Siswa &amp; Paket</label>
+                        <select name="student_package" class="form-select" required>
+                            <option value="">-- Pilih --</option>
+                            @foreach ($chargeOptions as $option)
+                                <option value="{{ $option['value'] }}" @selected(old('student_package') === $option['value'])>{{ $option['label'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Pengajar (opsional)</label>
+                        <select name="teacher_user_id" class="form-select">
+                            <option value="">Tanpa honor</option>
+                            @foreach ($teachers as $teacher)
+                                <option value="{{ $teacher->id }}" @selected(old('teacher_user_id') === $teacher->id)>{{ $teacher->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-1">
+                        <label class="form-label">Credit</label>
+                        <input type="number" name="credit_amount" class="form-control" min="0.5" max="10" step="0.5" value="{{ old('credit_amount', 1) }}" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Tanggal Kelas</label>
+                        <input type="datetime-local" name="class_at" class="form-control" max="{{ now()->format('Y-m-d\TH:i') }}" value="{{ old('class_at', now()->format('Y-m-d\TH:i')) }}" required>
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Alasan</label>
+                        <input type="text" name="reason" class="form-control" maxlength="500" placeholder="Tidak hadir, diganti video" value="{{ old('reason') }}" required>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Potong credit siswa ini?')">Potong</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="row layout-top-spacing">
+        <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
+            <div class="widget-content widget-content-area br-8">
                 <h6 class="mb-3">Menunggu Approval Final (sudah disetujui pengajar)</h6>
                 <div class="table-responsive">
                     <table class="table dt-table-hover" style="width:100%">
@@ -147,6 +192,7 @@
                                 <th>Package</th>
                                 <th>Credit Final</th>
                                 <th>Status</th>
+                                <th class="no-content text-center">Action</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -160,14 +206,50 @@
                                     <td>
                                         @if ($session->status === 'disetujui')
                                             <span class="badge badge-success">Disetujui</span>
+                                        @elseif ($session->status === 'direfund')
+                                            <span class="badge badge-secondary">Direfund</span>
+                                            <div class="small text-muted">{{ optional($session->refundedBy)->name ?? '-' }}, {{ optional($session->refunded_at)->format('d/m/Y H:i') }}: {{ $session->refund_reason }}</div>
                                         @else
                                             <span class="badge badge-danger">Ditolak Admin</span>
+                                        @endif
+                                        @if ($session->is_admin_entry)
+                                            <div class="small text-muted">Dipotong admin: {{ $session->notes }}</div>
+                                        @endif
+                                    </td>
+                                    <td class="text-center">
+                                        @if ($session->status === 'disetujui')
+                                            <button type="button" class="btn btn-sm btn-outline-warning text-nowrap" data-bs-toggle="modal" data-bs-target="#refundModal-{{ $session->id }}">Refund</button>
+
+                                            <div class="modal fade" id="refundModal-{{ $session->id }}" tabindex="-1">
+                                                <div class="modal-dialog">
+                                                    <div class="modal-content">
+                                                        <form method="POST" action="{{ route('class-session.refund', $session->id) }}">
+                                                            @csrf
+                                                            <div class="modal-header">
+                                                                <h6 class="modal-title">Refund Credit</h6>
+                                                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                            </div>
+                                                            <div class="modal-body text-start">
+                                                                <p class="text-muted">{{ number_format((float) $session->credit_amount_final, 2, ',', '.') }} credit akan dikembalikan ke paket siswa, dan sesi ini tidak lagi dihitung honor pengajar.</p>
+                                                                <label class="form-label">Alasan refund</label>
+                                                                <textarea name="reason" class="form-control" rows="2" maxlength="500" required></textarea>
+                                                            </div>
+                                                            <div class="modal-footer">
+                                                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Batal</button>
+                                                                <button type="submit" class="btn btn-warning">Refund Credit</button>
+                                                            </div>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @else
+                                            -
                                         @endif
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted">Belum ada riwayat.</td>
+                                    <td colspan="7" class="text-center text-muted">Belum ada riwayat.</td>
                                 </tr>
                             @endforelse
                         </tbody>

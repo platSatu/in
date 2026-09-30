@@ -9,8 +9,10 @@ use App\Models\CoursePackagePurchase;
 use App\Models\CourseCredit;
 use App\Models\CompanyBranch;
 use App\Models\Student;
+use App\Models\TeacherHonorPeriod;
 use App\Models\User;
 use App\Services\CourseCredit\CourseCreditDebitService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -208,6 +210,106 @@ class ClassSessionWorkflowService
 
             return $session->fresh();
         });
+    }
+
+    /**
+     * Refund sesi yang sudah disetujui: credit kembali ke pembelian asalnya
+     * dan sesi tidak lagi dihitung honor. Ditolak kalau periode honor yang
+     * mencakup tanggal sesi sudah ditutup (honornya sudah terkunci).
+     */
+    public function refund(ClassSession $session, User $admin, string $reason): ClassSession
+    {
+        return DB::transaction(function () use ($session, $admin, $reason) {
+            $session = ClassSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            $this->assertStatus($session, ClassSession::STATUS_APPROVED);
+
+            if (! $session->course_credit_id) {
+                throw new InvalidClassSessionStateException('Sesi ini tidak punya catatan potongan credit, jadi tidak bisa di-refund.');
+            }
+
+            $this->assertPeriodOpen($session->branch_id, $session->requested_at);
+
+            $refund = $this->debitService->refund(
+                $session->courseCredit()->firstOrFail(),
+                sprintf('Refund kelas (%s) -- pengajuan #%s', optional($session->coursePackage)->name ?? 'Package', Str::limit($session->id, 8, ''))
+            );
+
+            $session->update([
+                'status' => ClassSession::STATUS_REFUNDED,
+                'refunded_at' => now(),
+                'refunded_by_user_id' => $admin->id,
+                'refund_reason' => $reason,
+                'refund_course_credit_id' => $refund->id,
+            ]);
+
+            return $session->fresh();
+        });
+    }
+
+    /**
+     * Admin memotong credit langsung (mis. siswa tidak hadir, diganti video,
+     * dianggap hadir). Tercatat sebagai sesi 'disetujui' berlabel admin.
+     * Pengajar opsional: kalau diisi, sesi ini masuk honor pengajar itu.
+     */
+    public function adminCharge(Student $student, CoursePackage $package, ?User $teacher, float $amount, Carbon $classAt, string $reason, User $admin): ClassSession
+    {
+        if ($amount <= 0.0) {
+            throw new InvalidArgumentException('Jumlah credit harus lebih besar dari 0.');
+        }
+
+        if ($classAt->isFuture()) {
+            throw new InvalidArgumentException('Tanggal kelas tidak boleh di masa depan.');
+        }
+
+        if ($teacher && ! $teacher->hasRole('teacher')) {
+            throw new InvalidArgumentException('Pengajar yang dipilih tidak valid.');
+        }
+
+        $branchId = $student->branch?->id;
+        $this->assertPeriodOpen($branchId, $classAt);
+
+        return DB::transaction(function () use ($student, $package, $teacher, $amount, $classAt, $reason, $admin, $branchId) {
+            $student = Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
+            $this->assertNoPendingTradeIn($student, $package->id);
+
+            $session = ClassSession::create([
+                'student_id' => $student->id,
+                'teacher_user_id' => $teacher?->id,
+                'course_package_id' => $package->id,
+                'branch_id' => $branchId,
+                'credit_amount_requested' => $amount,
+                'status' => ClassSession::STATUS_WAITING_ADMIN,
+                'notes' => $reason,
+                'requested_at' => $classAt,
+                'is_admin_entry' => true,
+            ]);
+
+            $debit = $this->debitService->debit(
+                $student,
+                $amount,
+                CourseCredit::SOURCE_SESSION_DEBIT,
+                sprintf('Potong credit oleh admin (%s) -- %s', $package->name, Str::limit($reason, 60)),
+                $package->id
+            );
+
+            $session->update([
+                'status' => ClassSession::STATUS_APPROVED,
+                'credit_amount_final' => $amount,
+                'course_credit_id' => $debit->id,
+                'admin_approved_at' => now(),
+                'admin_user_id' => $admin->id,
+            ]);
+
+            return $session->fresh();
+        });
+    }
+
+    /** Honor periode yang mencakup tanggal ini sudah dikunci -- data kelasnya tidak boleh berubah lagi. */
+    private function assertPeriodOpen(?string $branchId, ?\DateTimeInterface $date): void
+    {
+        if ($date && TeacherHonorPeriod::closedCovers($branchId, $date)) {
+            throw new InvalidClassSessionStateException('Periode honor untuk tanggal ini sudah ditutup, jadi datanya tidak bisa diubah lagi.');
+        }
     }
 
     /** Credit paket ini sedang dipakai upgrade yang menunggu pembayaran. */

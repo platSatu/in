@@ -33,6 +33,9 @@ class ClassSession extends Model
 
     public const STATUS_REJECTED_BY_ADMIN = 'ditolak_admin';
 
+    // Credit sesi yang sudah disetujui dikembalikan admin (tidak dihitung honor).
+    public const STATUS_REFUNDED = 'direfund';
+
     protected $fillable = [
         'student_id',
         'teacher_user_id',
@@ -47,6 +50,11 @@ class ClassSession extends Model
         'teacher_approved_at',
         'admin_approved_at',
         'admin_user_id',
+        'is_admin_entry',
+        'refunded_at',
+        'refunded_by_user_id',
+        'refund_reason',
+        'refund_course_credit_id',
     ];
 
     protected $casts = [
@@ -55,6 +63,8 @@ class ClassSession extends Model
         'requested_at' => 'datetime',
         'teacher_approved_at' => 'datetime',
         'admin_approved_at' => 'datetime',
+        'is_admin_entry' => 'boolean',
+        'refunded_at' => 'datetime',
     ];
 
     public function student(): BelongsTo
@@ -85,5 +95,10 @@ class ClassSession extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(User::class, 'admin_user_id');
+    }
+
+    public function refundedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'refunded_by_user_id');
     }
 }

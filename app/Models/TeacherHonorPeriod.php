@@ -44,6 +44,16 @@ class TeacherHonorPeriod extends Model
         'closed_at' => 'datetime',
     ];
 
+    /** Periode yang sudah ditutup dan mencakup tanggal ini di cabang ini (honornya sudah terkunci). */
+    public static function closedCovers(?string $branchId, \DateTimeInterface $date): bool
+    {
+        return static::where('branch_id', $branchId)
+            ->where('status', self::STATUS_CLOSED)
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date)
+            ->exists();
+    }
+
     public function isOpen(): bool
     {
         return $this->status === self::STATUS_OPEN;

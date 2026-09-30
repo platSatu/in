@@ -321,6 +321,9 @@ Route::middleware(['auth', 'permission:class-session'])->prefix('dashboard/class
 Route::middleware(['auth', 'permission:class-session,edit'])->prefix('dashboard/class-session')->group(function () {
     Route::post('/{id}/approve', [ClassSessionAdminController::class, 'approve'])->name('class-session.approve');
     Route::post('/{id}/reject', [ClassSessionAdminController::class, 'reject'])->name('class-session.reject');
+    // Refund credit sesi & potong credit manual (30 September 2026).
+    Route::post('/{id}/refund', [ClassSessionAdminController::class, 'refund'])->name('class-session.refund');
+    Route::post('/charge', [ClassSessionAdminController::class, 'charge'])->name('class-session.charge');
 });
 
 // Honor Pengajar: periode per cabang -> rekap (jumlah kelas x fee Course

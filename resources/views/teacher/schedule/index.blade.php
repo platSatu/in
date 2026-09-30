@@ -121,6 +121,7 @@
                                                     'ditolak_guru' => ['Ditolak Anda', 'badge-danger'],
                                                     'menunggu_admin' => ['Menunggu Admin', 'badge-warning'],
                                                     'disetujui' => ['Disetujui', 'badge-success'],
+                                                    'direfund' => ['Direfund', 'badge-secondary'],
                                                     'ditolak_admin' => ['Ditolak Admin', 'badge-danger'],
                                                 ][$session->status] ?? [$session->status, 'badge-secondary'];
                                             @endphp

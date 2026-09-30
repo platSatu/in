@@ -127,6 +127,7 @@
                                             $statusLabel = [
                                                 'menunggu_admin' => ['Menunggu Admin', 'badge-warning'],
                                                 'disetujui' => ['Disetujui', 'badge-success'],
+                                                'direfund' => ['Direfund', 'badge-secondary'],
                                                 'ditolak_admin' => ['Ditolak Admin', 'badge-danger'],
                                                 'ditolak_guru' => ['Ditolak Saya', 'badge-danger'],
                                             ][$session->status] ?? [$session->status, 'badge-secondary'];

@@ -60,6 +60,7 @@ class TeacherHonorService
 
         $sessions = $this->sessionsIn($period)
             ->where('status', ClassSession::STATUS_APPROVED)
+            ->whereNotNull('teacher_user_id') // potong credit manual tanpa pengajar = tanpa honor
             ->when($teacherUserId, fn ($query) => $query->where('teacher_user_id', $teacherUserId))
             ->with([
                 'teacher',
