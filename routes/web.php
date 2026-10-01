@@ -952,6 +952,10 @@ Route::middleware(['auth', 'permission:student.student,edit'])->prefix('dashboar
     Route::put('/{id}', [StudentController::class, 'update'])->name('student.student.update');
     Route::delete('/{id}', [StudentController::class, 'destroy'])->name('student.student.destroy');
     Route::post('/{id}/add-user', [StudentController::class, 'addUser'])->name('student.student.add-user');
+    // Progress follow-up & Add to InaStudy (1 Oktober 2026), lihat StudentController.
+    Route::patch('/{id}/progress', [StudentController::class, 'updateProgress'])->name('student.student.progress');
+    Route::post('/{id}/followed-up', [StudentController::class, 'markFollowedUp'])->name('student.student.followed-up');
+    Route::post('/{id}/add-to-inastudy', [StudentController::class, 'addToInaStudy'])->name('student.student.add-to-inastudy');
 });
 
 // Invitation: SEBELUMNYA cuma dibungkus 'auth' polos (semua user login bisa

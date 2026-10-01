@@ -131,6 +131,19 @@
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
                         </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label">Progress</label>
+                            <select name="progress_student" class="form-select @error('progress_student') is-invalid @enderror">
+                                <option value="">-</option>
+                                @foreach (\App\Models\Student::PROGRESS_LABELS as $value => $label)
+                                    <option value="{{ $value }}" @selected(old('progress_student', $data->progress_student) === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            @error('progress_student')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                     </div>
 
                     <div class="d-flex gap-2 mt-4">

@@ -14,7 +14,7 @@
                  form/per tanggal dibuat. File-nya .csv, langsung bisa dibuka di
                  Excel atau di-import ke Google Sheets (menu File > Import di
                  Google Sheets). --}}
-            <a href="{{ route('student.student.export', request()->only(['search', 'branch_id', 'form_id', 'date'])) }}"
+            <a href="{{ route('student.student.export', request()->only(['search', 'branch_id', 'form_id', 'date', 'progress'])) }}"
                 class="btn btn-outline-success"
                 title="Export sesuai filter yang sedang aktif. Kosongkan filter untuk export semua student.">
                 <i class="bi bi-file-earmark-spreadsheet"></i> Export CSV
@@ -90,7 +90,7 @@
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('student.student.index') }}" class="row g-2 align-items-end">
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <label class="form-label small text-muted mb-1">Cari</label>
                             <input
                                 type="text"
@@ -133,7 +133,18 @@
                                 value="{{ $date }}">
                         </div>
 
-                        <div class="col-md-3 d-flex gap-2">
+                        <div class="col-md-2">
+                            <label class="form-label small text-muted mb-1">Progress</label>
+                            <select name="progress" class="form-select">
+                                <option value="">-- Semua Progress --</option>
+                                <option value="-" @selected($progress === '-')>Belum diisi</option>
+                                @foreach (\App\Models\Student::PROGRESS_LABELS as $value => $label)
+                                    <option value="{{ $value }}" @selected($progress === $value)>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+
+                        <div class="col-md-2 d-flex gap-2">
                             {{-- Padding vertikal disamakan manual dengan .form-control/.form-select
                                  (padding: 0.75rem 1.25rem di main.css) karena style .btn bawaan tema
                                  cuma punya padding 0.4375rem, jadi tanpa ini tombolnya kelihatan lebih
@@ -144,7 +155,7 @@
                                 </button>
                             </div>
 
-                            @if(request('search') || request('branch_id') || request('form_id') || request('date'))
+                            @if(request('search') || request('branch_id') || request('form_id') || request('date') || request('progress'))
                                 <a href="{{ route('student.student.index') }}" class="btn btn-outline-danger" title="Reset filter" style="padding-top: 0.75rem; padding-bottom: 0.75rem;">
                                     &times;
                                 </a>
@@ -164,10 +175,12 @@
                                 <th class="text-nowrap">Handphone</th>
                                 <th class="text-nowrap">Branch</th>
                                 <th>Form</th>
-                                <th class="text-nowrap">Kode Sales</th>
+                                {{-- Kode Sales disembunyikan (1 Oktober 2026): sudah terwakili kolom Sales Ditugaskan. --}}
+                                {{-- <th class="text-nowrap">Kode Sales</th> --}}
                                 <th class="text-nowrap">Sales Ditugaskan</th>
                                 <th class="text-nowrap">Pembayaran</th>
                                 <th class="text-nowrap">Status</th>
+                                <th class="text-nowrap">Progress</th>
                                 <th class="text-nowrap">Akun Login</th>
                                 <th class="no-content text-center">Action</th>
                             </tr>
@@ -185,10 +198,20 @@
                                     </td>
                                     <td class="fw-bold">{{ $item->first_name }} {{ $item->last_name }}</td>
                                     <td>{{ $item->email }}</td>
-                                    <td class="text-nowrap">{{ $item->handphone }}</td>
+                                    <td class="text-nowrap">
+                                        {{-- Klik = buka WhatsApp + progress kosong/Belum di-FU jadi Sudah di-FU (lihat script di bawah). --}}
+                                        @if ($item->whatsappNumber())
+                                            <a href="https://wa.me/{{ $item->whatsappNumber() }}" target="_blank" rel="noopener"
+                                                class="js-wa-link" title="Chat WhatsApp"
+                                                @if ($canEdit) data-followed-up-url="{{ route('student.student.followed-up', $item->id) }}" @endif
+                                                data-student-id="{{ $item->id }}">{{ $item->handphone }}</a>
+                                        @else
+                                            {{ $item->handphone ?: '-' }}
+                                        @endif
+                                    </td>
                                     <td class="text-nowrap">{{ $item->companyBranch->name ?? '-' }}</td>
                                     <td>{{ $item->form->name ?? '-' }}</td>
-                                    <td class="text-nowrap">{{ $item->sales_id ?? '-' }}</td>
+                                    {{-- <td class="text-nowrap">{{ $item->sales_id ?? '-' }}</td> --}}
                                     <td class="text-nowrap">
                                         @if ($item->handledBy)
                                             {{ $item->handledBy->name }}
@@ -226,6 +249,17 @@
                                             {{ ucfirst($item->status) }}
                                         </span>
                                     </td>
+                                    <td>
+                                        <select class="form-select form-select-sm js-progress" style="min-width: 11rem;"
+                                            data-student-id="{{ $item->id }}"
+                                            data-url="{{ route('student.student.progress', $item->id) }}"
+                                            @disabled(! $canEdit)>
+                                            <option value="">-</option>
+                                            @foreach (\App\Models\Student::PROGRESS_LABELS as $value => $label)
+                                                <option value="{{ $value }}" @selected($item->progress_student === $value)>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                    </td>
                                     <td class="text-nowrap">
                                         @if($item->user_id)
                                             <span class="badge bg-success">Sudah Terdaftar</span>
@@ -257,6 +291,12 @@
                                             @if ($latestApplication)
                                                 <a href="{{ route('quiz.university-application.show', $latestApplication->id) }}"
                                                     class="btn btn-sm btn-outline-info text-nowrap flex-shrink-0">Progress InaStudy</a>
+                                            @elseif ($canEdit)
+                                                {{-- Belum punya aplikasi: admin bisa daftarkan langsung tanpa pembayaran (popup #addInaStudyModal). --}}
+                                                <button type="button" class="btn btn-sm btn-outline-info text-nowrap flex-shrink-0"
+                                                    data-bs-toggle="modal" data-bs-target="#addInaStudyModal"
+                                                    data-add-url="{{ route('student.student.add-to-inastudy', $item->id) }}"
+                                                    data-student-name="{{ $item->first_name }} {{ $item->last_name }}">Add to InaStudy</button>
                                             @else
                                                 <button type="button" class="btn btn-sm btn-outline-info text-nowrap flex-shrink-0" disabled title="Student ini belum Register InaStudy">Progress InaStudy</button>
                                             @endif
@@ -369,6 +409,102 @@
                 nameInlineEl.textContent = studentName;
                 passwordInput.value = '';
             });
+        })();
+    </script>
+
+    @if ($canEdit)
+        {{-- Popup "Add to InaStudy": 1 modal dipakai bersama, action & nama diisi JS saat dibuka.
+             Aturan sama dengan Register manual di menu InaStudy siswa (tanpa pembayaran). --}}
+        <div class="modal fade" id="addInaStudyModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content text-start">
+                    <form id="addInaStudyForm" method="POST" action="">
+                        @csrf
+                        <div class="modal-header">
+                            <h6 class="modal-title mb-0">Add to InaStudy: <span id="addInaStudyStudentName"></span></h6>
+                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p class="text-muted small mb-3">
+                                Aplikasi Kuliah dibuat tanpa Registration Fee, sama seperti Register manual di menu InaStudy.
+                                Setelah itu formulir &amp; dokumen bisa dibantu isi lewat tombol Progress InaStudy.
+                            </p>
+                            @include('partials.inastudy-register-fields', [
+                                'prefix' => 'addInaStudy',
+                                'universities' => $registerUniversities,
+                                'degreeOrder' => $registerDegreeOrder,
+                                'withOld' => false,
+                            ])
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                            <button type="submit" class="btn btn-info btn-sm">Daftarkan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    @endif
+
+    <script>
+        (function () {
+            const csrf = @json(csrf_token());
+
+            function send(url, method, body) {
+                return fetch(url, {
+                    method: method,
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-CSRF-TOKEN': csrf },
+                    body: JSON.stringify(body || {}),
+                    keepalive: true,
+                }).then(function (response) {
+                    if (!response.ok) throw new Error(response.status);
+                    return response.json();
+                });
+            }
+
+            function setProgress(studentId, value) {
+                const select = document.querySelector('.js-progress[data-student-id="' + studentId + '"]');
+                if (select) {
+                    select.value = value || '';
+                    select.dataset.saved = select.value;
+                }
+            }
+
+            // Dropdown Progress: simpan langsung, kembalikan pilihan lama kalau gagal.
+            document.querySelectorAll('.js-progress').forEach(function (select) {
+                select.dataset.saved = select.value;
+                select.addEventListener('change', function () {
+                    select.disabled = true;
+                    send(select.dataset.url, 'PATCH', { progress_student: select.value || null })
+                        .then(function (data) { setProgress(select.dataset.studentId, data.progress_student); })
+                        .catch(function () {
+                            select.value = select.dataset.saved;
+                            alert('Progress gagal disimpan. Silakan coba lagi.');
+                        })
+                        .finally(function () { select.disabled = false; });
+                });
+            });
+
+            // Klik nomor HP: WhatsApp tetap terbuka (link biasa), status dicatat di belakang.
+            document.querySelectorAll('.js-wa-link[data-followed-up-url]').forEach(function (link) {
+                link.addEventListener('click', function () {
+                    send(link.dataset.followedUpUrl, 'POST')
+                        .then(function (data) { setProgress(link.dataset.studentId, data.progress_student); })
+                        .catch(function () {});
+                });
+            });
+
+            const modal = document.getElementById('addInaStudyModal');
+            if (modal) {
+                modal.addEventListener('show.bs.modal', function (event) {
+                    const trigger = event.relatedTarget;
+                    if (!trigger) return;
+                    const form = document.getElementById('addInaStudyForm');
+                    form.reset();
+                    form.setAttribute('action', trigger.getAttribute('data-add-url') || '');
+                    document.getElementById('addInaStudyStudentName').textContent = trigger.getAttribute('data-student-name') || '';
+                });
+            }
         })();
     </script>
 

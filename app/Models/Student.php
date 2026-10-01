@@ -28,7 +28,52 @@ class Student extends Model
         'email',
         'handphone',
         'status',
+        'progress_student',
     ];
+
+    /*
+     * Progress follow-up siswa oleh admin/sales (1 Oktober 2026). Kolom
+     * nullable: kosong = belum pernah disentuh. Klik nomor HP (buka WhatsApp)
+     * di index Student mengubah kosong/Belum di-FU jadi Sudah di-FU; status
+     * lain diubah lewat dropdown di index atau halaman Edit.
+     */
+    public const PROGRESS_NOT_FOLLOWED_UP = 'belum_fu';
+    public const PROGRESS_FOLLOWED_UP = 'sudah_fu';
+    public const PROGRESS_INTERESTED = 'interested';
+    public const PROGRESS_FOLLOW_UP_AGAIN = 'follow_up_kembali';
+    public const PROGRESS_PAID = 'sudah_bayar';
+    public const PROGRESS_CANCELLED = 'cancel';
+
+    public const PROGRESS_LABELS = [
+        self::PROGRESS_NOT_FOLLOWED_UP => 'Belum di-FU',
+        self::PROGRESS_FOLLOWED_UP => 'Sudah di-FU',
+        self::PROGRESS_INTERESTED => 'Interested',
+        self::PROGRESS_FOLLOW_UP_AGAIN => 'Follow-up kembali',
+        self::PROGRESS_PAID => 'Sudah bayar',
+        self::PROGRESS_CANCELLED => 'Cancel / tidak lanjut',
+    ];
+
+    public function progressLabel(): ?string
+    {
+        return self::PROGRESS_LABELS[$this->progress_student] ?? null;
+    }
+
+    /**
+     * Nomor untuk link wa.me: hanya angka, awalan 0 / 8 diubah ke 62.
+     * null kalau nomornya kosong/terlalu pendek.
+     */
+    public function whatsappNumber(): ?string
+    {
+        $digits = preg_replace('/\D+/', '', (string) $this->handphone);
+
+        if (str_starts_with($digits, '0')) {
+            $digits = '62'.substr($digits, 1);
+        } elseif (str_starts_with($digits, '8')) {
+            $digits = '62'.$digits;
+        }
+
+        return strlen($digits) >= 9 ? $digits : null;
+    }
 
     /**
      * Akun login (User) milik student ini, kalau sudah dibuat.

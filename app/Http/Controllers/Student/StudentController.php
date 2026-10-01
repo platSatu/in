@@ -14,6 +14,10 @@ use App\Models\Role;
 use App\Models\Student;
 use App\Models\User;
 use App\Models\RoleUser;
+use App\Models\UniversityProfileDegree;
+use App\Services\InaStudy\ManualApplicationRegistrar;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Validation\ValidationException;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\View\View;
@@ -40,9 +44,10 @@ class StudentController extends Controller
     /**
      * Tampilkan daftar student.
      */
-    public function index(Request $request): View
+    public function index(Request $request, ManualApplicationRegistrar $registrar): View
     {
         $search = $request->query('search');
+        $progress = $request->query('progress');
         $branchId = $request->query('branch_id');
         $formId = $request->query('form_id');
         $date = $request->query('date');
@@ -95,6 +100,7 @@ class StudentController extends Controller
             // punya jam:menit:detik -- whereDate() otomatis membandingkan cuma
             // bagian tanggalnya saja.
             ->when($date, fn ($query) => $query->whereDate('created_at', $date))
+            ->tap(fn ($query) => $this->filterProgress($query, $progress))
             // Urutkan data masuk TERBARU di paling atas. `created_at` saja kadang
             // punya beberapa baris dengan detik yang sama persis (mis. input
             // berturut-turut cepat / data lama yang di-import sekaligus), dan untuk
@@ -138,8 +144,19 @@ class StudentController extends Controller
                 ->count();
         }
 
+        // Tombol yang mengubah data (dropdown Progress, Add to InaStudy) hanya
+        // aktif untuk yang punya akses kelola Student; pilihan kampus untuk
+        // popup Add to InaStudy cuma di-load kalau memang bisa dipakai.
+        $canEdit = $user->canAccessPermission('student.student', 'edit');
+        $registerUniversities = $canEdit ? $registrar->options() : collect();
+        $registerDegreeOrder = UniversityProfileDegree::DEGREES;
+
         return view('student.student.index', compact(
             'data',
+            'progress',
+            'canEdit',
+            'registerUniversities',
+            'registerDegreeOrder',
             'companyBranches',
             'forms',
             'branchId',
@@ -170,6 +187,7 @@ class StudentController extends Controller
         $branchId = $request->query('branch_id');
         $formId = $request->query('form_id');
         $date = $request->query('date');
+        $progress = $request->query('progress');
 
         $user = Auth::user();
         if ($user === null) {
@@ -198,7 +216,8 @@ class StudentController extends Controller
             })
             ->when($branchId, fn ($q) => $q->where('branch_id', $branchId))
             ->when($formId, fn ($q) => $q->where('form_id', $formId))
-            ->when($date, fn ($q) => $q->whereDate('created_at', $date));
+            ->when($date, fn ($q) => $q->whereDate('created_at', $date))
+            ->tap(fn ($q) => $this->filterProgress($q, $progress));
 
         $filename = $this->buildExportFilename($branchId, $formId, $date);
 
@@ -224,6 +243,7 @@ class StudentController extends Controller
                 'Nominal Pembayaran',
                 'Tanggal Bayar',
                 'Status Student',
+                'Progress',
                 'Akun Login',
                 'Terdaftar Pada',
             ]);
@@ -260,6 +280,7 @@ class StudentController extends Controller
                         $payment ? number_format((float) $payment->amount, 0, ',', '.') : '-',
                         $payment && $payment->paid_at ? $payment->paid_at->format('Y-m-d H:i:s') : '-',
                         ucfirst($student->status),
+                        $student->progressLabel() ?? '-',
                         $student->user_id ? 'Sudah Terdaftar' : 'Belum Ada',
                         optional($student->created_at)->format('Y-m-d H:i:s'),
                     ]);
@@ -562,6 +583,76 @@ class StudentController extends Controller
     }
 
     /**
+     * Dropdown Progress di index (1 Oktober 2026): simpan langsung (AJAX).
+     * Kosong = kembalikan ke belum disentuh.
+     */
+    public function updateProgress(Request $request, string $id): JsonResponse
+    {
+        $student = $this->resolveVisibleStudent($id);
+
+        $validated = $request->validate([
+            'progress_student' => ['nullable', Rule::in(array_keys(Student::PROGRESS_LABELS))],
+        ]);
+
+        $student->update(['progress_student' => $validated['progress_student'] ?? null]);
+
+        return response()->json(['progress_student' => $student->progress_student]);
+    }
+
+    /**
+     * Dipanggil saat nomor HP di index diklik (membuka WhatsApp): kosong /
+     * Belum di-FU jadi Sudah di-FU. Status yang sudah lebih jauh (Interested,
+     * Sudah bayar, dst.) tidak ditimpa.
+     */
+    public function markFollowedUp(string $id): JsonResponse
+    {
+        $student = $this->resolveVisibleStudent($id);
+
+        Student::whereKey($student->id)
+            ->where(fn ($query) => $query
+                ->whereNull('progress_student')
+                ->orWhere('progress_student', Student::PROGRESS_NOT_FOLLOWED_UP))
+            ->update(['progress_student' => Student::PROGRESS_FOLLOWED_UP]);
+
+        return response()->json(['progress_student' => $student->fresh()->progress_student]);
+    }
+
+    /**
+     * Tombol "Add to InaStudy" (1 Oktober 2026): admin/sales mendaftarkan
+     * Aplikasi Kuliah untuk siswa yang belum punya, tanpa Registration Fee --
+     * aturan sama persis dengan Register manual siswa, lihat
+     * App\Services\InaStudy\ManualApplicationRegistrar. Setelah itu admin bisa
+     * membantu isi formulir & upload dokumen dari halaman Progress InaStudy.
+     */
+    public function addToInaStudy(Request $request, string $id, ManualApplicationRegistrar $registrar): RedirectResponse
+    {
+        $student = $this->resolveVisibleStudent($id);
+
+        try {
+            $validated = $request->validate($registrar->rules());
+            $registrar->register($student, $validated);
+        } catch (ValidationException $e) {
+            // Form-nya di popup: pesan ditampilkan sebagai alert di atas tabel,
+            // back() supaya filter & halaman yang sedang dibuka tetap.
+            return back()
+                ->with('error', collect($e->errors())->flatten()->first());
+        }
+
+        return back()
+            ->with('success', trim($student->first_name.' '.$student->last_name).' berhasil didaftarkan ke InaStudy. Formulir & dokumen bisa dibantu isi lewat tombol Progress InaStudy.');
+    }
+
+    /** Filter Progress: '-' = belum pernah diisi (kosong). */
+    private function filterProgress($query, ?string $progress): void
+    {
+        if ($progress === '-') {
+            $query->whereNull('progress_student');
+        } elseif (array_key_exists((string) $progress, Student::PROGRESS_LABELS)) {
+            $query->where('progress_student', $progress);
+        }
+    }
+
+    /**
      * Validasi form create/update.
      */
     private function validateStudent(Request $request, ?string $ignoreId = null): array
@@ -588,6 +679,7 @@ class StudentController extends Controller
             // teks bebas di atas) ke akun sales resmi lewat kolom ini.
             'handled_by_user_id' => ['nullable', 'exists:users,id'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
+            'progress_student' => ['nullable', Rule::in(array_keys(Student::PROGRESS_LABELS))],
         ]);
     }
 
