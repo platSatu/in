@@ -26,4 +26,16 @@ class MoneyMath
 
         return floor(($value * $factor) + 1e-6) / $factor;
     }
+
+    /**
+     * Pembulatan ke ATAS -- dipakai saat menghitung berapa credit yang harus
+     * DIPOTONG (mis. convert sebagian), supaya potongan selalu menutup
+     * nilainya penuh dan sistem tidak "menciptakan" nilai.
+     */
+    public static function ceilToScale(float $value, int $scale): float
+    {
+        $factor = 10 ** $scale;
+
+        return ceil(($value * $factor) - 1e-6) / $factor;
+    }
 }

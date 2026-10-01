@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,14 +45,18 @@ class TeacherHonorPeriod extends Model
         'closed_at' => 'datetime',
     ];
 
+    /** Periode di cabang ini yang mencakup tanggal ini. */
+    public static function covering(?string $branchId, \DateTimeInterface $date): Builder
+    {
+        return static::where('branch_id', $branchId)
+            ->whereDate('start_date', '<=', $date)
+            ->whereDate('end_date', '>=', $date);
+    }
+
     /** Periode yang sudah ditutup dan mencakup tanggal ini di cabang ini (honornya sudah terkunci). */
     public static function closedCovers(?string $branchId, \DateTimeInterface $date): bool
     {
-        return static::where('branch_id', $branchId)
-            ->where('status', self::STATUS_CLOSED)
-            ->whereDate('start_date', '<=', $date)
-            ->whereDate('end_date', '>=', $date)
-            ->exists();
+        return static::covering($branchId, $date)->where('status', self::STATUS_CLOSED)->exists();
     }
 
     public function isOpen(): bool

@@ -110,7 +110,7 @@ class ClassSessionController extends Controller
                 $teacher,
                 $package,
                 (float) $validated['credit_amount'],
-                $student->branch,
+                $student->companyBranch,
                 $validated['notes'] ?? null
             );
         } catch (InvalidArgumentException $e) {

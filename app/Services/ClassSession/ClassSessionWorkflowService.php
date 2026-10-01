@@ -265,11 +265,12 @@ class ClassSessionWorkflowService
             throw new InvalidArgumentException('Pengajar yang dipilih tidak valid.');
         }
 
-        $branchId = $student->branch?->id;
-        $this->assertPeriodOpen($branchId, $classAt);
+        // Cabang sesi = cabang siswa (dipakai rekap honor & batasan per cabang).
+        $branchId = $student->branch_id;
 
         return DB::transaction(function () use ($student, $package, $teacher, $amount, $classAt, $reason, $admin, $branchId) {
             $student = Student::whereKey($student->id)->lockForUpdate()->firstOrFail();
+            $this->assertPeriodOpen($branchId, $classAt);
             $this->assertNoPendingTradeIn($student, $package->id);
 
             $session = ClassSession::create([
@@ -304,10 +305,25 @@ class ClassSessionWorkflowService
         });
     }
 
-    /** Honor periode yang mencakup tanggal ini sudah dikunci -- data kelasnya tidak boleh berubah lagi. */
+    /**
+     * Honor periode yang mencakup tanggal ini sudah dikunci -- data kelasnya
+     * tidak boleh berubah lagi. WAJIB dipanggil di dalam transaksi: baris
+     * periode dikunci (lockForUpdate), jadi kalau admin lain sedang menutup
+     * periode yang sama, salah satunya menunggu -- potongan/refund tidak
+     * mungkin terlewat dari rekap yang dikunci.
+     */
     private function assertPeriodOpen(?string $branchId, ?\DateTimeInterface $date): void
     {
-        if ($date && TeacherHonorPeriod::closedCovers($branchId, $date)) {
+        if (! $date) {
+            return;
+        }
+
+        $closed = TeacherHonorPeriod::covering($branchId, $date)
+            ->lockForUpdate()
+            ->get()
+            ->contains(fn (TeacherHonorPeriod $period) => ! $period->isOpen());
+
+        if ($closed) {
             throw new InvalidClassSessionStateException('Periode honor untuk tanggal ini sudah ditutup, jadi datanya tidak bisa diubah lagi.');
         }
     }

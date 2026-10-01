@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\ClassSession;
 
+use App\Http\Controllers\Concerns\ScopesToVisibleBranches;
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
 use App\Models\CourseCredit;
@@ -31,9 +32,14 @@ use InvalidArgumentException;
  * Digerbangi permission modul 'class-session' (lihat config/menu.php &
  * routes/web.php), pola sama dengan modul admin lain -- BUKAN role
  * 'teacher' (itu di App\Http\Controllers\Teacher\ClassSessionApprovalController).
+ *
+ * Per cabang (1 Oktober 2026): admin hanya melihat & memproses sesi/siswa di
+ * cabang yang jadi cakupan role-nya (ScopesToVisibleBranches).
  */
 class ClassSessionAdminController extends Controller
 {
+    use ScopesToVisibleBranches;
+
     public function __construct(
         private readonly ClassSessionWorkflowService $workflowService = new ClassSessionWorkflowService()
     ) {
@@ -42,6 +48,7 @@ class ClassSessionAdminController extends Controller
     public function index(Request $request): View
     {
         $pending = ClassSession::where('status', ClassSession::STATUS_WAITING_ADMIN)
+            ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
             ->with(['student', 'teacher', 'coursePackage'])
             ->orderBy('requested_at')
             ->get();
@@ -49,11 +56,13 @@ class ClassSessionAdminController extends Controller
         // Belum disetujui pengajar -- admin hanya bisa menolak (mis. pengajar
         // tidak merespons), supaya periode Honor Pengajar bisa ditutup.
         $waitingTeacher = ClassSession::where('status', ClassSession::STATUS_WAITING_TEACHER)
+            ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
             ->with(['student', 'teacher', 'coursePackage'])
             ->orderBy('requested_at')
             ->get();
 
         $history = ClassSession::whereIn('status', [ClassSession::STATUS_APPROVED, ClassSession::STATUS_REJECTED_BY_ADMIN, ClassSession::STATUS_REFUNDED])
+            ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
             ->with(['student', 'teacher', 'coursePackage', 'refundedBy'])
             ->orderByDesc('requested_at')
             ->paginate(20);
@@ -62,7 +71,7 @@ class ClassSessionAdminController extends Controller
             'pending' => $pending,
             'waitingTeacher' => $waitingTeacher,
             'history' => $history,
-            'chargeOptions' => $this->chargeOptions(),
+            'chargeOptions' => $this->chargeOptions($request),
             'teachers' => User::whereHas('roles', fn ($query) => $query->where('slug', 'teacher')->where('roles.status', Role::STATUS_ACTIVE))
                 ->orderBy('name')->get(['id', 'name']),
         ]);
@@ -72,6 +81,7 @@ class ClassSessionAdminController extends Controller
     public function creditHistory(Request $request): View
     {
         $students = Student::whereIn('id', CoursePackagePurchase::select('student_id'))
+            ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -107,7 +117,7 @@ class ClassSessionAdminController extends Controller
         ], ['reason.required' => 'Tulis alasan refund.']);
 
         try {
-            $this->workflowService->refund(ClassSession::findOrFail($id), $request->user(), $validated['reason']);
+            $this->workflowService->refund($this->visibleSession($request, $id), $request->user(), $validated['reason']);
         } catch (InvalidClassSessionStateException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -131,10 +141,12 @@ class ClassSessionAdminController extends Controller
         ]);
 
         [$studentId, $packageId] = explode('|', $validated['student_package']);
+        $student = Student::findOrFail($studentId);
+        $this->abortUnlessBranchVisible($request, $student->branch_id);
 
         try {
             $this->workflowService->adminCharge(
-                Student::findOrFail($studentId),
+                $student,
                 CoursePackage::findOrFail($packageId),
                 isset($validated['teacher_user_id']) ? User::find($validated['teacher_user_id']) : null,
                 (float) $validated['credit_amount'],
@@ -156,9 +168,10 @@ class ClassSessionAdminController extends Controller
      *
      * @return array<int, array{value: string, label: string}>
      */
-    private function chargeOptions(): array
+    private function chargeOptions(Request $request): array
     {
         $purchases = CoursePackagePurchase::where('status', CoursePackagePurchase::STATUS_COMPLETED)
+            ->whereIn('student_id', $this->scopeToVisibleBranches(Student::select('id'), $request))
             ->with(['student:id,first_name,last_name', 'coursePackage:id,name'])
             ->get();
         $remaining = (new CourseCreditDebitService())->remainingByPurchase($purchases);
@@ -190,7 +203,7 @@ class ClassSessionAdminController extends Controller
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $session = ClassSession::findOrFail($id);
+        $session = $this->visibleSession($request, $id);
 
         try {
             $this->workflowService->adminApprove(
@@ -214,7 +227,7 @@ class ClassSessionAdminController extends Controller
             'reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        $session = ClassSession::findOrFail($id);
+        $session = $this->visibleSession($request, $id);
 
         try {
             $this->workflowService->adminReject($session, $request->user(), $validated['reason'] ?? null);
@@ -223,5 +236,14 @@ class ClassSessionAdminController extends Controller
         }
 
         return back()->with('success', 'Pengajuan ditolak.');
+    }
+
+    /** Sesi di cabang yang boleh dilihat admin ini; cabang lain = 404. */
+    private function visibleSession(Request $request, string $id): ClassSession
+    {
+        $session = ClassSession::findOrFail($id);
+        $this->abortUnlessBranchVisible($request, $session->branch_id);
+
+        return $session;
     }
 }

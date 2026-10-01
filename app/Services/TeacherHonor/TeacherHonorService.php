@@ -78,15 +78,14 @@ class TeacherHonorService
                 $classes = [];
 
                 foreach ($teacherSessions as $session) {
-                    foreach ($this->creditSources($session) as $key => $source) {
-                        $classes[$key] ??= $source + ['credit_total' => 0.0, 'sessions' => []];
-                        $classes[$key]['credit_total'] += (float) $session->credit_amount_final;
-                        $classes[$key]['sessions'][] = [
-                            'at' => optional($session->requested_at)->format('Y-m-d H:i'),
-                            'student' => $this->studentName($session->student),
-                            'credit' => (float) $session->credit_amount_final,
-                        ];
-                    }
+                    [$key, $source] = $this->creditSource($session);
+                    $classes[$key] ??= $source + ['credit_total' => 0.0, 'sessions' => []];
+                    $classes[$key]['credit_total'] += (float) $session->credit_amount_final;
+                    $classes[$key]['sessions'][] = [
+                        'at' => optional($session->requested_at)->format('Y-m-d H:i'),
+                        'student' => $this->studentName($session->student),
+                        'credit' => (float) $session->credit_amount_final,
+                    ];
                 }
 
                 $classes = collect($classes)->sortBy(fn (array $class) => $class['class_name'].'|'.$class['owner'])->values()->all();
@@ -240,36 +239,32 @@ class TeacherHonorService
     }
 
     /**
-     * Paket (credit) asal potongan sesi ini, dikunci per pembelian. Kalau
-     * karena data lama tidak ada alokasi, jatuh ke paket di sesi itu.
+     * Kelas (pembelian paket) tempat sesi ini dihitung -- SELALU satu, supaya
+     * 1 sesi tidak pernah terhitung 2 kelas. Kalau potongannya terbagi ke 2
+     * pembelian (sisa pembelian lama + pembelian baru), sesi masuk ke
+     * pembelian dengan porsi credit terbesar (sama besar: yang lebih dulu).
+     * Data lama tanpa alokasi jatuh ke paket di sesi itu.
      *
-     * @return array<string, array{owner: string, package: string, class_name: string, fee: float}>
+     * @return array{0: string, 1: array{owner: string, package: string, class_name: string, fee: float}}
      */
-    private function creditSources(ClassSession $session): array
+    private function creditSource(ClassSession $session): array
     {
-        $sources = [];
+        $allocation = collect($session->courseCredit?->allocations ?? [])
+            ->filter(fn ($allocation) => $allocation->purchase && (float) $allocation->amount > 0)
+            ->sortByDesc(fn ($allocation) => (float) $allocation->amount)
+            ->first();
 
-        foreach ($session->courseCredit?->allocations ?? [] as $allocation) {
-            $purchase = $allocation->purchase;
-
-            if (! $purchase) {
-                continue;
-            }
-
-            $sources['purchase:'.$purchase->id] = $this->source(
-                $this->studentName($purchase->student),
-                $purchase->coursePackage
-            );
+        if ($allocation) {
+            return ['purchase:'.$allocation->purchase->id, $this->source(
+                $this->studentName($allocation->purchase->student),
+                $allocation->purchase->coursePackage
+            )];
         }
 
-        if ($sources === []) {
-            $sources['package:'.$session->student_id.':'.$session->course_package_id] = $this->source(
-                $this->studentName($session->student),
-                $session->coursePackage
-            );
-        }
-
-        return $sources;
+        return ['package:'.$session->student_id.':'.$session->course_package_id, $this->source(
+            $this->studentName($session->student),
+            $session->coursePackage
+        )];
     }
 
     private function source(string $owner, $package): array

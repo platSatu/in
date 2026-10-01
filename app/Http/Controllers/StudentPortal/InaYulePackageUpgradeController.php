@@ -8,6 +8,7 @@ use App\Models\CoursePackagePayment;
 use App\Models\CoursePackagePurchase;
 use App\Models\PaymentGateway;
 use App\Models\Student;
+use App\Services\CourseCredit\CourseCreditDebitService;
 use App\Services\CoursePackagePayment\CoursePackagePaymentGatewayFactory;
 use App\Services\CoursePackagePayment\CoursePackagePurchaseNotifier;
 use App\Services\CoursePackagePayment\PackageUpgradeCalculator;
@@ -24,7 +25,7 @@ use Throwable;
  * App\Services\CoursePackagePayment\PackageUpgradeCalculator; controller ini
  * hanya HTTP. Angka SELALU dihitung ulang di server, tidak pernah dari browser.
  *
- * - convert (quantity N) dan upgrade yang tertutup trade-in + saldo: instan.
+ * - convert (quantity N / "Tukar Semua") dan upgrade yang tertutup trade-in + saldo: instan.
  * - upgrade yang masih kurang: CoursePackagePayment 'pending' ke gateway;
  *   credit asal dikunci sampai webhook (InaYulePackageWebhookController).
  * Route select-method/return/status memakai milik InaYulePackageCheckoutController.
@@ -52,13 +53,14 @@ class InaYulePackageUpgradeController extends Controller
         $mode = $request->query('mode') === 'convert' ? 'convert' : 'upgrade';
         $packageId = $request->query('package');
         $target = is_string($packageId) && $packageId !== '' ? $this->activePackage($packageId, $source) : null;
-        $quantity = $mode === 'convert' ? max(1, (int) $request->query('quantity', 1)) : null;
+        $convertAll = $mode === 'convert' && $request->boolean('all');
+        $quantity = $mode === 'convert' && ! $convertAll ? max(1, (int) $request->query('quantity', 1)) : null;
         $preview = null;
         $error = $this->calculator->blockedReason($source);
 
         if ($target && ! $error) {
             try {
-                $preview = $this->calculator->preview($request->user(), $source, $target, $quantity);
+                $preview = $this->calculator->preview($request->user(), $source, $target, $quantity, $convertAll);
             } catch (UpgradeConfirmationFailedException $e) {
                 $error = $e->getMessage();
             }
@@ -71,7 +73,11 @@ class InaYulePackageUpgradeController extends Controller
                 ->filter(fn (CoursePackage $package) => PackageUpgradeCalculator::isSellable($package))->values(),
             'target' => $target,
             'mode' => $mode,
-            'quantity' => $quantity,
+            'quantity' => $convertAll ? ($preview['quantity'] ?? null) : $quantity,
+            'convertAll' => $convertAll,
+            // Untuk penjelasan rumus di halaman (hitungan sebenarnya tetap di kalkulator).
+            'sourceUnit' => CourseCreditDebitService::unitPrice($source),
+            'targetUnit' => $target ? PackageUpgradeCalculator::targetUnitPrice($target) : 0.0,
             'preview' => $preview,
             'blockedReason' => $error,
             'gatewayMissing' => ($preview['gateway_portion'] ?? 0) > 0 && ! $this->activeGateway(),
@@ -83,7 +89,8 @@ class InaYulePackageUpgradeController extends Controller
         $validated = $request->validate([
             'package' => ['required', 'string'],
             'mode' => ['required', 'in:upgrade,convert'],
-            'quantity' => ['required_if:mode,convert', 'nullable', 'integer', 'min:1'],
+            'all' => ['nullable', 'boolean'],
+            'quantity' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $user = $request->user();
@@ -94,12 +101,19 @@ class InaYulePackageUpgradeController extends Controller
             return redirect()->route('inayule.index')->with('status', 'Paket tidak ditemukan atau sudah tidak aktif.');
         }
 
-        $quantity = $validated['mode'] === 'convert' ? (int) $validated['quantity'] : null;
+        $convertAll = $validated['mode'] === 'convert' && ! empty($validated['all']);
+        $quantity = $validated['mode'] === 'convert' && ! $convertAll ? (int) ($validated['quantity'] ?? 0) : null;
+
+        if ($validated['mode'] === 'convert' && ! $convertAll && $quantity < 1) {
+            return back()->with('error', 'Isi jumlah credit yang mau diambil.');
+        }
+
         $back = redirect()->route('inayule.upgrade.show', array_filter([
             'purchaseId' => $source->id,
             'package' => $target->id,
             'mode' => $validated['mode'],
             'quantity' => $quantity,
+            'all' => $convertAll ? 1 : null,
         ]));
 
         if ($reason = $this->calculator->blockedReason($source)) {
@@ -108,21 +122,21 @@ class InaYulePackageUpgradeController extends Controller
 
         try {
             // Preview hanya untuk memilih jalur; kebenarannya dicek ulang di dalam lock.
-            $preview = $this->calculator->preview($user, $source, $target, $quantity);
+            $preview = $this->calculator->preview($user, $source, $target, $quantity, $convertAll);
 
-            if ($preview['gateway_portion'] > 0.0) {
+            if ($preview['mode'] === 'upgrade' && $preview['gateway_portion'] > 0.0) {
                 return $this->initiateGatewayCheckout($user, $source, $target, $back);
             }
 
-            $payment = $this->calculator->completeInstant($user, $source->student, $source, $target, $quantity);
+            $payment = $this->calculator->completeInstant($user, $source->student, $source, $target, $quantity, $convertAll);
         } catch (UpgradeConfirmationFailedException $e) {
             return $back->with('error', self::FAILURE_MESSAGES[$e->getMessage()] ?? $e->getMessage());
         }
 
         (new CoursePackagePurchaseNotifier())->notify($payment);
 
-        return redirect()->route('inayule.index')->with('success', $quantity
-            ? "Convert berhasil, {$quantity} credit \"{$target->name}\" sudah masuk."
+        return redirect()->route('inayule.index')->with('success', $preview['mode'] === 'convert'
+            ? 'Convert berhasil, '.rtrim(rtrim(number_format((float) $payment->credits_granted, 2, ',', '.'), '0'), ',')." credit \"{$target->name}\" sudah masuk."
             : "Upgrade ke paket \"{$target->name}\" berhasil, credit Anda sudah diperbarui.");
     }
 
