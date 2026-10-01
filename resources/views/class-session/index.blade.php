@@ -31,9 +31,11 @@
             <div class="widget-content widget-content-area br-8">
                 <h6 class="mb-1">Potong Credit Manual</h6>
                 <p class="text-muted small mb-3">Untuk kelas yang dianggap hadir tanpa pengajuan siswa, mis. siswa tidak hadir lalu diganti video. Pilih pengajar kalau pengajar tetap mendapat honor; kosongkan kalau tidak.</p>
-                <form method="POST" action="{{ route('class-session.charge') }}" class="row g-2 align-items-end">
+                {{-- Form dibuat lebar tetap; di layar sempit bisa digeser ke kanan supaya semua kolom & tombol terbaca. --}}
+                <div class="overflow-auto pb-2">
+                <form method="POST" action="{{ route('class-session.charge') }}" class="row g-2 align-items-end flex-nowrap" style="min-width: 1100px">
                     @csrf
-                    <div class="col-md-4">
+                    <div class="col-4">
                         <label class="form-label">Siswa &amp; Paket</label>
                         <select name="student_package" class="form-select" required>
                             <option value="">-- Pilih --</option>
@@ -42,7 +44,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-2">
                         <label class="form-label">Pengajar (opsional)</label>
                         <select name="teacher_user_id" class="form-select">
                             <option value="">Tanpa honor</option>
@@ -51,22 +53,23 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-1">
+                    <div class="col-1">
                         <label class="form-label">Credit</label>
                         <input type="number" name="credit_amount" class="form-control" min="0.5" max="10" step="0.5" value="{{ old('credit_amount', 1) }}" required>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-2">
                         <label class="form-label">Tanggal Kelas</label>
                         <input type="datetime-local" name="class_at" class="form-control" max="{{ now()->format('Y-m-d\TH:i') }}" value="{{ old('class_at', now()->format('Y-m-d\TH:i')) }}" required>
                     </div>
-                    <div class="col-md-2">
+                    <div class="col-2">
                         <label class="form-label">Alasan</label>
                         <input type="text" name="reason" class="form-control" maxlength="500" placeholder="Tidak hadir, diganti video" value="{{ old('reason') }}" required>
                     </div>
-                    <div class="col-md-1">
-                        <button type="submit" class="btn btn-primary w-100" onclick="return confirm('Potong credit siswa ini?')">Potong</button>
+                    <div class="col-auto">
+                        <button type="submit" class="btn btn-primary text-nowrap px-4" onclick="return confirm('Potong credit siswa ini?')">Potong</button>
                     </div>
                 </form>
+                </div>
             </div>
         </div>
     </div>
