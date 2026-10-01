@@ -56,7 +56,7 @@
         'course.level' => 'Course Level',
         'course.package' => 'Course Package',
         'course.report' => 'Laporan Course',
-        'class-session' => 'Approval Pemakaian Credit',
+        'class-session' => 'Approval Credit',
         'schedule' => 'Jadwal',
         'teacher-honor' => 'Honor Pengajar',
         'quiz.university-application' => 'University Applications',

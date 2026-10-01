@@ -106,7 +106,7 @@ return [
     // dropdown sidebar 'Course' yang sama. Catatan: domain-nya TETAP beda
     // dari 'Absensi' (absensi staff berbasis QR-code, lihat
     // App\Http\Controllers\Absensi\*) -- cuma kebetulan namanya mirip.
-    ['key' => 'class-session', 'label' => 'Approval Pemakaian Credit', 'route' => 'class-session.index', 'group' => 'Course', 'icon' => 'list'],
+    ['key' => 'class-session', 'label' => 'Approval Credit', 'route' => 'class-session.index', 'group' => 'Course', 'icon' => 'list'],
     ['key' => 'teacher-honor', 'label' => 'Honor Pengajar', 'route' => 'teacher-honor.index', 'group' => 'Course', 'icon' => 'list'],
     // FASE 2 bagian 3 "Jadwal" (16 September 2026) -- lihat docblock
     // App\Http\Controllers\Schedule\ScheduleAdminController untuk keputusan
