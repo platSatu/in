@@ -171,7 +171,6 @@
                                 <th>No</th>
                                 <th>Foto</th>
                                 <th>Nama</th>
-                                <th>Email</th>
                                 <th class="text-nowrap">Handphone</th>
                                 <th class="text-nowrap">Branch</th>
                                 <th>Form</th>
@@ -196,15 +195,17 @@
                                             <span class="text-muted">-</span>
                                         @endif
                                     </td>
-                                    <td class="fw-bold">{{ $item->first_name }} {{ $item->last_name }}</td>
-                                    <td>{{ $item->email }}</td>
+                                    <td>
+                                        <div class="fw-bold">{{ $item->first_name }} {{ $item->last_name }}</div>
+                                        <div class="small text-muted">{{ $item->email }}</div>
+                                    </td>
                                     <td class="text-nowrap">
                                         {{-- Klik = buka WhatsApp + progress kosong/Belum di-FU jadi Sudah di-FU (lihat script di bawah). --}}
                                         @if ($item->whatsappNumber())
                                             <a href="https://wa.me/{{ $item->whatsappNumber() }}" target="_blank" rel="noopener"
-                                                class="js-wa-link" title="Chat WhatsApp"
+                                                class="js-wa-link btn btn-sm btn-outline-success text-nowrap" title="Chat WhatsApp"
                                                 @if ($canEdit) data-followed-up-url="{{ route('student.student.followed-up', $item->id) }}" @endif
-                                                data-student-id="{{ $item->id }}">{{ $item->handphone }}</a>
+                                                data-student-id="{{ $item->id }}"><i class="bi bi-whatsapp me-1"></i>{{ $item->handphone }}</a>
                                         @else
                                             {{ $item->handphone ?: '-' }}
                                         @endif
@@ -333,7 +334,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="13" class="text-center">Belum ada data.</td>
+                                    <td colspan="12" class="text-center">Belum ada data.</td>
                                 </tr>
                             @endforelse
                         </tbody>
