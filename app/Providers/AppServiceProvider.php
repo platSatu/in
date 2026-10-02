@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Helpers\ActivityLogger;
 use App\Models\Deposit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\View;
@@ -25,6 +26,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Semua pagination ({{ $data->links() }}) memakai tampilan Bootstrap 5,
+        // sama dengan tema dashboard -- tanpa ini Laravel memakai default
+        // Tailwind yang tampil berantakan (mis. halaman Roles, Honor Pengajar).
+        Paginator::useBootstrapFive();
+
         $this->registerActivityLogging();
         $this->registerHeaderBalanceComposer();
     }
