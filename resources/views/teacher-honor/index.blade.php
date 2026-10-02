@@ -22,8 +22,9 @@
         <div class="alert alert-danger">{{ session('error') }}</div>
     @endif
 
+    {{-- Atas: form buat periode (1 baris di layar lebar, turun ke bawah di layar kecil). --}}
     <div class="row layout-top-spacing">
-        <div class="col-xl-4 col-lg-5 layout-spacing">
+        <div class="col-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
                 <h6 class="mb-1">Buat Periode Baru</h6>
                 <p class="text-muted small mb-3">Tentukan tanggal cut-off-nya. Semua kelas yang diajar di rentang ini masuk ke honor periode tersebut.</p>
@@ -33,10 +34,10 @@
                     $defaultStart = $next['start'] ?? now()->startOfMonth()->format('Y-m-d');
                     $defaultEnd = $next['end'] ?? now()->endOfMonth()->format('Y-m-d');
                 @endphp
-                <form method="POST" action="{{ route('teacher-honor.store') }}" id="period-form" data-next-dates='@json($nextDates)'>
+                <form method="POST" action="{{ route('teacher-honor.store') }}" id="period-form" data-next-dates='@json($nextDates)' class="row g-2 align-items-end">
                     @csrf
-                    <div class="mb-3">
-                        <label class="form-label">Cabang</label>
+                    <div class="col-md-6 col-xl-3">
+                        <label class="form-label small text-muted mb-1">Cabang</label>
                         <select name="branch_id" id="period-branch" class="form-select @error('branch_id') is-invalid @enderror" required>
                             <option value="">Pilih cabang</option>
                             @foreach ($branches as $branch)
@@ -45,35 +46,39 @@
                         </select>
                         @error('branch_id') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Nama Periode</label>
+                    <div class="col-md-6 col-xl-3">
+                        <label class="form-label small text-muted mb-1">Nama Periode</label>
                         <input type="text" name="name" id="period-name" class="form-control @error('name') is-invalid @enderror"
                             value="{{ old('name', now()->translatedFormat('F Y')) }}" placeholder="September 2026" required>
                         @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
-                    <div class="row g-2 mb-3">
-                        <div class="col-6">
-                            <label class="form-label">Tanggal Mulai</label>
-                            <input type="date" name="start_date" id="period-start" class="form-control @error('start_date') is-invalid @enderror"
-                                value="{{ old('start_date', $defaultStart) }}" required>
-                        </div>
-                        <div class="col-6">
-                            <label class="form-label">Tanggal Tutup</label>
-                            <input type="date" name="end_date" id="period-end" class="form-control @error('end_date') is-invalid @enderror"
-                                value="{{ old('end_date', $defaultEnd) }}" required>
-                        </div>
-                        @error('end_date') <div class="text-danger small">{{ $message }}</div> @enderror
-                        <div class="form-text" id="period-hint" @if (! $next) hidden @endif>Tanggal otomatis menyambung dari periode sebelumnya di cabang ini, supaya tidak ada tanggal yang terlewat.</div>
+                    <div class="col-6 col-xl-2">
+                        <label class="form-label small text-muted mb-1">Tanggal Mulai</label>
+                        <input type="date" name="start_date" id="period-start" class="form-control @error('start_date') is-invalid @enderror"
+                            value="{{ old('start_date', $defaultStart) }}" required>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Buat Periode</button>
+                    <div class="col-6 col-xl-2">
+                        <label class="form-label small text-muted mb-1">Tanggal Tutup</label>
+                        <input type="date" name="end_date" id="period-end" class="form-control @error('end_date') is-invalid @enderror"
+                            value="{{ old('end_date', $defaultEnd) }}" required>
+                    </div>
+                    {{-- Padding vertikal disamakan dengan .form-control (pola tombol Filter di menu Student). --}}
+                    <div class="col-12 col-xl-2">
+                        <button type="submit" class="btn btn-primary w-100 text-nowrap" style="padding-top: 0.75rem; padding-bottom: 0.75rem;">Buat Periode</button>
+                    </div>
+                    @error('end_date') <div class="col-12 text-danger small">{{ $message }}</div> @enderror
+                    <div class="col-12 form-text mt-1" id="period-hint" @if (! $next) hidden @endif>Tanggal otomatis menyambung dari periode sebelumnya di cabang ini, supaya tidak ada tanggal yang terlewat.</div>
                 </form>
             </div>
         </div>
+    </div>
 
-        <div class="col-xl-8 col-lg-7 layout-spacing">
+    {{-- Bawah: daftar periode. Tabel bisa digeser ke kanan kalau layar tidak cukup (teks tidak menumpuk). --}}
+    <div class="row layout-top-spacing">
+        <div class="col-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
                 <form method="GET" action="{{ route('teacher-honor.index') }}" class="row g-2 mb-3">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <select name="branch_id" class="form-select" onchange="this.form.submit()">
                             <option value="">Semua cabang</option>
                             @foreach ($branches as $branch)
@@ -84,7 +89,7 @@
                 </form>
 
                 <div class="table-responsive">
-                    <table class="table dt-table-hover" style="width:100%">
+                    <table class="table dt-table-hover text-nowrap" style="width:100%">
                         <thead>
                             <tr>
                                 <th>Periode</th>
@@ -115,7 +120,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">Belum ada periode. Yuk buat periode pertama di sebelah kiri!</td>
+                                    <td colspan="6" class="text-center text-muted py-4">Belum ada periode. Yuk buat periode pertama lewat form di atas!</td>
                                 </tr>
                             @endforelse
                         </tbody>
