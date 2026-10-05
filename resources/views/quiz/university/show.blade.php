@@ -49,6 +49,18 @@
                         @if($data->description)
                             <p class="mb-0">{{ $data->description }}</p>
                         @endif
+                        <p class="mb-1 mt-2"><strong>Why Study Here:</strong>
+                            @if(! $data->whyStudyPoints(false))
+                                <span class="text-muted">belum diisi (halaman kampus memakai poin default)</span>
+                            @endif
+                        </p>
+                        @if($data->whyStudyPoints(false))
+                            <ul class="mb-0 ps-3">
+                                @foreach($data->whyStudyPoints(false) as $point)
+                                    <li>{{ $point }}</li>
+                                @endforeach
+                            </ul>
+                        @endif
                     </div>
                 </div>
 

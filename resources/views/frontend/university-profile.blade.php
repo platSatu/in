@@ -428,28 +428,6 @@
             font-size: 14px;
         }
 
-        .why-item {
-            display: flex;
-            gap: 14px;
-            margin-bottom: 18px;
-        }
-        .why-item:last-child { margin-bottom: 0; }
-
-        .why-icon {
-            width: 40px;
-            height: 40px;
-            border-radius: 10px;
-            background: #fbe6ea;
-            color: var(--brand);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .why-item h6 { font-weight: 700; margin-bottom: 2px; font-size: 14.5px; }
-        .why-item p { font-size: 13.5px; color: #6b7186; margin-bottom: 0; }
-
         /* ---------- ENTRY REQUIREMENTS ---------- */
         .requirement-item {
             display: flex;
@@ -1274,27 +1252,13 @@
 
                 <div class="info-card">
                     <h4><i class="bi bi-stars"></i> Why Study Here</h4>
-                    <div class="why-item">
-                        <div class="why-icon"><i class="bi bi-globe2"></i></div>
-                        <div>
-                            <h6>Globally Recognized Institution</h6>
-                            <p>Study at a university with strong academic reputation and international student support.</p>
+                    {{-- Dinamis per universitas (6 Oktober 2026), lihat University::whyStudyPoints(). --}}
+                    @foreach($university->whyStudyPoints() as $whyPoint)
+                        <div class="requirement-item">
+                            <i class="bi bi-check-circle-fill"></i>
+                            <span>{{ $whyPoint }}</span>
                         </div>
-                    </div>
-                    <div class="why-item">
-                        <div class="why-icon"><i class="bi bi-people"></i></div>
-                        <div>
-                            <h6>Dedicated Consultation</h6>
-                            <p>Our team guides you from application to arrival, every step of the way.</p>
-                        </div>
-                    </div>
-                    <div class="why-item">
-                        <div class="why-icon"><i class="bi bi-cash-coin"></i></div>
-                        <div>
-                            <h6>Scholarship Opportunities</h6>
-                            <p>We help you explore scholarship and funding options available for international students.</p>
-                        </div>
-                    </div>
+                    @endforeach
                 </div>
 
             </div>

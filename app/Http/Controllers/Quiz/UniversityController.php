@@ -93,6 +93,8 @@ class UniversityController extends Controller
                 // file besar akan gagal terupload SEBELUM sempat divalidasi
                 // rule ini (Laravel tidak bisa "melewati" batas PHP itu).
                 'attachment' => 'nullable|mimes:jpg,jpeg,pdf|max:15360',
+            'why_study_here' => 'nullable|array|max:10',
+            'why_study_here.*' => 'nullable|string|max:255',
             ]);
 
             $userId = Auth::id();
@@ -102,6 +104,7 @@ class UniversityController extends Controller
             }
 
             $validated['user_id'] = (string) $userId;
+            $validated['why_study_here'] = $this->joinPoints($validated['why_study_here'] ?? []);
 
             // Kolom `status` di tabel `universities` NOT NULL tanpa default,
             // sedangkan pilihan "Choose..." di form mengirim string kosong
@@ -171,6 +174,20 @@ class UniversityController extends Controller
                 ->withInput()
                 ->with('error', 'University gagal dibuat: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Baris-baris "Why Study Here" dari form -> satu teks (satu poin per
+     * baris). Baris kosong dibuang; semua kosong = null (pakai poin default).
+     */
+    private function joinPoints(array $points): ?string
+    {
+        $joined = collect($points)
+            ->map(fn ($point) => trim(preg_replace('/\s+/', ' ', (string) $point)))
+            ->filter()
+            ->implode("\n");
+
+        return $joined !== '' ? $joined : null;
     }
 
     /**
@@ -272,6 +289,8 @@ class UniversityController extends Controller
             // catatan di sana soal batas upload_max_filesize/post_max_size
             // di php.ini yang juga perlu >= 15M).
             'attachment' => 'nullable|mimes:jpg,jpeg,pdf|max:15360',
+            'why_study_here' => 'nullable|array|max:10',
+            'why_study_here.*' => 'nullable|string|max:255',
         ]);
 
         // Sama seperti store(): kolom `status` NOT NULL tanpa default. Kalau
@@ -280,6 +299,8 @@ class UniversityController extends Controller
         if (empty($validated['status'])) {
             $validated['status'] = $existing->status ?: 'active';
         }
+
+        $validated['why_study_here'] = $this->joinPoints($validated['why_study_here'] ?? []);
 
         if ($request->hasFile('logo')) {
             $validated['logo'] = $this->storeUniversityFile($request->file('logo'), 'logo');

@@ -24,11 +24,31 @@ class University extends Model
         'country',
         'city',
         'description',
+        'why_study_here',
         'status',
         'logo',
         'banner',
         'attachment',
     ];
+
+    /** Poin "Why Study Here" bawaan, dipakai kalau universitas belum mengisi sendiri. */
+    public const DEFAULT_WHY_STUDY_HERE = [
+        'Globally recognized institution with strong academic reputation and international student support.',
+        'Dedicated consultation from application to arrival, every step of the way.',
+        'Help exploring scholarship and funding options for international students.',
+    ];
+
+    /** Poin "Why Study Here" (satu poin per baris di kolom why_study_here). */
+    public function whyStudyPoints(bool $withDefault = true): array
+    {
+        $points = collect(preg_split('/\r\n|\r|\n/', (string) $this->why_study_here))
+            ->map(fn ($point) => trim($point))
+            ->filter()
+            ->values()
+            ->all();
+
+        return $points ?: ($withDefault ? self::DEFAULT_WHY_STUDY_HERE : []);
+    }
 
     /**
      * Relasi ke user (pemilik / admin yang membuat data universitas)

@@ -92,6 +92,8 @@
                         </div>
                     </div>
 
+                    @include('quiz.university._why-study-here', ['points' => $data->whyStudyPoints(false)])
+
                     <div class="row mb-4">
                         <div class="col-sm-4">
                             <label for="logo" class="mb-2">Logo</label>
