@@ -73,6 +73,10 @@
 
                     <div class="gdoc-meta-grid">
                         <div>
+                            <span class="gdoc-meta-label">Sekolah Asal / Saat Ini</span>
+                            <span class="gdoc-meta-value">{{ $data->current_school ?: '-' }}</span>
+                        </div>
+                        <div>
                             <span class="gdoc-meta-label">Branch Terakhir</span>
                             <span class="gdoc-meta-value">{{ optional($data->companyBranch)->name ?? '-' }}</span>
                         </div>

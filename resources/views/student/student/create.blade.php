@@ -57,6 +57,14 @@
                         </div>
 
                         <div class="col-md-6">
+                            <label class="form-label">Sekolah Asal / Saat Ini <span class="text-muted">(opsional)</span></label>
+                            <input type="text" name="current_school" maxlength="255" class="form-control @error('current_school') is-invalid @enderror" placeholder="mis. SMA Negeri 1 Jakarta" value="{{ old('current_school') }}">
+                            @error('current_school')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-md-6">
                             <label class="form-label">Branch <span class="text-muted">(opsional)</span></label>
                             {{-- Fix (14 September 2026, permintaan user): sales (scope 'self')
                                  dikunci ke branch tempat dia sendiri terdaftar (lewat Company >

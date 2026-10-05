@@ -669,6 +669,7 @@ class StudentController extends Controller
                 Rule::unique('students', 'email')->ignore($ignoreId),
             ],
             'handphone' => ['required', 'string', 'max:20'],
+            'current_school' => ['nullable', 'string', 'max:255'],
             // branch_id & form_id sengaja nullable: kolom ini cuma "singgahan terakhir"
             // (lihat catatan di Student::companyBranch()/form()), student boleh saja
             // belum pernah terhubung ke branch/form manapun saat dibuat manual dari sini.

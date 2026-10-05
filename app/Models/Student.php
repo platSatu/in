@@ -27,6 +27,7 @@ class Student extends Model
         'last_name',
         'email',
         'handphone',
+        'current_school',
         'status',
         'progress_student',
     ];

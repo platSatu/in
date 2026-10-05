@@ -62,6 +62,14 @@
                         </div>
 
                         <div class="col-md-6">
+                            <label class="form-label">Sekolah Asal / Saat Ini <span class="text-muted">(opsional)</span></label>
+                            <input type="text" name="current_school" maxlength="255" class="form-control @error('current_school') is-invalid @enderror" placeholder="mis. SMA Negeri 1 Jakarta" value="{{ old('current_school', $data->current_school) }}">
+                            @error('current_school')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+
+                        <div class="col-md-6">
                             <label class="form-label">Branch <span class="text-muted">(opsional)</span></label>
                             <select name="branch_id" class="form-select @error('branch_id') is-invalid @enderror">
                                 <option value="">-- Belum ada Branch --</option>
