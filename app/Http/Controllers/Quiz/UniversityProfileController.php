@@ -180,6 +180,9 @@ public function store(Request $request)
         // baris itu dibuang lewat filter isNotEmpty di bawah).
         'scholarships' => 'nullable|array',
         'scholarships.*.name' => 'nullable|string|max:255',
+        'scholarships.*.degree' => ['nullable', 'string', Rule::in(UniversityProfileDegree::DEGREES)],
+        'scholarships.*.details' => 'nullable|string|max:2000',
+        // Kolom lama, dibawa hidden dari form Edit supaya datanya tidak hilang.
         'scholarships.*.price' => 'nullable|integer|min:0',
         'scholarships.*.currency' => ['nullable', 'string', Rule::in(UniversityProfileScholarship::CURRENCIES)],
     ]);
@@ -230,7 +233,7 @@ public function store(Request $request)
     // yang semuanya kosong (termasuk baris kosong yang ikut terkirim kalau
     // section-nya sempat disembunyikan JS pas scholarship_available "No").
     $scholarshipRows = collect($validated['scholarships'] ?? [])
-        ->filter(fn ($row) => filled($row['name'] ?? null) || filled($row['price'] ?? null) || filled($row['currency'] ?? null))
+        ->filter(fn ($row) => filled($row['name'] ?? null) || filled($row['degree'] ?? null) || filled($row['details'] ?? null))
         ->values();
 
     unset($validated['scholarships']);
@@ -294,6 +297,8 @@ public function store(Request $request)
             'user_id' => (string) $userId,
             'university_profile_id' => $profile->id,
             'name' => $row['name'] ?? null,
+            'degree' => $row['degree'] ?? null,
+            'details' => $row['details'] ?? null,
             'price' => $row['price'] ?? null,
             'currency' => $row['currency'] ?? null,
             'sort_order' => $index,
@@ -383,6 +388,9 @@ public function store(Request $request)
             // sinkronisasi delete+recreate di bawah).
             'scholarships' => 'nullable|array',
             'scholarships.*.name' => 'nullable|string|max:255',
+            'scholarships.*.degree' => ['nullable', 'string', Rule::in(UniversityProfileDegree::DEGREES)],
+            'scholarships.*.details' => 'nullable|string|max:2000',
+            // Kolom lama, dibawa hidden dari form Edit supaya datanya tidak hilang.
             'scholarships.*.price' => 'nullable|integer|min:0',
             'scholarships.*.currency' => ['nullable', 'string', Rule::in(UniversityProfileScholarship::CURRENCIES)],
         ]);
@@ -431,7 +439,7 @@ public function store(Request $request)
             ->values();
 
         $scholarshipRows = collect($validated['scholarships'] ?? [])
-            ->filter(fn ($row) => filled($row['name'] ?? null) || filled($row['price'] ?? null) || filled($row['currency'] ?? null))
+            ->filter(fn ($row) => filled($row['name'] ?? null) || filled($row['degree'] ?? null) || filled($row['details'] ?? null))
             ->values();
 
         unset($validated['degree_intakes'], $validated['payments'], $validated['scholarships']);
@@ -480,6 +488,8 @@ public function store(Request $request)
                 'user_id' => (string) $userId,
                 'university_profile_id' => $profile->id,
                 'name' => $row['name'] ?? null,
+                'degree' => $row['degree'] ?? null,
+                'details' => $row['details'] ?? null,
                 'price' => $row['price'] ?? null,
                 'currency' => $row['currency'] ?? null,
                 'sort_order' => $index,

@@ -83,7 +83,10 @@ class InaStudyController extends Controller
         // widget/tombol Register.
         $hasStudent = (bool) $student;
 
-        return view('student-portal.inastudy.index', compact('myApplications', 'totalDocumentTypes', 'registerUniversities', 'registerDegreeOrder', 'hasStudent'));
+        // Nomor awal kolom WhatsApp di form Register -- sama dengan form Apply.
+        $defaultWhatsapp = $student->handphone ?? Auth::user()->handphone ?? '';
+
+        return view('student-portal.inastudy.index', compact('myApplications', 'totalDocumentTypes', 'registerUniversities', 'registerDegreeOrder', 'hasStudent', 'defaultWhatsapp'));
     }
 
     /**

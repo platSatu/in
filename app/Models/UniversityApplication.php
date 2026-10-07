@@ -98,6 +98,22 @@ class UniversityApplication extends Model
         return $this->belongsTo(University::class, 'university_id');
     }
 
+    /**
+     * Label kolom "Major" di tabel/detail aplikasi (7 Oktober 2026): jurusan
+     * (Course) yang dipilih saat Apply/Register, sama seperti label di form
+     * Apply -- mis. "Corporate Management (Bachelor)". Bukan dari
+     * universityProfile->field (sering kosong & tidak dipakai di alur Apply).
+     */
+    public function getMajorLabelAttribute(): string
+    {
+        // Aplikasi lama (sebelum course_name ikut di-snapshot) jatuh ke nama Program.
+        if (blank($this->course_name)) {
+            return optional($this->universityProfile)->field ?: '-';
+        }
+
+        return $this->course_name.(filled($this->degree) ? ' ('.$this->degree.')' : '');
+    }
+
     public function handledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by_user_id');

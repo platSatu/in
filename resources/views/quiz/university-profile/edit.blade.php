@@ -398,10 +398,10 @@
 
                     @php
                         $existingScholarships = old('scholarships', $data->scholarships->map(function ($s) {
-                            return ['name' => $s->name, 'price' => $s->price, 'currency' => $s->currency];
+                            return ['name' => $s->name, 'degree' => $s->degree, 'details' => $s->details, 'price' => $s->price, 'currency' => $s->currency];
                         })->toArray());
                         if (empty($existingScholarships)) {
-                            $existingScholarships = [['name' => null, 'price' => null, 'currency' => null]];
+                            $existingScholarships = [['name' => null, 'degree' => null, 'details' => null]];
                         }
                         // Ditampilkan awal cuma kalau scholarship_available sudah "Yes" --
                         // lihat IIFE toggle di bawah untuk perubahan setelah select diganti.
@@ -423,27 +423,30 @@
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
                                         </div>
-                                        <div class="col-md-4">
-                                            <label class="form-label">Price</label>
-                                            <input type="number" min="0" name="scholarships[{{ $index }}][price]"
-                                                class="form-control @error('scholarships.' . $index . '.price') is-invalid @enderror"
-                                                value="{{ old('scholarships.' . $index . '.price', $row['price'] ?? '') }}"
-                                                placeholder="0">
-                                            @error('scholarships.' . $index . '.price')
+                                        <div class="col-md-3">
+                                            <label class="form-label">Degree</label>
+                                        <select name="scholarships[{{ $index }}][degree]"
+                                            class="form-select @error('scholarships.' . $index . '.degree') is-invalid @enderror">
+                                            <option value="">Choose...</option>
+                                            @foreach (\App\Models\UniversityProfileDegree::DEGREES as $degreeOption)
+                                                <option value="{{ $degreeOption }}" {{ old('scholarships.' . $index . '.degree', $row['degree'] ?? '') === $degreeOption ? 'selected' : '' }}>{{ $degreeOption }}</option>
+                                            @endforeach
+                                        </select>
+                                            @error('scholarships.' . $index . '.degree')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
                                         </div>
-                                        <div class="col-md-3">
-                                            <label class="form-label">Currency</label>
-                                            <select name="scholarships[{{ $index }}][currency]"
-                                                class="form-select @error('scholarships.' . $index . '.currency') is-invalid @enderror">
-                                                <option value="">Choose...</option>
-                                                <option value="rupiah" {{ old('scholarships.' . $index . '.currency', $row['currency'] ?? '') === 'rupiah' ? 'selected' : '' }}>Rupiah (Rp)</option>
-                                                <option value="yuan" {{ old('scholarships.' . $index . '.currency', $row['currency'] ?? '') === 'yuan' ? 'selected' : '' }}>Yuan (元)</option>
-                                            </select>
-                                            @error('scholarships.' . $index . '.currency')
+                                        <div class="col-md-4">
+                                            <label class="form-label">Details</label>
+                                            <textarea name="scholarships[{{ $index }}][details]" rows="2"
+                                                class="form-control @error('scholarships.' . $index . '.details') is-invalid @enderror"
+                                                placeholder="mis. Bebas uang kuliah + asrama, syarat IPK min. 3.0">{{ old('scholarships.' . $index . '.details', $row['details'] ?? '') }}</textarea>
+                                            @error('scholarships.' . $index . '.details')
                                                 <div class="invalid-feedback">{{ $message }}</div>
                                             @enderror
+                                            {{-- Kolom lama (price/currency) dibawa diam-diam supaya tidak hilang saat disimpan ulang. --}}
+                                            <input type="hidden" name="scholarships[{{ $index }}][price]" value="{{ $row['price'] ?? '' }}">
+                                            <input type="hidden" name="scholarships[{{ $index }}][currency]" value="{{ $row['currency'] ?? '' }}">
                                         </div>
                                     </div>
                                     <div class="row g-3 mt-1">
@@ -663,17 +666,18 @@
                 <label class="form-label">Name</label>
                 <input type="text" name="scholarships[__INDEX__][name]" class="form-control" placeholder="mis. Full Scholarship">
             </div>
-            <div class="col-md-4">
-                <label class="form-label">Price</label>
-                <input type="number" min="0" name="scholarships[__INDEX__][price]" class="form-control" placeholder="0">
-            </div>
             <div class="col-md-3">
-                <label class="form-label">Currency</label>
-                <select name="scholarships[__INDEX__][currency]" class="form-select">
+                <label class="form-label">Degree</label>
+                <select name="scholarships[__INDEX__][degree]" class="form-select">
                     <option value="">Choose...</option>
-                    <option value="rupiah">Rupiah (Rp)</option>
-                    <option value="yuan">Yuan (元)</option>
+                    @foreach (\App\Models\UniversityProfileDegree::DEGREES as $degreeOption)
+                        <option value="{{ $degreeOption }}">{{ $degreeOption }}</option>
+                    @endforeach
                 </select>
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">Details</label>
+                <textarea name="scholarships[__INDEX__][details]" rows="2" class="form-control" placeholder="mis. Bebas uang kuliah + asrama, syarat IPK min. 3.0"></textarea>
             </div>
         </div>
         <div class="row g-3 mt-1">

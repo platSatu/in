@@ -60,7 +60,7 @@
                             </tr>
                             <tr>
                                 <td class="text-muted">Major</td>
-                                <td>{{ optional($application->universityProfile)->field ?? '-' }}</td>
+                                <td>{{ $application->major_label }}</td>
                             </tr>
                             <tr>
                                 {{--

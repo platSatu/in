@@ -42,6 +42,7 @@
                         'prefix' => 'register',
                         'universities' => $registerUniversities,
                         'degreeOrder' => $registerDegreeOrder,
+                        'defaultWhatsapp' => $defaultWhatsapp,
                     ])
                     <div class="mt-3">
                         <button type="submit" class="btn btn-success btn-sm">Save</button>
@@ -68,7 +69,7 @@
                             <tr>
                                 <td class="fw-bold">{{ $myApplication->application_no }}</td>
                                 <td>{{ optional($myApplication->university)->name ?? '-' }}</td>
-                                <td>{{ optional($myApplication->universityProfile)->field ?? '-' }}</td>
+                                <td>{{ $myApplication->major_label }}</td>
                                 <td><span class="badge bg-info text-capitalize">{{ str_replace('_', ' ', $myApplication->status) }}</span></td>
                                 <td>
                                     @php

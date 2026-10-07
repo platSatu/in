@@ -25,6 +25,11 @@ class UniversityProfileScholarship extends Model
         'user_id',
         'university_profile_id',
         'name',
+        // Degree (pilihan sama dengan UniversityProfileDegree::DEGREES) &
+        // Details (teks bebas) menggantikan price/currency di form (7 Okt 2026).
+        // price/currency tetap disimpan sementara supaya data lama tidak hilang.
+        'degree',
+        'details',
         'price',
         'currency',
         'sort_order',

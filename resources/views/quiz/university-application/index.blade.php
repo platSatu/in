@@ -82,7 +82,7 @@
                                         <div class="text-muted" style="font-size:12px;">{{ $item->whatsapp }}</div>
                                     </td>
                                     <td>{{ optional($item->university)->name ?? '-' }}</td>
-                                    <td>{{ optional($item->universityProfile)->field ?? '-' }}</td>
+                                    <td>{{ $item->major_label }}</td>
                                     <td>{{ $item->intake ?: '-' }} {{ $item->intake_year }}</td>
                                     <td>
                                         <span class="badge badge-info text-capitalize">{{ str_replace('_', ' ', $item->status) }}</span>

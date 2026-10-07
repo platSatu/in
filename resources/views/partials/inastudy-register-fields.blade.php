@@ -6,10 +6,15 @@
     Data dari App\Services\InaStudy\ManualApplicationRegistrar::options().
 
     Variabel: $prefix (prefix id unik per halaman), $universities, $degreeOrder,
-    $withOld (isi ulang dari old() setelah validasi gagal; default true).
+    $withOld (isi ulang dari old() setelah validasi gagal; default true),
+    $defaultWhatsapp (nomor awal kolom WhatsApp; default kosong).
+    Isian Intake Year & WhatsApp sama dengan form Apply (student-portal.apply.show).
     Reset form (form.reset()) otomatis mengosongkan & menyembunyikan Degree/Jurusan.
 --}}
-@php $withOld = $withOld ?? true; @endphp
+@php
+    $withOld = $withOld ?? true;
+    $defaultWhatsapp = $defaultWhatsapp ?? '';
+@endphp
 <div class="row g-3" id="{{ $prefix }}Fields">
     <div class="col-md-4">
         <label class="form-label">Universitas</label>
@@ -38,6 +43,22 @@
             <option value="">-- Pilih Jurusan --</option>
         </select>
         @error('degree_intake_id')
+            <div class="invalid-feedback">{{ $message }}</div>
+        @enderror
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">Intake Year</label>
+        <input type="number" name="intake_year" id="{{ $prefix }}IntakeYear" class="form-control @error('intake_year') is-invalid @enderror"
+            value="{{ $withOld ? old('intake_year', now()->year) : now()->year }}" min="{{ now()->year }}" max="{{ now()->year + 5 }}" required>
+        @error('intake_year')
+            <div class="invalid-feedback">{{ $message }}</div>
+        @enderror
+    </div>
+    <div class="col-md-6">
+        <label class="form-label">No. WhatsApp</label>
+        <input type="text" name="whatsapp" id="{{ $prefix }}Whatsapp" maxlength="20" class="form-control @error('whatsapp') is-invalid @enderror"
+            value="{{ $withOld ? old('whatsapp', $defaultWhatsapp) : $defaultWhatsapp }}" placeholder="08xxxxxxxxxx" required>
+        @error('whatsapp')
             <div class="invalid-feedback">{{ $message }}</div>
         @enderror
     </div>

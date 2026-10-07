@@ -297,7 +297,8 @@
                                                 <button type="button" class="btn btn-sm btn-outline-info text-nowrap flex-shrink-0"
                                                     data-bs-toggle="modal" data-bs-target="#addInaStudyModal"
                                                     data-add-url="{{ route('student.student.add-to-inastudy', $item->id) }}"
-                                                    data-student-name="{{ $item->first_name }} {{ $item->last_name }}">Add to InaStudy</button>
+                                                    data-student-name="{{ $item->first_name }} {{ $item->last_name }}"
+                                                    data-student-whatsapp="{{ $item->handphone }}">Add to InaStudy</button>
                                             @else
                                                 <button type="button" class="btn btn-sm btn-outline-info text-nowrap flex-shrink-0" disabled title="Student ini belum Register InaStudy">Progress InaStudy</button>
                                             @endif
@@ -504,6 +505,7 @@
                     form.reset();
                     form.setAttribute('action', trigger.getAttribute('data-add-url') || '');
                     document.getElementById('addInaStudyStudentName').textContent = trigger.getAttribute('data-student-name') || '';
+                    document.getElementById('addInaStudyWhatsapp').value = trigger.getAttribute('data-student-whatsapp') || '';
                 });
             }
         })();

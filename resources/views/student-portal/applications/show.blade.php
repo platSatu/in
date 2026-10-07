@@ -111,7 +111,7 @@
             </div>
             <div class="detail-row">
                 <span class="label">Major</span>
-                <span class="value">{{ $application->universityProfile->field ?? '-' }}</span>
+                <span class="value">{{ $application->major_label }}</span>
             </div>
             <div class="detail-row">
                 <span class="label">Degree</span>

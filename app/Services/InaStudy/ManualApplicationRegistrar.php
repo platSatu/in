@@ -46,7 +46,8 @@ class ManualApplicationRegistrar
                     ->flatMap(fn ($profile) => $profile->degrees->map(fn ($degreeRow) => [
                         'id' => $degreeRow->id,
                         'degree' => $degreeRow->degree,
-                        'label' => $degreeRow->course_name ?: $profile->field,
+                        // Label sama dengan pilihan "Program / Major" di form Apply.
+                        'label' => $degreeRow->course_name ?: ($profile->field ?: 'Program'),
                     ]))
                     ->filter(fn ($course) => filled($course['degree']) && filled($course['label']))
                     ->values(),
@@ -60,11 +61,14 @@ class ManualApplicationRegistrar
             'university_id' => ['required', 'uuid', 'exists:universities,id'],
             'degree' => ['required', 'string', Rule::in(UniversityProfileDegree::DEGREES)],
             'degree_intake_id' => ['required', 'uuid', 'exists:university_profile_degrees,id'],
+            // Sama dengan form Apply (StudentPortal\ApplyController::store).
+            'intake_year' => ['required', 'integer', 'min:'.now()->year, 'max:'.(now()->year + 5)],
+            'whatsapp' => ['required', 'string', 'max:20'],
         ];
     }
 
     /**
-     * @param  array{university_id: string, degree: string, degree_intake_id: string}  $input  sudah lolos rules()
+     * @param  array{university_id: string, degree: string, degree_intake_id: string, intake_year: int, whatsapp: string}  $input  sudah lolos rules()
      *
      * @throws ValidationException jurusan tidak cocok / siswa sudah punya aplikasi
      */
@@ -110,6 +114,8 @@ class ManualApplicationRegistrar
                 'language' => $profile->language,
                 'intake' => $degreeRow->intake,
                 'duration' => $degreeRow->duration,
+                'intake_year' => $input['intake_year'],
+                'whatsapp' => $input['whatsapp'],
                 'status' => UniversityApplication::STATUS_SUBMITTED,
                 'admission_status' => UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW,
                 'submitted_at' => now(),
