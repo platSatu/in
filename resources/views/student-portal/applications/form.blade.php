@@ -87,14 +87,19 @@
             border: 1px solid #eef1f8;
             border-radius: 12px;
             padding: 16px 18px;
-            max-height: 260px;
+            max-height: 420px;
             overflow-y: auto;
             font-size: 13px;
             color: #4a5063;
             background: #f8f9fc;
         }
         .terms-box ol { padding-left: 18px; margin-bottom: 0; }
-        .terms-box li { margin-bottom: 8px; }
+        .terms-box li { margin-bottom: 14px; }
+        .terms-box p { margin: 4px 0 0; }
+        .terms-box p[lang="en"] { color: #6b7186; font-style: italic; }
+        .terms-box p[lang="zh"] { color: #6b7186; }
+        .terms-title { font-weight: 700; text-align: center; color: #2b2f38; margin-bottom: 10px; line-height: 1.6; }
+        .terms-intro { margin-bottom: 12px; }
         .photo-preview {
             width: 90px; height: 110px; object-fit: cover; border-radius: 8px;
             border: 1px solid #eef1f8; background: #f8f9fc;
@@ -279,29 +284,102 @@
             </div>
 
             <div class="card-box">
-                <div class="section-title">Terms &amp; Condition</div>
+                <div class="section-title">Terms &amp; Conditions</div>
                 <div class="terms-box">
+                    {{-- S&K tiga bahasa (ID / EN / 中文), hardcode sesuai teks dari user 7 Okt 2026. --}}
+                    <div class="terms-title">TERMS &amp; CONDITIONS<br>KETENTUAN DAN SYARAT PENDAFTARAN KULIAH<br><span lang="zh">留学申请条款与条件</span></div>
+                    <div class="terms-intro">
+                        <p lang="id">Dengan melakukan pendaftaran melalui INA STUDY, calon mahasiswa/i menyatakan telah membaca, memahami, dan menyetujui seluruh ketentuan berikut.</p>
+                        <p lang="en">By registering through INA STUDY, the prospective student confirms that they have read, understood, and agreed to all of the following terms and conditions.</p>
+                        <p lang="zh">通过 INA STUDY 提交申请，即表示申请人已阅读、理解并同意以下所有条款与条件。</p>
+                    </div>
                     <ol>
-                        <li>INASTUDY (sebagai agency) berkewajiban membantu pendaftaran setiap calon mahasiswa/i ke universitas yang di minati.</li>
-                        <li>INASTUDY (sebagai agency) tidak menjamin beasiswa kepada calon mahasiswa/i ke universitas yang di minati.</li>
-                        <li>INASTUDY (sebagai agency) akan membantu mendampingi / menjemput mahasiswa/i ke university.</li>
-                        <li>INASTUDY (sebagai agency) tidak mengijinkan mahasiswa/i menitipkan barang kepada team ataupun pihak agency.</li>
-                        <li>INASTUDY (sebagai agency) tidak bertanggung jawab kepada mahasiswa/i atas Kesehatan dan Keselamatan kepada mahasiswa/i sebelum dan setelah pelepasan sampai pendampingan di China.</li>
-                        <li>INASTUDY (sebagai agency) tidak bertanggung jawab dalam hal, tindak criminal &amp; kehilangan dalam bentuk apa pun selama perjalanan dan sampai ke China.</li>
-                        <li>Calon mahasiswa/i wajib membayarkan registrasi fee setelah mengirimkan formulir pendaftaran maximal 3 hari setelah menyerahkan formulir.</li>
-                        <li>Biaya Registrasi fee tidak dapat ditukarkan dalam voucher dalam bentuk apapun, dan tidak dapat dikembalikan (non-refundable).</li>
-                        <li>Mahasiswa/i wajib melakukan pengurusan visa melalui pihak Inastudy.</li>
-                        <li>Mahasiswa/i wajib memesan tiket pesawat melalui pihak Inastudy.</li>
-                        <li>Mahasiswa/i berhak mendapatkan surat penerimaan dari Universitas.</li>
-                        <li>Mahasiswa/i yang sudah mendaftarkan melalui inastudy, berhak mendapatkan konsultasi secara gratis sampai penerimaan di universitas.</li>
+                        <li>
+                            <strong>Layanan Pendaftaran / Registration Services / 申请服务</strong>
+                            <p lang="id">INA STUDY sebagai agen pendidikan berkewajiban membantu proses pendaftaran calon mahasiswa/i ke universitas yang diminati, sesuai dengan program studi, persyaratan, dan ketentuan yang berlaku di universitas terkait.</p>
+                            <p lang="en">INA STUDY, as an education agency, is responsible for assisting prospective students with the application process to their chosen university, in accordance with the relevant academic program, admission requirements, and university regulations.</p>
+                            <p lang="zh">INA STUDY 作为教育中介机构，负责协助申请人申请其意向大学，并根据相关专业、入学要求及大学规定提供申请服务。</p>
+                        </li>
+                        <li>
+                            <strong>Beasiswa / Scholarship / 奖学金</strong>
+                            <p lang="id">INA STUDY dapat memberikan informasi dan membantu proses pengajuan beasiswa. Namun, INA STUDY tidak menjamin bahwa calon mahasiswa/i akan memperoleh beasiswa. Keputusan pemberian beasiswa sepenuhnya merupakan kewenangan universitas atau pihak pemberi beasiswa.</p>
+                            <p lang="en">INA STUDY may provide information and assistance regarding scholarship applications. However, INA STUDY does not guarantee that any prospective student will be awarded a scholarship. The decision to grant a scholarship is solely at the discretion of the relevant university or scholarship provider.</p>
+                            <p lang="zh">INA STUDY 可提供奖学金相关信息并协助申请人进行奖学金申请。但 INA STUDY 不保证申请人一定能够获得奖学金。奖学金的最终授予决定权归相关大学或奖学金提供方所有。</p>
+                        </li>
+                        <li>
+                            <strong>Pendampingan Kedatangan / Arrival Assistance / 抵达协助</strong>
+                            <p lang="id">INA STUDY akan memberikan bantuan dan pendampingan kepada mahasiswa/i pada saat kedatangan di China, termasuk penjemputan dan/atau pendampingan menuju universitas, sesuai dengan layanan yang telah ditentukan.</p>
+                            <p lang="en">INA STUDY will provide assistance and support to students upon their arrival in China, including airport pick-up and/or transportation assistance to the university, in accordance with the applicable services.</p>
+                            <p lang="zh">INA STUDY 将根据所提供的服务，为学生抵达中国后提供协助与陪同服务，包括机场接机及/或前往大学的相关协助。</p>
+                        </li>
+                        <li>
+                            <strong>Penitipan Barang / Personal Belongings / 个人物品</strong>
+                            <p lang="id">Calon mahasiswa/i maupun mahasiswa/i tidak diperkenankan menitipkan barang pribadi, dokumen, uang, atau barang berharga lainnya kepada tim INA STUDY maupun pihak yang ditunjuk oleh INA STUDY. INA STUDY tidak bertanggung jawab atas kehilangan atau kerusakan barang yang dititipkan.</p>
+                            <p lang="en">Prospective students and students are not permitted to entrust personal belongings, documents, cash, or other valuables to INA STUDY staff or any party designated by INA STUDY. INA STUDY shall not be responsible for any loss of or damage to items that have been entrusted to such parties.</p>
+                            <p lang="zh">申请人及学生不得将个人物品、文件、现金或其他贵重物品交由 INA STUDY 工作人员或 INA STUDY 指定的任何人员保管。对于因委托保管而产生的物品遗失或损坏，INA STUDY 不承担责任。</p>
+                        </li>
+                        <li>
+                            <strong>Kesehatan dan Keselamatan / Health and Safety / 健康与安全</strong>
+                            <p lang="id">INA STUDY tidak bertanggung jawab atas kondisi kesehatan maupun keselamatan calon mahasiswa/i atau mahasiswa/i di luar cakupan layanan pendampingan yang diberikan, termasuk sebelum keberangkatan, selama perjalanan, maupun setelah proses pelepasan, kecuali dalam lingkup layanan resmi yang secara khusus menjadi tanggung jawab INA STUDY.</p>
+                            <p lang="en">INA STUDY shall not be responsible for the health or safety of prospective students or students outside the scope of the assistance services provided, including prior to departure, during the journey, or after the handover, except for matters specifically covered by INA STUDY’s official services.</p>
+                            <p lang="zh">对于申请人或学生在 INA STUDY 所提供的陪同服务范围之外发生的健康或安全问题，INA STUDY 不承担责任，包括出发前、行程期间及交接完成后的相关情况，但属于 INA STUDY 官方服务明确责任范围内的事项除外。</p>
+                        </li>
+                        <li>
+                            <strong>Kehilangan dan Tindakan Kriminal / Loss and Criminal Incidents / 财物遗失及刑事事件</strong>
+                            <p lang="id">INA STUDY tidak bertanggung jawab atas kehilangan barang, kerugian, atau kejadian yang berkaitan dengan tindakan kriminal yang dialami calon mahasiswa/i atau mahasiswa/i selama perjalanan maupun selama berada di China, sepanjang kejadian tersebut berada di luar kendali dan tanggung jawab INA STUDY.</p>
+                            <p lang="en">INA STUDY shall not be responsible for any loss of belongings, financial loss, or criminal incidents experienced by prospective students or students during their journey or while in China, to the extent that such incidents are beyond the control and responsibility of INA STUDY.</p>
+                            <p lang="zh">对于申请人或学生在行程期间或在中国期间发生的财物遗失、经济损失或刑事事件，如相关事件超出 INA STUDY 的控制及责任范围，INA STUDY 不承担责任。</p>
+                        </li>
+                        <li>
+                            <strong>Pembayaran Registration Fee / Registration Fee Payment / 报名费支付</strong>
+                            <p lang="id">Calon mahasiswa/i wajib melakukan pembayaran Registration Fee maksimal 3 (tiga) hari setelah menyerahkan formulir pendaftaran kepada INA STUDY. Proses pendaftaran dapat dilanjutkan setelah pembayaran diterima dan dikonfirmasi oleh INA STUDY.</p>
+                            <p lang="en">Prospective students are required to pay the Registration Fee within a maximum of 3 (three) days after submitting the registration form to INA STUDY. The application process may proceed once the payment has been received and confirmed by INA STUDY.</p>
+                            <p lang="zh">申请人须在向 INA STUDY 提交申请表后最迟 3（三）日内支付报名费（Registration Fee）。在 INA STUDY 收到并确认付款后，申请流程方可继续进行。</p>
+                        </li>
+                        <li>
+                            <strong>Registration Fee – Non-Refundable / Registration Fee – Non-Refundable / 报名费不可退款</strong>
+                            <p lang="id">Registration Fee bersifat non-refundable dan tidak dapat dikembalikan, dialihkan maupun ditukarkan dalam bentuk voucher atau bentuk kompensasi lainnya, dengan alasan apa pun.</p>
+                            <p lang="en">The Registration Fee is non-refundable and may not be refunded, transferred, converted into a voucher, or exchanged for any other form of compensation for any reason.</p>
+                            <p lang="zh">报名费（Registration Fee）一经支付，不予退款，且无论任何原因，均不得转让、兑换为代金券或其他形式的补偿。</p>
+                        </li>
+                        <li>
+                            <strong>Pengurusan Visa / Visa Application / 签证办理</strong>
+                            <p lang="id">Mahasiswa/i yang menggunakan layanan INA STUDY wajib melakukan proses pengurusan visa melalui INA STUDY, sesuai dengan prosedur dan ketentuan yang berlaku.</p>
+                            <p lang="en">Students using INA STUDY’s services are required to process their visa application through INA STUDY, in accordance with the applicable procedures and regulations.</p>
+                            <p lang="zh">使用 INA STUDY 服务的学生须通过 INA STUDY 办理签证，并遵守相关办理流程及规定。</p>
+                        </li>
+                        <li>
+                            <strong>Pemesanan Tiket Pesawat / Flight Ticket Booking / 机票预订</strong>
+                            <p lang="id">Mahasiswa/i yang mengikuti program melalui INA STUDY wajib melakukan pemesanan tiket pesawat melalui INA STUDY, sesuai dengan ketentuan keberangkatan dan layanan yang berlaku.</p>
+                            <p lang="en">Students participating in a program through INA STUDY are required to book their flight tickets through INA STUDY, in accordance with the applicable departure arrangements and service terms.</p>
+                            <p lang="zh">通过 INA STUDY 参加相关项目的学生须通过 INA STUDY 预订机票，并遵守相关出发安排及服务规定。</p>
+                        </li>
+                        <li>
+                            <strong>Surat Penerimaan Universitas / University Admission Letter / 大学录取通知书</strong>
+                            <p lang="id">Calon mahasiswa/i yang memenuhi persyaratan dan dinyatakan diterima oleh universitas berhak memperoleh Surat Penerimaan/Admission Letter dari universitas yang bersangkutan.</p>
+                            <p lang="en">Prospective students who meet the applicable requirements and are successfully admitted by the university shall be entitled to receive an Admission Letter issued by the relevant university.</p>
+                            <p lang="zh">符合相关要求并成功获得大学录取的申请人，有权获得由相关大学出具的录取通知书（Admission Letter）。</p>
+                        </li>
+                        <li>
+                            <strong>Konsultasi Pendidikan / Education Consultation / 教育咨询</strong>
+                            <p lang="id">Calon mahasiswa/i yang telah melakukan pendaftaran melalui INA STUDY berhak memperoleh konsultasi pendidikan tanpa biaya tambahan sampai dengan proses penerimaan di universitas, sesuai dengan layanan konsultasi yang disediakan oleh INA STUDY.</p>
+                            <p lang="en">Prospective students who have registered through INA STUDY are entitled to receive education consultation at no additional cost throughout the university application process until admission, in accordance with the consultation services provided by INA STUDY.</p>
+                            <p lang="zh">通过 INA STUDY 完成报名的申请人，有权在大学申请及录取过程中获得免费的教育咨询服务，具体以 INA STUDY 所提供的咨询服务范围为准。</p>
+                        </li>
                     </ol>
+                    <div class="terms-intro mt-2">
+                        <p lang="id">Dengan melakukan pendaftaran melalui INA STUDY, calon mahasiswa/i menyatakan bahwa seluruh informasi yang diberikan adalah benar dan lengkap serta menyatakan telah membaca, memahami, dan menyetujui seluruh Terms &amp; Conditions yang berlaku.</p>
+                        <p lang="en">By registering through INA STUDY, the prospective student confirms that all information provided is true and complete, and acknowledges that they have read, understood, and agreed to all applicable Terms &amp; Conditions.</p>
+                        <p lang="zh">通过 INA STUDY 提交申请，即表示申请人确认所提供的信息真实、完整，并确认已阅读、理解并同意所有适用的条款与条件。</p>
+                    </div>
                 </div>
 
                 <div class="form-check mt-3">
-                    <input class="form-check-input @error('terms_accepted') is-invalid @enderror" type="checkbox" name="terms_accepted" value="1" id="termsAccepted"
+                    <input class="form-check-input @error('terms_accepted') is-invalid @enderror" type="checkbox" name="terms_accepted" value="1" id="termsAccepted" required
                         {{ old('terms_accepted', $formDetail && $formDetail->terms_accepted_at ? '1' : '') ? 'checked' : '' }}>
                     <label class="form-check-label" for="termsAccepted" style="font-size:14px;">
-                        I have read and agree to the Terms &amp; Condition above.
+                        Saya telah membaca, memahami, dan menyetujui seluruh Terms &amp; Conditions di atas.
+                        <span class="d-block text-muted" style="font-size:12.5px;">I have read, understood, and agree to all Terms &amp; Conditions above. / 我已阅读、理解并同意以上所有条款与条件。</span>
                     </label>
                     @error('terms_accepted')
                         <div class="invalid-feedback d-block">{{ $message }}</div>
