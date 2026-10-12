@@ -29,6 +29,8 @@ use InvalidArgumentException;
  *    pemakaian kredit dengan besaran 1 atau 1.5 (1 credit = 1 jam). Kalau
  *    ternyata di hari tersebut belajar 2 jam berarti ngajuin 2 kali 1
  *    kredit."
+ *   (12 Oktober 2026: owner menambah pilihan 2 credit, jadi belajar 2 jam
+ *    cukup 1 pengajuan. Validasinya di StudentPortal\ClassSessionController.)
  *
  * KENAPA SISWA YANG TRIGGER DULUAN (bukan guru seperti desain absensi
  * awal yang sempat didiskusikan): pengajar itu sendiri yang DIUNTUNGKAN

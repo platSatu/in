@@ -11,8 +11,9 @@
 @php
     $rp = fn ($value) => 'Rp ' . number_format((float) $value, 0, ',', '.');
     $num = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',');
-    $sourceName = $source->coursePackage->name ?? 'paket lama';
-    $sourceClass = $source->coursePackage->courseClass->name ?? '-';
+    // Detail lengkap (Nama · Type · Class · Level) supaya paket yang class-nya
+    // sama (mis. sama-sama Private) tetap bisa dibedakan.
+    $sourceLabel = $source->coursePackage?->detailLabel() ?: 'paket lama';
 @endphp
 
 <div class="col-lg-6 mx-auto layout-spacing">
@@ -20,8 +21,8 @@
         <div class="widget-content widget-content-area">
             <h4 class="mb-1">Upgrade / Convert Paket</h4>
             <p class="text-muted mb-3">
-                Dari: <strong>{{ $sourceName }}</strong>
-                ({{ $sourceClass }}) &middot; sisa {{ $num($remaining) }} credit
+                Dari: <strong>{{ $sourceLabel }}</strong>
+                &middot; sisa {{ $num($remaining) }} credit
             </p>
 
             @if (session('error'))
@@ -41,7 +42,7 @@
                             <option value="">-- Pilih Paket --</option>
                             @foreach ($packages as $package)
                                 <option value="{{ $package->id }}" @selected($target?->id === $package->id)>
-                                    {{ $package->name }} ({{ $package->courseClass->name ?? '-' }}) &middot; {{ $rp($package->effectivePrice()) }} / {{ $num($package->credits) }} credit
+                                    {{ $package->detailLabel() }} &middot; {{ $rp($package->effectivePrice()) }} / {{ $num($package->credits) }} credit
                                 </option>
                             @endforeach
                         </select>
@@ -64,21 +65,22 @@
 
                     @if ($mode === 'convert' && $target && $sourceUnit > 0 && $targetUnit > 0)
                         @php
-                            $targetName = $target->courseClass->name ?? $target->name;
+                            $targetLabel = $target->detailLabel();
                             $ratio = $targetUnit / $sourceUnit;
                         @endphp
                         <div class="alert alert-light border small mb-3">
                             <div class="fw-semibold mb-1">Cara hitungnya</div>
-                            1 credit {{ $sourceClass }} = {{ $rp($sourceUnit) }} &middot; 1 credit {{ $targetName }} = {{ $rp($targetUnit) }}<br>
+                            1 credit <strong>{{ $sourceLabel }}</strong> = {{ $rp($sourceUnit) }}<br>
+                            1 credit <strong>{{ $targetLabel }}</strong> = {{ $rp($targetUnit) }}<br>
                             @if ($ratio >= 1)
-                                Jadi <strong>{{ $num($ratio) }} credit {{ $sourceClass }} = 1 credit {{ $targetName }}</strong>.
+                                Jadi <strong>{{ $num($ratio) }} credit lama = 1 credit baru</strong>.
                             @else
-                                Jadi <strong>1 credit {{ $sourceClass }} = {{ $num(1 / $ratio) }} credit {{ $targetName }}</strong>.
+                                Jadi <strong>1 credit lama = {{ $num(1 / $ratio) }} credit baru</strong>.
                             @endif
                         </div>
 
                         <div class="mb-3">
-                            <label class="form-label">Mau ambil berapa credit {{ $targetName }}?</label>
+                            <label class="form-label">Mau ambil berapa credit {{ $targetLabel }}?</label>
                             <div class="input-group">
                                 <input type="number" name="quantity" class="form-control" min="1" step="1"
                                     @if (isset($preview['max_quantity'])) max="{{ $preview['max_quantity'] }}" @endif
@@ -114,7 +116,7 @@
                         </div>
                         @if ($preview['source_after'] > 0)
                             <div class="d-flex justify-content-between py-1 text-success">
-                                <span>Sisa credit {{ $sourceName }} (tetap bisa dipakai)</span>
+                                <span>Sisa credit {{ $sourceLabel }} (tetap bisa dipakai)</span>
                                 <span>{{ $num($preview['source_after']) }} credit</span>
                             </div>
                         @endif

@@ -340,6 +340,10 @@
                 --}}
                 <div class="tab-pane fade" id="inayule-schedule" role="tabpanel"
                     aria-labelledby="inayule-schedule-tab">
+                    <div class="mb-3">
+                        <a href="{{ route('inayule.class-sessions.create') }}" class="btn btn-primary btn-sm">+ Ajukan Pemakaian Credit</a>
+                    </div>
+
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
                             <thead>
@@ -381,10 +385,6 @@
                                 @endforelse
                             </tbody>
                         </table>
-                    </div>
-
-                    <div class="mt-3">
-                        <a href="{{ route('inayule.class-sessions.create') }}" class="btn btn-primary btn-sm">+ Ajukan Pemakaian Credit</a>
                     </div>
                 </div>
 

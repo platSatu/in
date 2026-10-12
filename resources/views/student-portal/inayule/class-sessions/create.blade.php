@@ -11,7 +11,7 @@
     <div class="statbox widget box box-shadow">
         <div class="widget-content widget-content-area">
             <h4 class="mb-1">Ajukan Pemakaian Credit</h4>
-            <p class="text-muted mb-4">1 credit = 1 jam kelas. Kalau belajar 2 jam di hari yang sama, ajukan 2 kali terpisah (masing-masing 1 credit).</p>
+            <p class="text-muted mb-4">1 credit = 1 jam kelas. Pilih 1, 1.5, atau 2 credit sesuai lama belajar.</p>
 
             @if (session('error'))
                 <div class="alert alert-danger">{{ session('error') }}</div>
@@ -50,7 +50,7 @@
                         @foreach ($packages as $package)
                             @php($sisa = (float) ($remainingByPackage[$package->id] ?? 0))
                             <option value="{{ $package->id }}" @selected(old('course_package_id') === $package->id) @disabled($sisa <= 0)>
-                                {{ $package->name }} &middot; sisa {{ rtrim(rtrim(number_format($sisa, 2, ',', '.'), '0'), ',') }} credit
+                                {{ $package->detailLabel() }} &middot; sisa {{ rtrim(rtrim(number_format($sisa, 2, ',', '.'), '0'), ',') }} credit
                             </option>
                         @endforeach
                     </select>
@@ -67,6 +67,7 @@
                         <option value="">-- Pilih Jumlah --</option>
                         <option value="1" @selected(old('credit_amount') === '1')>1 credit (1 jam)</option>
                         <option value="1.5" @selected(old('credit_amount') === '1.5')>1.5 credit (1.5 jam)</option>
+                        <option value="2" @selected(old('credit_amount') === '2')>2 credit (2 jam)</option>
                     </select>
                 </div>
 

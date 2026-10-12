@@ -67,7 +67,10 @@ class ClassSessionController extends Controller
         $purchases = CoursePackagePurchase::where('student_id', $student->id)
             ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
             ->get();
-        $packages = CoursePackage::whereIn('id', $purchases->pluck('course_package_id')->unique())->orderBy('name')->get();
+        $packages = CoursePackage::whereIn('id', $purchases->pluck('course_package_id')->unique())
+            ->with(['type', 'courseClass', 'level'])
+            ->orderBy('name')
+            ->get();
 
         // Credit terpisah per paket -- tampilkan sisa tiap paket di pilihan.
         $remainingByPurchase = (new CourseCreditDebitService())->remainingByPurchase($purchases);
@@ -88,11 +91,10 @@ class ClassSessionController extends Controller
         $validated = $request->validate([
             'teacher_user_id' => ['required', 'string', 'exists:users,id'],
             'course_package_id' => ['required', 'string', 'exists:course_packages,id'],
-            // Requirement eksplisit owner: besaran credit HANYA 1 atau 1.5
-            // (1 credit = 1 jam) -- kalau 1 hari belajar 2 jam, siswa
-            // mengajukan 2 KALI terpisah masing-masing 1 credit, BUKAN
-            // 1 pengajuan besaran 2.
-            'credit_amount' => ['required', 'numeric', 'in:1,1.5'],
+            // Requirement owner: besaran credit 1, 1.5, atau 2 (1 credit =
+            // 1 jam). Pilihan 2 credit ditambahkan 12 Oktober 2026 --
+            // sebelumnya belajar 2 jam harus diajukan 2 kali 1 credit.
+            'credit_amount' => ['required', 'numeric', 'in:1,1.5,2'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
 

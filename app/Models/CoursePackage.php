@@ -64,6 +64,22 @@ class CoursePackage extends Model
         return $this->hasActivePromo() ? (float) $this->promo_price : (float) $this->price;
     }
 
+    /**
+     * "Nama · Type · Class · Level" dalam satu baris -- untuk pilihan
+     * dropdown & kalimat. Urutannya sama dengan partial
+     * student-portal/inayule/_package-info (versi bertumpuk). Eager-load
+     * type, courseClass, level supaya tidak query per baris.
+     */
+    public function detailLabel(): string
+    {
+        return implode(' · ', array_filter([
+            $this->name,
+            $this->type?->name,
+            $this->courseClass?->name,
+            $this->level?->name,
+        ]));
+    }
+
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');

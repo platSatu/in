@@ -67,11 +67,11 @@ class InaYulePackageUpgradeController extends Controller
         }
 
         return view('student-portal.inayule.upgrade', [
-            'source' => $source->load('coursePackage.courseClass'),
+            'source' => $source->load(['coursePackage.type', 'coursePackage.courseClass', 'coursePackage.level']),
             'remaining' => $this->calculator->remaining($source),
-            'packages' => CoursePackage::where('status', 'active')->whereKeyNot($source->course_package_id)->with('courseClass')->orderBy('name')->get()
+            'packages' => CoursePackage::where('status', 'active')->whereKeyNot($source->course_package_id)->with(['type', 'courseClass', 'level'])->orderBy('name')->get()
                 ->filter(fn (CoursePackage $package) => PackageUpgradeCalculator::isSellable($package))->values(),
-            'target' => $target,
+            'target' => $target?->loadMissing(['type', 'courseClass', 'level']),
             'mode' => $mode,
             'quantity' => $convertAll ? ($preview['quantity'] ?? null) : $quantity,
             'convertAll' => $convertAll,
