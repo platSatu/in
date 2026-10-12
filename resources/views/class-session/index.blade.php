@@ -31,19 +31,30 @@
             <div class="widget-content widget-content-area br-8">
                 <h6 class="mb-1">Potong Credit Manual</h6>
                 <p class="text-muted small mb-3">Untuk kelas yang dianggap hadir tanpa pengajuan siswa, mis. siswa tidak hadir lalu diganti video. Pilih pengajar kalau pengajar tetap mendapat honor; kosongkan kalau tidak.</p>
-                <form method="POST" action="{{ route('class-session.charge') }}" class="row g-2">
+                <form method="POST" action="{{ route('class-session.charge') }}" class="row g-2 align-items-end">
                     @csrf
-                    <div class="col-md-6 col-xl-3 d-flex flex-column">
-                        <label class="form-label">Siswa &amp; Paket</label>
-                        <select name="student_package" class="form-select" required>
-                            <option value="">-- Pilih --</option>
-                            @foreach ($chargeOptions as $option)
-                                <option value="{{ $option['value'] }}" @selected(old('student_package') === $option['value'])>{{ $option['label'] }}</option>
+                    <div class="col-md-6 col-xl-2">
+                        <label class="form-label small text-muted mb-1">Siswa</label>
+                        <select name="student_id" id="charge-student" class="form-select" required>
+                            <option value="">-- Pilih Siswa --</option>
+                            @foreach ($chargeOptions['students'] as $chargeStudent)
+                                <option value="{{ $chargeStudent['id'] }}" @selected(old('student_id') === $chargeStudent['id'])>{{ $chargeStudent['name'] }}</option>
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-6 col-xl-2 d-flex flex-column">
-                        <label class="form-label">Pengajar (opsional)</label>
+                    <div class="col-md-6 col-xl-3">
+                        <label class="form-label small text-muted mb-1">Paket</label>
+                        {{-- Hanya paket milik siswa yang dipilih yang tampil (lihat script di bawah). --}}
+                        <select name="course_package_id" id="charge-package" class="form-select" required>
+                            <option value="">-- Pilih Paket --</option>
+                            @foreach ($chargeOptions['packages'] as $chargePackage)
+                                <option value="{{ $chargePackage['package_id'] }}" data-student="{{ $chargePackage['student_id'] }}"
+                                    @selected(old('student_id') === $chargePackage['student_id'] && old('course_package_id') === $chargePackage['package_id'])>{{ $chargePackage['label'] }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="col-md-6 col-xl-2">
+                        <label class="form-label small text-muted mb-1">Pengajar (opsional)</label>
                         <select name="teacher_user_id" class="form-select">
                             <option value="">Tanpa honor</option>
                             @foreach ($teachers as $teacher)
@@ -51,25 +62,23 @@
                             @endforeach
                         </select>
                     </div>
-                    <div class="col-md-3 col-xl-1 d-flex flex-column">
-                        <label class="form-label">Credit</label>
+                    <div class="col-md-3 col-xl-1">
+                        <label class="form-label small text-muted mb-1">Credit</label>
                         <input type="number" name="credit_amount" class="form-control" min="0.5" max="10" step="0.5" value="{{ old('credit_amount', 1) }}" required>
                     </div>
-                    <div class="col-md-4 col-xl-2 d-flex flex-column">
-                        <label class="form-label">Tanggal Kelas</label>
+                    <div class="col-md-4 col-xl-2">
+                        <label class="form-label small text-muted mb-1">Tanggal Kelas</label>
                         <input type="datetime-local" name="class_at" class="form-control" max="{{ now()->format('Y-m-d\TH:i') }}" value="{{ old('class_at', now()->format('Y-m-d\TH:i')) }}" required>
                     </div>
-                    <div class="col-md-5 col-xl d-flex flex-column">
-                        <label class="form-label">Alasan</label>
+                    <div class="col-md-5 col-xl">
+                        <label class="form-label small text-muted mb-1">Alasan</label>
                         <input type="text" name="reason" class="form-control" maxlength="500" placeholder="Tidak hadir, diganti video" value="{{ old('reason') }}" required>
                     </div>
-                    {{-- Label tak terlihat + flex-grow: tombol setinggi kotak isian di sebelahnya. --}}
-                    <div class="col-12 col-xl-auto d-flex flex-column">
-                        <label class="form-label invisible d-none d-xl-block">Aksi</label>
-                        <button type="submit" class="btn btn-primary text-nowrap px-4 flex-grow-1" onclick="return confirm('Potong credit siswa ini?')">Potong</button>
+                    {{-- Padding vertikal disamakan dengan .form-control (sama seperti tombol Filter di menu Student). --}}
+                    <div class="col-12 col-xl-auto">
+                        <button type="submit" class="btn btn-primary w-100 text-nowrap px-4" style="padding-top: 0.75rem; padding-bottom: 0.75rem;" onclick="return confirm('Potong credit siswa ini?')">Potong</button>
                     </div>
                 </form>
-
             </div>
         </div>
     </div>
@@ -269,4 +278,27 @@
         </div>
     </div>
 </div>
+<script>
+    // Form Potong Credit Manual: dropdown Paket hanya berisi paket milik siswa yang dipilih.
+    (function () {
+        var student = document.getElementById('charge-student');
+        var pkg = document.getElementById('charge-package');
+        if (!student || !pkg) return;
+
+        function sync(resetValue) {
+            var studentId = student.value;
+            Array.prototype.forEach.call(pkg.options, function (option) {
+                if (!option.value) return;
+                var match = option.getAttribute('data-student') === studentId;
+                option.hidden = !match;
+                option.disabled = !match;
+            });
+            if (resetValue) pkg.value = '';
+            pkg.disabled = !studentId;
+        }
+
+        student.addEventListener('change', function () { sync(true); });
+        sync(false);
+    })();
+</script>
 @endsection

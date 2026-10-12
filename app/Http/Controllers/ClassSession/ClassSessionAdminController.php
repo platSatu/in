@@ -129,19 +129,21 @@ class ClassSessionAdminController extends Controller
     public function charge(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'student_package' => ['required', 'string', 'regex:/^[0-9a-f-]{36}\|[0-9a-f-]{36}$/i'],
+            'student_id' => ['required', 'string', 'exists:students,id'],
+            'course_package_id' => ['required', 'string', 'exists:course_packages,id'],
             'teacher_user_id' => ['nullable', 'string', 'exists:users,id'],
             'credit_amount' => ['required', 'numeric', 'min:0.5', 'max:10', 'multiple_of:0.5'],
             'class_at' => ['required', 'date', 'before_or_equal:now'],
             'reason' => ['required', 'string', 'max:500'],
         ], [
-            'student_package.required' => 'Pilih siswa & paket.',
+            'student_id.required' => 'Pilih siswa.',
+            'course_package_id.required' => 'Pilih paket.',
             'class_at.before_or_equal' => 'Tanggal kelas tidak boleh di masa depan.',
             'reason.required' => 'Tulis alasannya, mis. "Tidak hadir, diganti video".',
         ]);
 
-        [$studentId, $packageId] = explode('|', $validated['student_package']);
-        $student = Student::findOrFail($studentId);
+        $student = Student::findOrFail($validated['student_id']);
+        $packageId = $validated['course_package_id'];
         $this->abortUnlessBranchVisible($request, $student->branch_id);
 
         try {
@@ -164,32 +166,44 @@ class ClassSessionAdminController extends Controller
     }
 
     /**
-     * Pilihan "siswa -- paket" yang masih punya sisa credit, untuk form potong manual.
+     * Pilihan form potong manual: siswa yang masih punya sisa credit, dan
+     * paket per siswa (Nama · Type · Class · Level + sisa). Dropdown Paket
+     * di view difilter sesuai siswa yang dipilih.
      *
-     * @return array<int, array{value: string, label: string}>
+     * @return array{students: array<int, array{id: string, name: string}>, packages: array<int, array{student_id: string, package_id: string, label: string}>}
      */
     private function chargeOptions(Request $request): array
     {
         $purchases = CoursePackagePurchase::where('status', CoursePackagePurchase::STATUS_COMPLETED)
             ->whereIn('student_id', $this->scopeToVisibleBranches(Student::select('id'), $request))
-            ->with(['student:id,first_name,last_name', 'coursePackage:id,name'])
+            ->with(['student:id,first_name,last_name', 'coursePackage.type', 'coursePackage.courseClass', 'coursePackage.level'])
             ->get();
         $remaining = (new CourseCreditDebitService())->remainingByPurchase($purchases);
 
-        return $purchases->groupBy(fn ($purchase) => $purchase->student_id . '|' . $purchase->course_package_id)
-            ->map(function ($rows, $key) use ($remaining) {
+        $packages = $purchases->groupBy(fn ($purchase) => $purchase->student_id . '|' . $purchase->course_package_id)
+            ->map(function ($rows) use ($remaining) {
                 $sisa = $rows->sum(fn ($purchase) => $remaining[$purchase->id] ?? 0.0);
                 $first = $rows->first();
 
                 return $sisa > 0 ? [
-                    'value' => $key,
-                    'label' => trim(($first->student->first_name ?? '') . ' ' . ($first->student->last_name ?? '')) . ' -- ' . ($first->coursePackage->name ?? '-') . ' (sisa ' . rtrim(rtrim(number_format($sisa, 2, ',', '.'), '0'), ',') . ' credit)',
+                    'student_id' => $first->student_id,
+                    'student_name' => trim(($first->student->first_name ?? '') . ' ' . ($first->student->last_name ?? '')),
+                    'package_id' => $first->course_package_id,
+                    'label' => ($first->coursePackage?->detailLabel() ?: '-') . ' (sisa ' . rtrim(rtrim(number_format($sisa, 2, ',', '.'), '0'), ',') . ' credit)',
                 ] : null;
             })
             ->filter()
             ->sortBy('label')
-            ->values()
-            ->all();
+            ->values();
+
+        return [
+            'students' => $packages->unique('student_id')
+                ->map(fn ($row) => ['id' => $row['student_id'], 'name' => $row['student_name']])
+                ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+                ->values()
+                ->all(),
+            'packages' => $packages->all(),
+        ];
     }
 
     /**
