@@ -275,41 +275,40 @@
                     @endif
                 </div>
 
-                {{-- Tab 2: Status (paket yang dibeli) --}}
+                {{-- Tab 2: Status -- 1 baris per paket (pembelian paket yang sama digabung,
+                     rincian per pembelian ada di tab Riwayat Credit). --}}
                 <div class="tab-pane fade" id="inayule-history" role="tabpanel"
                     aria-labelledby="inayule-history-tab">
+                    @php
+                        $creditNum = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',');
+                    @endphp
                     <div class="table-responsive">
                         <table class="table align-middle mb-0">
                             <thead>
                                 <tr>
                                     <th>Package</th>
-                                    <th>Tanggal Beli</th>
                                     <th>Credits</th>
                                     <th>Terpakai</th>
                                     <th>Sisa</th>
-                                    <th>Status</th>
                                     <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @forelse ($purchases as $purchase)
+                                @forelse ($packageStatuses as $status)
                                     <tr>
-                                        <td>@include('student-portal.inayule._package-info', ['package' => $purchase->coursePackage])</td>
-                                        <td>{{ $purchase->created_at?->translatedFormat('d M Y, H:i') ?? '-' }}</td>
-                                        <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_granted, 2, ',', '.'), '0'), ',') }}</td>
-                                        <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_used, 2, ',', '.'), '0'), ',') }}</td>
-                                        <td>{{ rtrim(rtrim(number_format((float) $purchase->credits_remaining, 2, ',', '.'), '0'), ',') }}</td>
                                         <td>
-                                            @if($purchase->status === 'completed')
-                                                <span class="badge bg-success">Completed</span>
-                                            @else
-                                                <span class="badge bg-secondary">{{ ucfirst($purchase->status) }}</span>
+                                            @include('student-portal.inayule._package-info', ['package' => $status->package])
+                                            @if ($status->purchase_count > 1)
+                                                <div class="text-muted" style="font-size:12px;">dibeli {{ $status->purchase_count }}x</div>
                                             @endif
                                         </td>
+                                        <td>{{ $creditNum($status->credits_granted) }}</td>
+                                        <td>{{ $creditNum($status->credits_used) }}</td>
+                                        <td>{{ $creditNum($status->credits_remaining) }}</td>
                                         <td>
-                                            {{-- Upgrade paket penuh / convert sebagian credit dari baris ini saja. --}}
-                                            @if ($purchase->status === 'completed' && $purchase->credits_remaining > 0)
-                                                <a href="{{ route('inayule.upgrade.show', $purchase->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
+                                            {{-- Upgrade / convert gabungan sisa credit semua pembelian paket ini. --}}
+                                            @if ($status->credits_remaining > 0)
+                                                <a href="{{ route('inayule.upgrade.show', $status->first_purchase_id) }}" class="btn btn-sm btn-outline-primary text-nowrap">
                                                     Upgrade / Convert
                                                 </a>
                                             @else
@@ -322,7 +321,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="text-center text-muted py-4">Data not found</td>
+                                        <td colspan="5" class="text-center text-muted py-4">Data not found</td>
                                     </tr>
                                 @endforelse
                             </tbody>

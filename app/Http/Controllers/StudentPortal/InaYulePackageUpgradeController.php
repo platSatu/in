@@ -8,7 +8,6 @@ use App\Models\CoursePackagePayment;
 use App\Models\CoursePackagePurchase;
 use App\Models\PaymentGateway;
 use App\Models\Student;
-use App\Services\CourseCredit\CourseCreditDebitService;
 use App\Services\CoursePackagePayment\CoursePackagePaymentGatewayFactory;
 use App\Services\CoursePackagePayment\CoursePackagePurchaseNotifier;
 use App\Services\CoursePackagePayment\PackageUpgradeCalculator;
@@ -21,7 +20,8 @@ use RuntimeException;
 use Throwable;
 
 /**
- * Upgrade / Convert dari 1 baris paket di tab Status. Semua hitungan di
+ * Upgrade / Convert 1 paket di tab Status (gabungan semua pembelian paket
+ * itu; {purchaseId} = salah satu barisnya). Semua hitungan di
  * App\Services\CoursePackagePayment\PackageUpgradeCalculator; controller ini
  * hanya HTTP. Angka SELALU dihitung ulang di server, tidak pernah dari browser.
  *
@@ -66,6 +66,8 @@ class InaYulePackageUpgradeController extends Controller
             }
         }
 
+        $tradeIn = $this->calculator->tradeIn($source);
+
         return view('student-portal.inayule.upgrade', [
             'source' => $source->load(['coursePackage.type', 'coursePackage.courseClass', 'coursePackage.level']),
             'remaining' => $this->calculator->remaining($source),
@@ -76,7 +78,10 @@ class InaYulePackageUpgradeController extends Controller
             'quantity' => $convertAll ? ($preview['quantity'] ?? null) : $quantity,
             'convertAll' => $convertAll,
             // Untuk penjelasan rumus di halaman (hitungan sebenarnya tetap di kalkulator).
-            'sourceUnit' => CourseCreditDebitService::unitPrice($source),
+            // Rata-rata kalau pembeliannya beda harga (promo/normal).
+            'sourceUnit' => $tradeIn['unit_price'],
+            'mixedUnitPrice' => count(array_unique(array_column($tradeIn['rows'], 'unit_price'))) > 1,
+            'freeCredits' => $tradeIn['free_credits'],
             'targetUnit' => $target ? PackageUpgradeCalculator::targetUnitPrice($target) : 0.0,
             'preview' => $preview,
             'blockedReason' => $error,

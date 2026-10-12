@@ -58,8 +58,8 @@ use InvalidArgumentException;
  *
  * CREDIT TERPISAH PER PAKET (30 September 2026): credit tidak lagi 1 pool
  * lintas paket. Sesi kelas hanya memotong dari pembelian paket yang sama
- * (debit() dengan $coursePackageId), dan upgrade/convert hanya menukar
- * credit dari 1 baris pembelian yang dipilih siswa (debitPurchase()).
+ * (debit() dengan $coursePackageId), dan upgrade/convert menukar credit
+ * dari pembelian-pembelian paket yang dipilih siswa (debitPurchases()).
  * Sisa per pembelian = credits_granted - total alokasi (remainingByPurchase()).
  * Kolom balance di course_credits tetap total semua paket (ringkasan).
  */
@@ -86,15 +86,22 @@ class CourseCreditDebitService
     }
 
     /**
-     * Potong credit dari SATU baris pembelian (trade-in upgrade/convert).
-     * $amount null = seluruh sisa pembelian itu. Balik null kalau sisanya 0.
+     * Potong credit dari pembelian-pembelian tertentu, FIFO (trade-in
+     * upgrade/convert -- tab Status menggabungkan pembelian paket yang sama).
+     * $amount null = seluruh sisanya. Balik null kalau sisanya 0.
+     *
+     * @param  array<int, string>  $purchaseIds
      */
-    public function debitPurchase(Student $student, CoursePackagePurchase $purchase, ?float $amount, string $sourceType, string $description): ?CourseCredit
+    public function debitPurchases(Student $student, array $purchaseIds, ?float $amount, string $sourceType, string $description): ?CourseCredit
     {
-        return DB::transaction(function () use ($student, $purchase, $amount, $sourceType, $description) {
+        if ($purchaseIds === []) {
+            return null;
+        }
+
+        return DB::transaction(function () use ($student, $purchaseIds, $amount, $sourceType, $description) {
             $lockedStudent = Student::where('id', $student->id)->lockForUpdate()->first();
-            $purchases = $this->lockedPurchases($lockedStudent->id, purchaseId: $purchase->id);
-            $remaining = $this->available($purchases)[$purchase->id] ?? 0.0;
+            $purchases = $this->lockedPurchases($lockedStudent->id, purchaseIds: $purchaseIds);
+            $remaining = array_sum($this->available($purchases));
             $amount ??= $remaining;
 
             if ($amount <= 0.0) {
@@ -164,14 +171,21 @@ class CourseCreditDebitService
         return $credits > 0 ? MoneyMath::floorToScale(((float) $purchase->price_paid) / $credits, 4) : 0.0;
     }
 
-    /** Pembelian completed milik student (opsional 1 paket / 1 baris), urut FIFO, dikunci. */
-    private function lockedPurchases(string $studentId, ?string $coursePackageId = null, ?string $purchaseId = null): Collection
+    /**
+     * Pembelian completed milik student (opsional 1 paket / beberapa baris),
+     * urut FIFO, dikunci. Urutan created_at lalu id -- harus sama persis
+     * dengan PackageUpgradeCalculator::group() supaya rencana = eksekusi.
+     *
+     * @param  array<int, string>|null  $purchaseIds
+     */
+    private function lockedPurchases(string $studentId, ?string $coursePackageId = null, ?array $purchaseIds = null): Collection
     {
         return CoursePackagePurchase::where('student_id', $studentId)
             ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
             ->when($coursePackageId, fn ($query) => $query->where('course_package_id', $coursePackageId))
-            ->when($purchaseId, fn ($query) => $query->whereKey($purchaseId))
+            ->when($purchaseIds !== null, fn ($query) => $query->whereKey($purchaseIds))
             ->orderBy('created_at')
+            ->orderBy('id')
             ->lockForUpdate()
             ->get();
     }

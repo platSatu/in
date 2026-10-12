@@ -108,7 +108,11 @@ class CoursePackagePayment extends Model
         return $this->belongsTo(CourseCredit::class, 'trade_in_course_credit_id');
     }
 
-    /** Baris pembelian yang credit-nya ditukar (upgrade/convert dari tab Status). */
+    /**
+     * Salah satu baris pembelian paket yang credit-nya ditukar (upgrade/convert
+     * dari tab Status). Yang ditukar = gabungan semua pembelian paket itu,
+     * lihat PackageUpgradeCalculator::group().
+     */
     public function sourcePurchase(): BelongsTo
     {
         return $this->belongsTo(CoursePackagePurchase::class, 'source_course_package_purchase_id');

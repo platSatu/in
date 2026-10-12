@@ -133,14 +133,31 @@ class InaYulePackageController extends Controller
 
         $remainingByPurchase = (new CourseCreditDebitService())->remainingByPurchase($purchases);
 
-        foreach ($purchases as $purchase) {
-            $completed = $purchase->status === CoursePackagePurchase::STATUS_COMPLETED;
-            $purchase->credits_remaining = $remainingByPurchase[$purchase->id] ?? 0.0;
-            $purchase->credits_used = $completed ? max((float) $purchase->credits_granted - $purchase->credits_remaining, 0.0) : 0.0;
-        }
+        // Tab Status (12 Oktober 2026): pembelian paket yang SAMA digabung jadi
+        // 1 baris (total credit/terpakai/sisa). Rincian per pembelian ada di
+        // tab Riwayat Credit. Hanya pembelian completed (yang benar-benar jadi
+        // credit). first_purchase_id = baris tertua, dipakai tombol Upgrade /
+        // Convert (kalkulatornya menukar gabungan semua pembelian paket itu).
+        $packageStatuses = $purchases
+            ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
+            ->groupBy('course_package_id')
+            ->map(function ($rows) use ($remainingByPurchase) {
+                $granted = (float) $rows->sum(fn ($purchase) => (float) $purchase->credits_granted);
+                $remaining = (float) $rows->sum(fn ($purchase) => (float) ($remainingByPurchase[$purchase->id] ?? 0.0));
 
-        // Balik ke urutan terbaru dulu buat tampilan (sama seperti sebelumnya).
-        $purchases = $purchases->sortByDesc('created_at')->values();
+                return (object) [
+                    'package' => $rows->first()->coursePackage,
+                    'first_purchase_id' => $rows->first()->id,
+                    'purchase_count' => $rows->count(),
+                    'last_purchased_at' => $rows->max('created_at'),
+                    'credits_granted' => $granted,
+                    'credits_remaining' => $remaining,
+                    'credits_used' => max($granted - $remaining, 0.0),
+                ];
+            })
+            // Paket yang terakhir dibeli tampil paling atas.
+            ->sortByDesc('last_purchased_at')
+            ->values();
 
         // FASE 2 bagian 3 "Jadwal" -- lihat docblock class di atas. Cuma
         // milik student INI SENDIRI (tidak bisa lihat student lain, sesuai
@@ -183,7 +200,7 @@ class InaYulePackageController extends Controller
             ],
             'creditBalance' => $creditBalance,
             'claimedTrialPackageIds' => $claimedTrialPackageIds,
-            'purchases' => $purchases,
+            'packageStatuses' => $packageStatuses,
             'scheduleSessions' => $scheduleSessions,
             'depositBalance' => $depositBalance,
             'depositLedger' => $depositLedger,

@@ -13,15 +13,21 @@ use App\Models\Student;
 use App\Models\Transaction;
 use App\Services\CourseCredit\CourseCreditDebitService;
 use App\Services\CourseCredit\InsufficientCourseCreditException;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
- * Upgrade & Convert paket -- satu-satunya tempat aturannya. Credit yang
- * ditukar SELALU dari 1 baris pembelian yang dipilih siswa di tab Status
- * ($source), bukan dari semua paket.
+ * Upgrade & Convert paket -- satu-satunya tempat aturannya. Tab Status
+ * menggabungkan pembelian paket yang sama (12 Oktober 2026), jadi credit
+ * yang ditukar = gabungan sisa SEMUA pembelian paket itu milik siswa
+ * (group()), FIFO. $source cukup salah satu baris pembelian paket itu
+ * (yang tersimpan di CoursePackagePayment::source_course_package_purchase_id).
+ * Nilai tukar tetap dihitung per pembelian (harga per credit saat dibeli,
+ * promo/normal bisa beda). Pembelian gratis/trial tidak ikut ditukar --
+ * credit-nya tetap di paket, bisa dipakai kelas.
  *
- * - UPGRADE ($quantity null): beli 1 paket penuh. Seluruh sisa credit baris
+ * - UPGRADE ($quantity null): beli 1 paket penuh. Seluruh sisa credit paket
  *   itu ditukar ke rupiah (harga per credit saat dibeli); kurangnya dibayar
  *   saldo Deposit lalu payment gateway, lebihnya masuk saldo Deposit.
  * - CONVERT SEBAGIAN ($quantity N): ambil N credit paket tujuan (harga per
@@ -43,7 +49,7 @@ class PackageUpgradeCalculator
     ) {
     }
 
-    /** Alasan baris pembelian ini belum bisa di-upgrade/convert; null = boleh. */
+    /** Alasan paket ini belum bisa di-upgrade/convert; null = boleh. */
     public function blockedReason(CoursePackagePurchase $source): ?string
     {
         $pendingSessions = ClassSession::where('student_id', $source->student_id)
@@ -55,7 +61,12 @@ class PackageUpgradeCalculator
             return 'Masih ada pengajuan kelas untuk paket ini yang belum selesai. Tunggu disetujui/ditolak dulu sebelum upgrade atau convert.';
         }
 
-        if (CoursePackagePayment::awaitingTradeIn()->where('source_course_package_purchase_id', $source->id)->exists()) {
+        $awaitingPayment = CoursePackagePayment::awaitingTradeIn()
+            ->where('student_id', $source->student_id)
+            ->whereHas('sourcePurchase', fn ($query) => $query->where('course_package_id', $source->course_package_id))
+            ->exists();
+
+        if ($awaitingPayment) {
             return 'Credit paket ini sedang dipakai untuk upgrade yang menunggu pembayaran. Selesaikan atau tunggu pembayaran itu kedaluwarsa dulu.';
         }
 
@@ -63,7 +74,7 @@ class PackageUpgradeCalculator
             return 'Credit paket ini sudah habis.';
         }
 
-        if (CourseCreditDebitService::unitPrice($source) <= 0.0) {
+        if ($this->tradeIn($source)['value'] <= 0.0) {
             return 'Credit dari paket gratis/trial tidak punya nilai tukar, jadi tidak bisa di-upgrade atau convert.';
         }
 
@@ -79,7 +90,7 @@ class PackageUpgradeCalculator
      */
     public function preview(mixed $user, CoursePackagePurchase $source, CoursePackage $target, ?int $quantity = null, bool $convertAll = false): array
     {
-        $plan = $this->plan($this->remaining($source), $source, $target, $quantity, convertAll: $convertAll);
+        $plan = $this->plan($source, $target, $quantity, convertAll: $convertAll);
         $depositBalance = Deposit::currentBalanceFor((string) $user->id);
         $depositPortion = MoneyMath::floorToScale(min($depositBalance, $plan['shortfall']), 2);
 
@@ -106,7 +117,7 @@ class PackageUpgradeCalculator
                 throw new UpgradeConfirmationFailedException($reason);
             }
 
-            $plan = $this->plan($this->remaining($source), $source, $target, $quantity, convertAll: $convertAll);
+            $plan = $this->plan($source, $target, $quantity, convertAll: $convertAll);
             $orderId = $this->generateOrderId();
             $result = $this->settle((string) $user->id, $lockedStudent, $source, $target, $plan, $plan['shortfall'], 0.0, $orderId);
 
@@ -195,7 +206,7 @@ class PackageUpgradeCalculator
         $source = CoursePackagePurchase::findOrFail($lockedPayment->source_course_package_purchase_id);
         $target = CoursePackage::findOrFail($lockedPayment->course_package_id);
 
-        $plan = $this->plan($this->remaining($source), $source, $target, null, $lockedPayment);
+        $plan = $this->plan($source, $target, null, $lockedPayment);
 
         if ($plan['trade_in_applied'] + 0.000001 < (float) $lockedPayment->credit_trade_in_portion) {
             throw new UpgradeConfirmationFailedException('insufficient_trade_in');
@@ -237,19 +248,23 @@ class PackageUpgradeCalculator
     /**
      * Hitungan murni.
      *
-     * @return array{mode: string, convert_all: bool, price: float, quantity: float, max_quantity: ?int, source_remaining: float, source_unit_price: float, target_unit_price: float, credits_used: float, source_after: float, trade_in_value: float, trade_in_applied: float, keeps_leftover: bool, leftover_to_deposit: float, shortfall: float}
+     * @return array{mode: string, convert_all: bool, price: float, quantity: float, max_quantity: ?int, source_remaining: float, source_unit_price: float, purchase_ids: array<int, string>, target_unit_price: float, credits_used: float, source_after: float, free_credits: float, trade_in_value: float, trade_in_applied: float, keeps_leftover: bool, leftover_to_deposit: float, shortfall: float}
      *
      * @throws UpgradeConfirmationFailedException
      */
-    private function plan(float $remaining, CoursePackagePurchase $source, CoursePackage $target, ?int $quantity, ?CoursePackagePayment $agreed = null, bool $convertAll = false): array
+    private function plan(CoursePackagePurchase $source, CoursePackage $target, ?int $quantity, ?CoursePackagePayment $agreed = null, bool $convertAll = false): array
     {
         if (! $agreed && ! self::isSellable($target)) {
             throw new UpgradeConfirmationFailedException('Paket tujuan ini tidak bisa dipakai untuk upgrade/convert.');
         }
 
-        $sourceUnit = CourseCreditDebitService::unitPrice($source);
+        // Gateway: hanya pembelian yang sudah ada saat checkout, supaya paket
+        // yang sama yang dibeli belakangan tidak ikut tertukar diam-diam.
+        $tradeIn = $this->tradeIn($source, $agreed?->created_at);
+        $remaining = $tradeIn['credits'];
+        $sourceUnit = $tradeIn['unit_price'];
         $targetUnit = self::targetUnitPrice($target);
-        $maxQuantity = $targetUnit > 0 ? (int) floor(MoneyMath::floorToScale($remaining * $sourceUnit, 2) / $targetUnit + 1e-9) : 0;
+        $maxQuantity = $targetUnit > 0 ? (int) floor($tradeIn['value'] / $targetUnit + 1e-9) : 0;
 
         $isConvert = $quantity !== null || $convertAll;
 
@@ -258,6 +273,7 @@ class PackageUpgradeCalculator
             $price = $agreed ? (float) $agreed->price_total : $target->effectivePrice();
             $grant = $agreed ? (float) $agreed->credits_granted : (float) $target->credits;
             $used = $remaining;
+            $value = $tradeIn['value'];
         } else {
             if ($maxQuantity < 1) {
                 throw new UpgradeConfirmationFailedException('Nilai sisa credit ini belum cukup untuk 1 credit paket tujuan.');
@@ -273,10 +289,9 @@ class PackageUpgradeCalculator
             $grant = (float) $quantity;
             // Tukar semua: seluruh sisa dipakai. Sebagian: dipotong pas senilai
             // harga (pecahan boleh, dibulatkan ke atas), sisanya tetap credit.
-            $used = $convertAll ? $remaining : min($remaining, MoneyMath::ceilToScale($price / $sourceUnit, 2));
+            [$used, $value] = $convertAll ? [$remaining, $tradeIn['value']] : $this->creditsFor($tradeIn['rows'], $price);
         }
 
-        $value = MoneyMath::floorToScale($used * $sourceUnit, 2);
         $applied = MoneyMath::floorToScale(min($value, $price), 2);
 
         if ($isConvert && $applied < $price) {
@@ -296,9 +311,12 @@ class PackageUpgradeCalculator
             'max_quantity' => $maxQuantity,
             'source_remaining' => $remaining,
             'source_unit_price' => $sourceUnit,
+            'purchase_ids' => array_column($tradeIn['rows'], 'id'),
             'target_unit_price' => $targetUnit,
             'credits_used' => MoneyMath::floorToScale($used, 2),
-            'source_after' => max(0.0, MoneyMath::floorToScale($remaining - $used, 2)),
+            // Sisa credit paket asal setelah ditukar (credit gratis/trial ikut dihitung, tidak ditukar).
+            'source_after' => max(0.0, MoneyMath::floorToScale($remaining - $used + $tradeIn['free_credits'], 2)),
+            'free_credits' => $tradeIn['free_credits'],
             'trade_in_value' => $value,
             'trade_in_applied' => $applied,
             'keeps_leftover' => $keepsLeftover,
@@ -318,7 +336,7 @@ class PackageUpgradeCalculator
         $label = ($plan['mode'] === 'convert' ? 'Convert ke ' : 'Upgrade ke ').$target->name;
 
         try {
-            $tradeInDebit = $this->debitService->debitPurchase($lockedStudent, $source, $plan['credits_used'], CourseCredit::SOURCE_TRADE_IN_DEBIT, "Trade-in credit untuk {$label}");
+            $tradeInDebit = $this->debitService->debitPurchases($lockedStudent, $plan['purchase_ids'], $plan['credits_used'], CourseCredit::SOURCE_TRADE_IN_DEBIT, "Trade-in credit untuk {$label}");
         } catch (InsufficientCourseCreditException) {
             throw new UpgradeConfirmationFailedException('insufficient_trade_in');
         }
@@ -411,9 +429,98 @@ class PackageUpgradeCalculator
         ]);
     }
 
-    /** Sisa credit 1 baris pembelian. */
+    /** Total sisa credit paket ini (semua pembelian, termasuk gratis/trial). */
     public function remaining(CoursePackagePurchase $source): float
     {
-        return $this->debitService->remainingByPurchase([$source])[$source->id] ?? 0.0;
+        return MoneyMath::floorToScale(array_sum($this->debitService->remainingByPurchase($this->group($source))), 2);
+    }
+
+    /**
+     * Semua pembelian completed paket yang sama milik siswa yang sama, FIFO
+     * (created_at lalu id -- sama dengan CourseCreditDebitService).
+     */
+    public function group(CoursePackagePurchase $source, mixed $createdBefore = null): Collection
+    {
+        return CoursePackagePurchase::where('student_id', $source->student_id)
+            ->where('course_package_id', $source->course_package_id)
+            ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
+            ->when($createdBefore, fn ($query) => $query->where('created_at', '<=', $createdBefore))
+            ->orderBy('created_at')
+            ->orderBy('id')
+            ->get();
+    }
+
+    /**
+     * Credit yang BISA ditukar: sisa pembelian berbayar (harga per credit > 0),
+     * FIFO. unit_price = rata-rata (untuk penjelasan di halaman saja).
+     *
+     * @return array{rows: array<int, array{id: string, credits: float, unit_price: float, value: float}>, credits: float, value: float, unit_price: float, free_credits: float}
+     */
+    public function tradeIn(CoursePackagePurchase $source, mixed $createdBefore = null): array
+    {
+        $group = $this->group($source, $createdBefore);
+        $available = $this->debitService->remainingByPurchase($group);
+        $rows = [];
+        $free = 0.0;
+
+        foreach ($group as $purchase) {
+            $credits = (float) ($available[$purchase->id] ?? 0.0);
+            $unit = CourseCreditDebitService::unitPrice($purchase);
+
+            if ($credits <= 0.0) {
+                continue;
+            }
+
+            if ($unit <= 0.0) {
+                $free += $credits;
+
+                continue;
+            }
+
+            $rows[] = ['id' => $purchase->id, 'credits' => $credits, 'unit_price' => $unit, 'value' => MoneyMath::floorToScale($credits * $unit, 2)];
+        }
+
+        $credits = MoneyMath::floorToScale(array_sum(array_column($rows, 'credits')), 2);
+        $value = MoneyMath::floorToScale(array_sum(array_column($rows, 'value')), 2);
+
+        return [
+            'rows' => $rows,
+            'credits' => $credits,
+            'value' => $value,
+            'unit_price' => $credits > 0 ? MoneyMath::floorToScale($value / $credits, 4) : 0.0,
+            'free_credits' => MoneyMath::floorToScale($free, 2),
+        ];
+    }
+
+    /**
+     * Convert sebagian: berapa credit lama (FIFO, harga per pembelian) yang
+     * harus dipotong supaya nilainya menutup $price. Pembelian terakhir yang
+     * tersentuh dipotong pecahan (dibulatkan ke atas 2 desimal) -- persis
+     * seperti alokasi CourseCreditDebitService::createDebit().
+     *
+     * @return array{0: float, 1: float} [credit dipotong, nilai rupiahnya]
+     */
+    private function creditsFor(array $rows, float $price): array
+    {
+        $used = 0.0;
+        $value = 0.0;
+        $need = $price;
+
+        foreach ($rows as $row) {
+            if ($need <= 0.0) {
+                break;
+            }
+
+            $take = $row['value'] <= $need
+                ? $row['credits']
+                : min($row['credits'], MoneyMath::ceilToScale($need / $row['unit_price'], 2));
+            $takeValue = MoneyMath::floorToScale($take * $row['unit_price'], 2);
+
+            $used = MoneyMath::floorToScale($used + $take, 2);
+            $value = MoneyMath::floorToScale($value + $takeValue, 2);
+            $need = MoneyMath::floorToScale($price - $value, 2);
+        }
+
+        return [$used, $value];
     }
 }

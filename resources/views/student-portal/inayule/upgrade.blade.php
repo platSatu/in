@@ -2,7 +2,7 @@
 @section('content')
 
 {{--
-    Upgrade / Convert dari 1 baris paket (lihat PackageUpgradeCalculator).
+    Upgrade / Convert 1 paket: gabungan sisa credit semua pembelian paket itu (lihat PackageUpgradeCalculator).
     Halaman ini hanya tampilan; semua angka dihitung ulang di server saat submit.
     - Upgrade paket penuh: semua sisa credit ditukar ke 1 paket utuh, kurang dibayar / lebih ke saldo.
     - Convert sebagian: credit lama dipotong pas, sisanya tetap credit.
@@ -23,6 +23,9 @@
             <p class="text-muted mb-3">
                 Dari: <strong>{{ $sourceLabel }}</strong>
                 &middot; sisa {{ $num($remaining) }} credit
+                @if ($freeCredits > 0)
+                    <br><small>{{ $num($freeCredits) }} credit dari paket gratis/trial tidak ikut ditukar dan tetap bisa dipakai kelas.</small>
+                @endif
             </p>
 
             @if (session('error'))
@@ -70,7 +73,7 @@
                         @endphp
                         <div class="alert alert-light border small mb-3">
                             <div class="fw-semibold mb-1">Cara hitungnya</div>
-                            1 credit <strong>{{ $sourceLabel }}</strong> = {{ $rp($sourceUnit) }}<br>
+                            1 credit <strong>{{ $sourceLabel }}</strong> = {{ $rp($sourceUnit) }}{{ $mixedUnitPrice ? ' (rata-rata, karena harga belinya beda-beda)' : '' }}<br>
                             1 credit <strong>{{ $targetLabel }}</strong> = {{ $rp($targetUnit) }}<br>
                             @if ($ratio >= 1)
                                 Jadi <strong>{{ $num($ratio) }} credit lama = 1 credit baru</strong>.
