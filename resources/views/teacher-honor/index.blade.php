@@ -105,7 +105,7 @@
                                 <tr>
                                     <td class="fw-bold">{{ $period->name }}</td>
                                     <td>{{ optional($period->branch)->name ?? '-' }}</td>
-                                    <td class="text-nowrap">{{ $period->start_date->format('d/m/Y') }} - {{ $period->end_date->format('d/m/Y') }}</td>
+                                    <td class="text-nowrap">{{ $period->start_date->translatedFormat('d F Y') }} - {{ $period->end_date->translatedFormat('d F Y') }}</td>
                                     <td class="text-nowrap">Rp {{ number_format((float) ($period->isOpen() ? ($openTotals[$period->id] ?? 0) : $period->honors_sum_honor_amount), 0, ',', '.') }}</td>
                                     <td>
                                         @if ($period->isOpen())

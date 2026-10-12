@@ -23,7 +23,7 @@
         <div>
             <h5 class="mb-1">{{ $period->name }} &middot; {{ optional($period->branch)->name ?? '-' }}</h5>
             <p class="text-muted mb-0">
-                {{ $period->start_date->translatedFormat('d F Y') }} &ndash; {{ $period->end_date->translatedFormat('d F Y') }}
+                {{ $period->start_date->translatedFormat('d F Y') }} - {{ $period->end_date->translatedFormat('d F Y') }}
                 @if ($period->isOpen())
                     <span class="badge badge-info ms-1">Sedang berjalan</span>
                 @else

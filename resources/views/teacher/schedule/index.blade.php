@@ -22,7 +22,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                 <div>
                     <h6 class="mb-1">Kelas kamu di periode {{ $item['period']->name }} &middot; {{ optional($item['period']->branch)->name }}</h6>
-                    <p class="text-muted small mb-0">{{ $item['period']->start_date->translatedFormat('d M') }} &ndash; {{ $item['period']->end_date->translatedFormat('d M Y') }} &middot; masih berjalan, angka bisa bertambah</p>
+                    <p class="text-muted small mb-0">{{ $item['period']->start_date->translatedFormat('d F Y') }} - {{ $item['period']->end_date->translatedFormat('d F Y') }} &middot; masih berjalan, angka bisa bertambah</p>
                 </div>
                 <div class="text-end">
                     <div class="text-muted small">Honor sementara</div>
