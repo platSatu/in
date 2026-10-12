@@ -1,6 +1,12 @@
 @extends('layouts.frontend')
 @section('content')
 
+@php
+    // Tombol "Profile (N)" mengarah ke menu University Profile, jadi hanya
+    // tampil untuk admin yang punya akses ke menu itu (sama dengan route-nya).
+    $canSeeProfiles = auth()->user()?->canAccessPermission('quiz.university-profile') ?? false;
+@endphp
+
 <div class="middle-content container-xxl p-0">
 
     <div class="page-meta mb-3 text-end">
@@ -91,6 +97,25 @@
                                         <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
                                             <a href="{{ route('quiz.university.show', $item->id) }}"
                                                 class="btn btn-sm btn-outline-secondary text-nowrap">Detail</a>
+
+                                            {{-- Jumlah profile kampus ini (1 kampus seharusnya 1 profile):
+                                                 0 = abu-abu, 1 = normal, >1 = merah (ada yang dobel). --}}
+                                            @if ($canSeeProfiles)
+                                                @php
+                                                    $profileCount = (int) $item->profiles_count;
+                                                    $inactiveCount = (int) $item->inactive_profiles_count;
+                                                    $profileBtnClass = $profileCount > 1
+                                                        ? 'btn-outline-danger'
+                                                        : ($profileCount === 0 ? 'btn-outline-secondary' : 'btn-outline-info');
+                                                    $profileBtnTitle = $profileCount > 1
+                                                        ? 'Kampus ini punya ' . $profileCount . ' profile, seharusnya cukup 1. Cek dan hapus yang dobel.'
+                                                        : ($profileCount === 0 ? 'Kampus ini belum punya profile.' : 'Lihat profile kampus ini.');
+                                                @endphp
+                                                <a href="{{ route('quiz.university-profile.index', ['university_id' => $item->id]) }}"
+                                                    class="btn btn-sm {{ $profileBtnClass }} text-nowrap" title="{{ $profileBtnTitle }}">
+                                                    Profile ({{ $profileCount }}){{ $inactiveCount ? ' · ' . $inactiveCount . ' nonaktif' : '' }}
+                                                </a>
+                                            @endif
 
                                             <a href="{{ route('quiz.university.edit', $item->id) }}"
                                                 class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>

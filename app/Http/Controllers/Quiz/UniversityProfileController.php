@@ -24,18 +24,32 @@ class UniversityProfileController extends Controller
             abort(401);
         }
 
-        // Sama seperti University sendiri -- daftar Profile boleh dilihat SEMUA
-        // admin, tidak lagi dibatasi per pembuat.
-        $data = AdminCrud::paginate(
-            UniversityProfile::class,
-            null,
-            ['field', 'language', 'status'],
-            $search,
-            10,
-            ['university']
-        );
+        // Filter opsional ?university_id= dari tombol "Profile (N)" di index
+        // University. ID yang tidak valid diabaikan (tampil semua).
+        $filterUniversity = $request->filled('university_id')
+            ? University::find($request->query('university_id'))
+            : null;
 
-        return view('quiz.university-profile.index', compact('data'));
+        // Sama seperti University sendiri -- daftar Profile boleh dilihat SEMUA
+        // admin, tidak lagi dibatasi per pembuat. Pencarian juga mencakup
+        // nama kampus.
+        $data = UniversityProfile::query()
+            ->with('university')
+            ->when($filterUniversity, fn ($query) => $query->where('university_id', $filterUniversity->id))
+            ->when($search, function ($query) use ($search) {
+                $query->where(function ($q) use ($search) {
+                    foreach (['field', 'language', 'status'] as $column) {
+                        $q->orWhere($column, 'like', "%{$search}%");
+                    }
+
+                    $q->orWhereHas('university', fn ($u) => $u->where('name', 'like', "%{$search}%"));
+                });
+            })
+            ->latest('created_at')
+            ->paginate(10)
+            ->withQueryString();
+
+        return view('quiz.university-profile.index', compact('data', 'filterUniversity'));
     }
 
     // public function create()

@@ -36,6 +36,14 @@ class UniversityController extends Controller
 
         $data->load('city');
 
+        // Jumlah profile per kampus untuk tombol "Profile (N)" -- satu query
+        // untuk satu halaman. Seharusnya 1 kampus = 1 profile; lebih dari itu
+        // ditandai merah di view supaya yang dobel gampang dicek.
+        $data->loadCount([
+            'profiles',
+            'profiles as inactive_profiles_count' => fn ($query) => $query->where('status', '!=', 'active'),
+        ]);
+
         return view('quiz.university.index', compact('data'));
     }
 

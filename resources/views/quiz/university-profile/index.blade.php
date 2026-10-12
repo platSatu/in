@@ -4,8 +4,23 @@
 <div class="middle-content container-xxl p-0">
 
     <div class="page-meta mb-3 text-end">
-        <a href="{{ route('quiz.university-profile.create') }}" class="btn btn-primary">+ Add University Profile</a>
+        {{-- Kalau sedang difilter per kampus, kampusnya ikut terkunci di form create. --}}
+        <a href="{{ route('quiz.university-profile.create', $filterUniversity ? ['university_id' => $filterUniversity->id] : []) }}" class="btn btn-primary">+ Add University Profile</a>
     </div>
+
+    @if ($filterUniversity)
+        @php $filteredTotal = $data->total(); @endphp
+        <div class="alert {{ $filteredTotal > 1 ? 'alert-warning' : 'alert-info' }} d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                Profile untuk: <strong>{{ $filterUniversity->name }}</strong>
+                ({{ $filteredTotal }} profile{{ request('search') ? ' sesuai pencarian' : '' }})
+                @if ($filteredTotal > 1 && ! request('search'))
+                    <div class="small">Satu kampus seharusnya cukup 1 profile. Cek lalu hapus profile yang dobel.</div>
+                @endif
+            </div>
+            <a href="{{ route('quiz.university-profile.index') }}" class="btn btn-sm btn-outline-secondary">Tampilkan semua</a>
+        </div>
+    @endif
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -20,9 +35,12 @@
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('quiz.university-profile.index') }}" class="row g-2">
+                        @if ($filterUniversity)
+                            <input type="hidden" name="university_id" value="{{ $filterUniversity->id }}">
+                        @endif
                         <div class="col-md-10">
                             <input type="text" name="search" class="form-control"
-                                placeholder="Search field/language/status..." value="{{ request('search') }}">
+                                placeholder="Search university/field/language/status..." value="{{ request('search') }}">
                         </div>
                         <div class="col-md-2 d-grid">
                             <button type="submit" class="btn btn-outline-primary">Search</button>
