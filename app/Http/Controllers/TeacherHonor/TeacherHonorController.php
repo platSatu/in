@@ -54,8 +54,10 @@ class TeacherHonorController extends Controller
 
         $branches = $this->scopeToVisibleBranches(CompanyBranch::query(), $request, 'id')->orderBy('name')->get(['id', 'name']);
         $nextDates = $this->honorService->nextPeriodDates();
+        // Cabang yang belum punya periode: siklus 26 -> 25 yang sedang berjalan.
+        $defaultDates = $this->honorService->cycleFor(Carbon::today());
 
-        return view('teacher-honor.index', compact('periods', 'openTotals', 'branches', 'branchId', 'nextDates'));
+        return view('teacher-honor.index', compact('periods', 'openTotals', 'branches', 'branchId', 'nextDates', 'defaultDates'));
     }
 
     public function store(Request $request): RedirectResponse

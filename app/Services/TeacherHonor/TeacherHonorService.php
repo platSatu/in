@@ -3,6 +3,7 @@
 namespace App\Services\TeacherHonor;
 
 use App\Models\ClassSession;
+use App\Models\CompanyBranch;
 use App\Models\TeacherHonor;
 use App\Models\TeacherHonorPeriod;
 use App\Models\User;
@@ -31,9 +32,19 @@ use Illuminate\Support\Facades\DB;
  *   (validateNewPeriod, nextPeriodDates untuk isian otomatis);
  * - periode baru bisa ditutup setelah tanggal tutupnya lewat DAN semua
  *   pengajuan kelas di rentangnya sudah disetujui/ditolak (closeBlockedReason).
+ *
+ * Siklus tetap 26 -> 25 (12 Oktober 2026): periode selalu berakhir tanggal
+ * CUTOFF_DAY (25). syncPeriods() (command teacher-honor:sync-periods, tiap
+ * jam) otomatis membuka periode baru tiap tanggal 26 per cabang dan menutup
+ * periode yang sudah lewat kalau semua pengajuannya sudah selesai. Periode
+ * lama yang belum berpola 26-25 dibiarkan; periode berikutnya disambung
+ * sampai tanggal 25 terdekat, lalu seterusnya 26 -> 25.
  */
 class TeacherHonorService
 {
+    /** Tanggal tutup periode setiap bulan; periode berikutnya mulai besoknya (26). */
+    public const CUTOFF_DAY = 25;
+
     /**
      * Rekap per pengajar untuk satu periode.
      *
@@ -107,7 +118,8 @@ class TeacherHonorService
      * Tutup periode: rekap dikunci jadi 1 TeacherHonor per pengajar
      * (status pending), lalu periode tidak menghitung sesi baru lagi.
      */
-    public function close(TeacherHonorPeriod $period, User $user): void
+    /** $user null = ditutup otomatis oleh sistem (syncPeriods). */
+    public function close(TeacherHonorPeriod $period, ?User $user): void
     {
         DB::transaction(function () use ($period, $user) {
             $period = TeacherHonorPeriod::whereKey($period->id)->lockForUpdate()->firstOrFail();
@@ -133,7 +145,7 @@ class TeacherHonorService
 
             $period->update([
                 'status' => TeacherHonorPeriod::STATUS_CLOSED,
-                'closed_by_user_id' => $user->id,
+                'closed_by_user_id' => $user?->id,
                 'closed_at' => now(),
             ]);
         });
@@ -164,7 +176,7 @@ class TeacherHonorService
 
     /**
      * Isian otomatis periode berikutnya per cabang: mulai sehari setelah
-     * periode terakhir berakhir, selama satu bulan (26 Sep -> 25 Okt).
+     * periode terakhir berakhir, sampai tanggal 25 terdekat (26 Sep -> 25 Okt).
      *
      * @return array<string, array{start: string, end: string}> branch_id => tanggal Y-m-d
      */
@@ -173,12 +185,104 @@ class TeacherHonorService
         return TeacherHonorPeriod::groupBy('branch_id')
             ->selectRaw('branch_id, MAX(end_date) as last_end')
             ->pluck('last_end', 'branch_id')
-            ->map(function ($lastEnd) {
-                $start = Carbon::parse($lastEnd)->addDay();
-
-                return ['start' => $start->toDateString(), 'end' => $start->copy()->addMonthNoOverflow()->subDay()->toDateString()];
-            })
+            ->map(fn ($lastEnd) => $this->rangeFrom(Carbon::parse($lastEnd)->addDay()))
             ->all();
+    }
+
+    /**
+     * Periode 26 -> 25 yang mencakup $date, untuk cabang yang belum punya
+     * periode sama sekali (12 Okt -> 26 Sep s/d 25 Okt).
+     *
+     * @return array{start: string, end: string}
+     */
+    public function cycleFor(Carbon $date): array
+    {
+        $start = $date->day > self::CUTOFF_DAY
+            ? $date->copy()->day(self::CUTOFF_DAY + 1)
+            : $date->copy()->startOfMonth()->subMonthNoOverflow()->day(self::CUTOFF_DAY + 1);
+
+        return $this->rangeFrom($start);
+    }
+
+    /** Dari $start sampai tanggal 25 pertama pada/sesudah $start. */
+    private function rangeFrom(Carbon $start): array
+    {
+        $end = $start->day <= self::CUTOFF_DAY
+            ? $start->copy()->day(self::CUTOFF_DAY)
+            : $start->copy()->startOfMonth()->addMonthNoOverflow()->day(self::CUTOFF_DAY);
+
+        return ['start' => $start->toDateString(), 'end' => $end->toDateString()];
+    }
+
+    /**
+     * Dipanggil command tiap jam: (1) tiap cabang aktif selalu punya periode
+     * yang mencakup hari ini -- dibuat menyambung dari periode terakhirnya
+     * (kalau terlewat beberapa bulan, dibuat berurutan); (2) periode terbuka
+     * yang sudah lewat tanggal tutupnya ditutup kalau sudah bersih. Kalau
+     * masih ada pengajuan menunggu, dibiarkan terbuka dan dicoba lagi nanti.
+     *
+     * @return array{created: int, closed: int, waiting: int}
+     */
+    public function syncPeriods(): array
+    {
+        $today = Carbon::today();
+        $created = 0;
+
+        $branchIds = CompanyBranch::where(fn ($query) => $query->whereNull('status')->orWhere('status', '!=', 'inactive'))->pluck('id');
+
+        foreach ($branchIds as $branchId) {
+            $created += DB::transaction(function () use ($branchId, $today) {
+                // Kunci cabang supaya dua proses tidak membuat periode yang sama.
+                CompanyBranch::whereKey($branchId)->lockForUpdate()->first();
+                $count = 0;
+
+                while (true) {
+                    $lastEnd = TeacherHonorPeriod::where('branch_id', $branchId)->max('end_date');
+
+                    if ($lastEnd && Carbon::parse($lastEnd)->gte($today)) {
+                        break;
+                    }
+
+                    $range = $lastEnd ? $this->rangeFrom(Carbon::parse($lastEnd)->addDay()) : $this->cycleFor($today);
+                    $start = Carbon::parse($range['start']);
+                    $end = Carbon::parse($range['end']);
+
+                    if ($this->validateNewPeriod($branchId, $start, $end)) {
+                        break; // Data periode cabang ini tidak wajar; biarkan admin yang merapikan.
+                    }
+
+                    TeacherHonorPeriod::create([
+                        'branch_id' => $branchId,
+                        'name' => $end->translatedFormat('F Y'),
+                        'start_date' => $range['start'],
+                        'end_date' => $range['end'],
+                        'status' => TeacherHonorPeriod::STATUS_OPEN,
+                    ]);
+                    $count++;
+                }
+
+                return $count;
+            });
+        }
+
+        $closed = 0;
+        $waiting = 0;
+
+        $overdue = TeacherHonorPeriod::where('status', TeacherHonorPeriod::STATUS_OPEN)
+            ->whereDate('end_date', '<', $today)
+            ->orderBy('start_date')
+            ->get();
+
+        foreach ($overdue as $period) {
+            try {
+                $this->close($period, null);
+                $closed++;
+            } catch (InvalidTeacherHonorStateException) {
+                $waiting++; // Masih ada pengajuan menunggu; dicoba lagi jam berikutnya.
+            }
+        }
+
+        return ['created' => $created, 'closed' => $closed, 'waiting' => $waiting];
     }
 
     /** Periode baru tidak boleh bentrok atau menyisakan tanggal bolong dengan periode lain di cabang yang sama. */
@@ -195,6 +299,14 @@ class TeacherHonorService
 
         if ($previousEnd && ! Carbon::parse($previousEnd)->addDay()->isSameDay($start)) {
             return 'Periode sebelumnya berakhir '.$format($previousEnd).', jadi periode baru harus mulai '.$format(Carbon::parse($previousEnd)->addDay()).' supaya tidak ada tanggal yang terlewat.';
+        }
+
+        if ($end->day !== self::CUTOFF_DAY) {
+            return 'Periode honor selalu ditutup tanggal '.self::CUTOFF_DAY.', jadi tanggal tutupnya harus tanggal '.self::CUTOFF_DAY.'.';
+        }
+
+        if (! $previousEnd && $start->day !== self::CUTOFF_DAY + 1) {
+            return 'Periode honor selalu dibuka tanggal '.(self::CUTOFF_DAY + 1).', jadi tanggal mulainya harus tanggal '.(self::CUTOFF_DAY + 1).'.';
         }
 
         $nextStart = $periods()->where('start_date', '>', $end->toDateString())->min('start_date');

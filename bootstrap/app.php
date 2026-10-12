@@ -23,6 +23,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // App\Console\Commands\ExpireStalePayments. Butuh cron
         // `* * * * * php artisan schedule:run` aktif di server supaya benar-benar jalan.
         $schedule->command('payments:expire-stale')->everyFiveMinutes();
+        // Periode Honor Pengajar 26 -> 25: buka tiap tanggal 26, tutup otomatis
+        // kalau sudah bersih (lihat TeacherHonorService::syncPeriods()).
+        $schedule->command('teacher-honor:sync-periods')->hourly()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

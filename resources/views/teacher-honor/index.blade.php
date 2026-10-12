@@ -27,12 +27,12 @@
         <div class="col-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
                 <h6 class="mb-1">Buat Periode Baru</h6>
-                <p class="text-muted small mb-3">Tentukan tanggal cut-off-nya. Semua kelas yang diajar di rentang ini masuk ke honor periode tersebut.</p>
+                <p class="text-muted small mb-3">Periode berjalan tanggal 26 sampai 25 bulan berikutnya, dan otomatis dibuka tiap tanggal 26 lalu ditutup setelah tanggal 25 kalau semua pengajuan kelas sudah selesai. Form ini hanya untuk jaga-jaga.</p>
 
                 @php
                     $next = $nextDates[old('branch_id', $branchId)] ?? null;
-                    $defaultStart = $next['start'] ?? now()->startOfMonth()->format('Y-m-d');
-                    $defaultEnd = $next['end'] ?? now()->endOfMonth()->format('Y-m-d');
+                    $defaultStart = $next['start'] ?? $defaultDates['start'];
+                    $defaultEnd = $next['end'] ?? $defaultDates['end'];
                 @endphp
                 <form method="POST" action="{{ route('teacher-honor.store') }}" id="period-form" data-next-dates='@json($nextDates)' class="row g-2 align-items-end">
                     @csrf
@@ -49,7 +49,7 @@
                     <div class="col-md-6 col-xl-3">
                         <label class="form-label small text-muted mb-1">Nama Periode</label>
                         <input type="text" name="name" id="period-name" class="form-control @error('name') is-invalid @enderror"
-                            value="{{ old('name', now()->translatedFormat('F Y')) }}" placeholder="September 2026" required>
+                            value="{{ old('name', \Illuminate\Support\Carbon::parse($defaultEnd)->translatedFormat('F Y')) }}" placeholder="September 2026" required>
                         @error('name') <div class="invalid-feedback">{{ $message }}</div> @enderror
                     </div>
                     <div class="col-6 col-xl-2">
