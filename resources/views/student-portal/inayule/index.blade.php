@@ -347,8 +347,7 @@
                         <table class="table align-middle mb-0">
                             <thead>
                                 <tr>
-                                    <th>Tanggal</th>
-                                    <th>Jam</th>
+                                    <th>Diajukan</th>
                                     <th>Package</th>
                                     <th>Pengajar</th>
                                     <th>Credit</th>
@@ -358,8 +357,8 @@
                             <tbody>
                                 @forelse ($scheduleSessions as $session)
                                     <tr>
-                                        <td>{{ optional($session->requested_at)->format('d/m/Y') }}</td>
-                                        <td>{{ optional($session->requested_at)->format('H:i') }}</td>
+                                        {{-- Waktu siswa mengajukan (requested_at), bukan jam/lama kelas. --}}
+                                        <td class="text-nowrap">{{ $session->requested_at?->translatedFormat('d M Y, H:i') ?? '-' }}</td>
                                         <td>@include('student-portal.inayule._package-info', ['package' => $session->coursePackage])</td>
                                         <td>{{ optional($session->teacher)->name ?? '-' }}</td>
                                         <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
@@ -379,7 +378,7 @@
                                     </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="6" class="text-center text-muted py-4">Belum ada jadwal/pengajuan pemakaian credit.</td>
+                                        <td colspan="5" class="text-center text-muted py-4">Belum ada jadwal/pengajuan pemakaian credit.</td>
                                     </tr>
                                 @endforelse
                             </tbody>
