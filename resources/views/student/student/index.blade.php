@@ -377,7 +377,7 @@
                 <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
                     <div class="widget-content widget-content-area br-8">
                         @if ($applicationsByUniversity->isEmpty())
-                            <p class="text-center text-muted py-4 mb-0">Belum ada student yang apply ke university.</p>
+                            <p class="text-center text-muted py-4 mb-0">Belum ada student yang sudah apply (Registration Fee lunas) ke university.</p>
                         @else
                             <ul class="nav nav-pills flex-nowrap overflow-auto mb-3 pb-1" id="universityTabs" role="tablist">
                                 @foreach ($applicationsByUniversity as $universityId => $applications)
@@ -386,7 +386,7 @@
                                             data-bs-toggle="tab" data-bs-target="#university-pane-{{ $loop->index }}" type="button" role="tab"
                                             aria-controls="university-pane-{{ $loop->index }}" aria-selected="{{ $loop->first ? 'true' : 'false' }}">
                                             {{ $applications->first()->university->name ?? 'University (sudah dihapus)' }}
-                                            <span class="badge bg-light text-dark ms-1">{{ $applications->count() }}</span>
+                                            <span class="badge rounded-pill bg-danger ms-1">{{ $applications->count() }}</span>
                                         </button>
                                     </li>
                                 @endforeach

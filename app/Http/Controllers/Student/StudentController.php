@@ -89,6 +89,8 @@ class StudentController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")
                         ->orWhere('last_name', 'like', "%{$search}%")
+                        // Nama lengkap ("Natan Super") juga ketemu, bukan cuma nama depan/belakang saja.
+                        ->orWhereRaw("CONCAT_WS(' ', first_name, last_name) LIKE ?", ["%{$search}%"])
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('handphone', 'like', "%{$search}%")
                         ->orWhere('sales_id', 'like', "%{$search}%");
@@ -154,10 +156,15 @@ class StudentController extends Controller
         $registerDegreeOrder = UniversityProfileDegree::DEGREES;
 
         // Tab "Progress Student" (13 Oktober 2026): student yang sudah apply,
-        // dikelompokkan per kampus. Cakupan aksesnya sama dengan menu Aplikasi
-        // Kuliah (DataScope::visibleStudentIds), tidak ikut filter tab Data Student.
+        // dikelompokkan per kampus. "Sudah apply" = Registration Fee sudah
+        // lunas atau didaftarkan manual admin -- keduanya mengisi
+        // admission_status (lihat UniversityApplication::ADMISSION_STATUS_*).
+        // Yang baru klik Apply tapi belum bayar tidak ditampilkan. Cakupan
+        // aksesnya sama dengan menu Aplikasi Kuliah (DataScope::visibleStudentIds),
+        // tidak ikut filter tab Data Student.
         $visibleStudentIds = DataScope::visibleStudentIds($user);
         $applicationsByUniversity = UniversityApplication::with(['student', 'university', 'handledBy'])
+            ->whereNotNull('admission_status')
             ->withCount('documents')
             ->when($visibleStudentIds !== null, fn ($query) => $query->whereIn('student_id', $visibleStudentIds))
             ->orderByDesc('submitted_at')
@@ -226,6 +233,7 @@ class StudentController extends Controller
                 $q->where(function ($qq) use ($search) {
                     $qq->where('first_name', 'like', "%{$search}%")
                         ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhereRaw("CONCAT_WS(' ', first_name, last_name) LIKE ?", ["%{$search}%"])
                         ->orWhere('email', 'like', "%{$search}%")
                         ->orWhere('handphone', 'like', "%{$search}%")
                         ->orWhere('sales_id', 'like', "%{$search}%");
