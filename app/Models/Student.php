@@ -28,6 +28,9 @@ class Student extends Model
         'email',
         'handphone',
         'current_school',
+        'application_no',
+        'name_pasport',
+        'number_pasport',
         'status',
         'progress_student',
     ];
