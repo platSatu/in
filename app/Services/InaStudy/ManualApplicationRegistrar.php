@@ -95,7 +95,8 @@ class ManualApplicationRegistrar
             // tidak membuat 2 aplikasi.
             Student::whereKey($student->id)->lockForUpdate()->first();
 
-            if (UniversityApplication::where('student_id', $student->id)->exists()) {
+            // Aplikasi yang sudah Cancelled (mis. data uji coba yang dilepas) tidak menghalangi daftar ulang.
+            if (UniversityApplication::where('student_id', $student->id)->where('status', '!=', UniversityApplication::STATUS_CANCELLED)->exists()) {
                 throw ValidationException::withMessages([
                     'university_id' => 'Sudah ada Aplikasi Kuliah untuk siswa ini. Silakan lanjutkan dari daftar aplikasinya.',
                 ]);

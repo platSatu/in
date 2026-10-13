@@ -82,7 +82,11 @@ class StudentController extends Controller
                 // sini -- limit() pada eager load hasMany berlaku GLOBAL ke seluruh
                 // baris gabungan (bukan per-student), jadi kalau dipasang cuma
                 // 1 aplikasi TOTAL se-halaman yang kebawa, bukan 1 per student.
-                'applications' => fn ($query) => $query->latest('submitted_at'),
+                // Aplikasi Cancelled (mis. data uji coba yang dilepas dari tab
+                // Progress Student) dianggap tidak ada.
+                'applications' => fn ($query) => $query
+                    ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+                    ->latest('submitted_at'),
             ])
             ->tap(fn ($query) => DataScope::applyBranchDivisionScope($query, $user, 'handled_by_user_id'))
             ->when($search, function ($query) use ($search) {
@@ -171,6 +175,7 @@ class StudentController extends Controller
                 'payments' => fn ($query) => $query->latest('created_at'),
             ])
             ->whereNotNull('admission_status')
+            ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
             ->withCount('documents')
             ->when($visibleStudentIds !== null, fn ($query) => $query->whereIn('student_id', $visibleStudentIds))
             ->orderByDesc('submitted_at')
@@ -628,6 +633,38 @@ class StudentController extends Controller
         $student->update(['progress_student' => $validated['progress_student'] ?? null]);
 
         return response()->json(['progress_student' => $student->progress_student]);
+    }
+
+    /**
+     * Tab Progress Student: lepas status apply (mis. data uji coba). Aplikasi
+     * Kuliah-nya ditandai Cancelled sehingga hilang dari tab Progress Student;
+     * data student, dokumen & catatan pembayaran TIDAK dihapus, dan student
+     * tetap ada di tab Data Student (boleh didaftarkan ulang ke InaStudy).
+     * Perubahannya tercatat otomatis di Activity Log.
+     */
+    public function cancelApplication(Request $request, string $applicationId): RedirectResponse
+    {
+        $visibleStudentIds = DataScope::visibleStudentIds($request->user());
+
+        $application = DB::transaction(function () use ($applicationId, $visibleStudentIds) {
+            $application = UniversityApplication::whereKey($applicationId)
+                ->when($visibleStudentIds !== null, fn ($query) => $query->whereIn('student_id', $visibleStudentIds))
+                ->lockForUpdate()
+                ->first();
+
+            abort_if(! $application, 404);
+
+            if ($application->status !== UniversityApplication::STATUS_CANCELLED) {
+                $application->update(['status' => UniversityApplication::STATUS_CANCELLED]);
+            }
+
+            return $application;
+        });
+
+        $name = trim(($application->student->first_name ?? '').' '.($application->student->last_name ?? '')) ?: 'Student';
+
+        return redirect()->to(route('student.student.index').'#progress')
+            ->with('success', "Status apply {$name} sudah dilepas (Cancelled). Data student-nya tetap ada di tab Data Student.");
     }
 
     /**

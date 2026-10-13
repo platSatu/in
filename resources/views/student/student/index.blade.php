@@ -503,8 +503,19 @@
                                                             <td class="text-nowrap">{{ $application->handledBy->name ?? '-' }}</td>
                                                             <td class="text-nowrap">{{ $application->submitted_at?->format('Y/m/d') ?? '-' }}</td>
                                                             <td class="text-center">
-                                                                <a href="{{ route('quiz.university-application.show', $application->id) }}"
-                                                                    class="btn btn-sm btn-outline-info text-nowrap">Progress InaStudy</a>
+                                                                <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                                                    <a href="{{ route('quiz.university-application.show', $application->id) }}"
+                                                                        class="btn btn-sm btn-outline-info text-nowrap">Progress InaStudy</a>
+                                                                    @if ($canEdit)
+                                                                        {{-- Lepas status apply (data uji coba): aplikasi jadi Cancelled, data student tetap. --}}
+                                                                        <form action="{{ route('student.student.cancel-application', $application->id) }}" method="POST" class="m-0"
+                                                                            onsubmit="return confirm('Lepas status apply {{ addslashes(trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? ''))) }}? Aplikasinya ditandai Cancelled dan hilang dari tab ini. Data student tetap ada di tab Data Student.');">
+                                                                            @csrf
+                                                                            @method('PATCH')
+                                                                            <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">Lepas Apply</button>
+                                                                        </form>
+                                                                    @endif
+                                                                </div>
                                                             </td>
                                                         </tr>
                                                     @endforeach

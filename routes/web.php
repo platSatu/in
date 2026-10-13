@@ -956,6 +956,8 @@ Route::middleware(['auth', 'permission:student.student,edit'])->prefix('dashboar
     Route::patch('/{id}/progress', [StudentController::class, 'updateProgress'])->name('student.student.progress');
     Route::post('/{id}/followed-up', [StudentController::class, 'markFollowedUp'])->name('student.student.followed-up');
     Route::post('/{id}/add-to-inastudy', [StudentController::class, 'addToInaStudy'])->name('student.student.add-to-inastudy');
+    // Tab Progress Student: lepas status apply (aplikasi jadi Cancelled), 13 Oktober 2026.
+    Route::patch('/applications/{applicationId}/cancel', [StudentController::class, 'cancelApplication'])->name('student.student.cancel-application');
 });
 
 // Invitation: SEBELUMNYA cuma dibungkus 'auth' polos (semua user login bisa
