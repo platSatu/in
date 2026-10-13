@@ -40,6 +40,25 @@
         </div>
     @endif
 
+    {{-- Tab utama (13 Oktober 2026): Data Student (seperti sebelumnya) & Progress Student
+         (student yang sudah apply, per kampus). --}}
+    <ul class="nav nav-tabs mb-3" id="studentTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="student-data-tab" data-bs-toggle="tab" data-bs-target="#student-data"
+                type="button" role="tab" aria-controls="student-data" aria-selected="true">Data Student</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="student-progress-tab" data-bs-toggle="tab" data-bs-target="#student-progress"
+                type="button" role="tab" aria-controls="student-progress" aria-selected="false">
+                Progress Student
+                <span class="badge bg-secondary ms-1">{{ $applicationsByUniversity->flatten(1)->count() }}</span>
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="studentTabsContent">
+        <div class="tab-pane fade show active" id="student-data" role="tabpanel" aria-labelledby="student-data-tab">
+
     {{-- === RINGKASAN === --}}
     <div class="row layout-top-spacing g-3 mb-1">
         <div class="col-md-3 col-sm-6">
@@ -349,6 +368,122 @@
             </div>
         </div>
     </div>
+
+        </div>
+
+        {{-- Tab 2: Progress Student -- 1 tab per kampus, isinya student yang sudah apply ke kampus itu. --}}
+        <div class="tab-pane fade" id="student-progress" role="tabpanel" aria-labelledby="student-progress-tab">
+            <div class="row layout-top-spacing">
+                <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
+                    <div class="widget-content widget-content-area br-8">
+                        @if ($applicationsByUniversity->isEmpty())
+                            <p class="text-center text-muted py-4 mb-0">Belum ada student yang apply ke university.</p>
+                        @else
+                            <ul class="nav nav-pills flex-nowrap overflow-auto mb-3 pb-1" id="universityTabs" role="tablist">
+                                @foreach ($applicationsByUniversity as $universityId => $applications)
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link text-nowrap @if ($loop->first) active @endif" id="university-tab-{{ $loop->index }}"
+                                            data-bs-toggle="tab" data-bs-target="#university-pane-{{ $loop->index }}" type="button" role="tab"
+                                            aria-controls="university-pane-{{ $loop->index }}" aria-selected="{{ $loop->first ? 'true' : 'false' }}">
+                                            {{ $applications->first()->university->name ?? 'University (sudah dihapus)' }}
+                                            <span class="badge bg-light text-dark ms-1">{{ $applications->count() }}</span>
+                                        </button>
+                                    </li>
+                                @endforeach
+                            </ul>
+
+                            <div class="tab-content">
+                                @foreach ($applicationsByUniversity as $universityId => $applications)
+                                    <div class="tab-pane fade @if ($loop->first) show active @endif" id="university-pane-{{ $loop->index }}"
+                                        role="tabpanel" aria-labelledby="university-tab-{{ $loop->index }}">
+                                        <div class="table-responsive">
+                                            <table class="table dt-table-hover align-middle" style="width:100%">
+                                                <thead>
+                                                    <tr>
+                                                        <th>No</th>
+                                                        <th class="text-nowrap">Application No</th>
+                                                        <th>Student</th>
+                                                        <th>Major</th>
+                                                        <th>Intake</th>
+                                                        <th>Status</th>
+                                                        <th style="width:140px;">Documents</th>
+                                                        <th class="text-nowrap">Sales</th>
+                                                        <th>Submitted</th>
+                                                        <th class="no-content text-center">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    @foreach ($applications as $application)
+                                                        @php
+                                                            $docsCount = $application->documents_count ?? 0;
+                                                            $docsPercent = $totalDocumentTypes > 0 ? min(100, round(($docsCount / $totalDocumentTypes) * 100)) : 0;
+                                                            $docsComplete = $totalDocumentTypes > 0 && $docsCount >= $totalDocumentTypes;
+                                                        @endphp
+                                                        <tr>
+                                                            <td>{{ $loop->iteration }}</td>
+                                                            <td class="fw-bold text-nowrap">{{ $application->application_no ?: '-' }}</td>
+                                                            <td>
+                                                                @if ($application->student)
+                                                                    <a href="{{ route('student.student.show', $application->student->id) }}" class="fw-bold">
+                                                                        {{ trim($application->student->first_name . ' ' . $application->student->last_name) }}
+                                                                    </a>
+                                                                @else
+                                                                    -
+                                                                @endif
+                                                                <div class="small text-muted">{{ $application->whatsapp }}</div>
+                                                            </td>
+                                                            <td>{{ $application->major_label }}</td>
+                                                            <td class="text-nowrap">{{ $application->intake ?: '-' }} {{ $application->intake_year }}</td>
+                                                            <td>
+                                                                <span class="badge badge-info text-capitalize">{{ str_replace('_', ' ', $application->status) }}</span>
+                                                                @if ($application->admission_status)
+                                                                    <div class="small text-muted text-capitalize mt-1">{{ str_replace('_', ' ', $application->admission_status) }}</div>
+                                                                @endif
+                                                            </td>
+                                                            <td>
+                                                                <div class="small mb-1">{{ $docsCount }} / {{ $totalDocumentTypes }}</div>
+                                                                <div class="progress" style="height:6px;">
+                                                                    <div class="progress-bar {{ $docsComplete ? 'bg-success' : 'bg-primary' }}" role="progressbar" style="width: {{ $docsPercent }}%;"></div>
+                                                                </div>
+                                                            </td>
+                                                            <td class="text-nowrap">{{ $application->handledBy->name ?? '-' }}</td>
+                                                            <td class="text-nowrap">{{ $application->submitted_at?->format('Y/m/d') ?? '-' }}</td>
+                                                            <td class="text-center">
+                                                                <a href="{{ route('quiz.university-application.show', $application->id) }}"
+                                                                    class="btn btn-sm btn-outline-info text-nowrap">Progress InaStudy</a>
+                                                            </td>
+                                                        </tr>
+                                                    @endforeach
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Buka tab Progress Student kalau URL berakhiran #progress, dan ingat tab saat pindah.
+        document.addEventListener('DOMContentLoaded', function () {
+            var progressTab = document.getElementById('student-progress-tab');
+            var dataTab = document.getElementById('student-data-tab');
+            if (!progressTab || !window.bootstrap) return;
+            if (window.location.hash === '#progress') {
+                bootstrap.Tab.getOrCreateInstance(progressTab).show();
+            }
+            progressTab.addEventListener('shown.bs.tab', function () {
+                history.replaceState(null, '', window.location.pathname + window.location.search + '#progress');
+            });
+            dataTab.addEventListener('shown.bs.tab', function () {
+                history.replaceState(null, '', window.location.pathname + window.location.search);
+            });
+        });
+    </script>
 
     {{--
         FIX (permintaan user, 16 September 2026): 1 modal saja dipakai

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Student;
 use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\CompanyBranch;
+use App\Models\DocumentType;
 use App\Models\Form;
 use App\Models\FormAnswer;
 use App\Models\FormPayment;
@@ -12,6 +13,7 @@ use App\Models\FormSubmission;
 use App\Models\Major;
 use App\Models\Role;
 use App\Models\Student;
+use App\Models\UniversityApplication;
 use App\Models\User;
 use App\Models\RoleUser;
 use App\Models\UniversityProfileDegree;
@@ -151,6 +153,19 @@ class StudentController extends Controller
         $registerUniversities = $canEdit ? $registrar->options() : collect();
         $registerDegreeOrder = UniversityProfileDegree::DEGREES;
 
+        // Tab "Progress Student" (13 Oktober 2026): student yang sudah apply,
+        // dikelompokkan per kampus. Cakupan aksesnya sama dengan menu Aplikasi
+        // Kuliah (DataScope::visibleStudentIds), tidak ikut filter tab Data Student.
+        $visibleStudentIds = DataScope::visibleStudentIds($user);
+        $applicationsByUniversity = UniversityApplication::with(['student', 'university', 'handledBy'])
+            ->withCount('documents')
+            ->when($visibleStudentIds !== null, fn ($query) => $query->whereIn('student_id', $visibleStudentIds))
+            ->orderByDesc('submitted_at')
+            ->get()
+            ->groupBy('university_id')
+            ->sortBy(fn ($rows) => mb_strtolower($rows->first()->university->name ?? ''));
+        $totalDocumentTypes = DocumentType::active()->count();
+
         return view('student.student.index', compact(
             'data',
             'progress',
@@ -164,7 +179,9 @@ class StudentController extends Controller
             'date',
             'totalBranches',
             'totalForms',
-            'studentsCreatedOnDate'
+            'studentsCreatedOnDate',
+            'applicationsByUniversity',
+            'totalDocumentTypes'
         ));
     }
 
