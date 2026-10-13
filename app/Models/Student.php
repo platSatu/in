@@ -82,6 +82,31 @@ class Student extends Model
     /**
      * Akun login (User) milik student ini, kalau sudah dibuat.
      */
+    /** Kolom paspor & Application No yang boleh diisi lewat savePassport(). */
+    public const PASSPORT_FIELDS = ['application_no', 'name_pasport', 'number_pasport'];
+
+    /**
+     * Simpan Application No / data paspor (13 Oktober 2026). Satu sumber di
+     * Student; passport_no di Formulir aplikasi (ApplicationFormDetail) ikut
+     * disamakan supaya tidak ada dua nomor paspor yang berbeda. Hanya key
+     * yang dikirim yang diubah.
+     */
+    public function savePassport(array $data): void
+    {
+        $data = array_intersect_key($data, array_flip(self::PASSPORT_FIELDS));
+
+        if ($data === []) {
+            return;
+        }
+
+        $this->update($data);
+
+        if (array_key_exists('number_pasport', $data)) {
+            ApplicationFormDetail::whereIn('application_id', $this->applications()->select('id'))
+                ->update(['passport_no' => $data['number_pasport']]);
+        }
+    }
+
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id', 'id');

@@ -192,8 +192,13 @@
                     </div>
 
                     <div class="col-md-6">
+                        <label class="form-label">Name on Passport</label>
+                        <input type="text" name="name_pasport" maxlength="100" class="form-control" value="{{ old('name_pasport', $application->student->name_pasport ?? '') }}">
+                    </div>
+                    <div class="col-md-6">
                         <label class="form-label">Passport No.</label>
-                        <input type="text" name="passport_no" class="form-control" value="{{ old('passport_no', $formDetail->passport_no ?? '') }}">
+                        {{-- Satu sumber: nomor paspor di data Student (fallback isian formulir lama). --}}
+                        <input type="text" name="passport_no" maxlength="100" class="form-control" value="{{ old('passport_no', ($application->student->number_pasport ?? null) ?: ($formDetail->passport_no ?? '')) }}">
                     </div>
                     <div class="col-md-6">
                         <label class="form-label">Passport Expiry Date</label>

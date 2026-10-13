@@ -4,7 +4,8 @@
 <div class="middle-content container-xxl p-0">
 
     <div class="page-meta mb-3">
-        <a href="{{ route('quiz.university-application.index') }}" class="btn btn-outline-secondary">&laquo; Back to List</a>
+        {{-- Kembali ke tab Progress Student di menu Student (13 Oktober 2026). --}}
+        <a href="{{ route('student.student.index') }}#progress" class="btn btn-outline-secondary">&laquo; Student: Progress Student</a>
     </div>
 
     @if (session('success'))
@@ -121,6 +122,32 @@
                         </table>
                     </div>
                 </div>
+
+                <hr>
+
+                {{-- Application No (diisi manual admin) & data paspor -- disimpan di data Student. --}}
+                <h6 class="fw-bold mb-3">Application No &amp; Passport</h6>
+                <form method="POST" action="{{ route('quiz.university-application.passport.update', $application->id) }}" class="row g-3 mb-4">
+                    @csrf
+                    <div class="col-md-4">
+                        <label class="form-label" style="font-size:13px;">Application No</label>
+                        <input type="text" name="application_no" maxlength="100" class="form-control"
+                            value="{{ old('application_no', $application->student->application_no ?? '') }}" placeholder="Diisi manual admin">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" style="font-size:13px;">Name Passport</label>
+                        <input type="text" name="name_pasport" maxlength="100" class="form-control"
+                            value="{{ old('name_pasport', $application->student->name_pasport ?? '') }}">
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label" style="font-size:13px;">Passport Number</label>
+                        <input type="text" name="number_pasport" maxlength="100" class="form-control"
+                            value="{{ old('number_pasport', $application->student->number_pasport ?? '') }}">
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary btn-sm">Save Application No &amp; Passport</button>
+                    </div>
+                </form>
 
                 <hr>
 

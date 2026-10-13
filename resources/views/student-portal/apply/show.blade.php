@@ -273,6 +273,25 @@
                         @enderror
                     </div>
 
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Name on Passport <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="text" name="name_pasport" maxlength="100" class="form-control @error('name_pasport') is-invalid @enderror"
+                                value="{{ old('name_pasport', $student->name_pasport ?? '') }}" placeholder="As written in your passport">
+                            @error('name_pasport')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Passport Number <span class="text-muted fw-normal">(optional)</span></label>
+                            <input type="text" name="number_pasport" maxlength="100" class="form-control @error('number_pasport') is-invalid @enderror"
+                                value="{{ old('number_pasport', $student->number_pasport ?? '') }}">
+                            @error('number_pasport')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
                     <div class="mb-4">
                         <label class="form-label">WhatsApp Number</label>
                         <input type="text" name="whatsapp" class="form-control @error('whatsapp') is-invalid @enderror"

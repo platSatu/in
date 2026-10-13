@@ -300,6 +300,35 @@ class UniversityApplicationController extends Controller
     }
 
     /**
+     * Admin isi/ubah Application No (manual) & data paspor student aplikasi
+     * ini (13 Oktober 2026). Disimpan ke data Student (Student::savePassport),
+     * jadi langsung ikut tampil di tab Progress Student. Boleh dikosongkan.
+     */
+    public function updatePassport(Request $request, string $id): RedirectResponse
+    {
+        $application = UniversityApplication::with('student')->findOrFail($id);
+
+        $this->assertVisibleApplication($request->user(), $application);
+        abort_if(! $application->student, 404);
+
+        $validated = $request->validate([
+            'application_no' => 'nullable|string|max:100',
+            'name_pasport' => 'nullable|string|max:100',
+            'number_pasport' => 'nullable|string|max:100',
+        ]);
+
+        $application->student->savePassport([
+            'application_no' => $validated['application_no'] ?? null,
+            'name_pasport' => $validated['name_pasport'] ?? null,
+            'number_pasport' => $validated['number_pasport'] ?? null,
+        ]);
+
+        return redirect()
+            ->route('quiz.university-application.show', $id)
+            ->with('success', 'Application No & data paspor berhasil disimpan.');
+    }
+
+    /**
      * FASE 4 -- admin ubah admission_status manual jadi PROCESSING atau
      * ACCEPTED. UNDER_REVIEW SENGAJA tidak ada di pilihan form ini -- status
      * itu hanya diset otomatis oleh webhook begitu Registration Fee lunas

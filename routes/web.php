@@ -775,6 +775,8 @@ Route::middleware(['auth', 'permission:quiz.university-application,edit'])->pref
     // pernah bisa membayar (ApplicationPaymentController::init() menolak
     // nominal kosong/0).
     Route::post('/{id}/fees', [UniversityApplicationController::class, 'updateFees'])->name('quiz.university-application.fees.update');
+    // Application No (manual) & data paspor student, 13 Oktober 2026.
+    Route::post('/{id}/passport', [UniversityApplicationController::class, 'updatePassport'])->name('quiz.university-application.passport.update');
     // FASE 4 -- admin update manual admission_status (UNDER REVIEW diset
     // otomatis oleh webhook begitu Registration Fee lunas -- lihat
     // FormPaymentController::onApplicationPaymentPaid() -- PROCESSING &

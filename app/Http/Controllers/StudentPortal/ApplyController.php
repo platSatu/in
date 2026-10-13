@@ -137,6 +137,7 @@ class ApplyController extends Controller
             'registrationFee' => $registrationFee,
             'courseRegistrationFeeAmount' => $courseRegistrationFeeAmount,
             'defaultWhatsapp' => $student->handphone ?? $user->handphone ?? '',
+            'student' => $student,
         ]);
     }
 
@@ -156,6 +157,9 @@ class ApplyController extends Controller
             'degree_intake_id' => 'required|uuid|exists:university_profile_degrees,id',
             'intake_year' => 'required|integer|min:' . now()->year . '|max:' . (now()->year + 5),
             'whatsapp' => 'required|string|max:20',
+            // Opsional (13 Oktober 2026), disimpan ke data Student.
+            'name_pasport' => 'nullable|string|max:100',
+            'number_pasport' => 'nullable|string|max:100',
         ]);
 
         $degreeRow = UniversityProfileDegree::where('id', $validated['degree_intake_id'])
@@ -211,6 +215,13 @@ class ApplyController extends Controller
         // Fee Course ini (masih null), ApplicationPaymentController::init()
         // tetap menolak transaksi dengan pesan jelas -- SAMA seperti perilaku
         // sebelumnya kalau nominal kosong, cuma sumbernya sekarang dari Course.
+        // Data paspor opsional: yang diisi saja yang disimpan, isian kosong
+        // tidak menghapus data yang sudah ada.
+        $student->savePassport(array_filter([
+            'name_pasport' => $validated['name_pasport'] ?? null,
+            'number_pasport' => $validated['number_pasport'] ?? null,
+        ], 'filled'));
+
         $application = UniversityApplication::create([
             'application_no' => (new ApplicationNumberGenerator())->next(),
             'student_id' => $student->id,

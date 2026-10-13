@@ -64,6 +64,7 @@ class ApplicationFormController extends Controller
             'gender' => 'nullable|string|max:20',
             'nationality' => 'nullable|string|max:255',
             'passport_no' => 'nullable|string|max:100',
+            'name_pasport' => 'nullable|string|max:100',
             'passport_expiry_date' => 'nullable|date',
             'telephone_no' => 'nullable|string|max:50',
             'date_of_birth' => 'nullable|date',
@@ -94,6 +95,13 @@ class ApplicationFormController extends Controller
             'education.*.location' => 'nullable|string|max:255',
             'education.*.year_start' => 'nullable|string|max:10',
             'education.*.year_end' => 'nullable|string|max:10',
+        ]);
+
+        // Nama & nomor paspor disimpan di data Student (satu sumber, ikut
+        // tampil di menu Student admin); passport_no formulir ikut disamakan.
+        $application->student?->savePassport([
+            'name_pasport' => $validated['name_pasport'] ?? null,
+            'number_pasport' => $validated['passport_no'] ?? null,
         ]);
 
         $existingFormDetail = ApplicationFormDetail::where('application_id', $application->id)->first();
