@@ -201,6 +201,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // lihat blockIfFormNotSubmitted().
     Route::get('/applications/{application}/documents', [ApplicationDocumentController::class, 'edit'])->name('student-portal.applications.documents.edit');
     Route::post('/applications/{application}/documents', [ApplicationDocumentController::class, 'update'])->name('student-portal.applications.documents.update');
+    // Hapus 1 file dari jenis yang boleh banyak (Any Certificate), 13 Oktober 2026.
+    Route::delete('/applications/{application}/documents/{document}', [ApplicationDocumentController::class, 'destroy'])->name('student-portal.applications.documents.destroy');
 });
 
 Route::get('/packages', [DashboardPackageController::class, 'index'])->name('public.packages.index');

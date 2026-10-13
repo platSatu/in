@@ -26,6 +26,8 @@ class ApplicationDocument extends Model
     protected $fillable = [
         'application_id',
         'document_type_id',
+        // Nama file untuk jenis yang boleh banyak (mis. nama sertifikat).
+        'title',
         'file_path',
         'original_filename',
         'uploaded_by_user_id',
@@ -40,6 +42,20 @@ class ApplicationDocument extends Model
         'uploaded_at' => 'datetime',
         'reviewed_at' => 'datetime',
     ];
+
+    /** Student boleh menghapus sendiri selama belum di-approve (jenis yang boleh banyak). */
+    public function canBeDeletedByStudent(): bool
+    {
+        return in_array($this->review_status, [self::REVIEW_PENDING, self::REVIEW_REJECTED], true);
+    }
+
+    /** Label tampilan: "Any Certificate: Juara 1 Lomba" kalau ada title. */
+    public function displayLabel(): string
+    {
+        $label = $this->documentType->label ?? 'Document';
+
+        return filled($this->title) ? "{$label}: {$this->title}" : $label;
+    }
 
     public function application(): BelongsTo
     {

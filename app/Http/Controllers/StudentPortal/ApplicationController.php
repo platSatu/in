@@ -61,10 +61,19 @@ class ApplicationController extends Controller
             ->where('status', ApplicationPayment::STATUS_PAID)
             ->exists();
 
+        // Sertifikat yang diupload student (jenis allows_multiple, mis. Any
+        // Certificate), ditampilkan di card "My Certificates" (13 Oktober 2026).
+        $certificates = ApplicationDocument::where('application_id', $application->id)
+            ->whereHas('documentType', fn ($query) => $query->active()->studentUpload()->where('allows_multiple', true))
+            ->with('documentType')
+            ->orderBy('uploaded_at')
+            ->get();
+
         return view('student-portal.applications.show', [
             'application' => $application,
             'adminDocumentTypes' => $adminDocumentTypes,
             'adminDocuments' => $adminDocuments,
+            'certificates' => $certificates,
             'departureFeePaid' => $departureFeePaid,
         ]);
     }

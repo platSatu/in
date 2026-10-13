@@ -119,6 +119,73 @@
                     <div class="group-title">{{ $groupLabel }}</div>
 
                     @foreach($types as $documentType)
+                        @if($documentType->allows_multiple)
+                            {{-- Jenis boleh lebih dari 1 file (mis. Any Certificate): daftar + tambah baris. --}}
+                            @php
+                                $files = $multipleDocuments->get($documentType->id) ?? collect();
+                                $remaining = max(0, \App\Models\DocumentType::MAX_MULTIPLE_FILES - $files->count());
+                                $statusBadges = ['approved' => ['badge-approved', 'Approved'], 'rejected' => ['badge-rejected', 'Rejected']];
+                            @endphp
+                            <div class="doc-row">
+                                <div class="mb-2">
+                                    <div class="doc-name">{{ $documentType->label }}</div>
+                                    <div class="doc-hint">You can upload more than one ({{ $files->count() }}/{{ \App\Models\DocumentType::MAX_MULTIPLE_FILES }}) &middot; Allowed: {{ strtoupper($documentType->allowed_extensions) }} &middot; max 5MB each</div>
+                                </div>
+
+                                @foreach($files as $file)
+                                    @php [$badgeClass, $badgeText] = $statusBadges[$file->review_status] ?? ['badge-pending', 'Pending review']; @endphp
+                                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 py-2" style="border-top:1px dashed #eef1f8;">
+                                        <div>
+                                            <div class="fw-semibold" style="font-size:14px;">{{ $file->title ?: ($file->original_filename ?: 'Certificate') }}</div>
+                                            <a href="{{ asset($file->file_path) }}" target="_blank" rel="noopener" class="doc-current-link">
+                                                <i class="bi bi-eye"></i> Preview
+                                            </a>
+                                            <span class="doc-hint">&middot; uploaded {{ optional($file->uploaded_at)->format('d M Y, H:i') }}</span>
+                                            @if($file->review_status === 'rejected' && $file->review_note)
+                                                <div class="doc-hint" style="color:var(--brand);"><i class="bi bi-exclamation-circle"></i> {{ $file->review_note }}</div>
+                                            @endif
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge-status {{ $badgeClass }}">{{ $badgeText }}</span>
+                                            @if($file->canBeDeletedByStudent())
+                                                <button type="submit" form="delete-doc-{{ $file->id }}" class="btn btn-sm btn-outline-danger"
+                                                    onclick="return confirm('Remove this file?')"><i class="bi bi-trash"></i></button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+
+                                @if($remaining > 0)
+                                    <div class="js-multi-rows mt-2" data-type="{{ $documentType->id }}" data-remaining="{{ $remaining }}">
+                                        <div class="row g-2 js-multi-row mb-2">
+                                            <div class="col-md-5">
+                                                <input type="text" name="certificates[{{ $documentType->id }}][0][title]" maxlength="150"
+                                                    class="form-control form-control-sm" placeholder="Certificate name, e.g. 1st Place Speech Contest">
+                                            </div>
+                                            <div class="col-md-7">
+                                                <input type="file" name="certificates[{{ $documentType->id }}][0][file]" class="form-control form-control-sm">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary js-multi-add" data-type="{{ $documentType->id }}" @disabled($remaining <= 1)>
+                                        <i class="bi bi-plus"></i> Add another certificate
+                                    </button>
+                                @else
+                                    <div class="doc-hint mt-2">Maximum number of files reached. Remove a file to add a new one.</div>
+                                @endif
+
+                                @error('certificates.' . $documentType->id)
+                                    <div class="invalid-feedback d-block">{{ $message }}</div>
+                                @enderror
+                                @foreach($errors->get('certificates.' . $documentType->id . '.*') as $messages)
+                                    @foreach((array) $messages as $message)
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
+                                    @endforeach
+                                @endforeach
+                            </div>
+                            @continue
+                        @endif
+
                         @php
                             $existingDocument = $existingDocuments->get($documentType->id);
                             $statusKey = $existingDocument->review_status ?? null;
@@ -204,6 +271,16 @@
                     <i class="bi bi-cloud-upload me-1"></i> Save Documents
                 </button>
             </form>
+
+            {{-- Form hapus file (di luar form utama karena form tidak boleh bersarang). --}}
+            @foreach($multipleDocuments->flatten(1) as $file)
+                @if($file->documentType?->allows_multiple && $file->canBeDeletedByStudent())
+                    <form id="delete-doc-{{ $file->id }}" method="POST" action="{{ route('student-portal.applications.documents.destroy', [$application->id, $file->id]) }}" class="d-none">
+                        @csrf
+                        @method('DELETE')
+                    </form>
+                @endif
+            @endforeach
         </div>
 
         <div class="text-center">
@@ -213,6 +290,27 @@
         </div>
 
     </div>
+
+    <script>
+        // "Add another certificate": tambah baris nama + file, maksimal sisa kuota.
+        document.querySelectorAll('.js-multi-add').forEach(function (button) {
+            button.addEventListener('click', function () {
+                var box = document.querySelector('.js-multi-rows[data-type="' + button.dataset.type + '"]');
+                var rows = box.querySelectorAll('.js-multi-row');
+                var remaining = parseInt(box.dataset.remaining, 10);
+                if (rows.length >= remaining) return;
+
+                var index = rows.length;
+                var clone = rows[0].cloneNode(true);
+                clone.querySelectorAll('input').forEach(function (input) {
+                    input.name = input.name.replace(/\]\[\d+\]\[/, '][' + index + '][');
+                    input.value = '';
+                });
+                box.appendChild(clone);
+                button.disabled = rows.length + 1 >= remaining;
+            });
+        });
+    </script>
 
 </body>
 

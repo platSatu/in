@@ -257,9 +257,20 @@
                             </thead>
                             <tbody>
                                 @foreach ($types as $documentType)
-                                    @php $document = $existingDocuments->get($documentType->id); @endphp
+                                    @php
+                                        // Jenis boleh banyak (Any Certificate): 1 baris per file + baris "Tambah".
+                                        $rowDocuments = $documentType->allows_multiple
+                                            ? ($multipleDocuments->get($documentType->id) ?? collect())
+                                            : collect([$existingDocuments->get($documentType->id)]);
+                                    @endphp
+                                    @foreach ($rowDocuments as $document)
                                     <tr>
-                                        <td class="fw-bold">{{ $documentType->label }}</td>
+                                        <td class="fw-bold">
+                                            {{ $documentType->label }}
+                                            @if ($document && $document->title)
+                                                <div class="fw-normal" style="font-size:12.5px;">{{ $document->title }}</div>
+                                            @endif
+                                        </td>
                                         <td>{{ $document->original_filename ?? '-' }}</td>
                                         <td>
                                             @if (!$document)
@@ -319,12 +330,12 @@
                                                                 Approve
                                                             </button>
                                                         </form>
-                                                        <button type="button" class="btn btn-sm btn-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $documentType->id }}">
+                                                        <button type="button" class="btn btn-sm btn-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $document->id }}">
                                                             Reject
                                                         </button>
                                                     </div>
 
-                                                    <div class="modal fade" id="rejectModal-{{ $documentType->id }}" tabindex="-1" aria-hidden="true">
+                                                    <div class="modal fade" id="rejectModal-{{ $document->id }}" tabindex="-1" aria-hidden="true">
                                                         <div class="modal-dialog">
                                                             <div class="modal-content text-start">
                                                                 <form method="POST" action="{{ route('quiz.university-application.documents.review', [$application->id, $document->id]) }}">
@@ -376,13 +387,39 @@
                                                 <span class="text-muted d-block mb-2">-</span>
                                             @endif
 
-                                            <form method="POST" action="{{ route('quiz.university-application.documents.upload', [$application->id, $documentType->id]) }}" enctype="multipart/form-data" class="d-flex flex-nowrap justify-content-center gap-1 mt-2">
-                                                @csrf
-                                                <input type="file" name="document" class="form-control form-control-sm" style="max-width:150px;" required>
-                                                <button type="submit" class="btn btn-sm btn-outline-dark text-nowrap">{{ $document ? 'Re-upload' : 'Upload' }}</button>
-                                            </form>
+                                            @unless ($documentType->allows_multiple)
+                                                <form method="POST" action="{{ route('quiz.university-application.documents.upload', [$application->id, $documentType->id]) }}" enctype="multipart/form-data" class="d-flex flex-nowrap justify-content-center gap-1 mt-2">
+                                                    @csrf
+                                                    <input type="file" name="document" class="form-control form-control-sm" style="max-width:150px;" required>
+                                                    <button type="submit" class="btn btn-sm btn-outline-dark text-nowrap">{{ $document ? 'Re-upload' : 'Upload' }}</button>
+                                                </form>
+                                            @endunless
                                         </td>
                                     </tr>
+                                    @endforeach
+
+                                    @if ($documentType->allows_multiple)
+                                        @php $multipleCount = $rowDocuments->count(); @endphp
+                                        <tr>
+                                            <td class="fw-bold">
+                                                {{ $documentType->label }}
+                                                <div class="text-muted fw-normal" style="font-size:12px;">{{ $multipleCount }} / {{ \App\Models\DocumentType::MAX_MULTIPLE_FILES }} file</div>
+                                            </td>
+                                            <td colspan="4">
+                                                @if ($multipleCount < \App\Models\DocumentType::MAX_MULTIPLE_FILES)
+                                                    {{-- Tambah sertifikat atas nama student (nama + file). --}}
+                                                    <form method="POST" action="{{ route('quiz.university-application.documents.upload', [$application->id, $documentType->id]) }}" enctype="multipart/form-data" class="d-flex flex-wrap gap-2 align-items-center">
+                                                        @csrf
+                                                        <input type="text" name="title" maxlength="150" class="form-control form-control-sm" style="max-width:260px;" placeholder="Nama sertifikat" required>
+                                                        <input type="file" name="document" class="form-control form-control-sm" style="max-width:220px;" required>
+                                                        <button type="submit" class="btn btn-sm btn-outline-dark text-nowrap">+ Tambah</button>
+                                                    </form>
+                                                @else
+                                                    <span class="text-muted" style="font-size:12.5px;">Sudah mencapai batas maksimal file.</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endif
                                 @endforeach
                             </tbody>
                         </table>

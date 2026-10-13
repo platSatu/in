@@ -9,9 +9,11 @@ use App\Models\ApplicationFormDetail;
 use App\Models\ApplicationPayment;
 use App\Models\DocumentType;
 use App\Models\UniversityApplication;
+use App\Services\InaStudy\MultipleDocumentUploader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\Response;
@@ -68,17 +70,19 @@ class ApplicationDocumentController extends Controller
         // sendiri. Lihat DocumentType::scopeStudentUpload().
         $documentTypes = DocumentType::active()->studentUpload()->orderBy('sort_order')->get();
 
-        $existingDocuments = ApplicationDocument::where('application_id', $application->id)
-            ->with('histories.uploadedBy')
-            ->get()
-            ->keyBy('document_type_id');
+        $documents = ApplicationDocument::where('application_id', $application->id)
+            ->with(['histories.uploadedBy', 'documentType'])
+            ->orderBy('uploaded_at')
+            ->get();
 
         $groupedTypes = $documentTypes->groupBy('group_label');
 
         return view('student-portal.applications.documents', [
             'application' => $application,
             'groupedTypes' => $groupedTypes,
-            'existingDocuments' => $existingDocuments,
+            // Jenis biasa: 1 file per jenis. Jenis allows_multiple: daftar file.
+            'existingDocuments' => $documents->keyBy('document_type_id'),
+            'multipleDocuments' => $documents->groupBy('document_type_id'),
         ]);
     }
 
@@ -116,13 +120,26 @@ class ApplicationDocumentController extends Controller
         $rules = [];
         foreach ($documentTypes as $documentType) {
             $extensions = implode(',', $documentType->allowedExtensionsArray());
-            $rules["documents.{$documentType->id}"] = "nullable|file|max:5120|mimes:{$extensions}";
+
+            if ($documentType->allows_multiple) {
+                // Jenis boleh banyak (mis. Any Certificate): baris baru = nama + file.
+                $rules["certificates.{$documentType->id}"] = 'nullable|array|max:'.DocumentType::MAX_MULTIPLE_FILES;
+                $rules["certificates.{$documentType->id}.*.title"] = "nullable|string|max:150|required_with:certificates.{$documentType->id}.*.file";
+                $rules["certificates.{$documentType->id}.*.file"] = "nullable|file|max:5120|mimes:{$extensions}";
+            } else {
+                $rules["documents.{$documentType->id}"] = "nullable|file|max:5120|mimes:{$extensions}";
+            }
         }
 
-        $validated = $request->validate($rules);
+        $validated = $request->validate($rules, [
+            'certificates.*.*.title.required_with' => 'Please fill in the certificate name for each file.',
+        ]);
         $uploadedFiles = array_filter($validated['documents'] ?? []);
+        $newMultiple = collect($validated['certificates'] ?? [])
+            ->map(fn ($rows) => collect($rows)->filter(fn ($row) => ! empty($row['file']))->values())
+            ->filter(fn ($rows) => $rows->isNotEmpty());
 
-        if (empty($uploadedFiles)) {
+        if (empty($uploadedFiles) && $newMultiple->isEmpty()) {
             return redirect()
                 ->route('student-portal.applications.documents.edit', $application->id)
                 ->with('status', 'No file was selected to upload.');
@@ -130,10 +147,16 @@ class ApplicationDocumentController extends Controller
 
         $userId = Auth::id();
 
+        // Unique (aplikasi, jenis) sudah tidak di database (lihat migration
+        // allow_multiple_application_documents) -- untuk jenis biasa tetap 1
+        // file per aplikasi, dijaga dengan lock aplikasi di sini.
+        DB::transaction(function () use ($application, $uploadedFiles, $documentTypes, $userId) {
+        UniversityApplication::whereKey($application->id)->lockForUpdate()->first();
+
         foreach ($uploadedFiles as $documentTypeId => $file) {
             $documentType = $documentTypes->get($documentTypeId);
 
-            if (! $documentType) {
+            if (! $documentType || $documentType->allows_multiple) {
                 continue;
             }
 
@@ -182,10 +205,55 @@ class ApplicationDocumentController extends Controller
                 ]
             );
         }
+        });
+
+        $uploader = new MultipleDocumentUploader();
+
+        foreach ($newMultiple as $documentTypeId => $rows) {
+            $documentType = $documentTypes->get($documentTypeId);
+
+            if (! $documentType || ! $documentType->allows_multiple) {
+                continue;
+            }
+
+            foreach ($rows as $row) {
+                $uploader->add($application, $documentType, $row['file'], trim($row['title']), $userId, "certificates.{$documentTypeId}");
+            }
+        }
 
         return redirect()
             ->route('student-portal.applications.documents.edit', $application->id)
             ->with('success', 'Documents uploaded successfully. Our team will review them shortly.');
+    }
+
+    /**
+     * Hapus 1 file dari jenis yang boleh banyak (mis. Any Certificate) -- hanya
+     * milik student sendiri dan selama belum di-approve (pending/rejected).
+     */
+    public function destroy(Request $request, string $applicationId, string $documentId): RedirectResponse
+    {
+        $application = $this->ownedApplicationOrFail($request, $applicationId);
+
+        if ($redirect = $this->blockIfRegistrationFeeUnpaid($application)) {
+            return $redirect;
+        }
+
+        $document = ApplicationDocument::where('application_id', $application->id)
+            ->with('documentType')
+            ->findOrFail($documentId);
+
+        abort_unless($document->documentType?->allows_multiple && $document->canBeDeletedByStudent(), Response::HTTP_FORBIDDEN);
+
+        $path = $document->file_path ? public_path($document->file_path) : null;
+        $document->delete();
+
+        if ($path && is_file($path)) {
+            @unlink($path);
+        }
+
+        return redirect()
+            ->route('student-portal.applications.documents.edit', $application->id)
+            ->with('success', 'File removed.');
     }
 
     /**

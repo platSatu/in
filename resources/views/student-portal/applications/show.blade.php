@@ -217,6 +217,27 @@
             </a>
         </div>
 
+        {{-- Sertifikat yang sudah diupload student (Any Certificate, bisa lebih dari 1). --}}
+        @if($certificates->isNotEmpty())
+            <div class="card-box">
+                <h6 class="fw-bold mb-3">My Certificates</h6>
+                @foreach($certificates as $certificate)
+                    <div class="doc-download-row">
+                        <div>
+                            <div class="doc-name">{{ $certificate->title ?: ($certificate->original_filename ?: $certificate->documentType->label) }}</div>
+                            <div class="doc-hint">
+                                {{ $certificate->documentType->label }} &middot; uploaded {{ optional($certificate->uploaded_at)->format('d M Y, H:i') }}
+                                &middot; {{ ['approved' => 'Approved', 'rejected' => 'Rejected'][$certificate->review_status] ?? 'Pending review' }}
+                            </div>
+                        </div>
+                        <a href="{{ asset($certificate->file_path) }}" target="_blank" rel="noopener" class="btn btn-brand" style="padding:8px 16px;">
+                            <i class="bi bi-eye"></i> Preview
+                        </a>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
         {{--
             FASE 4 -- dokumen yang diupload ADMIN (Offer Letter, Passport),
             siswa cuma bisa lihat/download di sini, tidak pernah upload

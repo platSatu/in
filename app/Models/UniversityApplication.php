@@ -125,7 +125,9 @@ class UniversityApplication extends Model
     public function scopeWithDocumentProgress($query)
     {
         return $query->withCount([
-            'documents' => fn ($q) => $q->whereHas('documentType', fn ($t) => $t->active()->studentUpload()),
+            // count distinct: jenis yang boleh banyak file (Any Certificate) tetap dihitung 1 jenis.
+            'documents' => fn ($q) => $q->whereHas('documentType', fn ($t) => $t->active()->studentUpload())
+                ->select(\Illuminate\Support\Facades\DB::raw('count(distinct document_type_id)')),
             'documents as ina_documents_count' => fn ($q) => $q->whereHas('documentType', fn ($t) => $t->active()->adminProvided()),
         ]);
     }

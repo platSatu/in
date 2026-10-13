@@ -30,6 +30,9 @@ class DocumentType extends Model
     public const PROVIDED_BY_STUDENT = 'student';
     public const PROVIDED_BY_ADMIN = 'admin';
 
+    // Batas file per aplikasi untuk jenis yang allows_multiple (Any Certificate).
+    public const MAX_MULTIPLE_FILES = 10;
+
     protected $fillable = [
         'code',
         'label',
@@ -42,6 +45,8 @@ class DocumentType extends Model
         'template_file_path',
         // FIX (10 September 2026): lihat catatan PROVIDED_BY_* di atas.
         'provided_by',
+        // 13 Oktober 2026: boleh lebih dari 1 file per aplikasi (mis. Any Certificate).
+        'allows_multiple',
         'is_required',
         'sort_order',
         'status',
@@ -49,6 +54,7 @@ class DocumentType extends Model
 
     protected $casts = [
         'is_required' => 'boolean',
+        'allows_multiple' => 'boolean',
         'sort_order' => 'integer',
     ];
 

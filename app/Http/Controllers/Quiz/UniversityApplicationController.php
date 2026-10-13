@@ -9,8 +9,10 @@ use App\Models\ApplicationDocumentHistory;
 use App\Models\DocumentType;
 use App\Models\University;
 use App\Models\UniversityApplication;
+use App\Services\InaStudy\MultipleDocumentUploader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 /**
@@ -143,10 +145,13 @@ class UniversityApplicationController extends Controller
 
         $documentTypes = DocumentType::active()->orderBy('sort_order')->get();
 
-        $existingDocuments = ApplicationDocument::where('application_id', $application->id)
+        $documents = ApplicationDocument::where('application_id', $application->id)
             ->with(['histories.uploadedBy', 'histories.reviewedBy', 'uploadedBy', 'reviewedBy'])
-            ->get()
-            ->keyBy('document_type_id');
+            ->orderBy('uploaded_at')
+            ->get();
+        // Jenis biasa: 1 file per jenis. Jenis allows_multiple (Any Certificate): daftar file.
+        $existingDocuments = $documents->keyBy('document_type_id');
+        $multipleDocuments = $documents->groupBy('document_type_id');
 
         $groupedTypes = $documentTypes->groupBy('group_label');
 
@@ -160,6 +165,7 @@ class UniversityApplicationController extends Controller
             'application',
             'groupedTypes',
             'existingDocuments',
+            'multipleDocuments',
             'payments'
         ));
     }
@@ -173,7 +179,8 @@ class UniversityApplicationController extends Controller
      */
     public function reviewDocument(Request $request, string $id, string $documentId): RedirectResponse
     {
-        $document = ApplicationDocument::where('application_id', $id)->findOrFail($documentId);
+        $document = ApplicationDocument::where('application_id', $id)->with('application')->findOrFail($documentId);
+        $this->assertVisibleApplication($request->user(), $document->application);
 
         $validated = $request->validate([
             'action' => 'required|in:approve,reject',
@@ -215,7 +222,24 @@ class UniversityApplicationController extends Controller
         $extensions = implode(',', $documentType->allowedExtensionsArray());
         $validated = $request->validate([
             'document' => "required|file|max:5120|mimes:{$extensions}",
+            // Jenis boleh banyak (Any Certificate): admin menambah 1 file baru + namanya.
+            'title' => $documentType->allows_multiple ? 'required|string|max:150' : 'nullable',
+        ], [
+            'title.required' => 'Nama sertifikat wajib diisi.',
         ]);
+
+        if ($documentType->allows_multiple) {
+            (new MultipleDocumentUploader())->add($application, $documentType, $validated['document'], trim($validated['title']), $request->user()->id, 'document');
+
+            return redirect()
+                ->route('quiz.university-application.show', $id)
+                ->with('success', 'Sertifikat berhasil ditambahkan.');
+        }
+
+        // Unique (aplikasi, jenis) dijaga di kode sejak migration
+        // allow_multiple_application_documents: kunci aplikasi dulu.
+        DB::transaction(function () use ($application, $documentType, $documentTypeId, $validated, $request) {
+        UniversityApplication::whereKey($application->id)->lockForUpdate()->first();
 
         $existing = ApplicationDocument::where('application_id', $application->id)
             ->where('document_type_id', $documentTypeId)
@@ -257,6 +281,7 @@ class UniversityApplicationController extends Controller
                 'reviewed_at' => $documentType->isAdminProvided() ? now() : null,
             ]
         );
+        });
 
         return redirect()
             ->route('quiz.university-application.show', $id)
