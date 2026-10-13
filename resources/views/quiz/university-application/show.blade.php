@@ -264,6 +264,9 @@
                                         <td>
                                             @if (!$document)
                                                 <span class="badge badge-secondary">Not uploaded</span>
+                                            @elseif ($documentType->provided_by === 'admin')
+                                                {{-- Dokumen dari INA: final, tampil di dashboard student. --}}
+                                                <span class="badge badge-success">Uploaded oleh INA</span>
                                             @elseif ($document->review_status === 'approved')
                                                 <span class="badge badge-success">Approved</span>
                                             @elseif ($document->review_status === 'rejected')

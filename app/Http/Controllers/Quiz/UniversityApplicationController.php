@@ -59,7 +59,7 @@ class UniversityApplicationController extends Controller
         // tiap jenis dokumen memang cuma bisa muncul 1 baris per aplikasi
         // (lihat migration create_application_documents_table).
         $query = UniversityApplication::with(['student', 'university', 'universityProfile'])
-            ->withCount('documents');
+            ->withDocumentProgress();
 
         // FIX (15 September 2026): batasi ke aplikasi milik student yang jadi
         // cakupan user ini (lihat docblock class & DataScope::visibleStudentIds()).
@@ -102,7 +102,7 @@ class UniversityApplicationController extends Controller
         // + badge "Documents Complete" di kolom Documents (lihat
         // index.blade.php) -- total jenis dokumen berlaku sama untuk semua
         // aplikasi (DocumentType belum per-university/per-major).
-        $totalDocumentTypes = DocumentType::active()->count();
+        $totalDocumentTypes = DocumentType::studentUploadTotal();
 
         $universities = University::orderBy('name')->get();
 
@@ -209,6 +209,7 @@ class UniversityApplicationController extends Controller
     public function uploadDocument(Request $request, string $id, string $documentTypeId): RedirectResponse
     {
         $application = UniversityApplication::findOrFail($id);
+        $this->assertVisibleApplication($request->user(), $application);
         $documentType = DocumentType::active()->findOrFail($documentTypeId);
 
         $extensions = implode(',', $documentType->allowedExtensionsArray());
@@ -247,10 +248,13 @@ class UniversityApplicationController extends Controller
                 'original_filename' => $validated['document']->getClientOriginalName(),
                 'uploaded_by_user_id' => $request->user()->id,
                 'uploaded_at' => now(),
-                'review_status' => ApplicationDocument::REVIEW_PENDING,
+                // Dokumen dari INA (Offer Letter, JW, VISA) sudah final, tidak
+                // perlu direview -- langsung approved. Dokumen student yang
+                // diupload admin atas nama student tetap pending (direview ulang).
+                'review_status' => $documentType->isAdminProvided() ? ApplicationDocument::REVIEW_APPROVED : ApplicationDocument::REVIEW_PENDING,
                 'review_note' => null,
-                'reviewed_by_user_id' => null,
-                'reviewed_at' => null,
+                'reviewed_by_user_id' => $documentType->isAdminProvided() ? $request->user()->id : null,
+                'reviewed_at' => $documentType->isAdminProvided() ? now() : null,
             ]
         );
 
@@ -285,6 +289,7 @@ class UniversityApplicationController extends Controller
     public function updateFees(Request $request, string $id): RedirectResponse
     {
         $application = UniversityApplication::findOrFail($id);
+        $this->assertVisibleApplication($request->user(), $application);
 
         $validated = $request->validate([
             'deposit_fee_china_amount' => 'nullable|integer|min:0',
@@ -339,6 +344,7 @@ class UniversityApplicationController extends Controller
     public function updateAdmissionStatus(Request $request, string $id): RedirectResponse
     {
         $application = UniversityApplication::findOrFail($id);
+        $this->assertVisibleApplication($request->user(), $application);
 
         $validated = $request->validate([
             'admission_status' => ['nullable', 'in:' . implode(',', [

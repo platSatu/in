@@ -114,6 +114,22 @@ class UniversityApplication extends Model
         return $this->course_name.(filled($this->degree) ? ' ('.$this->degree.')' : '');
     }
 
+    /**
+     * Hitungan dokumen untuk progress (13 Oktober 2026), dipisah supaya
+     * dokumen dari INA (Offer Letter, JW, VISA) tidak membuat dokumen
+     * student terlihat belum lengkap:
+     *  - documents_count: dokumen STUDENT (jenis aktif, provided_by student)
+     *  - ina_documents_count: dokumen dari INA (jenis aktif, provided_by admin)
+     * Pasangannya DocumentType::studentUploadTotal() / adminProvidedTotal().
+     */
+    public function scopeWithDocumentProgress($query)
+    {
+        return $query->withCount([
+            'documents' => fn ($q) => $q->whereHas('documentType', fn ($t) => $t->active()->studentUpload()),
+            'documents as ina_documents_count' => fn ($q) => $q->whereHas('documentType', fn ($t) => $t->active()->adminProvided()),
+        ]);
+    }
+
     public function handledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by_user_id');

@@ -92,6 +92,9 @@ class DocumentTypeSeeder extends Seeder
             // yang sudah diproses/terbit dari InaStudy, dokumen yang berbeda.
             ['code' => 'admin_offer_letter', 'label' => 'Offer Letter', 'group_label' => 'Documents from InaStudy', 'allowed_extensions' => 'pdf,jpg,jpeg', 'provided_by' => DocumentType::PROVIDED_BY_ADMIN, 'is_required' => false, 'sort_order' => 200],
             ['code' => 'admin_passport', 'label' => 'Passport (Processed)', 'group_label' => 'Documents from InaStudy', 'allowed_extensions' => 'pdf,jpg,jpeg', 'provided_by' => DocumentType::PROVIDED_BY_ADMIN, 'is_required' => false, 'sort_order' => 210],
+            // 13 Oktober 2026 -- juga ditambahkan lewat migration add_jw_and_visa_document_types.
+            ['code' => 'admin_jw', 'label' => 'JW', 'group_label' => 'Documents from InaStudy', 'allowed_extensions' => 'pdf,jpg,jpeg', 'provided_by' => DocumentType::PROVIDED_BY_ADMIN, 'is_required' => false, 'sort_order' => 220],
+            ['code' => 'admin_visa', 'label' => 'VISA', 'group_label' => 'Documents from InaStudy', 'allowed_extensions' => 'pdf,jpg,jpeg', 'provided_by' => DocumentType::PROVIDED_BY_ADMIN, 'is_required' => false, 'sort_order' => 230],
         ];
 
         foreach ($items as $item) {

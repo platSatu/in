@@ -39,14 +39,14 @@ class InaStudyController extends Controller
 
         $student = Student::where('user_id', $userId)->first();
         $myApplications = $student
-            ? $student->applications()->with(['university', 'universityProfile'])->withCount('documents')->orderByDesc('submitted_at')->get()
+            ? $student->applications()->with(['university', 'universityProfile'])->withDocumentProgress()->orderByDesc('submitted_at')->get()
             : collect();
 
         // Sama seperti di halaman admin (Quiz\UniversityApplicationController::index)
         // -- dipakai bareng documents_count di atas untuk progress bar "x / total"
         // dokumen di widget "My University Applications" (lihat diskusi
         // "progress bar student dashboard", 10 September 2026).
-        $totalDocumentTypes = DocumentType::active()->count();
+        $totalDocumentTypes = DocumentType::studentUploadTotal();
 
         // FASE "InaStudy Register Manual" (14 September 2026, permintaan user):
         // widget "My University Applications" di atas SEKARANG selalu

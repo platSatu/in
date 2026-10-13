@@ -176,13 +176,14 @@ class StudentController extends Controller
             ])
             ->whereNotNull('admission_status')
             ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
-            ->withCount('documents')
+            ->withDocumentProgress()
             ->when($visibleStudentIds !== null, fn ($query) => $query->whereIn('student_id', $visibleStudentIds))
             ->orderByDesc('submitted_at')
             ->get()
             ->groupBy('university_id')
             ->sortBy(fn ($rows) => mb_strtolower($rows->first()->university->name ?? ''));
-        $totalDocumentTypes = DocumentType::active()->count();
+        $totalDocumentTypes = DocumentType::studentUploadTotal();
+        $totalInaDocumentTypes = DocumentType::adminProvidedTotal();
 
         return view('student.student.index', compact(
             'data',
@@ -199,7 +200,8 @@ class StudentController extends Controller
             'totalForms',
             'studentsCreatedOnDate',
             'applicationsByUniversity',
-            'totalDocumentTypes'
+            'totalDocumentTypes',
+            'totalInaDocumentTypes'
         ));
     }
 

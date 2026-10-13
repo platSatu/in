@@ -86,4 +86,21 @@ class DocumentType extends Model
     {
         return $query->where('provided_by', self::PROVIDED_BY_ADMIN);
     }
+
+    /** Jumlah jenis dokumen aktif yang diupload student (penyebut progress "x / total"). */
+    public static function studentUploadTotal(): int
+    {
+        return static::active()->studentUpload()->count();
+    }
+
+    /** Jumlah jenis dokumen aktif yang diupload INA (Offer Letter, JW, VISA, ...). */
+    public static function adminProvidedTotal(): int
+    {
+        return static::active()->adminProvided()->count();
+    }
+
+    public function isAdminProvided(): bool
+    {
+        return $this->provided_by === self::PROVIDED_BY_ADMIN;
+    }
 }

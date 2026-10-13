@@ -499,6 +499,10 @@
                                                                 <div class="progress" style="height:6px;">
                                                                     <div class="progress-bar {{ $docsComplete ? 'bg-success' : 'bg-primary' }}" role="progressbar" style="width: {{ $docsPercent }}%;"></div>
                                                                 </div>
+                                                                @if ($totalInaDocumentTypes > 0)
+                                                                    {{-- Dokumen dari INA (Offer Letter, JW, VISA) dihitung terpisah. --}}
+                                                                    <div class="small text-muted mt-1">INA: {{ $application->ina_documents_count ?? 0 }} / {{ $totalInaDocumentTypes }}</div>
+                                                                @endif
                                                             </td>
                                                             <td class="text-nowrap">{{ $application->handledBy->name ?? '-' }}</td>
                                                             <td class="text-nowrap">{{ $application->submitted_at?->format('Y/m/d') ?? '-' }}</td>
