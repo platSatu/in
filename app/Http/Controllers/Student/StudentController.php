@@ -163,7 +163,13 @@ class StudentController extends Controller
         // aksesnya sama dengan menu Aplikasi Kuliah (DataScope::visibleStudentIds),
         // tidak ikut filter tab Data Student.
         $visibleStudentIds = DataScope::visibleStudentIds($user);
-        $applicationsByUniversity = UniversityApplication::with(['student', 'university', 'handledBy'])
+        $applicationsByUniversity = UniversityApplication::with([
+                'student',
+                'university',
+                'handledBy',
+                // Kolom Fee/Status Fee: pembayaran terbaru per jenis fee (Registration/Departure).
+                'payments' => fn ($query) => $query->latest('created_at'),
+            ])
             ->whereNotNull('admission_status')
             ->withCount('documents')
             ->when($visibleStudentIds !== null, fn ($query) => $query->whereIn('student_id', $visibleStudentIds))

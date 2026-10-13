@@ -403,9 +403,13 @@
                                                         <th>No</th>
                                                         <th class="text-nowrap">Application No</th>
                                                         <th>Student</th>
+                                                        <th class="text-nowrap">Name Passport</th>
+                                                        <th class="text-nowrap">Passport Number</th>
                                                         <th>Major</th>
                                                         <th>Intake</th>
                                                         <th>Status</th>
+                                                        <th>Fee</th>
+                                                        <th class="text-nowrap">Status Fee</th>
                                                         <th style="width:140px;">Documents</th>
                                                         <th class="text-nowrap">Sales</th>
                                                         <th>Submitted</th>
@@ -418,10 +422,37 @@
                                                             $docsCount = $application->documents_count ?? 0;
                                                             $docsPercent = $totalDocumentTypes > 0 ? min(100, round(($docsCount / $totalDocumentTypes) * 100)) : 0;
                                                             $docsComplete = $totalDocumentTypes > 0 && $docsCount >= $totalDocumentTypes;
+
+                                                            // Fee: Registration (sudah lunas -- syarat masuk tab ini) & Departure
+                                                            // (nominal diisi admin, deposit_fee_china_amount). Status dari
+                                                            // pembayaran terbaru per jenis (payments sudah urut terbaru dulu).
+                                                            $latestPayments = $application->payments->unique('purpose')->keyBy('purpose');
+                                                            $registrationPayment = $latestPayments->get(\App\Models\ApplicationPayment::PURPOSE_REGISTRATION_FEE);
+                                                            $departurePayment = $latestPayments->get(\App\Models\ApplicationPayment::PURPOSE_DEPARTURE_FEE);
+                                                            $feeRows = [
+                                                                'Registration' => [
+                                                                    'amount' => $registrationPayment->amount ?? $application->registration_fee_amount,
+                                                                    'payment' => $registrationPayment,
+                                                                ],
+                                                                'Departure' => [
+                                                                    'amount' => $departurePayment->amount ?? $application->deposit_fee_china_amount,
+                                                                    'payment' => $departurePayment,
+                                                                ],
+                                                            ];
+                                                            $feeStatusLabels = [
+                                                                'paid' => ['Lunas', 'bg-success'],
+                                                                'pending' => ['Menunggu', 'bg-warning text-dark'],
+                                                                'failed' => ['Gagal', 'bg-danger'],
+                                                                'expired' => ['Kedaluwarsa', 'bg-secondary'],
+                                                            ];
                                                         @endphp
                                                         <tr>
                                                             <td>{{ $loop->iteration }}</td>
-                                                            <td class="fw-bold text-nowrap">{{ $application->application_no ?: '-' }}</td>
+                                                            {{-- Application No diisi manual admin di data Student (students.application_no). --}}
+                                                            <td class="text-nowrap">
+                                                                <span class="fw-bold">{{ $application->student?->application_no ?: '-' }}</span>
+                                                                <div class="small text-muted" title="Nomor otomatis sistem">{{ $application->application_no }}</div>
+                                                            </td>
                                                             <td>
                                                                 @if ($application->student)
                                                                     <a href="{{ route('student.student.show', $application->student->id) }}" class="fw-bold">
@@ -432,6 +463,8 @@
                                                                 @endif
                                                                 <div class="small text-muted">{{ $application->whatsapp }}</div>
                                                             </td>
+                                                            <td>{{ $application->student?->name_pasport ?: '-' }}</td>
+                                                            <td class="text-nowrap">{{ $application->student?->number_pasport ?: '-' }}</td>
                                                             <td>{{ $application->major_label }}</td>
                                                             <td class="text-nowrap">{{ $application->intake ?: '-' }} {{ $application->intake_year }}</td>
                                                             <td>
@@ -439,6 +472,27 @@
                                                                 @if ($application->admission_status)
                                                                     <div class="small text-muted text-capitalize mt-1">{{ str_replace('_', ' ', $application->admission_status) }}</div>
                                                                 @endif
+                                                            </td>
+                                                            <td class="text-nowrap">
+                                                                @foreach ($feeRows as $feeLabel => $fee)
+                                                                    <div class="small">
+                                                                        <span class="text-muted">{{ $feeLabel }}:</span>
+                                                                        {{ $fee['amount'] !== null ? 'Rp ' . number_format((float) $fee['amount'], 0, ',', '.') : '-' }}
+                                                                    </div>
+                                                                @endforeach
+                                                            </td>
+                                                            <td class="text-nowrap">
+                                                                @foreach ($feeRows as $feeLabel => $fee)
+                                                                    @php
+                                                                        [$feeStatusText, $feeStatusClass] = $fee['payment']
+                                                                            ? ($feeStatusLabels[$fee['payment']->status] ?? [ucfirst($fee['payment']->status), 'bg-secondary'])
+                                                                            : ($fee['amount'] !== null ? ['Belum Bayar', 'bg-light text-dark'] : ['Belum ditagih', 'bg-light text-muted']);
+                                                                    @endphp
+                                                                    <div class="small mb-1">
+                                                                        <span class="text-muted">{{ $feeLabel }}:</span>
+                                                                        <span class="badge {{ $feeStatusClass }}">{{ $feeStatusText }}</span>
+                                                                    </div>
+                                                                @endforeach
                                                             </td>
                                                             <td>
                                                                 <div class="small mb-1">{{ $docsCount }} / {{ $totalDocumentTypes }}</div>
