@@ -727,11 +727,12 @@ class StudentController extends Controller
      */
     private function validateStudent(Request $request, ?string $ignoreId = null): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'images' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'sales_id' => ['nullable', 'string', 'max:255'],
             'first_name' => ['required', 'string', 'max:255'],
-            'last_name' => ['required', 'string', 'max:255'],
+            // Opsional (14 Oktober 2026): banyak nama hanya 1 kata.
+            'last_name' => ['nullable', 'string', 'max:255'],
             'email' => [
                 'required',
                 'email',
@@ -752,6 +753,12 @@ class StudentController extends Controller
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'progress_student' => ['nullable', Rule::in(array_keys(Student::PROGRESS_LABELS))],
         ]);
+
+        // Kosong disimpan '' (bukan NULL) -- sama seperti StudentIdentityResolver,
+        // aman walau kolom last_name di database tidak nullable.
+        $validated['last_name'] = $validated['last_name'] ?? '';
+
+        return $validated;
     }
 
     /**
