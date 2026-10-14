@@ -299,6 +299,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/inayule/class-sessions', [ClassSessionController::class, 'index'])->name('inayule.class-sessions.index');
     Route::get('/inayule/class-sessions/create', [ClassSessionController::class, 'create'])->name('inayule.class-sessions.create');
     Route::post('/inayule/class-sessions', [ClassSessionController::class, 'store'])->name('inayule.class-sessions.store');
+    // Siswa membatalkan pengajuan yang belum disetujui pengajar (14 Oktober 2026).
+    Route::post('/inayule/class-sessions/{id}/cancel', [ClassSessionController::class, 'cancel'])->name('inayule.class-sessions.cancel');
 });
 
 // FASE 2 bagian 2 "Absensi": sisi PENGAJAR -- digerbangi ROLE 'teacher'

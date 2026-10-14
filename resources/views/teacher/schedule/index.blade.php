@@ -123,6 +123,7 @@
                                                     'disetujui' => ['Disetujui', 'badge-success'],
                                                     'direfund' => ['Direfund', 'badge-secondary'],
                                                     'ditolak_admin' => ['Ditolak Admin', 'badge-danger'],
+                                                    'dibatalkan' => ['Dibatalkan Siswa', 'badge-secondary'],
                                                 ][$session->status] ?? [$session->status, 'badge-secondary'];
                                             @endphp
                                             <span class="badge {{ $teacherScheduleStatusLabel[1] }}">{{ $teacherScheduleStatusLabel[0] }}</span>

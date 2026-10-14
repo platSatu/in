@@ -185,6 +185,16 @@
                     .inayule-page #inayule-credit table > tbody > tr > td[colspan]::before { content: none; }
                 }
             </style>
+            {{-- Pesan hasil aksi (batal pengajuan, upgrade/convert, dll.). --}}
+            @foreach (['success' => 'alert-success', 'error' => 'alert-danger', 'status' => 'alert-info'] as $flashKey => $flashClass)
+                @if (session($flashKey))
+                    <div class="alert {{ $flashClass }} alert-dismissible fade show" role="alert">
+                        {{ session($flashKey) }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                @endif
+            @endforeach
+
             <div class="simple-tab inayule-tabs">
                 <ul class="nav nav-tabs" id="inayuleTab" role="tablist">
                     <li class="nav-item" role="presentation">
@@ -472,9 +482,18 @@
                                                     'disetujui' => ['Disetujui', 'badge-success'],
                                                     'direfund' => ['Direfund', 'badge-secondary'],
                                                     'ditolak_admin' => ['Ditolak Admin', 'badge-danger'],
+                                                    'dibatalkan' => ['Dibatalkan Siswa', 'badge-secondary'],
                                                 ][$session->status] ?? [$session->status, 'badge-secondary'];
                                             @endphp
                                             <span class="badge {{ $scheduleStatusLabel[1] }}">{{ $scheduleStatusLabel[0] }}</span>
+                                            @if ($session->canBeCancelledByStudent())
+                                                {{-- Batal sebelum pengajar menyetujui: tidak ada transaksi/pemotongan credit. --}}
+                                                <form action="{{ route('inayule.class-sessions.cancel', $session->id) }}" method="POST" class="mt-2"
+                                                    onsubmit="return confirm('Batalkan pengajuan ini? Credit Anda tidak akan terpotong.');">
+                                                    @csrf
+                                                    <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap">Batalkan</button>
+                                                </form>
+                                            @endif
                                         </td>
                                     </tr>
                                 @empty

@@ -121,6 +121,30 @@ class ClassSessionWorkflowService
         return $session->fresh();
     }
 
+    /**
+     * Siswa membatalkan pengajuannya sendiri (14 Oktober 2026). Hanya boleh
+     * selama masih 'menunggu_guru' -- credit belum terpotong, jadi tidak ada
+     * transaksi apa pun. Setelah pengajar menyetujui (kelas sudah dimulai),
+     * pembatalan harus lewat admin (Tolak), supaya siswa tidak bisa
+     * membatalkan kelas yang sudah diikuti.
+     */
+    public function studentCancel(ClassSession $session, Student $student): ClassSession
+    {
+        return DB::transaction(function () use ($session, $student) {
+            $session = ClassSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+
+            if ($session->student_id !== $student->id) {
+                throw new InvalidArgumentException('Pengajuan ini bukan milik Anda.');
+            }
+
+            $this->assertStatus($session, ClassSession::STATUS_WAITING_TEACHER);
+
+            $session->update(['status' => ClassSession::STATUS_CANCELLED_BY_STUDENT]);
+
+            return $session->fresh();
+        });
+    }
+
     public function teacherReject(ClassSession $session, User $teacher, ?string $reason = null): ClassSession
     {
         $this->assertStatus($session, ClassSession::STATUS_WAITING_TEACHER);

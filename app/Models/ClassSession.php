@@ -36,6 +36,16 @@ class ClassSession extends Model
     // Credit sesi yang sudah disetujui dikembalikan admin (tidak dihitung honor).
     public const STATUS_REFUNDED = 'direfund';
 
+    // Dibatalkan siswa sendiri sebelum pengajar menyetujui (14 Oktober 2026).
+    // Tidak ada transaksi: credit belum pernah terpotong & tidak dihitung honor.
+    public const STATUS_CANCELLED_BY_STUDENT = 'dibatalkan';
+
+    /** Siswa hanya boleh membatalkan selama pengajar belum menyetujui. */
+    public function canBeCancelledByStudent(): bool
+    {
+        return $this->status === self::STATUS_WAITING_TEACHER;
+    }
+
     protected $fillable = [
         'student_id',
         'teacher_user_id',

@@ -10,6 +10,7 @@ use App\Models\Role;
 use App\Models\Student;
 use App\Models\User;
 use App\Services\ClassSession\ClassSessionWorkflowService;
+use App\Services\ClassSession\InvalidClassSessionStateException;
 use App\Services\CourseCredit\CourseCreditDebitService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -121,5 +122,28 @@ class ClassSessionController extends Controller
 
         return redirect()->route('inayule.class-sessions.index')
             ->with('success', 'Pengajuan pemakaian credit berhasil dikirim, menunggu approval pengajar.');
+    }
+
+    /**
+     * Siswa membatalkan pengajuan pemakaian credit yang belum disetujui
+     * pengajar. Tidak ada transaksi/pemotongan -- lihat
+     * ClassSessionWorkflowService::studentCancel().
+     */
+    public function cancel(Request $request, string $id): RedirectResponse
+    {
+        $student = Student::where('user_id', $request->user()->id)->first();
+        abort_unless($student, 404);
+
+        $session = ClassSession::where('student_id', $student->id)->findOrFail($id);
+
+        try {
+            $this->workflowService->studentCancel($session, $student);
+        } catch (InvalidClassSessionStateException|InvalidArgumentException) {
+            return redirect()->to(route('inayule.index').'#kelas')
+                ->with('error', 'Pengajuan ini sudah diproses pengajar, jadi tidak bisa dibatalkan lagi. Silakan hubungi admin.');
+        }
+
+        return redirect()->to(route('inayule.index').'#kelas')
+            ->with('success', 'Pengajuan dibatalkan. Credit Anda tidak terpotong.');
     }
 }

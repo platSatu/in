@@ -69,9 +69,17 @@
                                                 'disetujui' => ['Disetujui', 'badge-success'],
                                                 'direfund' => ['Direfund', 'badge-secondary'],
                                                 'ditolak_admin' => ['Ditolak Admin', 'badge-danger'],
+                                                'dibatalkan' => ['Dibatalkan Siswa', 'badge-secondary'],
                                             ][$session->status] ?? [$session->status, 'badge-secondary'];
                                         @endphp
                                         <span class="badge {{ $statusLabel[1] }}">{{ $statusLabel[0] }}</span>
+                                        @if ($session->canBeCancelledByStudent())
+                                            <form action="{{ route('inayule.class-sessions.cancel', $session->id) }}" method="POST" class="mt-2"
+                                                onsubmit="return confirm('Batalkan pengajuan ini? Credit Anda tidak akan terpotong.');">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap">Batalkan</button>
+                                            </form>
+                                        @endif
                                     </td>
                                     <td>{{ $session->notes ?? '-' }}</td>
                                 </tr>
