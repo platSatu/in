@@ -122,6 +122,11 @@
                 .inayule-page .iy-progress { height: 6px; border-radius: 999px; background: #f1f2f6; overflow: hidden; margin-top: 10px; }
                 .inayule-page .iy-progress > span { display: block; height: 100%; background: var(--ina-red); border-radius: 999px; }
                 .inayule-page .iy-fab { display: none; }
+                /* Tombol Batalkan (tab Kelas): sejajar & setinggi badge status di sebelahnya. */
+                .inayule-page .iy-status-actions { display: inline-flex; align-items: stretch; gap: 8px; flex-wrap: wrap; }
+                .inayule-page .iy-status-actions .badge { display: inline-flex; align-items: center; }
+                .inayule-page .iy-cancel-form { display: flex; margin: 0; }
+                .inayule-page .iy-cancel-btn { min-height: 0; height: 100%; padding: 0 12px; font-size: 12px; line-height: 1; border-radius: 6px; box-shadow: none; }
 
                 @media (max-width: 767.98px) {
                     .inayule-page { padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
@@ -129,6 +134,7 @@
                     .inayule-page .tab-content { padding-top: 4px !important; }
                     .inayule-page .ina-card:hover { transform: none; }
                     .inayule-page .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+                    .inayule-page .btn.iy-cancel-btn { min-height: 0; }
 
                     /* Tab jadi menu bawah (ikon + label pendek) */
                     .inayule-page .iy-label-full { display: none; }
@@ -485,15 +491,18 @@
                                                     'dibatalkan' => ['Dibatalkan Siswa', 'badge-secondary'],
                                                 ][$session->status] ?? [$session->status, 'badge-secondary'];
                                             @endphp
-                                            <span class="badge {{ $scheduleStatusLabel[1] }}">{{ $scheduleStatusLabel[0] }}</span>
-                                            @if ($session->canBeCancelledByStudent())
-                                                {{-- Batal sebelum pengajar menyetujui: tidak ada transaksi/pemotongan credit. --}}
-                                                <form action="{{ route('inayule.class-sessions.cancel', $session->id) }}" method="POST" class="mt-2"
-                                                    onsubmit="return confirm('Batalkan pengajuan ini? Credit Anda tidak akan terpotong.');">
-                                                    @csrf
-                                                    <button type="submit" class="btn btn-sm btn-outline-secondary text-nowrap">Batalkan</button>
-                                                </form>
-                                            @endif
+                                            {{-- Badge + tombol Batalkan sejajar dan sama tinggi (align-items: stretch). --}}
+                                            <div class="iy-status-actions">
+                                                <span class="badge {{ $scheduleStatusLabel[1] }}">{{ $scheduleStatusLabel[0] }}</span>
+                                                @if ($session->canBeCancelledByStudent())
+                                                    {{-- Batal sebelum pengajar menyetujui: tidak ada transaksi/pemotongan credit. --}}
+                                                    <form action="{{ route('inayule.class-sessions.cancel', $session->id) }}" method="POST" class="iy-cancel-form"
+                                                        onsubmit="return confirm('Batalkan pengajuan ini? Credit Anda tidak akan terpotong.');">
+                                                        @csrf
+                                                        <button type="submit" class="btn btn-outline-secondary text-nowrap iy-cancel-btn">Batalkan</button>
+                                                    </form>
+                                                @endif
+                                            </div>
                                         </td>
                                     </tr>
                                 @empty
