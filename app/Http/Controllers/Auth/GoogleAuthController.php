@@ -68,6 +68,14 @@ class GoogleAuthController extends Controller
 
         $user = User::where('email', $googleUser->getEmail())->first();
 
+        // FIX keamanan (14 Oktober 2026): akun yang dinonaktifkan admin tidak
+        // boleh masuk -- dulu login Google malah mengaktifkannya kembali.
+        if ($user && $user->isSuspended()) {
+            return redirect()
+                ->route('login')
+                ->withErrors(['email' => User::INACTIVE_MESSAGE]);
+        }
+
         if (!$user) {
             $user = User::create([
                 'name' => $googleUser->getName() ?: $googleUser->getNickname() ?: 'User',
@@ -93,40 +101,31 @@ class GoogleAuthController extends Controller
                 'status' => RoleUser::STATUS_ACTIVE,
             ]);
 
-            // Ditambahkan 8 September 2026 (fitur Apply Kampus): sama seperti
-            // registrasi manual (lihat RegisteredUserController::store()),
-            // otomatis cari-atau-buatkan record Student (CRM) untuk User baru
-            // ini supaya orang yang sama nyambung ke satu identitas Student
-            // yang sama, biarpun daftarnya lewat Google. Handphone dikirim
-            // '' (kosong) karena Google tidak pernah memberikan nomor HP --
-            // StudentIdentityResolver sudah menjaga supaya handphone kosong
-            // TIDAK dipakai untuk mencocokkan ke Student manapun (lihat
-            // catatan GUARD di StudentIdentityResolver::findOrCreate()),
-            // jadi pencocokan di sini murni lewat email.
-            $student = (new StudentIdentityResolver())->findOrCreate([
-                'name' => $user->name,
-                'email' => $user->email,
-                'handphone' => '',
-            ]);
-
-            if (empty($student->user_id)) {
-                $student->user_id = $user->id;
-                $student->save();
-            } elseif ($student->user_id !== $user->id) {
-                Log::warning('[GOOGLE-LOGIN] Student hasil pencocokan email sudah ke-link ke User lain, tidak ditimpa', [
-                    'student_id' => $student->id,
-                    'existing_user_id' => $student->user_id,
-                    'new_user_id' => $user->id,
-                ]);
-            }
-        } elseif (!$user->hasVerifiedEmail() || !$user->isActive()) {
+            // Email sudah diverifikasi Google -> tautkan/buat Student (CRM),
+            // dicocokkan lewat email saja (lihat StudentIdentityResolver::resolveForUser()).
+            (new StudentIdentityResolver())->resolveForUser($user);
+        } elseif (!$user->hasVerifiedEmail()) {
             // Email Google ini sudah dipakai daftar manual tapi belum
-            // diverifikasi -> login via Google otomatis menganggap email
-            // itu valid, jadi langsung aktifkan.
+            // diverifikasi -> login via Google membuktikan email itu miliknya,
+            // jadi langsung aktifkan.
+            //
+            // FIX keamanan (14 Oktober 2026): password lama diganti acak &
+            // semua sesi lama dikeluarkan. Akun yang belum terverifikasi bisa
+            // saja dibuat ORANG LAIN pakai email ini (password-nya dia yang
+            // tahu) -- tanpa ini, orang itu ikut bisa masuk begitu pemilik
+            // asli email login lewat Google. Pemilik asli tetap bisa pakai
+            // password lewat "Forgot Password".
             $user->forceFill([
                 'status' => User::STATUS_ACTIVE,
-                'email_verified_at' => $user->email_verified_at ?? now(),
+                'email_verified_at' => now(),
+                'password' => Hash::make(Str::random(40)),
             ])->save();
+
+            $user->logoutEverywhere();
+
+            if ($user->hasRole('student')) {
+                (new StudentIdentityResolver())->resolveForUser($user);
+            }
         }
 
         Auth::login($user, true);

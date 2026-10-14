@@ -99,7 +99,12 @@ class UserController extends Controller
             $validated['sales_code'] = null;
         }
 
-        AdminCrud::update(User::class, $id, $validated);
+        $updated = AdminCrud::update(User::class, $id, $validated);
+
+        // Baru dinonaktifkan -> langsung keluar dari semua perangkat (bukan nunggu sesi habis).
+        if ($data->isActive() && ! $updated->isActive()) {
+            $updated->logoutEverywhere();
+        }
 
         return redirect()
             ->route('user.index')

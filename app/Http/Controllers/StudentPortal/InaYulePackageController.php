@@ -244,19 +244,11 @@ class InaYulePackageController extends Controller
         // sini cuma jaring pengaman untuk kasus langka User lama yang
         // belum sempat ke-link -- pola SAMA PERSIS dengan
         // InaStudyController::registerApplication().
-        $student = Student::where('user_id', $user->id)->first();
+        // Cocok lewat email saja, bukan HP -- lihat StudentIdentityResolver::resolveForUser().
+        $student = (new StudentIdentityResolver())->resolveForUser($user);
 
-        if (!$student) {
-            $student = (new StudentIdentityResolver())->findOrCreate([
-                'name' => $user->name,
-                'email' => $user->email,
-                'handphone' => $user->handphone,
-            ]);
-
-            if (empty($student->user_id)) {
-                $student->user_id = $user->id;
-                $student->save();
-            }
+        if (! $student) {
+            return redirect()->route('inayule.index')->with('status', StudentIdentityResolver::CONFLICT_MESSAGE);
         }
 
         $package = CoursePackage::where('status', 'active')->find($packageId);

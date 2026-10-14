@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
 class User extends Authenticatable implements MustVerifyEmail
@@ -19,6 +20,8 @@ class User extends Authenticatable implements MustVerifyEmail
 
     public const STATUS_ACTIVE = 'active';
     public const STATUS_INACTIVE = 'inactive';
+
+    public const INACTIVE_MESSAGE = 'Akun Anda sedang dinonaktifkan. Silakan hubungi admin kami.';
 
     protected $keyType = 'string';
 
@@ -104,6 +107,32 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isActive(): bool
     {
         return $this->status === self::STATUS_ACTIVE;
+    }
+
+    /**
+     * Akun yang sudah verifikasi email tapi dinonaktifkan admin -- ditolak
+     * saat login (password & Google). Akun baru yang belum verifikasi juga
+     * masih inactive, tapi itu normal (diaktifkan oleh link verifikasi).
+     */
+    public function isSuspended(): bool
+    {
+        return $this->hasVerifiedEmail() && ! $this->isActive();
+    }
+
+    /**
+     * Keluarkan akun ini dari SEMUA perangkat: cookie "remember me" dibuat
+     * tidak berlaku & sesi login yang tersimpan dihapus (driver database).
+     */
+    public function logoutEverywhere(): void
+    {
+        $this->forceFill(['remember_token' => Str::random(60)])->save();
+
+        if (config('session.driver') === 'database') {
+            DB::connection(config('session.connection'))
+                ->table(config('session.table', 'sessions'))
+                ->where('user_id', $this->getKey())
+                ->delete();
+        }
     }
 
     /**

@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Student;
+use App\Models\User;
+use Illuminate\Database\QueryException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -98,11 +100,18 @@ class StudentIdentityResolver
                 // di Student itu (kemungkinan hasil isi quiz-wizard
                 // sebelumnya) dengan string kosong -- itu akan menghapus data
                 // yang justru lebih lengkap.
+                //
+                // FIX keamanan (14 Oktober 2026): email & HP yang SUDAH ADA
+                // tidak lagi ditimpa (cuma diisi kalau masih kosong). Form ini
+                // publik tanpa login -- dulu siapa pun bisa isi quiz pakai HP
+                // orang lain + email miliknya sendiri, email Student orang itu
+                // berubah, lalu daftar akun pakai email tsb dan otomatis
+                // "memiliki" data Student orang itu (lihat resolveForUser()).
                 $existingStudent->update([
                     'first_name' => $payload['first_name'],
                     'last_name' => $payload['last_name'],
-                    'email' => $payload['email'],
-                    'handphone' => $handphone !== '' ? $payload['handphone'] : $existingStudent->handphone,
+                    'email' => filled($existingStudent->email) ? $existingStudent->email : $payload['email'],
+                    'handphone' => filled($existingStudent->handphone) || $handphone === '' ? $existingStudent->handphone : $payload['handphone'],
                 ]);
 
                 Log::info('[FORM-WIZARD] Pakai Student yang sudah ada (cocok lewat HP atau email), update data ke yang terbaru', [
@@ -174,6 +183,81 @@ class StudentIdentityResolver
             ]);
 
             throw $e;
+        }
+    }
+
+    public const CONFLICT_MESSAGE = 'Data siswa untuk akun Anda belum bisa disiapkan otomatis. Silakan hubungi admin kami supaya dibantu.';
+
+    /**
+     * Student milik akun yang sedang login (audit keamanan 14 Oktober 2026).
+     *
+     * BEDA dengan findOrCreate() (quiz-wizard publik): nomor HP TIDAK
+     * PERNAH dipakai untuk menautkan akun ke Student yang sudah ada -- dulu
+     * siapa pun bisa daftar pakai nomor HP orang lain lalu otomatis
+     * "memiliki" data Student orang itu (aplikasi kampus, paspor, dokumen,
+     * credit). Urutannya:
+     *  1. Student yang sudah ditautkan ke akun ini -> dipakai apa adanya.
+     *  2. Student dengan email SAMA yang belum punya akun -> ditautkan.
+     *     Data lamanya tidak ditimpa, HP cuma diisi kalau masih kosong.
+     *  3. Selain itu -> Student baru.
+     *
+     * Null kalau email akun belum terverifikasi (pemilik email belum
+     * terbukti), atau datanya bentrok dengan Student lain (dicatat di log,
+     * admin cek manual) -- caller menampilkan CONFLICT_MESSAGE.
+     */
+    public function resolveForUser(User $user, ?string $handphone = null): ?Student
+    {
+        if (! $user->hasVerifiedEmail()) {
+            return null;
+        }
+
+        $email = trim((string) $user->email);
+        $handphone = trim((string) ($handphone ?? $user->handphone ?? ''));
+
+        try {
+            return DB::transaction(function () use ($user, $email, $handphone) {
+                // Kunci baris user supaya 2 request bersamaan tidak menautkan/membuat dobel.
+                User::whereKey($user->id)->lockForUpdate()->first();
+
+                $student = Student::where('user_id', $user->id)->first()
+                    ?? Student::whereNull('user_id')->where('email', $email)
+                        ->orderBy('created_at')->lockForUpdate()->first();
+
+                if ($student) {
+                    $student->user_id = $student->user_id ?: $user->id;
+
+                    if (blank($student->handphone) && $handphone !== '') {
+                        $student->handphone = $handphone;
+                    }
+
+                    $student->save();
+
+                    return $student;
+                }
+
+                $nameParts = preg_split('/\s+/', trim((string) $user->name), 2);
+
+                return Student::create([
+                    'user_id' => $user->id,
+                    'first_name' => $nameParts[0] ?: 'User',
+                    'last_name' => $nameParts[1] ?? '',
+                    'email' => $email,
+                    'handphone' => $handphone,
+                    'status' => 'active',
+                    'images' => null,
+                ]);
+            });
+        } catch (QueryException $e) {
+            // Bentrok constraint unik (email/HP sudah dipakai Student lain).
+            if ($e->getCode() !== '23000') {
+                throw $e;
+            }
+
+            Log::warning('[STUDENT-IDENTITY] Student untuk akun ini tidak bisa dibuat/ditautkan otomatis, perlu dicek admin', [
+                'user_id' => $user->id,
+            ]);
+
+            return null;
         }
     }
 

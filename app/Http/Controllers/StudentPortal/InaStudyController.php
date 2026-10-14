@@ -11,6 +11,7 @@ use App\Services\StudentIdentityResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -124,24 +125,13 @@ class InaStudyController extends Controller
 
         $user = $request->user();
 
-        // Hampir semua User login sudah otomatis punya Student terhubung
-        // (dibuat saat register/Google login, lihat
-        // RegisteredUserController::store() & GoogleAuthController::callback()).
-        // StudentIdentityResolver di sini cuma jaring pengaman untuk kasus
-        // langka User lama yang belum sempat ke-link.
-        $student = Student::where('user_id', $user->id)->first();
+        // Student milik akun ini (biasanya sudah dibuat saat verifikasi
+        // email / login Google). Cocok lewat email saja, bukan HP -- lihat
+        // StudentIdentityResolver::resolveForUser().
+        $student = (new StudentIdentityResolver())->resolveForUser($user);
 
-        if (!$student) {
-            $student = (new StudentIdentityResolver())->findOrCreate([
-                'name' => $user->name,
-                'email' => $user->email,
-                'handphone' => $user->handphone,
-            ]);
-
-            if (empty($student->user_id)) {
-                $student->user_id = $user->id;
-                $student->save();
-            }
+        if (! $student) {
+            throw ValidationException::withMessages(['university_id' => StudentIdentityResolver::CONFLICT_MESSAGE]);
         }
 
         // Validasi jurusan, guard "sudah punya aplikasi", pembuatan aplikasi
