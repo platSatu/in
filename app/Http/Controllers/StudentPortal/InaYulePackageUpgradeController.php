@@ -140,7 +140,7 @@ class InaYulePackageUpgradeController extends Controller
 
         (new CoursePackagePurchaseNotifier())->notify($payment);
 
-        return redirect()->route('inayule.index')->with('success', $preview['mode'] === 'convert'
+        return redirect()->to(route('inayule.index').'#paket')->with('success', $preview['mode'] === 'convert'
             ? 'Convert berhasil, '.rtrim(rtrim(number_format((float) $payment->credits_granted, 2, ',', '.'), '0'), ',')." credit \"{$target->name}\" sudah masuk."
             : "Upgrade ke paket \"{$target->name}\" berhasil, credit Anda sudah diperbarui.");
     }

@@ -312,7 +312,7 @@ class InaYulePackageController extends Controller
             ]);
 
             return redirect()
-                ->route('inayule.index')
+                ->to(route('inayule.index').'#paket')
                 ->with('success', 'Trial "' . $package->name . '" berhasil diklaim, credit Anda bertambah.');
         });
     }

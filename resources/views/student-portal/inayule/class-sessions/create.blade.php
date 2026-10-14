@@ -7,7 +7,8 @@
     lihat docblock ClassSessionWorkflowService::adminApprove()).
 --}}
 
-<div class="col-lg-6 mx-auto layout-spacing">
+<div class="col-lg-6 mx-auto layout-spacing inayule-sub">
+    @include('student-portal.inayule._subpage', ['backTab' => 'kelas'])
     <div class="statbox widget box box-shadow">
         <div class="widget-content widget-content-area">
             <h4 class="mb-1">Ajukan Pemakaian Credit</h4>
@@ -78,7 +79,7 @@
 
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary">Ajukan</button>
-                    <a href="{{ route('inayule.class-sessions.index') }}" class="btn btn-outline-secondary">Batal</a>
+                    <a href="{{ route('inayule.index') }}#kelas" class="btn btn-outline-secondary">Batal</a>
                 </div>
             </form>
         </div>

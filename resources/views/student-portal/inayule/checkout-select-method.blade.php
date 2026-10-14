@@ -4,7 +4,8 @@
 {{-- Khusus Duitku -- lihat docblock InaYulePackageCheckoutController::selectMethodForm(),
      pola & style sama persis dengan resources/views/dashboard/deposit/select-method.blade.php. --}}
 
-<div class="col-lg-6 mx-auto layout-spacing">
+<div class="col-lg-6 mx-auto layout-spacing inayule-sub">
+    @include('student-portal.inayule._subpage', ['backTab' => 'beli'])
     <div class="statbox widget box box-shadow">
         <div class="widget-content widget-content-area">
             <h4 class="mb-1">Pilih Metode Pembayaran</h4>
@@ -18,7 +19,7 @@
 
             @if (empty($methods))
                 <p class="text-muted">Tidak ada metode pembayaran yang bisa ditampilkan saat ini.</p>
-                <a href="{{ route('inayule.index') }}" class="btn btn-outline-secondary">Kembali</a>
+                <a href="{{ route('inayule.index') }}#beli" class="btn btn-outline-secondary">Kembali</a>
             @else
                 <form method="POST" action="{{ route('inayule.checkout.select-method.store', ['orderId' => $payment->order_id]) }}">
                     @csrf
@@ -49,7 +50,7 @@
 
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-primary">Bayar</button>
-                        <a href="{{ route('inayule.index') }}" class="btn btn-outline-secondary">Batal</a>
+                        <a href="{{ route('inayule.index') }}#beli" class="btn btn-outline-secondary">Batal</a>
                     </div>
                 </form>
             @endif

@@ -6,19 +6,20 @@
      InaYulePackageCheckoutController::return()/status() & style disamakan
      dengan resources/views/dashboard/deposit/return.blade.php. --}}
 
-<div class="col-lg-6 mx-auto layout-spacing">
+<div class="col-lg-6 mx-auto layout-spacing inayule-sub">
+    @include('student-portal.inayule._subpage', ['backTab' => 'paket'])
     <div class="statbox widget box box-shadow">
         <div class="widget-content widget-content-area text-center">
             <h4 class="mb-3">Status Pembayaran</h4>
 
             @if (!$payment)
                 <p class="text-muted">Transaksi tidak ditemukan.</p>
-                <a href="{{ route('inayule.index') }}" class="btn btn-primary">Kembali</a>
+                <a href="{{ route('inayule.index') }}#paket" class="btn btn-primary">Kembali</a>
             @else
                 <p class="text-muted mb-2">{{ optional($payment->coursePackage)->name ?? 'Package' }}</p>
                 <p id="cpp-status-text" class="mb-3">Memeriksa status pembayaran...</p>
 
-                <a href="{{ route('inayule.index') }}" class="btn btn-primary">Kembali ke InaYule</a>
+                <a href="{{ route('inayule.index') }}#paket" class="btn btn-primary">Kembali ke InaYule</a>
 
                 <script>
                     (function () {

@@ -16,7 +16,8 @@
     $sourceLabel = $source->coursePackage?->detailLabel() ?: 'paket lama';
 @endphp
 
-<div class="col-lg-6 mx-auto layout-spacing">
+<div class="col-lg-6 mx-auto layout-spacing inayule-sub">
+    @include('student-portal.inayule._subpage', ['backTab' => 'paket'])
     <div class="statbox widget box box-shadow">
         <div class="widget-content widget-content-area">
             <h4 class="mb-1">Upgrade / Convert Paket</h4>
@@ -35,7 +36,7 @@
             @if ($blockedReason)
                 {{-- Tidak bisa ditukar: tampilkan alasannya saja, tanpa pilihan yang bisa diklik. --}}
                 <div class="alert alert-warning">{{ $blockedReason }}</div>
-                <a href="{{ route('inayule.index') }}" class="btn btn-outline-secondary">Kembali</a>
+                <a href="{{ route('inayule.index') }}#paket" class="btn btn-outline-secondary">Kembali</a>
             @else
                 {{-- Langkah 1: pilih paket tujuan & cara --}}
                 <form method="GET" action="{{ route('inayule.upgrade.show', $source->id) }}" class="mb-4">
@@ -166,11 +167,11 @@
                             <button type="submit" class="btn btn-primary" @disabled($gatewayMissing)>
                                 {{ $mode === 'convert' ? ($convertAll ? 'Tukar Semua Sekarang' : 'Convert Sekarang') : ($preview['gateway_portion'] > 0 ? 'Lanjut ke Pembayaran' : 'Upgrade Sekarang') }}
                             </button>
-                            <a href="{{ route('inayule.index') }}" class="btn btn-outline-secondary">Batal</a>
+                            <a href="{{ route('inayule.index') }}#paket" class="btn btn-outline-secondary">Batal</a>
                         </div>
                     </form>
                 @else
-                    <a href="{{ route('inayule.index') }}" class="btn btn-outline-secondary">Kembali</a>
+                    <a href="{{ route('inayule.index') }}#paket" class="btn btn-outline-secondary">Kembali</a>
                 @endif
             @endif
         </div>

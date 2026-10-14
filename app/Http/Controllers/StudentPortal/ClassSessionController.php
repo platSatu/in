@@ -120,7 +120,7 @@ class ClassSessionController extends Controller
             return back()->withInput()->with('error', $e->getMessage());
         }
 
-        return redirect()->route('inayule.class-sessions.index')
+        return redirect()->to(route('inayule.index').'#kelas')
             ->with('success', 'Pengajuan pemakaian credit berhasil dikirim, menunggu approval pengajar.');
     }
 

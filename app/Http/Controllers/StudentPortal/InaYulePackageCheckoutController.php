@@ -143,7 +143,7 @@ class InaYulePackageCheckoutController extends Controller
             if ($outcome['ok']) {
                 (new CoursePackagePurchaseNotifier())->notify($outcome['payment']);
 
-                return redirect()->route('inayule.index')->with('success', 'Package "' . $package->name . '" berhasil dibeli pakai saldo, credit Anda bertambah.');
+                return redirect()->to(route('inayule.index').'#paket')->with('success', 'Package "' . $package->name . '" berhasil dibeli pakai saldo, credit Anda bertambah.');
             }
 
             // Saldo berubah tepat di antara preview & lock (race jarang) --
