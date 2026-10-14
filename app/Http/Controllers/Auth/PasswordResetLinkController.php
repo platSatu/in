@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Rules\Turnstile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Password;
@@ -28,6 +29,7 @@ class PasswordResetLinkController extends Controller
     {
         $request->validate([
             'email' => ['required', 'email', 'exists:users,email'],
+            'cf-turnstile-response' => [new Turnstile()],
         ], [
             'email.exists' => 'Email tersebut belum terdaftar di sistem kami.',
         ]);

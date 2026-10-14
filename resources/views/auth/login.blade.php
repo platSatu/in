@@ -60,9 +60,9 @@
                                 </div>
                             @endif
 
-                            @if ($errors->any() && !$errors->has('email') && !$errors->has('password'))
+                            @if ($errors->has('cf-turnstile-response') || ($errors->any() && !$errors->has('email') && !$errors->has('password')))
                                 <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
-                                    {{ $errors->first() }}
+                                    {{ $errors->first('cf-turnstile-response') ?: $errors->first() }}
                                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                                 </div>
                             @endif
@@ -124,6 +124,8 @@
                                             <a href="{{ route('password.request') }}">Forgot Password ?</a>
                                         @endif
                                     </div>
+
+                                    @include('auth.partials.turnstile')
 
                                     <!-- Login Button -->
                                     <div class="col-12">

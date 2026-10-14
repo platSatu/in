@@ -6,7 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Role;
 use App\Models\RoleUser;
 use App\Models\User;
-use App\Services\StudentIdentityResolver;
+use App\Rules\Turnstile;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -44,6 +44,7 @@ class RegisteredUserController extends Controller
             // kosong, WA welcome message-nya gagal terkirim ke nomor kosong.
             'handphone' => ['required', 'string', 'max:20'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
+            'cf-turnstile-response' => [new Turnstile()],
         ]);
 
         $user = User::create([
@@ -63,32 +64,12 @@ class RegisteredUserController extends Controller
             'status' => RoleUser::STATUS_ACTIVE,
         ]);
 
-        // Ditambahkan 8 September 2026 (fitur Apply Kampus): otomatis cari-
-        // atau-buatkan record Student (CRM) untuk User baru ini, dicocokkan
-        // lewat handphone ATAU email -- logic PERSIS SAMA dengan yang dipakai
-        // quiz-wizard publik (lihat App\Services\StudentIdentityResolver),
-        // supaya satu orang yang pernah isi quiz kursus Mandarin & sekarang
-        // daftar buat Apply kampus otomatis "ketemu" jadi satu identitas yang
-        // sama, tanpa admin perlu link manual. Student.user_id cuma diisi
-        // kalau MASIH KOSONG -- kalau Student itu ternyata sudah ke-link ke
-        // User lain (kasus langka), tidak ditimpa paksa, cukup dicatat di
-        // log biar admin bisa cek manual.
-        $student = (new StudentIdentityResolver())->findOrCreate([
-            'name' => $user->name,
-            'email' => $user->email,
-            'handphone' => $user->handphone,
-        ]);
-
-        if (empty($student->user_id)) {
-            $student->user_id = $user->id;
-            $student->save();
-        } elseif ($student->user_id !== $user->id) {
-            Log::warning('[REGISTER] Student hasil pencocokan HP/email sudah ke-link ke User lain, tidak ditimpa', [
-                'student_id' => $student->id,
-                'existing_user_id' => $student->user_id,
-                'new_user_id' => $user->id,
-            ]);
-        }
+        // FIX keamanan (14 Oktober 2026): Student (CRM) TIDAK lagi dicari/
+        // ditautkan di sini. Dulu dicocokkan lewat HP ATAU email sebelum email
+        // terverifikasi -- siapa pun bisa daftar pakai HP orang lain lalu
+        // otomatis "memiliki" data Student orang itu. Sekarang ditautkan
+        // setelah link verifikasi diklik (VerifyEmailController), lewat
+        // StudentIdentityResolver::resolveForUser() (cocok lewat email saja).
 
         // Kirim WhatsApp
         $this->sendWhatsapp(

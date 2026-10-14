@@ -136,6 +136,8 @@
                                         </div>
                                     </div>
 
+                                    @include('auth.partials.turnstile')
+
                                     <!-- Register Button -->
                                     <div class="col-12">
                                         <div class="d-grid">

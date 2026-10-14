@@ -46,6 +46,14 @@ return [
     // `php artisan zoom:bootstrap-credentials`) lalu dipindah ke tabel
     // zoom_settings (ter-enkripsi) -- setelah itu, pengelolaan kredensial
     // sehari-hari lewat menu Settings > Setting Zoom, bukan lewat .env lagi.
+    // Captcha Cloudflare Turnstile di login/register/forgot-password (lihat
+    // App\Rules\Turnstile). site_key publik (tampil di HTML), secret_key
+    // hanya di server.
+    'turnstile' => [
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
     'zoom' => [
         'account_id' => env('ZOOM_ACCOUNT_ID'),
         'client_id' => env('ZOOM_CLIENT_ID'),

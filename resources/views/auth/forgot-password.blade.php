@@ -72,6 +72,14 @@
                                         </div>
                                     @enderror
 
+                                    @include('auth.partials.turnstile')
+
+                                    @error('cf-turnstile-response')
+                                        <div class="col-12">
+                                            <div class="alert alert-danger">{{ $message }}</div>
+                                        </div>
+                                    @enderror
+
                                     <!-- Buttons -->
                                     <div class="col-12">
                                         <div class="d-grid gap-2">
