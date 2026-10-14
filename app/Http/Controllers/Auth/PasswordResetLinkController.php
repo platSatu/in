@@ -41,9 +41,13 @@ class PasswordResetLinkController extends Controller
             $request->only('email')
         );
 
-        return $status == Password::RESET_LINK_SENT
-                    ? back()->with('status', __($status))
-                    : back()->withInput($request->only('email'))
-                        ->withErrors(['email' => __($status)]);
+        if ($status === Password::RESET_LINK_SENT) {
+            return back()->with('status', 'Link reset password sudah kami kirim ke email Anda. Silakan cek inbox (termasuk folder spam) dan klik link tersebut dalam 60 menit.');
+        }
+
+        return back()->withInput($request->only('email'))->withErrors(['email' => match ($status) {
+            Password::RESET_THROTTLED => 'Link reset baru saja dikirim. Silakan cek email Anda, atau tunggu sekitar 1 menit sebelum meminta lagi.',
+            default => 'Link reset password belum bisa dikirim. Silakan coba lagi.',
+        }]);
     }
 }

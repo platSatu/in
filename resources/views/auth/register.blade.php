@@ -53,6 +53,13 @@
                             <h4 class="fw-bold">Get Started Now</h4>
                             <p class="mb-0">Enter your credentials to create your account</p>
 
+                            @if (session('status'))
+                                <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                                    {{ session('status') }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            @endif
+
                             @if ($errors->any())
                                 <div class="alert alert-danger alert-dismissible fade show mt-3" role="alert">
                                     <ul class="mb-0 ps-3">
