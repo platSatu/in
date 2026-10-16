@@ -26,6 +26,21 @@
         </div>
     @endif
 
+    {{-- 16 Oktober 2026: dua tab -- Detail Aplikasi (isi lama, tidak diubah) & Application Form (A4 siap print). --}}
+    <ul class="nav nav-tabs mb-3" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-detail" type="button" role="tab" data-app-tab="detail">Detail Aplikasi</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-form" type="button" role="tab" data-app-tab="form">
+                Application Form
+                @if (! $application->formDetail) <span class="badge bg-secondary ms-1">Belum diisi</span> @endif
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-detail" role="tabpanel">
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
@@ -429,6 +444,30 @@
             </div>
         </div>
     </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-form" role="tabpanel">
+            <div class="widget-content widget-content-area br-8">
+                @include('quiz.university-application._print-form')
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Ingat tab terakhir yang dibuka admin (per browser).
+        document.addEventListener('DOMContentLoaded', function () {
+            var key = 'ua-show-tab';
+            document.querySelectorAll('[data-app-tab]').forEach(function (btn) {
+                btn.addEventListener('shown.bs.tab', function () {
+                    try { localStorage.setItem(key, btn.dataset.appTab); } catch (e) {}
+                });
+            });
+            var saved = null;
+            try { saved = localStorage.getItem(key); } catch (e) {}
+            var target = saved && document.querySelector('[data-app-tab="' + saved + '"]');
+            if (target && window.bootstrap) { bootstrap.Tab.getOrCreateInstance(target).show(); }
+        });
+    </script>
 
 </div>
 

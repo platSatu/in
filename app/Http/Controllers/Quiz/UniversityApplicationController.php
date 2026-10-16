@@ -138,7 +138,8 @@ class UniversityApplicationController extends Controller
 
     public function show(Request $request, string $id)
     {
-        $application = UniversityApplication::with(['student', 'university', 'universityProfile', 'handledBy'])
+        // formDetail & educationBackgrounds: tab "Application Form" (A4 siap print), 16 Oktober 2026.
+        $application = UniversityApplication::with(['student', 'university', 'universityProfile', 'handledBy', 'formDetail', 'educationBackgrounds'])
             ->findOrFail($id);
 
         $this->assertVisibleApplication($request->user(), $application);
