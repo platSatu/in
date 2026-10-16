@@ -43,6 +43,8 @@ class DocumentType extends Model
         // "document-templates/medical_certificate.pdf"). Lihat
         // resources/views/student-portal/applications/documents.blade.php.
         'template_file_path',
+        // 16 Oktober 2026: panduan/prosedur ("Download Guide"), path relatif ke public/.
+        'guide_file_path',
         // FIX (10 September 2026): lihat catatan PROVIDED_BY_* di atas.
         'provided_by',
         // 13 Oktober 2026: boleh lebih dari 1 file per aplikasi (mis. Any Certificate).

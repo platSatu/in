@@ -44,8 +44,8 @@ class DocumentTypeSeeder extends Seeder
             ['code' => 'formulir', 'label' => 'Formulir', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 60, 'status' => DocumentType::STATUS_INACTIVE],
             ['code' => 'study_plan', 'label' => 'Study Plan', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 70],
             // Label diganti dari "Transcript Nilai" -> "Transcript (Report Card)" (10 September 2026).
-            ['code' => 'transcript', 'label' => 'Transcript (Report Card)', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 80],
-            ['code' => 'graduation_letter_expected', 'label' => 'Graduation Letter Expected', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 90],
+            ['code' => 'transcript', 'label' => 'Transcript (Report Card)', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'template_file_path' => 'document-templates/Transkrip-1-5.pdf', 'is_required' => false, 'sort_order' => 80],
+            ['code' => 'graduation_letter_expected', 'label' => 'Graduation Letter Expected', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'template_file_path' => 'document-templates/Expected-Graduate-Letter.pdf', 'is_required' => false, 'sort_order' => 90],
             // Label diganti dari "Ijazah Translate" -> "Graduation Certificate Translate" (10 September 2026).
             ['code' => 'ijazah_translate', 'label' => 'Graduation Certificate Translate', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 100],
 
@@ -67,13 +67,15 @@ class DocumentTypeSeeder extends Seeder
             // Certificate dikasih file template kosong (dari user) yang bisa
             // didownload siswa dulu sebelum diisi & diupload ulang lewat
             // kolom upload yang sama. File-nya ditaruh di
-            // public/document-templates/medical_certificate.pdf.
-            ['code' => 'medical_checkup', 'label' => 'Medical Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'template_file_path' => 'document-templates/medical_certificate.pdf', 'is_required' => false, 'sort_order' => 140],
-            ['code' => 'skck', 'label' => 'Non Criminal Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 150],
+            // public/document-templates/. 16 Oktober 2026: template untuk
+            // Graduation Letter, Transcript & Recommendation Letter, plus
+            // guide_file_path (prosedur) untuk Medical & SKCK.
+            ['code' => 'medical_checkup', 'label' => 'Medical Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'template_file_path' => 'document-templates/MEDICAL-CHECK-UP-FORM.pdf', 'guide_file_path' => 'document-templates/Prosedur-Medical-Check-Up-INA-STUDY.pdf', 'is_required' => false, 'sort_order' => 140],
+            ['code' => 'skck', 'label' => 'Non Criminal Certificate', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'guide_file_path' => 'document-templates/Prosedur-Pembuatan-SKCK-INA-STUDY.pdf', 'is_required' => false, 'sort_order' => 150],
 
             // --- Supporting Letter (sebelumnya "Surat Pendukung" -- penamaan
             // ulang 10 September 2026) ---
-            ['code' => 'recommendation_letter', 'label' => 'Recommendation Letter', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 160],
+            ['code' => 'recommendation_letter', 'label' => 'Recommendation Letter', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'template_file_path' => 'document-templates/Recommendation-Letter.pdf', 'is_required' => false, 'sort_order' => 160],
             ['code' => 'guardian_letter', 'label' => 'Guardian Letter', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 170],
             ['code' => 'any_certificate', 'label' => 'Any Certificate', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 180],
 

@@ -207,11 +207,18 @@
                                         (lihat DocumentTypeSeeder) -- jenis dokumen lain
                                         yang tidak punya template tetap tampil normal.
                                     --}}
-                                    @if($documentType->template_file_path)
-                                        <div class="mt-1">
-                                            <a href="{{ asset($documentType->template_file_path) }}" target="_blank" class="doc-current-link">
-                                                <i class="bi bi-download"></i> Download Template
-                                            </a>
+                                    @if($documentType->template_file_path || $documentType->guide_file_path)
+                                        <div class="mt-1 d-flex flex-wrap gap-3">
+                                            @if($documentType->template_file_path)
+                                                <a href="{{ asset($documentType->template_file_path) }}" target="_blank" class="doc-current-link">
+                                                    <i class="bi bi-download"></i> Download Template
+                                                </a>
+                                            @endif
+                                            @if($documentType->guide_file_path)
+                                                <a href="{{ asset($documentType->guide_file_path) }}" target="_blank" class="doc-current-link">
+                                                    <i class="bi bi-journal-text"></i> Download Guide
+                                                </a>
+                                            @endif
                                         </div>
                                     @endif
                                 </div>
