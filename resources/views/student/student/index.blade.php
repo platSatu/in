@@ -513,10 +513,10 @@
                                                                     @if ($canEdit)
                                                                         {{-- Lepas status apply (data uji coba): aplikasi jadi Cancelled, data student tetap. --}}
                                                                         <form action="{{ route('student.student.cancel-application', $application->id) }}" method="POST" class="m-0"
-                                                                            onsubmit="return confirm('Lepas status apply {{ addslashes(trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? ''))) }}? Aplikasinya ditandai Cancelled dan hilang dari tab ini. Data student tetap ada di tab Data Student.');">
+                                                                            onsubmit="return confirm('Cancel apply {{ addslashes(trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? ''))) }}? Aplikasinya ditandai Cancelled dan hilang dari tab ini. Data student tetap ada di tab Data Student.');">
                                                                             @csrf
                                                                             @method('PATCH')
-                                                                            <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">Lepas Apply</button>
+                                                                            <button type="submit" class="btn btn-sm btn-outline-danger text-nowrap">Cancel Apply</button>
                                                                         </form>
                                                                     @endif
                                                                 </div>
