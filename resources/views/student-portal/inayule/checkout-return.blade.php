@@ -19,6 +19,8 @@
                 <p class="text-muted mb-2">{{ optional($payment->coursePackage)->name ?? 'Package' }}</p>
                 <p id="cpp-status-text" class="mb-3">Memeriksa status pembayaran...</p>
 
+                @include('partials.midtrans-snap')
+
                 <a href="{{ route('inayule.index') }}#paket" class="btn btn-primary">Kembali ke InaYule</a>
 
                 <script>

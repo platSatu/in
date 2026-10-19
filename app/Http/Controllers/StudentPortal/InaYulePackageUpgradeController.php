@@ -183,6 +183,11 @@ class InaYulePackageUpgradeController extends Controller
                 throw new RuntimeException('Gateway tidak mengembalikan URL pembayaran.');
             }
 
+            // Midtrans: popup Snap dibuka di halaman status (token = gateway_reference). Gateway lain tetap redirect.
+            if ($activeGateway->gateway === 'midtrans' && ! empty($result['reference'])) {
+                return redirect()->route('inayule.checkout.return', ['order_id' => $payment->order_id]);
+            }
+
             return redirect()->away($result['redirect_url']);
         } catch (Throwable $e) {
             Log::error('[COURSE-PACKAGE][UPGRADE] Gagal init transaksi upgrade', [

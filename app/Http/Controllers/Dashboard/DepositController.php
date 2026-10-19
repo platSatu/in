@@ -100,6 +100,11 @@ class DepositController extends Controller
                 throw new \RuntimeException('Gateway tidak mengembalikan URL pembayaran.');
             }
 
+            // Midtrans: popup Snap dibuka di halaman status (token = gateway_reference). Gateway lain tetap redirect.
+            if ($gateway->gateway === 'midtrans' && ! empty($result['reference'])) {
+                return redirect()->route('dashboard.deposit.return', ['order_id' => $payment->order_id]);
+            }
+
             return redirect()->away($result['redirect_url']);
         } catch (Throwable $e) {
             Log::error('[DEPOSIT] Gagal init transaksi topup saldo', [

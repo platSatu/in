@@ -12,6 +12,8 @@
                 @else
                     <p id="deposit-status-text" class="mb-3">Memeriksa status pembayaran...</p>
 
+                    @include('partials.midtrans-snap')
+
                     <a href="{{ route('profile.edit') }}" class="btn btn-primary">Kembali ke Dashboard</a>
 
                     <script>
