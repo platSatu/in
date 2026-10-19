@@ -203,6 +203,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/applications/{application}/documents', [ApplicationDocumentController::class, 'update'])->name('student-portal.applications.documents.update');
     // Hapus 1 file dari jenis yang boleh banyak (Any Certificate), 13 Oktober 2026.
     Route::delete('/applications/{application}/documents/{document}', [ApplicationDocumentController::class, 'destroy'])->name('student-portal.applications.documents.destroy');
+    // File dokumen & foto formulir PRIVAT (storage/app/private), hanya untuk pemilik aplikasi -- 19 Oktober 2026.
+    Route::get('/applications/{application}/documents/{document}/file', [ApplicationDocumentController::class, 'file'])->name('student-portal.applications.documents.file');
+    Route::get('/applications/{application}/documents/history/{history}/file', [ApplicationDocumentController::class, 'historyFile'])->name('student-portal.applications.documents.history.file');
+    Route::get('/applications/{application}/form/photo', [ApplicationFormController::class, 'photo'])->name('student-portal.applications.form.photo');
 });
 
 Route::get('/packages', [DashboardPackageController::class, 'index'])->name('public.packages.index');
@@ -763,6 +767,7 @@ Route::middleware(['auth', 'permission:quiz.university-application'])->prefix('d
     Route::get('/{id}', [UniversityApplicationController::class, 'show'])->name('quiz.university-application.show');
     Route::get('/{id}/documents/{documentId}/download', [UniversityApplicationController::class, 'downloadDocument'])->name('quiz.university-application.documents.download');
     Route::get('/{id}/documents/history/{historyId}/download', [UniversityApplicationController::class, 'downloadDocumentHistory'])->name('quiz.university-application.documents.history.download');
+    Route::get('/{id}/form-photo', [UniversityApplicationController::class, 'formPhoto'])->name('quiz.university-application.form-photo');
 });
 
 // Ability 'edit' -- superadmin approve/reject dokumen & upload dokumen atas

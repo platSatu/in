@@ -137,7 +137,7 @@
                                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 py-2" style="border-top:1px dashed #eef1f8;">
                                         <div>
                                             <div class="fw-semibold" style="font-size:14px;">{{ $file->title ?: ($file->original_filename ?: 'Certificate') }}</div>
-                                            <a href="{{ asset($file->file_path) }}" target="_blank" rel="noopener" class="doc-current-link">
+                                            <a href="{{ route('student-portal.applications.documents.file', [$application->id, $file->id]) }}" target="_blank" rel="noopener" class="doc-current-link">
                                                 <i class="bi bi-eye"></i> Preview
                                             </a>
                                             <span class="doc-hint">&middot; uploaded {{ optional($file->uploaded_at)->format('d M Y, H:i') }}</span>
@@ -236,7 +236,7 @@
 
                             @if($existingDocument)
                                 <div class="mb-2">
-                                    <a href="{{ asset($existingDocument->file_path) }}" target="_blank" class="doc-current-link">
+                                    <a href="{{ route('student-portal.applications.documents.file', [$application->id, $existingDocument->id]) }}" target="_blank" class="doc-current-link">
                                         <i class="bi bi-eye"></i> View current file
                                     </a>
                                     <span class="doc-hint">&middot; uploaded {{ optional($existingDocument->uploaded_at)->format('d M Y, H:i') }}</span>
@@ -254,7 +254,7 @@
                                         <ul class="history-list">
                                             @foreach($existingDocument->histories as $history)
                                                 <li>
-                                                    <a href="{{ asset($history->file_path) }}" target="_blank" class="doc-current-link">
+                                                    <a href="{{ route('student-portal.applications.documents.history.file', [$application->id, $history->id]) }}" target="_blank" class="doc-current-link">
                                                         {{ $history->original_filename ?: 'File' }}
                                                     </a>
                                                     -- replaced {{ optional($history->replaced_at)->format('d M Y, H:i') }}

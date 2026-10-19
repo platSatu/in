@@ -168,7 +168,7 @@
                         <label class="form-label">Photo</label>
                         <div class="d-flex align-items-center gap-3">
                             @if($formDetail && $formDetail->photo_path)
-                                <img src="{{ asset($formDetail->photo_path) }}" class="photo-preview" alt="Current photo">
+                                <img src="{{ route('student-portal.applications.form.photo', $application->id) }}" class="photo-preview" alt="Current photo">
                             @endif
                             <input type="file" name="photo" class="form-control @error('photo') is-invalid @enderror" accept=".jpg,.jpeg">
                         </div>

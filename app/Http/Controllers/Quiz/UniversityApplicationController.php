@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Quiz;
 
+use App\Helpers\ApplicationFiles;
 use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDocument;
@@ -406,7 +407,8 @@ class UniversityApplicationController extends Controller
             $document->file_path,
             $document->application->student ?? null,
             $document->documentType->label ?? 'document',
-            $document->original_filename
+            $document->original_filename,
+            $request->boolean('preview')
         );
     }
 
@@ -428,7 +430,8 @@ class UniversityApplicationController extends Controller
             $history->file_path,
             $document->application->student ?? null,
             ($document->documentType->label ?? 'document') . '-old',
-            $history->original_filename
+            $history->original_filename,
+            $request->boolean('preview')
         );
     }
 
@@ -448,21 +451,26 @@ class UniversityApplicationController extends Controller
         }
     }
 
-    private function downloadFile(?string $relativePath, $student, string $label, ?string $originalFilename)
+    /** ?preview=1 membuka PDF/gambar di browser; tanpa itu selalu diunduh. File privat (ApplicationFiles). */
+    private function downloadFile(?string $relativePath, $student, string $label, ?string $originalFilename, bool $preview = false)
     {
-        abort_if(empty($relativePath), 404);
-
-        $path = public_path($relativePath);
-
-        if (!file_exists($path)) {
-            abort(404);
-        }
+        $path = ApplicationFiles::path($relativePath);
+        abort_unless($path, 404);
 
         $extension = pathinfo($path, PATHINFO_EXTENSION);
         $studentName = $student ? trim($student->first_name . ' ' . $student->last_name) : 'student';
         $downloadName = Str::slug($studentName . '-' . $label) . '.' . $extension;
 
-        return response()->download($path, $downloadName);
+        return ApplicationFiles::response($relativePath, $downloadName, ! $preview);
+    }
+
+    /** Foto formulir siswa untuk tab Application Form (file privat) -- 19 Oktober 2026. */
+    public function formPhoto(Request $request, string $id)
+    {
+        $application = UniversityApplication::with('formDetail')->findOrFail($id);
+        $this->assertVisibleApplication($request->user(), $application);
+
+        return ApplicationFiles::response($application->formDetail?->photo_path);
     }
 
     /**
@@ -473,15 +481,6 @@ class UniversityApplicationController extends Controller
      */
     private function storeDocumentFile($file): string
     {
-        $destination = public_path($this->uploadFolder);
-
-        if (! file_exists($destination)) {
-            mkdir($destination, 0755, true);
-        }
-
-        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-        $file->move($destination, $filename);
-
-        return $this->uploadFolder . '/' . $filename;
+        return ApplicationFiles::store($file, ApplicationFiles::DOCUMENTS);
     }
 }

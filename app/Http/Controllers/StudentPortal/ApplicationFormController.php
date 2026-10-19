@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\StudentPortal;
 
+use App\Helpers\ApplicationFiles;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationEducationBackground;
 use App\Models\ApplicationFormDetail;
@@ -209,15 +210,15 @@ class ApplicationFormController extends Controller
 
     private function storePhotoFile($file): string
     {
-        $destination = public_path($this->photoUploadFolder);
+        return ApplicationFiles::store($file, ApplicationFiles::FORM_PHOTOS);
+    }
 
-        if (! file_exists($destination)) {
-            mkdir($destination, 0755, true);
-        }
+    /** Foto formulir milik siswa sendiri (file privat) -- 19 Oktober 2026. */
+    public function photo(Request $request, string $applicationId)
+    {
+        $application = $this->ownedApplicationOrFail($request, $applicationId);
+        $formDetail = ApplicationFormDetail::where('application_id', $application->id)->firstOrFail();
 
-        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-        $file->move($destination, $filename);
-
-        return $this->photoUploadFolder . '/' . $filename;
+        return ApplicationFiles::response($formDetail->photo_path);
     }
 }

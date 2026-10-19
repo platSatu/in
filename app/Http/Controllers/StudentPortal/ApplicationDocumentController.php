@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\StudentPortal;
 
+use App\Helpers\ApplicationFiles;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationDocumentHistory;
@@ -244,12 +245,9 @@ class ApplicationDocumentController extends Controller
 
         abort_unless($document->documentType?->allows_multiple && $document->canBeDeletedByStudent(), Response::HTTP_FORBIDDEN);
 
-        $path = $document->file_path ? public_path($document->file_path) : null;
+        $filePath = $document->file_path;
         $document->delete();
-
-        if ($path && is_file($path)) {
-            @unlink($path);
-        }
+        ApplicationFiles::delete($filePath);
 
         return redirect()
             ->route('student-portal.applications.documents.edit', $application->id)
@@ -325,15 +323,28 @@ class ApplicationDocumentController extends Controller
      */
     private function storeDocumentFile($file): string
     {
-        $destination = public_path($this->uploadFolder);
+        return ApplicationFiles::store($file, ApplicationFiles::DOCUMENTS);
+    }
 
-        if (! file_exists($destination)) {
-            mkdir($destination, 0755, true);
-        }
+    /**
+     * Buka file dokumen milik aplikasi siswa sendiri (termasuk dokumen dari
+     * InaStudy). File privat, tidak ada URL publik -- 19 Oktober 2026.
+     */
+    public function file(Request $request, string $applicationId, string $documentId)
+    {
+        $application = $this->ownedApplicationOrFail($request, $applicationId);
+        $document = ApplicationDocument::where('application_id', $application->id)->findOrFail($documentId);
 
-        $filename = Str::uuid() . '.' . $file->getClientOriginalExtension();
-        $file->move($destination, $filename);
+        return ApplicationFiles::response($document->file_path, $document->original_filename);
+    }
 
-        return $this->uploadFolder . '/' . $filename;
+    public function historyFile(Request $request, string $applicationId, string $historyId)
+    {
+        $application = $this->ownedApplicationOrFail($request, $applicationId);
+        $history = ApplicationDocumentHistory::with('applicationDocument')->findOrFail($historyId);
+
+        abort_unless($history->applicationDocument?->application_id === $application->id, Response::HTTP_NOT_FOUND);
+
+        return ApplicationFiles::response($history->file_path, $history->original_filename);
     }
 }

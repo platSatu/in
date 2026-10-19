@@ -61,7 +61,7 @@
                     <th>Surname</th><td>{{ $value($form->surname) }}</td>
                     <td rowspan="5" style="width:34mm; text-align:center; border:none; padding:0 0 0 6px;">
                         @if ($form->photo_path)
-                            <img src="{{ asset($form->photo_path) }}" alt="Photo" class="a4-photo">
+                            <img src="{{ route('quiz.university-application.form-photo', $application->id) }}" alt="Photo" class="a4-photo">
                         @else
                             <div class="a4-photo empty">No photo</div>
                         @endif

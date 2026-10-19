@@ -230,7 +230,7 @@
                                 &middot; {{ ['approved' => 'Approved', 'rejected' => 'Rejected'][$certificate->review_status] ?? 'Pending review' }}
                             </div>
                         </div>
-                        <a href="{{ asset($certificate->file_path) }}" target="_blank" rel="noopener" class="btn btn-brand" style="padding:8px 16px;">
+                        <a href="{{ route('student-portal.applications.documents.file', [$application->id, $certificate->id]) }}" target="_blank" rel="noopener" class="btn btn-brand" style="padding:8px 16px;">
                             <i class="bi bi-eye"></i> Preview
                         </a>
                     </div>
@@ -263,7 +263,7 @@
                             @endif
                         </div>
                         @if($adminDocument)
-                            <a href="{{ asset($adminDocument->file_path) }}" target="_blank" class="btn btn-brand" style="padding:8px 16px;">
+                            <a href="{{ route('student-portal.applications.documents.file', [$application->id, $adminDocument->id]) }}" target="_blank" class="btn btn-brand" style="padding:8px 16px;">
                                 <i class="bi bi-download"></i> Download
                             </a>
                         @endif

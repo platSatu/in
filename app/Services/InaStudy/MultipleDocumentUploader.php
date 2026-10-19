@@ -2,6 +2,7 @@
 
 namespace App\Services\InaStudy;
 
+use App\Helpers\ApplicationFiles;
 use App\Models\ApplicationDocument;
 use App\Models\DocumentType;
 use App\Models\UniversityApplication;
@@ -53,15 +54,6 @@ class MultipleDocumentUploader
 
     private function store(UploadedFile $file): string
     {
-        $destination = public_path(self::FOLDER);
-
-        if (! file_exists($destination)) {
-            mkdir($destination, 0755, true);
-        }
-
-        $filename = Str::uuid().'.'.$file->getClientOriginalExtension();
-        $file->move($destination, $filename);
-
-        return self::FOLDER.'/'.$filename;
+        return ApplicationFiles::store($file, self::FOLDER);
     }
 }

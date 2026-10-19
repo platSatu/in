@@ -320,7 +320,7 @@
                                         <td class="text-center">
                                             @if ($document)
                                                 <div class="d-flex flex-nowrap justify-content-center gap-2 mb-2">
-                                                    <a href="{{ asset($document->file_path) }}" target="_blank" class="btn btn-sm btn-outline-primary text-nowrap">
+                                                    <a href="{{ route('quiz.university-application.documents.download', [$application->id, $document->id, 'preview' => 1]) }}" target="_blank" class="btn btn-sm btn-outline-primary text-nowrap">
                                                         Preview
                                                     </a>
                                                     <a href="{{ route('quiz.university-application.documents.download', [$application->id, $document->id]) }}" class="btn btn-sm btn-outline-success text-nowrap">
@@ -383,7 +383,7 @@
                                                             @foreach ($document->histories as $history)
                                                                 <li class="mb-1">
                                                                     {{ optional($history->replaced_at)->format('Y/m/d H:i') }} --
-                                                                    <a href="{{ asset($history->file_path) }}" target="_blank">Preview</a>
+                                                                    <a href="{{ route('quiz.university-application.documents.history.download', [$application->id, $history->id, 'preview' => 1]) }}" target="_blank">Preview</a>
                                                                     /
                                                                     <a href="{{ route('quiz.university-application.documents.history.download', [$application->id, $history->id]) }}">Download</a>
                                                                     @if ($history->review_status)
