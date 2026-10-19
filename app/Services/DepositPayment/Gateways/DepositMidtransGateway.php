@@ -58,9 +58,14 @@ class DepositMidtransGateway implements DepositPaymentGatewayInterface
         [$firstName, $lastName] = $this->splitName($payment->name);
         $amount = (int) round((float) $payment->amount);
 
+        // Notifikasi diarahkan ke webhook alur ini (bukan URL default di dashboard Midtrans),
+        // dan user dikembalikan ke halaman status setelah bayar.
         $response = Http::withBasicAuth($this->serverKey(), '')
             ->acceptJson()
+            ->withHeaders(['X-Override-Notification' => route('deposit.webhook.midtrans')])
             ->post($this->transactionUrl(), [
+                'callbacks' => ['finish' => route('dashboard.deposit.return')],
+                'expiry' => ['unit' => 'minutes', 'duration' => (int) ($this->config->expiry_minutes ?? 60)],
                 'transaction_details' => [
                     'order_id' => $payment->order_id,
                     'gross_amount' => $amount,

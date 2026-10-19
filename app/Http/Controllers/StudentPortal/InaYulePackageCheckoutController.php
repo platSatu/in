@@ -83,7 +83,7 @@ class InaYulePackageCheckoutController extends Controller
         $gatewayPortion = max($price - $depositPortion, 0.0);
 
         $activeGateway = $gatewayPortion > 0
-            ? PaymentGateway::where('is_active', true)->where('status', 'active')->latest('updated_at')->first()
+            ? PaymentGateway::forInayule()
             : null;
 
         return view('student-portal.inayule.checkout', [
@@ -263,10 +263,7 @@ class InaYulePackageCheckoutController extends Controller
      */
     private function initiateGatewayCheckout(mixed $user, Student $student, CoursePackage $package, float $price, float $depositBalance): RedirectResponse
     {
-        $activeGateway = PaymentGateway::where('is_active', true)
-            ->where('status', 'active')
-            ->latest('updated_at')
-            ->first();
+        $activeGateway = PaymentGateway::forInayule();
 
         if (!$activeGateway) {
             return redirect()->route('inayule.checkout.show', ['packageId' => $package->id])

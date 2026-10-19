@@ -60,14 +60,9 @@ class DepositController extends Controller
 
         $user = Auth::user();
 
-        // Gateway berlaku system-wide (bukan di-scope per user_id) -- sama
-        // persis keputusan yang sudah dipakai FormPaymentController::init(),
-        // supaya konsisten: 1 gateway aktif dipakai untuk SEMUA transaksi
-        // pembayaran di aplikasi ini, form maupun topup saldo.
-        $gateway = PaymentGateway::where('is_active', true)
-            ->where('status', 'active')
-            ->latest('updated_at')
-            ->first();
+        // Topup saldo bagian dari Inayule (Saldo Saya): selalu Midtrans,
+        // lihat PaymentGateway::forInayule(). 19 Oktober 2026.
+        $gateway = PaymentGateway::forInayule();
 
         if (!$gateway) {
             return back()->withInput()->with('error', 'Payment gateway belum diaktifkan oleh admin. Silakan hubungi penyelenggara.');

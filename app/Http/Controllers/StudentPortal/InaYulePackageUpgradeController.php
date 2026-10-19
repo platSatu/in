@@ -219,6 +219,6 @@ class InaYulePackageUpgradeController extends Controller
 
     private function activeGateway(): ?PaymentGateway
     {
-        return PaymentGateway::where('is_active', true)->where('status', 'active')->latest('updated_at')->first();
+        return PaymentGateway::forInayule();
     }
 }

@@ -34,6 +34,16 @@ class PaymentGateway extends Model
     ];
 
     /**
+     * Gateway khusus Inayule (Buy Packages, Upgrade/Convert, Saldo Saya): selalu Midtrans,
+     * terpisah dari gateway aktif (is_active) yang dipakai pendaftaran & quiz (Duitku).
+     * Kredensial & mode sandbox/production tetap dari baris Midtrans di menu superadmin.
+     */
+    public static function forInayule(): ?self
+    {
+        return static::where('gateway', 'midtrans')->where('status', 'active')->latest('updated_at')->first();
+    }
+
+    /**
      * Daftar field kredensial yang dibutuhkan tiap gateway, dipakai bareng
      * oleh controller (validasi) dan view (render input dinamis).
      *

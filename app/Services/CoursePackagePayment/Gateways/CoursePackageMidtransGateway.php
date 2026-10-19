@@ -58,9 +58,14 @@ class CoursePackageMidtransGateway implements CoursePackagePaymentGatewayInterfa
         [$firstName, $lastName] = $this->splitName((string) $payment->name);
         $amount = (int) round((float) $payment->gateway_portion);
 
+        // Notifikasi diarahkan ke webhook alur ini (bukan URL default di dashboard Midtrans),
+        // dan user dikembalikan ke halaman status setelah bayar.
         $response = Http::withBasicAuth($this->serverKey(), '')
             ->acceptJson()
+            ->withHeaders(['X-Override-Notification' => route('course-package.webhook.midtrans')])
             ->post($this->transactionUrl(), [
+                'callbacks' => ['finish' => route('inayule.checkout.return')],
+                'expiry' => ['unit' => 'minutes', 'duration' => (int) ($this->config->expiry_minutes ?? 60)],
                 'transaction_details' => [
                     'order_id' => $payment->order_id,
                     'gross_amount' => $amount,
