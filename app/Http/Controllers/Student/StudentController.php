@@ -12,6 +12,7 @@ use App\Models\FormPayment;
 use App\Models\FormSubmission;
 use App\Models\Major;
 use App\Models\Role;
+use App\Models\SettingUniversity;
 use App\Models\Student;
 use App\Models\UniversityApplication;
 use App\Models\User;
@@ -486,12 +487,22 @@ class StudentController extends Controller
 
         $majorNames = Major::whereIn('id', $majorIds)->pluck('name', 'id');
 
+        // Rekomendasi kampus per jurusan -- aturan sama dengan pesan WhatsApp quiz
+        // (FrontendController::buildMajorUniversitiesMessage), 19 Oktober 2026.
+        $majorUniversities = SettingUniversity::whereIn('major_id', $majorIds)
+            ->where('status', 'active')
+            ->with('university')
+            ->get()
+            ->groupBy('major_id')
+            ->map(fn ($rows) => $rows->pluck('university')->filter()->unique('id')->values());
+
         return view('student.student.show', compact(
             'data',
             'submissions',
             'answersBySubmission',
             'paymentsBySubmission',
-            'majorNames'
+            'majorNames',
+            'majorUniversities'
         ));
     }
 

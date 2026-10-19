@@ -245,6 +245,17 @@
                                             <div class="gdoc-answer-value">
                                                 {{ $majorNames[$answer->answer_text] ?? '-' }}
                                             </div>
+                                            @php $recommended = $majorUniversities->get($answer->answer_text, collect()); @endphp
+                                            <div class="mt-2">
+                                                <span class="gdoc-answer-label">Rekomendasi Kampus</span>
+                                                @forelse ($recommended as $university)
+                                                    <div class="gdoc-answer-value">
+                                                        {{ $loop->iteration }}. <a href="{{ route('frontend.university.profile', $university->id) }}" target="_blank" rel="noopener">{{ $university->name }}</a>
+                                                    </div>
+                                                @empty
+                                                    <div class="gdoc-subtle">Belum ada kampus aktif untuk jurusan ini.</div>
+                                                @endforelse
+                                            </div>
                                         @else
                                             @php $answer = $group->first(); @endphp
                                             <div class="gdoc-answer-value">{{ $answer->answer_text ?: '-' }}</div>
