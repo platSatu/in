@@ -29,8 +29,10 @@ class RoleUserController extends Controller
 {
     public function index(Request $request)
     {
-        $search = $request->query('search');
+        $search = trim((string) $request->query('search'));
+        $roleId = $request->query('role_id');
         $context = $this->scopeContext($request->user());
+        $roles = $this->eligibleRoles($context);
 
         $query = RoleUser::query()->with(['user', 'role', 'companyBranch', 'companyDivision']);
 
@@ -38,13 +40,20 @@ class RoleUserController extends Controller
             $query->whereIn('user_id', $this->eligibleUsers($context)->pluck('id'));
         }
 
-        if (!empty($search)) {
-            $query->where('status', 'like', "%{$search}%");
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->whereHas('user', fn ($u) => $u->where('name', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"))
+                    ->orWhereHas('role', fn ($r) => $r->where('name', 'like', "%{$search}%"));
+            });
+        }
+
+        if (filled($roleId)) {
+            $query->where('role_id', $roleId);
         }
 
         $data = $query->latest('created_at')->paginate(10)->withQueryString();
 
-        return view('roleuser.index', compact('data'));
+        return view('roleuser.index', compact('data', 'roles'));
     }
 
     public function create(Request $request)

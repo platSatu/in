@@ -31,9 +31,17 @@
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('roleuser.index') }}" class="row g-2">
-                        <div class="col-md-10">
-                            <input type="text" name="search" class="form-control" placeholder="Search role user..."
+                        <div class="col-md-7">
+                            <input type="text" name="search" class="form-control" placeholder="Cari nama, email, atau role..."
                                    value="{{ request('search') }}">
+                        </div>
+                        <div class="col-md-3">
+                            <select name="role_id" class="form-select" onchange="this.form.submit()">
+                                <option value="">Semua Role</option>
+                                @foreach ($roles as $role)
+                                    <option value="{{ $role->id }}" @selected((string) request('role_id') === (string) $role->id)>{{ $role->name }}</option>
+                                @endforeach
+                            </select>
                         </div>
                         <div class="col-md-2 d-grid">
                             <button type="submit" class="btn btn-outline-primary">Search</button>
@@ -46,7 +54,8 @@
                         <thead>
                             <tr>
                                 <th>No</th>
-                                <th>User</th>
+                                <th>Nama</th>
+                                <th>Email</th>
                                 <th>Role</th>
                                 <th>Scope</th>
                                 <th>Status</th>
@@ -58,6 +67,7 @@
                                 <tr>
                                     <td>{{ $data->firstItem() + $index }}</td>
                                     <td>{{ optional($item->user)->name ?? '-' }}</td>
+                                    <td>{{ optional($item->user)->email ?? '-' }}</td>
                                     <td>{{ optional($item->role)->name ?? '-' }}</td>
                                     <td>
                                         @if (optional($item->role)->scope_level === 'branch')
@@ -90,7 +100,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center">Belum ada data role user.</td>
+                                    <td colspan="7" class="text-center">Belum ada data role user.</td>
                                 </tr>
                             @endforelse
                         </tbody>
