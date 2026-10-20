@@ -385,7 +385,8 @@ class StudentController extends Controller
         // role scope branch/division tetap bebas memilih seperti biasa.
         $isSelfScoped = $user->isSelfScopedOnly();
         $lockedBranchId = $isSelfScoped ? $this->ownBranchId($user) : null;
-        $lockedSalesUserId = $isSelfScoped ? $user->id : null;
+        // 20 Oktober 2026: kunci assign berdasarkan role 'sales', bukan scope.
+        $lockedSalesUserId = $this->isSalesUser($user) ? $user->id : null;
 
         return view('student.student.create', compact(
             'companyBranches',
@@ -413,6 +414,9 @@ class StudentController extends Controller
         // dari form (mis. kalau field disabled itu diakali lewat devtools).
         if ($user->isSelfScopedOnly()) {
             $validated['branch_id'] = $this->ownBranchId($user);
+        }
+
+        if ($this->isSalesUser($user)) {
             $validated['handled_by_user_id'] = $user->id;
         }
 
@@ -516,8 +520,9 @@ class StudentController extends Controller
         $companyBranches = CompanyBranch::select('id', 'name')->orderBy('name')->get();
         $forms = Form::select('id', 'name')->orderBy('name')->get();
         $salesUsers = $this->activeSalesUsers();
+        $isSalesUser = $this->isSalesUser(Auth::user());
 
-        return view('student.student.edit', compact('data', 'companyBranches', 'forms', 'salesUsers'));
+        return view('student.student.edit', compact('data', 'companyBranches', 'forms', 'salesUsers', 'isSalesUser'));
     }
 
     /**
@@ -528,6 +533,11 @@ class StudentController extends Controller
         $data = $this->resolveVisibleStudent($id);
 
         $validated = $this->validateStudent($request, $data->id);
+
+        // Sales tidak bisa memindahkan student ke sales lain; yang belum di-assign jadi miliknya.
+        if ($this->isSalesUser(Auth::user())) {
+            $validated['handled_by_user_id'] = $data->handled_by_user_id ?: Auth::id();
+        }
 
         if ($request->hasFile('images')) {
             if ($data->images) {
@@ -817,6 +827,13 @@ class StudentController extends Controller
      * untuk asal Kode Sales (User::sales_code) yang ditampilkan sebagai
      * referensi tiap opsinya.
      */
+    /** User dengan role 'sales' aktif dan bukan company-scope (superadmin/admin pusat tetap bebas). */
+    private function isSalesUser(User $user): bool
+    {
+        return ! $user->isCompanyScoped()
+            && $user->activeRoleAssignments()->contains(fn (RoleUser $ru) => $ru->role->slug === 'sales');
+    }
+
     private function activeSalesUsers()
     {
         return User::query()

@@ -113,6 +113,13 @@
                              yang diisi student sendiri (tetap teks bebas, tidak diubah). --}}
                         <div class="col-md-6">
                             <label class="form-label">Assign ke Sales <span class="text-muted">(opsional)</span></label>
+                            @if ($isSalesUser)
+                                @php $lockedSalesUser = $salesUsers->firstWhere('id', $data->handled_by_user_id ?: auth()->id()); @endphp
+                                <select class="form-select" disabled>
+                                    <option selected>{{ $lockedSalesUser->name ?? '(Anda)' }} ({{ $lockedSalesUser->sales_code ?? 'belum ada kode' }})</option>
+                                </select>
+                                <div class="form-text">Assign sales dikunci, hanya admin yang bisa mengubah.</div>
+                            @else
                             <select name="handled_by_user_id" class="form-select @error('handled_by_user_id') is-invalid @enderror">
                                 <option value="">-- Belum di-assign --</option>
                                 @foreach ($salesUsers as $salesUser)
@@ -124,6 +131,7 @@
                             <div class="form-text">
                                 Cocokkan dengan Kode Sales yang diisi student di sebelah kiri, lalu pilih sales yang sesuai.
                             </div>
+                            @endif
                             @error('handled_by_user_id')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror

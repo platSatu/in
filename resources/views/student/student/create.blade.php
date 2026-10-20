@@ -129,7 +129,7 @@
                                  (scope 'self' cuma memfilter dari handled_by_user_id, lihat
                                  App\Helpers\DataScope::applyBranchDivisionScope()), dan tidak
                                  bisa sengaja/salah assign ke sales lain. --}}
-                            @if ($isSelfScoped)
+                            @if ($lockedSalesUserId)
                                 @php $lockedSalesUser = $salesUsers->firstWhere('id', $lockedSalesUserId); @endphp
                                 <select class="form-select" disabled>
                                     <option selected>{{ $lockedSalesUser->name ?? '(Anda)' }} ({{ $lockedSalesUser->sales_code ?? 'belum ada kode' }})</option>
