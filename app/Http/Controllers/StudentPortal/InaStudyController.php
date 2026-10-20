@@ -5,6 +5,7 @@ namespace App\Http\Controllers\StudentPortal;
 use App\Http\Controllers\Controller;
 use App\Models\DocumentType;
 use App\Models\Student;
+use App\Models\UniversityApplication;
 use App\Models\UniversityProfileDegree;
 use App\Services\InaStudy\ManualApplicationRegistrar;
 use App\Services\StudentIdentityResolver;
@@ -40,7 +41,9 @@ class InaStudyController extends Controller
 
         $student = Student::where('user_id', $userId)->first();
         $myApplications = $student
-            ? $student->applications()->with(['university', 'universityProfile'])->withDocumentProgress()->orderByDesc('submitted_at')->get()
+            // Aplikasi yang sudah di-Cancel admin tidak ditampilkan ke siswa (20 Oktober 2026).
+            ? $student->applications()->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+                ->with(['university', 'universityProfile'])->withDocumentProgress()->orderByDesc('submitted_at')->get()
             : collect();
 
         // Sama seperti di halaman admin (Quiz\UniversityApplicationController::index)
