@@ -57,6 +57,9 @@
             margin: 8px 0 16px;
         }
         label.form-label { font-size: 13.5px; font-weight: 600; color: #4a5063; }
+        .parent-box { border: 1px solid #eef1f8; border-radius: 12px; padding: 16px; height: 100%; }
+        .parent-title { font-weight: 700; font-size: 14px; color: #2b3043; padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid #eef1f8; }
+        .parent-box .mb-3:last-child { margin-bottom: 0 !important; }
         .edu-row { border: 1px solid #eef1f8; border-radius: 12px; padding: 14px; margin-bottom: 12px; position: relative; }
         .edu-row .btn-remove-row {
             position: absolute; top: 10px; right: 10px; border: none; background: none;
@@ -161,7 +164,7 @@
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">Chinese Name (if any)</label>
+                        <label class="form-label">Chinese Name 中文名字</label>
                         <input type="text" name="chinese_name" class="form-control" value="{{ old('chinese_name', $formDetail->chinese_name ?? '') }}">
                     </div>
                     <div class="col-md-6">
@@ -224,19 +227,6 @@
                     </div>
 
                     <div class="col-md-6">
-                        <label class="form-label">Parents Name (Father &amp; Mother)</label>
-                        <input type="text" name="parents_name" class="form-control" value="{{ old('parents_name', $formDetail->parents_name ?? '') }}">
-                    </div>
-                    <div class="col-md-6">
-                        <label class="form-label">Parents Phone Number (Father &amp; Mother)</label>
-                        <input type="text" name="parents_phone" class="form-control" value="{{ old('parents_phone', $formDetail->parents_phone ?? '') }}">
-                    </div>
-
-                    <div class="col-md-6">
-                        <label class="form-label">Parents Occupation (Father/Mother)</label>
-                        <input type="text" name="parents_occupation" class="form-control" value="{{ old('parents_occupation', $formDetail->parents_occupation ?? '') }}">
-                    </div>
-                    <div class="col-md-6">
                         <label class="form-label">E-mail Address</label>
                         <input type="email" name="email" class="form-control" value="{{ old('email', $formDetail->email ?? '') }}">
                     </div>
@@ -271,6 +261,59 @@
                             <option value="scholarship" {{ old('sponsorship_type', $formDetail->sponsorship_type ?? '') === 'scholarship' ? 'selected' : '' }}>Scholarship</option>
                             <option value="self_sponsored" {{ old('sponsorship_type', $formDetail->sponsorship_type ?? '') === 'self_sponsored' ? 'selected' : '' }}>Self Sponsored</option>
                         </select>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">Reason Why Apply Scholarship</label>
+                        <textarea name="scholarship_reason" class="form-control" rows="4">{{ old('scholarship_reason', $formDetail->scholarship_reason ?? '') }}</textarea>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card-box">
+                <div class="section-title">Parents Information</div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="parent-box">
+                            <div class="parent-title">Father</div>
+                            <div class="mb-3">
+                                <label class="form-label">Father Name</label>
+                                <input type="text" name="father_name" class="form-control" value="{{ old('father_name', $formDetail->father_name ?? '') }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Occupation</label>
+                                <input type="text" name="father_occupation" class="form-control" value="{{ old('father_occupation', $formDetail->father_occupation ?? '') }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Phone</label>
+                                <input type="text" name="father_phone" class="form-control" value="{{ old('father_phone', $formDetail->father_phone ?? '') }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="father_email" class="form-control" value="{{ old('father_email', $formDetail->father_email ?? '') }}">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="parent-box">
+                            <div class="parent-title">Mother</div>
+                            <div class="mb-3">
+                                <label class="form-label">Mother Name</label>
+                                <input type="text" name="parents_name" class="form-control" value="{{ old('parents_name', $formDetail->parents_name ?? '') }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Occupation</label>
+                                <input type="text" name="parents_occupation" class="form-control" value="{{ old('parents_occupation', $formDetail->parents_occupation ?? '') }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Phone</label>
+                                <input type="text" name="parents_phone" class="form-control" value="{{ old('parents_phone', $formDetail->parents_phone ?? '') }}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="mother_email" class="form-control" value="{{ old('mother_email', $formDetail->mother_email ?? '') }}">
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

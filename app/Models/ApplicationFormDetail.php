@@ -47,6 +47,11 @@ class ApplicationFormDetail extends Model
         'parents_name',
         'parents_phone',
         'parents_occupation',
+        'father_name',
+        'father_occupation',
+        'father_phone',
+        'father_email',
+        'mother_email',
         'home_address',
         'email',
         'religion',
@@ -54,6 +59,7 @@ class ApplicationFormDetail extends Model
         'field_of_study_in_china',
         'financial_support_by',
         'sponsorship_type',
+        'scholarship_reason',
         'terms_accepted_at',
     ];
 

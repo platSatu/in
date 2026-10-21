@@ -68,7 +68,7 @@
                     </td>
                 </tr>
                 <tr><th>Given Name</th><td>{{ $value($form->given_name) }}</td></tr>
-                <tr><th>Chinese Name</th><td>{{ $value($form->chinese_name) }}</td></tr>
+                <tr><th>Chinese Name 中文名字</th><td>{{ $value($form->chinese_name) }}</td></tr>
                 <tr><th>Gender</th><td>{{ $value($form->gender) }}</td></tr>
                 <tr><th>Nationality</th><td>{{ $value($form->nationality) }}</td></tr>
             </table>
@@ -82,13 +82,22 @@
                 <tr><th>Religion</th><td>{{ $value($form->religion) }}</td></tr>
                 <tr><th>Hobby</th><td>{{ $value($form->hobby) }}</td></tr>
                 <tr><th>Home Address and Zipcode</th><td>{!! nl2br(e($value($form->home_address))) !!}</td></tr>
-                <tr><th>Parents Name (Father &amp; Mother)</th><td>{{ $value($form->parents_name) }}</td></tr>
-                <tr><th>Parents Phone Number</th><td>{{ $value($form->parents_phone) }}</td></tr>
-                <tr><th>Parents Occupation</th><td>{{ $value($form->parents_occupation) }}</td></tr>
                 <tr><th>Highest Degree Obtained</th><td>{{ $value($form->highest_degree_obtained) }}</td></tr>
                 <tr><th>Field of Study in China</th><td>{{ $value($form->field_of_study_in_china) }}</td></tr>
                 <tr><th>Financial Support Provided By</th><td>{{ $value($form->financial_support_by) }}</td></tr>
                 <tr><th>Scholarship / Self Sponsored</th><td>{{ $sponsorships[$form->sponsorship_type] ?? $value($form->sponsorship_type) }}</td></tr>
+                <tr><th>Reason Why Apply Scholarship</th><td>{!! nl2br(e($value($form->scholarship_reason))) !!}</td></tr>
+            </table>
+
+            <div class="a4-title">PARENTS INFORMATION</div>
+            <table class="a4-table grid">
+                <thead><tr><th style="width:20%"></th><th style="width:40%">Father</th><th style="width:40%">Mother</th></tr></thead>
+                <tbody>
+                    <tr><th>Name</th><td>{{ $value($form->father_name) }}</td><td>{{ $value($form->parents_name) }}</td></tr>
+                    <tr><th>Occupation</th><td>{{ $value($form->father_occupation) }}</td><td>{{ $value($form->parents_occupation) }}</td></tr>
+                    <tr><th>Phone</th><td>{{ $value($form->father_phone) }}</td><td>{{ $value($form->parents_phone) }}</td></tr>
+                    <tr><th>Email</th><td>{{ $value($form->father_email) }}</td><td>{{ $value($form->mother_email) }}</td></tr>
+                </tbody>
             </table>
 
             <div class="a4-title">EDUCATION BACKGROUND</div>
