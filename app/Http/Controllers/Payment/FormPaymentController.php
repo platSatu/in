@@ -365,7 +365,14 @@ class FormPaymentController extends Controller
             return;
         }
 
-        if ($payment->purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
+        // Uang tetap tercatat lunas, tapi aplikasi yang sudah dibatalkan admin
+        // tidak dibuka lagi -- admin cek di card Payment untuk refund/aktifkan manual.
+        if ($application->isCancelled()) {
+            Log::warning('[PAYMENT] Pembayaran masuk untuk aplikasi yang sudah dibatalkan', [
+                'application_id' => $application->id,
+                'order_id' => $payment->order_id,
+            ]);
+        } elseif ($payment->purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
             && empty($application->admission_status)) {
             $application->update([
                 'admission_status' => UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW,

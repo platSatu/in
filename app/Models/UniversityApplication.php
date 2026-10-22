@@ -68,6 +68,7 @@ class UniversityApplication extends Model
         'registration_fee_paid_at',
         'deposit_fee_china_amount',
         'status',
+        'cancel_reason',
         // FIX (10 September 2026): lihat catatan ADMISSION_STATUS_* di atas.
         'admission_status',
         'handled_by_user_id',
@@ -82,6 +83,40 @@ class UniversityApplication extends Model
         'deposit_fee_china_amount' => 'integer',
         'submitted_at' => 'datetime',
     ];
+
+    // Tahap lanjut: kampus/jurusan tidak bisa diubah lagi (batalkan lalu apply baru).
+    public const LOCKED_STATUSES = [
+        self::STATUS_REGISTERED,
+        self::STATUS_VISA_PROCESS,
+        self::STATUS_CHECK_IN,
+        self::STATUS_COMPLETED,
+    ];
+
+    /**
+     * Snapshot kampus & jurusan dari 1 Course -- satu sumber untuk Apply,
+     * Register manual & Ubah Kampus/Jurusan oleh admin (22 Oktober 2026).
+     * registration_fee_amount sengaja tidak di sini (aturannya beda tiap pintu).
+     */
+    public static function courseSnapshot(UniversityProfileDegree $course): array
+    {
+        $profile = $course->profile;
+
+        return [
+            'university_profile_id' => $profile->id,
+            'university_id' => $profile->university_id,
+            'degree_intake_id' => $course->id,
+            'course_name' => $course->course_name,
+            'degree' => $course->degree,
+            'language' => $profile->language,
+            'intake' => $course->intake,
+            'duration' => $course->duration,
+        ];
+    }
+
+    public function isCancelled(): bool
+    {
+        return $this->status === self::STATUS_CANCELLED;
+    }
 
     public function student(): BelongsTo
     {

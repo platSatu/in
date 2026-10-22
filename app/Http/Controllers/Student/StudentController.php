@@ -18,6 +18,7 @@ use App\Models\UniversityApplication;
 use App\Models\User;
 use App\Models\RoleUser;
 use App\Models\UniversityProfileDegree;
+use App\Services\InaStudy\ApplicationAdminService;
 use App\Services\InaStudy\ManualApplicationRegistrar;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Validation\ValidationException;
@@ -665,24 +666,14 @@ class StudentController extends Controller
      * tetap ada di tab Data Student (boleh didaftarkan ulang ke InaStudy).
      * Perubahannya tercatat otomatis di Activity Log.
      */
-    public function cancelApplication(Request $request, string $applicationId): RedirectResponse
+    public function cancelApplication(Request $request, string $applicationId, ApplicationAdminService $admin): RedirectResponse
     {
-        $visibleStudentIds = DataScope::visibleStudentIds($request->user());
-
-        $application = DB::transaction(function () use ($applicationId, $visibleStudentIds) {
-            $application = UniversityApplication::whereKey($applicationId)
-                ->when($visibleStudentIds !== null, fn ($query) => $query->whereIn('student_id', $visibleStudentIds))
-                ->lockForUpdate()
-                ->first();
-
-            abort_if(! $application, 404);
-
-            if ($application->status !== UniversityApplication::STATUS_CANCELLED) {
-                $application->update(['status' => UniversityApplication::STATUS_CANCELLED]);
-            }
-
-            return $application;
-        });
+        // Aturan sama dengan tombol Batalkan di detail Aplikasi Kuliah (ApplicationAdminService).
+        try {
+            $application = $admin->cancel($applicationId, DataScope::visibleStudentIds($request->user()), 'Dilepas dari Progress Student');
+        } catch (ValidationException $e) {
+            return redirect()->to(route('student.student.index').'#progress')->with('error', collect($e->errors())->flatten()->first());
+        }
 
         $name = trim(($application->student->first_name ?? '').' '.($application->student->last_name ?? '')) ?: 'Student';
 

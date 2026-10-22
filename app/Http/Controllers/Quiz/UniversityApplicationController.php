@@ -10,11 +10,15 @@ use App\Models\ApplicationDocumentHistory;
 use App\Models\DocumentType;
 use App\Models\University;
 use App\Models\UniversityApplication;
+use App\Models\UniversityProfileDegree;
+use App\Services\InaStudy\ApplicationAdminService;
+use App\Services\InaStudy\ManualApplicationRegistrar;
 use App\Services\InaStudy\MultipleDocumentUploader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Fase 5 (superadmin) -- daftar & detail Aplikasi Kuliah siswa, termasuk
@@ -124,7 +128,10 @@ class UniversityApplicationController extends Controller
             UniversityApplication::STATUS_CANCELLED => 'Cancelled',
         ];
 
+        $canEdit = $request->user()->canAccessPermission('quiz.university-application', 'edit');
+
         return view('quiz.university-application.index', compact(
+            'canEdit',
             'data',
             'universities',
             'intakeYears',
@@ -137,7 +144,7 @@ class UniversityApplicationController extends Controller
         ));
     }
 
-    public function show(Request $request, string $id)
+    public function show(Request $request, string $id, ApplicationAdminService $admin, ManualApplicationRegistrar $registrar)
     {
         // formDetail & educationBackgrounds: tab "Application Form" (A4 siap print), 16 Oktober 2026.
         $application = UniversityApplication::with(['student', 'university', 'universityProfile', 'handledBy', 'formDetail', 'educationBackgrounds'])
@@ -163,13 +170,76 @@ class UniversityApplicationController extends Controller
         // dashboard gateway terpisah.
         $payments = $application->payments()->latest('created_at')->get();
 
+        // Batalkan & Ubah Kampus/Jurusan (22 Oktober 2026), lihat ApplicationAdminService.
+        $canEdit = $request->user()->canAccessPermission('quiz.university-application', 'edit');
+        $canCancel = $canEdit && ! $application->isCancelled()
+            && ! $payments->contains(fn ($payment) => $payment->isPaid() && $payment->amount > 0);
+        $changeBlockedReason = $canEdit ? $admin->changeBlockedReason($application) : null;
+        $courseUniversities = $canEdit && ! $changeBlockedReason ? $registrar->options() : collect();
+        $degreeOrder = UniversityProfileDegree::DEGREES;
+
         return view('quiz.university-application.show', compact(
             'application',
             'groupedTypes',
             'existingDocuments',
             'multipleDocuments',
-            'payments'
+            'payments',
+            'canEdit',
+            'canCancel',
+            'changeBlockedReason',
+            'courseUniversities',
+            'degreeOrder'
         ));
+    }
+
+    /** Batalkan 1 aplikasi yang belum ada pembayaran (alasan wajib). */
+    public function cancel(Request $request, string $id, ApplicationAdminService $admin): RedirectResponse
+    {
+        $validated = $request->validate(['cancel_reason' => 'required|string|max:255'], [
+            'cancel_reason.required' => 'Alasan pembatalan wajib diisi.',
+        ]);
+
+        $application = $admin->cancel($id, DataScope::visibleStudentIds($request->user()), $validated['cancel_reason']);
+
+        return redirect()
+            ->route('quiz.university-application.show', $id)
+            ->with('success', 'Aplikasi '.$application->application_no.' sudah dibatalkan.');
+    }
+
+    /** Batal massal dari daftar aplikasi; yang sudah ada pembayaran otomatis dilewati. */
+    public function cancelMany(Request $request, ApplicationAdminService $admin): RedirectResponse
+    {
+        $validated = $request->validate([
+            'ids' => 'required|array|max:100',
+            'ids.*' => 'uuid',
+            'cancel_reason' => 'required|string|max:255',
+        ], [
+            'ids.required' => 'Centang dulu aplikasi yang mau dibatalkan.',
+            'cancel_reason.required' => 'Alasan pembatalan wajib diisi.',
+        ]);
+
+        $result = $admin->cancelMany($validated['ids'], DataScope::visibleStudentIds($request->user()), $validated['cancel_reason']);
+
+        return back()
+            ->with('success', $result['cancelled'].' aplikasi dibatalkan.')
+            ->withErrors($result['skipped']);
+    }
+
+    /** Ubah kampus/jurusan/intake (isian sama dengan Register manual). */
+    public function changeCourse(Request $request, string $id, ApplicationAdminService $admin, ManualApplicationRegistrar $registrar): RedirectResponse
+    {
+        $validated = $request->validate($registrar->rules());
+
+        try {
+            $result = $admin->changeCourse($id, DataScope::visibleStudentIds($request->user()), $validated);
+        } catch (ValidationException $e) {
+            return back()->withInput()->withErrors($e->errors());
+        }
+
+        return redirect()
+            ->route('quiz.university-application.show', $id)
+            ->with('success', 'Kampus/jurusan berhasil diubah ke '.optional($result['application']->university)->name.' - '.$result['application']->major_label.'.')
+            ->with('warning', $result['fee_warning']);
     }
 
     /**

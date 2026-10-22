@@ -74,21 +74,7 @@ class ManualApplicationRegistrar
      */
     public function register(Student $student, array $input): UniversityApplication
     {
-        // Course harus benar-benar milik universitas & degree yang dipilih
-        // (dicek di server, bukan cuma andalan filter dropdown di JS).
-        $degreeRow = UniversityProfileDegree::with('profile')
-            ->where('id', $input['degree_intake_id'])
-            ->where('degree', $input['degree'])
-            ->whereHas('profile', fn ($query) => $query
-                ->where('university_id', $input['university_id'])
-                ->where('status', 'active'))
-            ->first();
-
-        if (! $degreeRow) {
-            throw ValidationException::withMessages([
-                'degree_intake_id' => 'Jurusan yang dipilih tidak sesuai dengan universitas/degree yang dipilih. Silakan coba lagi.',
-            ]);
-        }
+        $degreeRow = $this->resolveCourse($input);
 
         return DB::transaction(function () use ($student, $input, $degreeRow) {
             // Kunci baris student supaya klik ganda / dua admin bersamaan
@@ -102,19 +88,9 @@ class ManualApplicationRegistrar
                 ]);
             }
 
-            $profile = $degreeRow->profile;
-
-            $application = UniversityApplication::create([
+            $application = UniversityApplication::create(UniversityApplication::courseSnapshot($degreeRow) + [
                 'application_no' => (new ApplicationNumberGenerator())->next(),
                 'student_id' => $student->id,
-                'university_profile_id' => $profile->id,
-                'university_id' => $input['university_id'],
-                'degree_intake_id' => $degreeRow->id,
-                'course_name' => $degreeRow->course_name,
-                'degree' => $degreeRow->degree,
-                'language' => $profile->language,
-                'intake' => $degreeRow->intake,
-                'duration' => $degreeRow->duration,
                 'intake_year' => $input['intake_year'],
                 'whatsapp' => $input['whatsapp'],
                 'status' => UniversityApplication::STATUS_SUBMITTED,
@@ -134,5 +110,31 @@ class ManualApplicationRegistrar
 
             return $application;
         });
+    }
+
+    /**
+     * Course harus benar-benar milik universitas & degree yang dipilih (dicek
+     * di server, bukan cuma andalan filter dropdown di JS). Dipakai juga oleh
+     * ApplicationAdminService::changeCourse().
+     *
+     * @throws ValidationException
+     */
+    public function resolveCourse(array $input): UniversityProfileDegree
+    {
+        $degreeRow = UniversityProfileDegree::with('profile')
+            ->where('id', $input['degree_intake_id'])
+            ->where('degree', $input['degree'])
+            ->whereHas('profile', fn ($query) => $query
+                ->where('university_id', $input['university_id'])
+                ->where('status', 'active'))
+            ->first();
+
+        if (! $degreeRow) {
+            throw ValidationException::withMessages([
+                'degree_intake_id' => 'Jurusan yang dipilih tidak sesuai dengan universitas/degree yang dipilih. Silakan coba lagi.',
+            ]);
+        }
+
+        return $degreeRow;
     }
 }

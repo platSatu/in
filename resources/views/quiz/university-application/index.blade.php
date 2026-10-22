@@ -10,6 +10,13 @@
         </div>
     @endif
 
+    @if ($errors->any())
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            <ul class="mb-0 ps-3">@foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach</ul>
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
@@ -56,10 +63,21 @@
                     </form>
                 </div>
 
+                {{-- Batal massal (22 Oktober 2026): yang sudah ada pembayaran otomatis dilewati. --}}
+                @if ($canEdit)
+                    <form method="POST" action="{{ route('quiz.university-application.cancel-many') }}" id="cancelManyForm" class="d-flex flex-wrap gap-2 align-items-center mb-3"
+                        onsubmit="return document.querySelectorAll('.js-app-check:checked').length ? confirm('Batalkan semua aplikasi yang dicentang?') : (alert('Centang dulu aplikasi yang mau dibatalkan.'), false);">
+                        @csrf
+                        <input type="text" name="cancel_reason" class="form-control form-control-sm" style="max-width:320px;" maxlength="255" required placeholder="Alasan batal, mis. apply coba-coba">
+                        <button type="submit" class="btn btn-sm btn-outline-danger">Batalkan yang dicentang</button>
+                    </form>
+                @endif
+
                 <div class="table-responsive">
                     <table class="table dt-table-hover" style="width:100%">
                         <thead>
                             <tr>
+                                @if ($canEdit) <th style="width:32px;"><input type="checkbox" class="form-check-input" onclick="document.querySelectorAll('.js-app-check').forEach(c => c.checked = this.checked)"></th> @endif
                                 <th>No</th>
                                 <th>Application No</th>
                                 <th>Student</th>
@@ -75,6 +93,13 @@
                         <tbody>
                             @forelse ($data as $index => $item)
                                 <tr>
+                                    @if ($canEdit)
+                                        <td>
+                                            @unless ($item->status === \App\Models\UniversityApplication::STATUS_CANCELLED)
+                                                <input type="checkbox" name="ids[]" value="{{ $item->id }}" form="cancelManyForm" class="form-check-input js-app-check">
+                                            @endunless
+                                        </td>
+                                    @endif
                                     <td>{{ $data->firstItem() + $index }}</td>
                                     <td class="fw-bold">{{ $item->application_no }}</td>
                                     <td>
@@ -110,7 +135,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center">Belum ada aplikasi kuliah masuk.</td>
+                                    <td colspan="{{ $canEdit ? 11 : 10 }}" class="text-center">Belum ada aplikasi kuliah masuk.</td>
                                 </tr>
                             @endforelse
                         </tbody>

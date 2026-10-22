@@ -26,6 +26,21 @@
         </div>
     @endif
 
+    @if (session('warning'))
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            {{ session('warning') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
+    @if ($application->isCancelled())
+        <div class="alert alert-secondary">
+            <strong>Aplikasi ini sudah dibatalkan.</strong>
+            @if ($application->cancel_reason) Alasan: {{ $application->cancel_reason }}. @endif
+            Siswa tidak bisa membuka, membayar, atau mengisi aplikasi ini lagi.
+        </div>
+    @endif
+
     {{-- 16 Oktober 2026: dua tab -- Detail Aplikasi (isi lama, tidak diubah) & Application Form (A4 siap print). --}}
     <ul class="nav nav-tabs mb-3" role="tablist">
         <li class="nav-item" role="presentation">
@@ -45,7 +60,74 @@
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
 
-                <h5 class="fw-bold mb-3">{{ $application->application_no }}</h5>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                    <h5 class="fw-bold mb-0 me-auto">{{ $application->application_no }}</h5>
+                    {{-- Ubah Kampus/Jurusan & Batalkan (22 Oktober 2026), aturan di ApplicationAdminService. --}}
+                    @if ($canEdit && ! $application->isCancelled())
+                        @if ($changeBlockedReason)
+                            <span class="text-muted small">{{ $changeBlockedReason }}</span>
+                        @else
+                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changeCourseModal">Ubah Kampus / Jurusan</button>
+                        @endif
+                        @if ($canCancel)
+                            <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelModal">Batalkan Aplikasi</button>
+                        @endif
+                    @endif
+                </div>
+
+                @if ($canEdit && ! $application->isCancelled() && ! $changeBlockedReason)
+                    <div class="modal fade" id="changeCourseModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg">
+                            <form method="POST" action="{{ route('quiz.university-application.course.update', $application->id) }}" class="modal-content">
+                                @csrf
+                                <div class="modal-header">
+                                    <h6 class="modal-title mb-0">Ubah Kampus / Jurusan</h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="text-muted small">Sekarang: <strong>{{ optional($application->university)->name ?? '-' }}</strong> &middot; {{ $application->major_label }} &middot; {{ $application->intake }} {{ $application->intake_year }}.
+                                        Nomor aplikasi, data siswa & dokumen tetap. Registration Fee yang sudah dibayar tidak berubah.</p>
+                                    @include('partials.inastudy-register-fields', [
+                                        'prefix' => 'change',
+                                        'universities' => $courseUniversities,
+                                        'degreeOrder' => $degreeOrder,
+                                        'defaultWhatsapp' => $application->whatsapp,
+                                    ])
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Batal</button>
+                                    <button type="submit" class="btn btn-primary btn-sm" onclick="return confirm('Simpan perubahan kampus/jurusan aplikasi ini?')">Simpan</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                    @if ($errors->hasAny(['university_id', 'degree', 'degree_intake_id', 'intake_year', 'whatsapp']))
+                        <script>document.addEventListener('DOMContentLoaded', function () { bootstrap.Modal.getOrCreateInstance(document.getElementById('changeCourseModal')).show(); });</script>
+                    @endif
+                @endif
+
+                @if ($canCancel)
+                    <div class="modal fade" id="cancelModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <form method="POST" action="{{ route('quiz.university-application.cancel', $application->id) }}" class="modal-content">
+                                @csrf
+                                <div class="modal-header">
+                                    <h6 class="modal-title mb-0">Batalkan {{ $application->application_no }}</h6>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="text-muted small">Tagihan yang masih menunggu ikut ditutup, dan aplikasi hilang dari halaman InaStudy siswa.</p>
+                                    <label class="form-label">Alasan</label>
+                                    <input type="text" name="cancel_reason" class="form-control" maxlength="255" required placeholder="Mis. apply coba-coba / dobel">
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Kembali</button>
+                                    <button type="submit" class="btn btn-danger btn-sm">Batalkan Aplikasi</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                @endif
 
                 <div class="row mb-4">
                     <div class="col-md-6">

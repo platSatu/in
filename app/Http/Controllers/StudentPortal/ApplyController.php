@@ -199,28 +199,13 @@ class ApplyController extends Controller
             'number_pasport' => $validated['number_pasport'] ?? null,
         ], 'filled'));
 
-        $application = UniversityApplication::create([
+        $degreeRow->setRelation('profile', $profile);
+
+        // Snapshot kampus & jurusan: satu sumber, lihat UniversityApplication::courseSnapshot().
+        $application = UniversityApplication::create(UniversityApplication::courseSnapshot($degreeRow) + [
             'application_no' => (new ApplicationNumberGenerator())->next(),
             'student_id' => $student->id,
-            'university_profile_id' => $profile->id,
-            // FIX (permintaan user, 16 September 2026): $degreeRow->id
-            // (degree_intake_id) dulu cuma dipakai buat validasi
-            // "exists:university_profile_degrees,id" lalu dibuang -- tidak
-            // pernah ikut disimpan ke aplikasi. course_name-nya (jurusan
-            // yang siswa pilih di select "Program / Major") malah TIDAK
-            // PERNAH disimpan sama sekali. Sekarang keduanya ikut
-            // di-snapshot, supaya begitu 1 Program punya lebih dari 1
-            // Course dengan Degree/Intake/Duration yang SAMA, admin tetap
-            // bisa tahu persis jurusan mana yang dipilih siswa (lihat
-            // migration add_course_snapshot_to_university_applications_table).
-            'degree_intake_id' => $degreeRow->id,
-            'course_name' => $degreeRow->course_name,
-            'university_id' => $profile->university_id,
-            'degree' => $degreeRow->degree,
-            'language' => $profile->language,
-            'intake' => $degreeRow->intake,
             'intake_year' => $validated['intake_year'],
-            'duration' => $degreeRow->duration,
             'whatsapp' => $validated['whatsapp'],
             'registration_fee_amount' => $degreeRow->registration_fee_amount,
             'status' => UniversityApplication::STATUS_SUBMITTED,

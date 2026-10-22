@@ -36,6 +36,8 @@ class ApplicationController extends Controller
         $ownsApplication = $application->student && $application->student->user_id === $user->id;
 
         abort_unless($ownsApplication, Response::HTTP_FORBIDDEN);
+        // Aplikasi yang dibatalkan admin tidak bisa dibuka/dibayar/diisi lagi.
+        abort_if($application->isCancelled(), Response::HTTP_NOT_FOUND);
 
         // FASE 4 -- dokumen yang DIUPLOAD ADMIN untuk siswa ini (Offer
         // Letter, Passport), ditampilkan sebagai daftar download di card

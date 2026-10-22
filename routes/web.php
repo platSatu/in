@@ -791,6 +791,10 @@ Route::middleware(['auth', 'permission:quiz.university-application,edit'])->pref
     // FormPaymentController::onApplicationPaymentPaid() -- PROCESSING &
     // ACCEPTED diubah manual oleh admin lewat form ini).
     Route::post('/{id}/admission-status', [UniversityApplicationController::class, 'updateAdmissionStatus'])->name('quiz.university-application.admission-status.update');
+    // Batalkan & Ubah Kampus/Jurusan (22 Oktober 2026), lihat ApplicationAdminService.
+    Route::post('/cancel-many', [UniversityApplicationController::class, 'cancelMany'])->name('quiz.university-application.cancel-many');
+    Route::post('/{id}/cancel', [UniversityApplicationController::class, 'cancel'])->name('quiz.university-application.cancel');
+    Route::post('/{id}/course', [UniversityApplicationController::class, 'changeCourse'])->name('quiz.university-application.course.update');
 });
 
 Route::middleware(['auth', 'permission:company.profile'])->prefix('dashboard/superadmin/company/profile')->group(function () {
