@@ -12,6 +12,10 @@
         </nav>
     </div>
 
+    @if ($errors->any())
+        <div class="alert alert-danger">Perubahan belum tersimpan, periksa kembali isian yang ditandai merah.</div>
+    @endif
+
     <form action="{{ route('user.update', $data->id) }}" method="POST">
         @csrf
         @method('PUT')
@@ -79,7 +83,7 @@
                         <div class="col-sm-6">
                             <label for="password" class="mb-2">Password (opsional)</label>
                             <input type="password" class="form-control @error('password') is-invalid @enderror"
-                                   id="password" name="password" placeholder="Kosongkan jika tidak diubah">
+                                   id="password" name="password" autocomplete="new-password" placeholder="Kosongkan jika tidak diubah">
                             @error('password')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
@@ -88,7 +92,7 @@
                         <div class="col-sm-6">
                             <label for="password_confirmation" class="mb-2">Confirm Password</label>
                             <input type="password" class="form-control"
-                                   id="password_confirmation" name="password_confirmation" placeholder="********">
+                                   id="password_confirmation" name="password_confirmation" autocomplete="new-password" placeholder="********">
                         </div>
                     </div>
 

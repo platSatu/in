@@ -42,9 +42,12 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email',
             'password' => ['required', 'confirmed', Password::defaults()],
-            'handphone' => 'nullable|string|max:30',
+            'handphone' => 'nullable|string|max:20',
             'status' => 'required|in:active,inactive',
         ]);
+
+        // Kolom handphone NOT NULL: kosong disimpan '' (sama seperti daftar lewat Google).
+        $validated['handphone'] = $validated['handphone'] ?? '';
 
         $user = AdminCrud::create(User::class, $validated);
 
@@ -82,7 +85,7 @@ class UserController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users,email,' . $data->id,
             'password' => ['nullable', 'confirmed', Password::defaults()],
-            'handphone' => 'nullable|string|max:30',
+            'handphone' => 'nullable|string|max:20',
             // Fix (14 September 2026, permintaan user): Kode Sales normalnya
             // dibuat OTOMATIS oleh sistem saat role "sales" di-assign (lihat
             // RoleUserController::assignSalesCodeIfNeeded()), tapi superadmin
@@ -94,6 +97,9 @@ class UserController extends Controller
         if (empty($validated['password'])) {
             unset($validated['password']);
         }
+
+        // Kolom handphone NOT NULL: kosong disimpan '' (sama seperti daftar lewat Google).
+        $validated['handphone'] = $validated['handphone'] ?? '';
 
         if (empty($validated['sales_code'])) {
             $validated['sales_code'] = null;
