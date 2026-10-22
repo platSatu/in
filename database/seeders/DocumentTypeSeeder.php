@@ -76,7 +76,7 @@ class DocumentTypeSeeder extends Seeder
             // --- Supporting Letter (sebelumnya "Surat Pendukung" -- penamaan
             // ulang 10 September 2026) ---
             ['code' => 'recommendation_letter', 'label' => 'Recommendation Letter', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'template_file_path' => 'document-templates/Recommendation-Letter.pdf', 'is_required' => false, 'sort_order' => 160],
-            ['code' => 'guardian_letter', 'label' => 'Guardian Letter', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 170],
+            ['code' => 'guardian_letter', 'label' => 'Guardian Letter (if student under 17 years old)', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 170],
             ['code' => 'any_certificate', 'label' => 'Any Certificate', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 180],
 
             // --- Documents from InaStudy (FASE 4, 10 September 2026) ---
