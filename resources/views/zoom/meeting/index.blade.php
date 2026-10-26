@@ -190,7 +190,7 @@
                     <div class="table-responsive">
                         <table class="table dt-table-hover" style="width:100%">
                             <thead>
-                                <tr>
+                                <tr class="text-nowrap">
                                     <th>No</th>
                                     <th>Nama Akun</th>
                                     <th>Account ID</th>
@@ -198,7 +198,7 @@
                                     <th>Client Secret</th>
                                     <th>Secret Token</th>
                                     <th>Meeting</th>
-                                    <th class="text-center">Aktif untuk Meeting Baru</th>
+                                    <th class="text-center">Aktif Meeting Baru</th>
                                     <th class="no-content text-center">Action</th>
                                 </tr>
                             </thead>
@@ -207,13 +207,13 @@
                                     @php $isOn = $setting->is_active && $setting->status === 'active'; @endphp
                                     <tr class="{{ $isOn ? 'table-success' : '' }}">
                                         <td>{{ $index + 1 }}</td>
-                                        <td class="fw-bold">
+                                        <td class="fw-bold text-nowrap">
                                             {{ $setting->name ?? 'Zoom Account' }}
                                             <div class="text-muted small">Diupdate {{ optional($setting->updated_at)->format('d M Y, H:i') }}</div>
                                         </td>
                                         {{-- Kredensial ter-enkripsi di database; di layar cuma ditampilkan sebagian. --}}
-                                        <td><code>{{ \Illuminate\Support\Str::mask((string) $setting->account_id, '•', 4) }}</code></td>
-                                        <td><code>{{ \Illuminate\Support\Str::mask((string) $setting->client_id, '•', 4) }}</code></td>
+                                        <td class="text-nowrap"><code>{{ \Illuminate\Support\Str::mask((string) $setting->account_id, '•', 4) }}</code></td>
+                                        <td class="text-nowrap"><code>{{ \Illuminate\Support\Str::mask((string) $setting->client_id, '•', 4) }}</code></td>
                                         <td><code>{{ $setting->client_secret ? '••••••••' : '-' }}</code></td>
                                         <td><code>{{ $setting->secret_token ? '••••••••' : '-' }}</code></td>
                                         <td>{{ $setting->meetings_count }}</td>
