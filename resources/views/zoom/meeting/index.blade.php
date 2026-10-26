@@ -267,26 +267,46 @@
 
 </div>
 
-{{-- Warna modal: CSS dark-mode template (body.dark) tidak memuat style label/form,
-     jadi label & judul modal diberi warna eksplisit untuk mode terang & gelap. --}}
+{{-- Modal akun Zoom selalu berlatar putih & teks hitam (sama dengan halaman lain),
+     apa pun tema template-nya -- CSS dark bawaan template membuat modal gelap. --}}
 <style>
+    #zoomSettingModal .modal-content,
+    #zoomSettingModal .modal-header,
+    #zoomSettingModal .modal-body,
+    #zoomSettingModal .modal-footer {
+        background-color: #fff !important;
+        color: #0e1726 !important;
+    }
+    #zoomSettingModal .modal-header,
+    #zoomSettingModal .modal-footer {
+        border-color: #e0e6ed !important;
+    }
     #zoomSettingModal .modal-title,
     #zoomSettingModal .form-label,
     #zoomSettingModal .form-check-label {
-        color: #3b3f5c;
+        color: #0e1726 !important;
         font-weight: 600;
     }
     #zoomSettingModal .form-label .text-muted,
     #zoomSettingModal .form-text {
-        color: #888ea8 !important;
+        color: #6c757d !important;
         font-weight: 400;
     }
     #zoomSettingModal .form-control {
-        color: #3b3f5c;
-        background-color: #fff;
+        background-color: #fff !important;
+        color: #0e1726 !important;
+        border: 1px solid #bfc9d4 !important;
+    }
+    #zoomSettingModal .form-control:focus {
+        border-color: #4361ee !important;
+        box-shadow: 0 0 0 .2rem rgba(67, 97, 238, .15) !important;
     }
     #zoomSettingModal .form-control::placeholder {
-        color: #a0a4b8;
+        color: #a0a4b8 !important;
+    }
+    #zoomSettingModal .btn-close {
+        filter: none !important;
+        opacity: .6;
     }
     #zoomSettingModal .alert-info a {
         color: inherit;
@@ -297,28 +317,12 @@
         width: 2.75em;
         height: 1.4em;
         cursor: pointer;
+        border: 1px solid #bfc9d4;
     }
     #zoomSettingModal .form-check-label {
         padding-left: .5rem;
         padding-top: .15rem;
         cursor: pointer;
-    }
-
-    body.dark #zoomSettingModal .modal-title,
-    body.dark #zoomSettingModal .form-label,
-    body.dark #zoomSettingModal .form-check-label {
-        color: #e0e6ed;
-    }
-    body.dark #zoomSettingModal .form-label .text-muted,
-    body.dark #zoomSettingModal .form-text {
-        color: #bfc9d4 !important;
-    }
-    body.dark #zoomSettingModal .form-control {
-        color: #0e1726;
-    }
-    body.dark #zoomSettingModal .modal-header,
-    body.dark #zoomSettingModal .modal-footer {
-        border-color: #1b2e4b;
     }
 </style>
 
