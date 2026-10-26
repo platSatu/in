@@ -75,6 +75,10 @@
 
                                 <td class="text-center">
                                     <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                        <button type="button" class="btn btn-sm btn-outline-info text-nowrap" data-bs-toggle="modal" data-bs-target="#majorUniversities{{ $major->id }}">
+                                            University ({{ $major->settingUniversities->count() }})
+                                        </button>
+
                                         <a href="{{ route('quiz.university.create', ['major_id' => $major->id]) }}" class="btn btn-sm btn-outline-success text-nowrap">
                                             + Add University
                                         </a>
@@ -108,6 +112,47 @@
                         </tbody>
                     </table>
                 </div>
+
+                {{-- Popup: university yang terhubung dengan tiap major (dari Setting University). --}}
+                @foreach ($data as $major)
+                    <div class="modal fade" id="majorUniversities{{ $major->id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">University untuk {{ $major->name }}</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    @forelse ($major->settingUniversities->sortBy(fn ($setting) => $setting->university->name ?? '') as $setting)
+                                        <div class="d-flex align-items-center justify-content-between gap-2 py-2 {{ $loop->last ? '' : 'border-bottom' }}">
+                                            <div>
+                                                <div class="fw-bold">{{ $setting->university->name ?? 'University sudah dihapus' }}</div>
+                                                @if ($setting->status === 'active')
+                                                    <span class="badge bg-success">Active</span>
+                                                @else
+                                                    <span class="badge bg-danger">Inactive</span>
+                                                    <small class="text-muted">tidak dikirim di WhatsApp</small>
+                                                @endif
+                                            </div>
+                                            <div class="d-flex gap-1 flex-nowrap">
+                                                @if ($setting->university)
+                                                    <a href="{{ route('frontend.university.profile', $setting->university->id) }}" target="_blank" class="btn btn-sm btn-outline-secondary text-nowrap">Profil</a>
+                                                @endif
+                                                <a href="{{ route('quiz.setting-university.edit', $setting->id) }}" class="btn btn-sm btn-outline-primary text-nowrap">Edit</a>
+                                            </div>
+                                        </div>
+                                    @empty
+                                        <p class="text-muted mb-0">Belum ada university yang terhubung. Student yang memilih major ini akan menerima pesan "Belum ada universitas yang tersedia".</p>
+                                    @endforelse
+                                </div>
+                                <div class="modal-footer">
+                                    <a href="{{ route('quiz.setting-university.create') }}" class="btn btn-sm btn-primary">+ Hubungkan University</a>
+                                    <button type="button" class="btn btn-sm btn-light" data-bs-dismiss="modal">Tutup</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                @endforeach
 
                 <div class="mt-4">
                     {{ $data->links('pagination::bootstrap-5') }}

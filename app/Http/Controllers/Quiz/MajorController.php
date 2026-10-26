@@ -26,7 +26,7 @@ class MajorController extends Controller
             ['name', 'description'],
             $search,
             10,
-            ['city']
+            ['city', 'settingUniversities.university:id,name']
         );
 
         return view('quiz.major.index', compact('data'));

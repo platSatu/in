@@ -35,4 +35,12 @@ class Major extends Model
     {
         return $this->belongsTo(City::class, 'city_id');
     }
+
+    /**
+     * University yang terhubung lewat menu Setting University (dipakai {{universitas_major}} di WA).
+     */
+    public function settingUniversities()
+    {
+        return $this->hasMany(SettingUniversity::class, 'major_id');
+    }
 }
