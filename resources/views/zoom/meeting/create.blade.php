@@ -14,6 +14,18 @@
         </div>
     @endif
 
+    @if ($activeSetting)
+        <div class="alert alert-info">
+            Meeting akan dibuat dengan akun Zoom <strong>{{ $activeSetting->name ?? 'Zoom Account' }}</strong>.
+            Ganti akun di tab <a href="{{ route('zoom.meeting.index', ['tab' => 'settings']) }}">Pengaturan Zoom</a>.
+        </div>
+    @else
+        <div class="alert alert-warning">
+            Belum ada akun Zoom yang aktif. Aktifkan salah satu akun di tab
+            <a href="{{ route('zoom.meeting.index', ['tab' => 'settings']) }}">Pengaturan Zoom</a> sebelum membuat meeting.
+        </div>
+    @endif
+
     <div class="widget-content widget-content-area">
 
         <form action="{{ route('zoom.meeting.store') }}" method="POST">

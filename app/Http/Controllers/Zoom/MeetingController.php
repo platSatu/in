@@ -6,6 +6,7 @@ use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
 use App\Models\ZoomMeeting;
 use App\Models\ZoomMeetingRecording;
+use App\Models\ZoomSetting;
 use App\Services\Zoom\ZoomClient;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -31,18 +32,29 @@ class MeetingController extends Controller
         $search = $request->query('search');
 
         $data = ZoomMeeting::query()
-            ->with('user')
+            ->with(['user', 'zoomSetting'])
             ->when($search, fn ($q) => $q->where('topic', 'like', "%{$search}%"))
             ->orderByDesc('start_time')
             ->paginate(10)
             ->withQueryString();
 
-        return view('zoom.meeting.index', compact('data', 'search'));
+        // Tab ke-2 "Pengaturan Zoom": daftar akun Zoom (kredensial di tabel
+        // zoom_settings) + switch mana yang dipakai untuk membuat meeting baru.
+        $tab = $request->query('tab') === 'settings' ? 'settings' : 'meetings';
+
+        $zoomSettings = ZoomSetting::query()
+            ->withCount('meetings')
+            ->orderByDesc('is_active')
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('zoom.meeting.index', compact('data', 'search', 'tab', 'zoomSettings'));
     }
 
     public function create()
     {
         return view('zoom.meeting.create', [
+            'activeSetting' => ZoomSetting::activeSetting(),
             'defaultSettings' => ZoomMeeting::defaultSettings(),
             'timezones' => $this->timezoneOptions(),
         ]);
@@ -57,14 +69,26 @@ class MeetingController extends Controller
 
         $validated = $this->validated($request);
 
+        // Meeting baru selalu dibuat dengan akun yang switch-nya aktif di tab
+        // "Pengaturan Zoom" -- & dicatat, supaya operasi berikutnya
+        // (edit/end/delete/recording) tetap ke akun yang sama.
+        $setting = ZoomSetting::activeSetting();
+        if (! $setting) {
+            return back()->withInput()->with(
+                'error',
+                'Belum ada akun Zoom yang aktif. Aktifkan salah satu akun di tab "Pengaturan Zoom".'
+            );
+        }
+
         try {
-            $response = (new ZoomClient())->createMeeting($this->buildZoomPayload($validated));
+            $response = (new ZoomClient($setting))->createMeeting($this->buildZoomPayload($validated));
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
 
         ZoomMeeting::create([
             'user_id' => (string) $userId,
+            'zoom_setting_id' => $setting->id,
             'zoom_meeting_id' => (string) $response['id'],
             'zoom_uuid' => $response['uuid'] ?? null,
             'topic' => $validated['topic'],
@@ -102,7 +126,7 @@ class MeetingController extends Controller
         $validated = $this->validated($request);
 
         try {
-            (new ZoomClient())->updateMeeting($meeting->zoom_meeting_id, $this->buildZoomPayload($validated));
+            $meeting->zoomClient()->updateMeeting($meeting->zoom_meeting_id, $this->buildZoomPayload($validated));
         } catch (RuntimeException $e) {
             return back()->withInput()->with('error', $e->getMessage());
         }
@@ -127,7 +151,7 @@ class MeetingController extends Controller
         $meeting = AdminCrud::findOrFail(ZoomMeeting::class, $id);
 
         try {
-            (new ZoomClient())->deleteMeeting($meeting->zoom_meeting_id);
+            $meeting->zoomClient()->deleteMeeting($meeting->zoom_meeting_id);
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -148,7 +172,7 @@ class MeetingController extends Controller
         $meeting = AdminCrud::findOrFail(ZoomMeeting::class, $id);
 
         try {
-            (new ZoomClient())->endMeeting($meeting->zoom_meeting_id);
+            $meeting->zoomClient()->endMeeting($meeting->zoom_meeting_id);
         } catch (RuntimeException $e) {
             return back()->with('error', $e->getMessage());
         }
@@ -188,7 +212,7 @@ class MeetingController extends Controller
 
     private function syncRecordings(ZoomMeeting $meeting): void
     {
-        $result = (new ZoomClient())->listRecordings($meeting->zoom_meeting_id);
+        $result = $meeting->zoomClient()->listRecordings($meeting->zoom_meeting_id);
 
         $meeting->forceFill(['recordings_synced_at' => now()])->save();
 

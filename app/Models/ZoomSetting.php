@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Kredensial Server-to-Server OAuth Zoom (menu Settings > Setting Zoom).
@@ -50,6 +51,14 @@ class ZoomSetting extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Meeting yang dibuat memakai akun Zoom ini.
+     */
+    public function meetings(): HasMany
+    {
+        return $this->hasMany(ZoomMeeting::class, 'zoom_setting_id');
     }
 
     /**

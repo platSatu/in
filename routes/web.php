@@ -73,6 +73,7 @@ use App\Http\Controllers\Settings\PaymentGatewayController;
 use App\Http\Controllers\Settings\WhatsappGatewayController;
 use App\Http\Controllers\Settings\ZoomSettingController;
 use App\Http\Controllers\Zoom\MeetingController as ZoomMeetingController;
+use App\Http\Controllers\Zoom\MeetingSettingController as ZoomMeetingSettingController;
 use App\Http\Controllers\Course\CourseClassController;
 use App\Http\Controllers\Course\CourseLevelController;
 use App\Http\Controllers\Course\CoursePackageController;
@@ -1062,6 +1063,13 @@ Route::middleware(['auth', 'permission:zoom.meeting,edit'])->prefix('dashboard/s
     Route::put('/{id}', [ZoomMeetingController::class, 'update'])->name('zoom.meeting.update');
     Route::put('/{id}/end', [ZoomMeetingController::class, 'end'])->name('zoom.meeting.end');
     Route::delete('/{id}', [ZoomMeetingController::class, 'destroy'])->name('zoom.meeting.destroy');
+
+    // Tab "Pengaturan Zoom" (akun Zoom + switch akun aktif untuk meeting baru).
+    // Jumlah segmen beda dengan /{id} & /{id}/end di atas, jadi tidak bentrok.
+    Route::post('/settings', [ZoomMeetingSettingController::class, 'store'])->name('zoom.meeting.settings.store');
+    Route::put('/settings/{id}', [ZoomMeetingSettingController::class, 'update'])->name('zoom.meeting.settings.update');
+    Route::put('/settings/{id}/toggle', [ZoomMeetingSettingController::class, 'toggle'])->name('zoom.meeting.settings.toggle');
+    Route::delete('/settings/{id}', [ZoomMeetingSettingController::class, 'destroy'])->name('zoom.meeting.settings.destroy');
 });
 
 

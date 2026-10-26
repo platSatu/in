@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\Zoom\ZoomClient;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -26,6 +27,7 @@ class ZoomMeeting extends Model
 
     protected $fillable = [
         'user_id',
+        'zoom_setting_id',
         'zoom_meeting_id',
         'zoom_uuid',
         'topic',
@@ -55,6 +57,23 @@ class ZoomMeeting extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * Akun Zoom (Pengaturan Zoom) yang dipakai saat meeting ini dibuat.
+     */
+    public function zoomSetting(): BelongsTo
+    {
+        return $this->belongsTo(ZoomSetting::class, 'zoom_setting_id');
+    }
+
+    /**
+     * Klien Zoom API untuk meeting ini: pakai akun pembuatnya; kalau akun itu
+     * sudah dihapus/belum tercatat, jatuh ke akun yang sedang aktif.
+     */
+    public function zoomClient(): ZoomClient
+    {
+        return new ZoomClient($this->zoomSetting ?? null);
     }
 
     public function recordings(): HasMany
