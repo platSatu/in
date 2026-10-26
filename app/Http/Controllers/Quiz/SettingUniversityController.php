@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\SettingUniversity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class SettingUniversityController extends Controller
 {
@@ -117,22 +118,63 @@ class SettingUniversityController extends Controller
         );
 
         $validated = $request->validate([
-            'city_id' => 'required|string|max:36',
-            'major_id' => 'required|string|max:36',
-            'university_id' => 'required|string|max:36',
+            'city_id' => 'required|string|exists:cities,id',
+            'major_id' => 'required|string|exists:majors,id',
+            'university_id' => 'required|string|exists:universities,id',
             'status' => 'required|in:active,inactive',
+            // Baris tambahan: university lain yang ikut dihubungkan ke major yang sama.
+            'extra_university_ids' => 'nullable|array|max:50',
+            'extra_university_ids.*' => 'nullable|string|distinct|exists:universities,id',
+        ], [
+            'extra_university_ids.*.distinct' => 'University yang sama dipilih lebih dari sekali.',
+            'extra_university_ids.*.exists' => 'University yang dipilih tidak ditemukan.',
         ]);
 
-        AdminCrud::update(
-            SettingUniversity::class,
-            $id,
-            $validated,
-            null
-        );
+        $extraIds = collect($validated['extra_university_ids'] ?? [])
+            ->filter()
+            ->reject(fn ($universityId) => $universityId === $validated['university_id'])
+            ->unique()
+            ->values();
+        unset($validated['extra_university_ids']);
+
+        $added = DB::transaction(function () use ($id, $validated, $extraIds, $userId) {
+            AdminCrud::update(SettingUniversity::class, $id, $validated, null);
+
+            if ($extraIds->isEmpty()) {
+                return 0;
+            }
+
+            // Yang sudah terhubung ke major ini dilewati, supaya tidak ada pasangan dobel.
+            $alreadyLinked = SettingUniversity::where('major_id', $validated['major_id'])
+                ->whereIn('university_id', $extraIds)
+                ->pluck('university_id');
+
+            $newIds = $extraIds->diff($alreadyLinked);
+
+            foreach ($newIds as $universityId) {
+                AdminCrud::create(SettingUniversity::class, [
+                    'user_id' => (string) $userId,
+                    'city_id' => $validated['city_id'],
+                    'major_id' => $validated['major_id'],
+                    'university_id' => $universityId,
+                    'status' => $validated['status'],
+                ]);
+            }
+
+            return $newIds->count();
+        });
+
+        $message = 'Setting University berhasil diupdate.';
+        if ($added > 0) {
+            $message .= " {$added} university baru ikut dihubungkan ke major ini.";
+        }
+        if ($extraIds->count() > $added) {
+            $message .= ' ' . ($extraIds->count() - $added) . ' university dilewati karena sudah terhubung.';
+        }
 
         return redirect()
             ->route('quiz.setting-university.index')
-            ->with('success', 'Setting University berhasil diupdate.');
+            ->with('success', $message);
     }
 
     public function destroy(string $id)

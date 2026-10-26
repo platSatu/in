@@ -160,6 +160,49 @@
 
 
 
+            {{-- Tambah university lain ke major yang sama. Setiap baris jadi pasangan Major-University baru. --}}
+            @php($extraIds = old('extra_university_ids', []))
+            <div class="mb-3 border rounded p-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <label class="form-label mb-0">Tambah University lain untuk major ini</label>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="add-university-row">+ Add Row</button>
+                </div>
+                <div class="small text-muted mb-2">City, Major, dan Status mengikuti isian di atas. University yang sudah terhubung ke major ini otomatis dilewati.</div>
+
+                <div id="university-rows">
+                    @foreach ($extraIds as $i => $extraId)
+                        <div class="d-flex gap-2 mb-2" data-university-row>
+                            <select name="extra_university_ids[]" class="form-control @error('extra_university_ids.' . $i) is-invalid @enderror">
+                                <option value="">-- Select University --</option>
+                                @foreach ($universities as $university)
+                                    <option value="{{ $university->id }}" {{ $extraId == $university->id ? 'selected' : '' }}>{{ $university->name }}</option>
+                                @endforeach
+                            </select>
+                            <button type="button" class="btn btn-outline-danger" data-remove-row>Hapus</button>
+                        </div>
+                        @error('extra_university_ids.' . $i)
+                            <div class="text-danger small mb-2">{{ $message }}</div>
+                        @enderror
+                    @endforeach
+                </div>
+
+                <template id="university-row-template">
+                    <div class="d-flex gap-2 mb-2" data-university-row>
+                        <select name="extra_university_ids[]" class="form-control">
+                            <option value="">-- Select University --</option>
+                            @foreach ($universities as $university)
+                                <option value="{{ $university->id }}">{{ $university->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="button" class="btn btn-outline-danger" data-remove-row>Hapus</button>
+                    </div>
+                </template>
+            </div>
+
+
+
+
+
             <div class="mb-3">
 
                 <label class="form-label">
@@ -221,5 +264,23 @@
 
 </div>
 
+
+<script>
+    (function () {
+        var rows = document.getElementById('university-rows');
+        var template = document.getElementById('university-row-template');
+
+        document.getElementById('add-university-row').addEventListener('click', function () {
+            rows.appendChild(template.content.cloneNode(true));
+        });
+
+        rows.addEventListener('click', function (event) {
+            var button = event.target.closest('[data-remove-row]');
+            if (button) {
+                button.closest('[data-university-row]').remove();
+            }
+        });
+    })();
+</script>
 
 @endsection
