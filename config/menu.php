@@ -43,6 +43,8 @@ return [
 
     // ================= Students =================
     ['key' => 'student.student', 'label' => 'Data Student', 'route' => 'student.student.index', 'group' => 'Students', 'icon' => 'list'],
+    // File Student (29 Oktober 2026): backup file yang diunggah student, unduh per student/semua dalam ZIP.
+    ['key' => 'student.files', 'label' => 'File Student', 'route' => 'student.files.index', 'group' => 'Students', 'icon' => 'list'],
 
     // ================= Invitation =================
     // Sebelumnya menu "Invitations" ini statis (hardcoded, tanpa pengecekan

@@ -48,6 +48,7 @@ use App\Http\Controllers\FrontendController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\BackendInvitationController;
 use App\Http\Controllers\Student\StudentController;
+use App\Http\Controllers\Student\StudentFileController;
 use App\Http\Controllers\StudentPortal\ApplyController;
 use App\Http\Controllers\StudentPortal\ApplicationController;
 use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
@@ -944,6 +945,11 @@ Route::middleware(['auth', 'permission:absensi.academic-calendar,edit'])->prefix
     Route::delete('/{id}', [AcademicCalendarController::class, 'destroy'])->name('absensi.academic-calendar.destroy');
 });
 
+
+// Students > File Student: daftar file yang diunggah student (lihat StudentFileController).
+Route::middleware(['auth', 'permission:student.files'])->prefix('dashboard/superadmin/student/files')->group(function () {
+    Route::get('/', [StudentFileController::class, 'index'])->name('student.files.index');
+});
 
 // student.student: show (GET /{id}) didaftarkan asli SETELAH create/store,
 // jadi urutan blok di bawah sengaja dipertahankan sama persis supaya

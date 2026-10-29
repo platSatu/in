@@ -39,6 +39,7 @@
         'quiz.form' => 'Quiz Form', // "Form" saja terlalu umum/ambigu
         'student.student' => 'Data Student',
         'student' => 'Data Student', // route student.student.* setelah dedupe segmen
+        'student.files' => 'File Student',
         'settings.whatsapp-gateway' => 'WhatsApp Gateway',
         'settings.backup' => 'Backup Database',
         'roleuser' => 'Role User',
