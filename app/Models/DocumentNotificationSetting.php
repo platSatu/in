@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *  - admin_*        : info ke admin saat student mengunggah dokumen (Card 1)
  *  - reminder_*     : pengingat ke student yang dokumennya belum lengkap (Card 2)
  *  - complete_*     : pesan saat semua dokumen wajib sudah lengkap (Card 3)
+ *  - upload_confirm_student : konfirmasi ke student setiap kali upload (Card 3)
  */
 class DocumentNotificationSetting extends Model
 {
@@ -40,6 +41,7 @@ class DocumentNotificationSetting extends Model
         'reminder_hour',
         'complete_notify_student',
         'complete_notify_admin',
+        'upload_confirm_student',
         'updated_by',
     ];
 
@@ -55,6 +57,7 @@ class DocumentNotificationSetting extends Model
         'reminder_hour' => 'integer',
         'complete_notify_student' => 'boolean',
         'complete_notify_admin' => 'boolean',
+        'upload_confirm_student' => 'boolean',
     ];
 
     public static function current(): self

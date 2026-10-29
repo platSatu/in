@@ -54,6 +54,7 @@ class StudentFileNotificationController extends Controller
             'reminder_hour' => ['required', 'integer', Rule::in(DocumentNotificationSetting::REMINDER_HOURS)],
             'complete_notify_student' => ['boolean'],
             'complete_notify_admin' => ['boolean'],
+            'upload_confirm_student' => ['boolean'],
         ], [
             'admin_whatsapp_numbers.required' => 'Isi minimal 1 nomor WhatsApp admin, atau matikan saklarnya.',
             'admin_whatsapp_numbers.*.regex' => 'Nomor WhatsApp admin tidak valid. Contoh: 081234567890.',
@@ -84,6 +85,7 @@ class StudentFileNotificationController extends Controller
             'reminder_hour' => (int) $data['reminder_hour'],
             'complete_notify_student' => $request->boolean('complete_notify_student'),
             'complete_notify_admin' => $request->boolean('complete_notify_admin'),
+            'upload_confirm_student' => $request->boolean('upload_confirm_student'),
             'updated_by' => $request->user()->id,
         ]);
 

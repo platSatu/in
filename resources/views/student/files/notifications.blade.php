@@ -184,8 +184,22 @@
         {{-- ================= Card 3: dokumen lengkap ================= --}}
         <div class="card mb-4">
             <div class="card-body p-4">
-                <h5 class="mb-1"><i class="bi bi-patch-check"></i> Saat Dokumen Sudah Lengkap</h5>
-                <p class="text-muted small mb-4">Dikirim satu kali, begitu student selesai mengunggah semua dokumen wajib.</p>
+                <h5 class="mb-1"><i class="bi bi-patch-check"></i> Konfirmasi Upload & Dokumen Lengkap</h5>
+                <p class="text-muted small mb-4">Pesan ke student setelah upload, dan pesan satu kali begitu semua dokumen wajib sudah lengkap.</p>
+
+                <div class="border rounded p-3 mb-3">
+                    <div class="form-check form-switch">
+                        <input type="hidden" name="upload_confirm_student" value="0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="upload_confirm_student" name="upload_confirm_student" value="1" @checked($on('upload_confirm_student'))>
+                        <label class="form-check-label fw-bold" for="upload_confirm_student">Konfirmasi ke student setiap kali upload</label>
+                    </div>
+                    <div class="text-muted small mt-2">
+                        Dikirim lewat kanal yang sama dengan pengingat (WhatsApp / Email student). Kalau upload itu membuat dokumen lengkap,
+                        cukup pesan terima kasih di bawah yang dikirim.<br>
+                        Contoh: <i>Hai Kak Budi 👋 Dokumen Passport, Ijazah SMA sudah kami terima, terima kasih ya! Tim kami akan segera memeriksanya.
+                        Masih ada yang perlu dilengkapi: Transkrip Nilai, Surat Rekomendasi. Yuk diunggah juga 😊</i>
+                    </div>
+                </div>
 
                 <div class="border rounded p-3 mb-3">
                     <div class="form-check form-switch">

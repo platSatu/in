@@ -283,9 +283,12 @@ class ApplicationDocumentController extends Controller
                 $fresh = UniversityApplication::with(['student', 'university', 'documents'])->find($applicationId);
                 if ($fresh) {
                     $notifier = app(DocumentNotifier::class);
+                    $completeness = app(DocumentCompleteness::class);
                     $notifier->documentsUploaded($fresh, $labels);
+                    // Card 3: konfirmasi ke student (dokumen diterima + yang masih kurang), kalau saklarnya aktif.
+                    $notifier->confirmUploadToStudent($fresh, $labels, $completeness);
                     // Card 3: kalau upload ini membuat dokumen wajib lengkap, kirim terima kasih & info admin (sekali).
-                    $notifier->notifyIfComplete($fresh, app(DocumentCompleteness::class));
+                    $notifier->notifyIfComplete($fresh, $completeness);
                 }
             } catch (\Throwable $e) {
                 report($e);

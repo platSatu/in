@@ -139,6 +139,57 @@ class DocumentNotifier
         }
     }
 
+    /**
+     * Card 3: konfirmasi ke student setiap kali upload -- dokumen yang diterima + yang masih kurang.
+     * Kalau upload ini membuat dokumen lengkap dan pesan "terima kasih, lengkap" aktif, konfirmasi
+     * TIDAK dikirim (supaya student tidak menerima 2 pesan sekaligus).
+     *
+     * @param  array<int, string>  $documents
+     */
+    public function confirmUploadToStudent(UniversityApplication $application, array $documents, DocumentCompleteness $completeness): void
+    {
+        $setting = DocumentNotificationSetting::current();
+        $documents = array_values(array_filter($documents));
+
+        if (! $setting->upload_confirm_student || $documents === []) {
+            return;
+        }
+
+        $missing = $completeness->missing($application)->all();
+        $complete = $completeness->requiredTypes()->isNotEmpty() && $missing === [];
+
+        if ($complete && $setting->complete_notify_student) {
+            return;
+        }
+
+        $application->loadMissing(['student', 'university']);
+        $name = $this->firstName($application);
+        $received = implode(', ', $documents);
+        $url = route('student-portal.applications.documents.edit', $application->id);
+        $tail = $complete
+            ? 'Semua dokumen wajib Kakak sudah lengkap 🎉'
+            : 'Masih ada yang perlu dilengkapi: *'.implode(', ', $missing).'*. Yuk diunggah juga 😊';
+
+        if ($setting->reminder_whatsapp && ($phone = $this->studentPhone($application))) {
+            $this->sendWhatsapp($phone, "Hai Kak {$name} 👋\n\nDokumen *{$received}* sudah kami terima, terima kasih ya! Tim kami akan segera memeriksanya.\n\n{$tail}".($complete ? '' : "\n{$url}"), 'upload_confirm', $application->id);
+        }
+
+        if ($setting->reminder_email && ($email = $application->student?->email)) {
+            $this->sendEmail($email, new DocumentNotificationMail(
+                'Dokumen Kakak sudah kami terima',
+                array_values(array_filter([
+                    "Hai Kak {$name} 👋",
+                    "Dokumen berikut sudah kami terima, terima kasih ya! Tim kami akan segera memeriksanya:",
+                    '• '.implode("\n• ", $documents),
+                    $complete ? 'Semua dokumen wajib Kakak sudah lengkap 🎉' : 'Masih ada yang perlu dilengkapi:',
+                    $complete ? null : '• '.implode("\n• ", $missing),
+                ])),
+                $complete ? null : $url,
+                $complete ? null : 'Lengkapi Dokumen',
+            ), 'upload_confirm', $application->id);
+        }
+    }
+
     /** Sudah pernah terkirim (minimal 1 kanal berhasil) untuk aplikasi & tipe ini? */
     public function alreadySent(string $applicationId, string $type): bool
     {
