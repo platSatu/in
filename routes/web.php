@@ -958,6 +958,7 @@ Route::middleware(['auth', 'permission:student.files'])->prefix('dashboard/super
 });
 Route::middleware(['auth', 'permission:student.files,edit'])->prefix('dashboard/superadmin/student/files')->group(function () {
     Route::put('/notifications', [StudentFileNotificationController::class, 'update'])->name('student.files.notifications.update');
+    Route::post('/notifications/test', [StudentFileNotificationController::class, 'test'])->middleware('throttle:5,1')->name('student.files.notifications.test');
 });
 
 // student.student: show (GET /{id}) didaftarkan asli SETELAH create/store,

@@ -10,6 +10,7 @@ use App\Models\ApplicationFormDetail;
 use App\Models\ApplicationPayment;
 use App\Models\DocumentType;
 use App\Models\UniversityApplication;
+use App\Services\InaStudy\DocumentNotifier;
 use App\Services\InaStudy\MultipleDocumentUploader;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -222,6 +223,8 @@ class ApplicationDocumentController extends Controller
             }
         }
 
+        $this->notifyAdminsAfterResponse($application, $uploadedFiles, $newMultiple, $documentTypes);
+
         return redirect()
             ->route('student-portal.applications.documents.edit', $application->id)
             ->with('success', 'Documents uploaded successfully. Our team will review them shortly.');
@@ -252,6 +255,38 @@ class ApplicationDocumentController extends Controller
         return redirect()
             ->route('student-portal.applications.documents.edit', $application->id)
             ->with('success', 'File removed.');
+    }
+
+    /**
+     * Notifikasi Dokumen (29 Oktober 2026, Students > File Student > tab Notifikasi):
+     * info ke admin bahwa student baru mengunggah dokumen. Dijalankan SETELAH respons
+     * terkirim ke student (app()->terminating), jadi upload tidak ikut lambat menunggu
+     * gateway WA/email, dan kalau pengiriman gagal upload tetap berhasil.
+     */
+    private function notifyAdminsAfterResponse(UniversityApplication $application, array $uploadedFiles, $newMultiple, $documentTypes): void
+    {
+        $labels = collect(array_keys($uploadedFiles))
+            ->map(fn ($id) => $documentTypes->get($id))
+            ->filter(fn ($type) => $type && ! $type->allows_multiple)
+            ->map(fn ($type) => $type->label)
+            ->concat(collect($newMultiple)->flatMap(fn ($rows, $id) => collect($rows)->map(
+                fn ($row) => ($documentTypes->get($id)->label ?? 'Document').': '.trim((string) ($row['title'] ?? ''))
+            )))
+            ->values()
+            ->all();
+
+        $applicationId = $application->id;
+
+        app()->terminating(function () use ($applicationId, $labels) {
+            try {
+                $fresh = UniversityApplication::with(['student', 'university'])->find($applicationId);
+                if ($fresh) {
+                    app(DocumentNotifier::class)->documentsUploaded($fresh, $labels);
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
     }
 
     /**

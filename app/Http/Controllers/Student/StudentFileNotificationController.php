@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
 use App\Models\DocumentNotificationSetting;
+use App\Services\InaStudy\DocumentNotifier;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -12,7 +13,7 @@ use Illuminate\View\View;
 /**
  * Tab "Notifikasi" di Students > File Student (29 Oktober 2026): pengaturan
  * info upload ke admin, pengingat dokumen ke student, dan pesan dokumen lengkap.
- * Langkah 1: hanya menyimpan pengaturan; pengiriman pesan menyusul.
+ * Pengiriman pesannya ada di App\Services\InaStudy\DocumentNotifier.
  */
 class StudentFileNotificationController extends Controller
 {
@@ -78,6 +79,21 @@ class StudentFileNotificationController extends Controller
         ]);
 
         return redirect()->route('student.files.notifications')->with('success', 'Pengaturan notifikasi disimpan.');
+    }
+
+    /** Tombol "Kirim Tes ke Admin": pesan contoh ke nomor & email admin yang sudah disimpan. */
+    public function test(DocumentNotifier $notifier): RedirectResponse
+    {
+        $setting = DocumentNotificationSetting::current();
+
+        if ($setting->adminWhatsappTargets() === [] && $setting->adminEmailTargets() === []) {
+            return back()->with('error', 'Aktifkan & simpan dulu nomor WhatsApp atau email admin di card pertama.');
+        }
+
+        $result = $notifier->sendAdminTest();
+        $message = "Pesan tes: {$result['sent']} terkirim".($result['failed'] ? ", {$result['failed']} gagal (cek pengaturan WhatsApp Gateway / email server)." : '. Silakan cek WhatsApp & email admin.');
+
+        return back()->with($result['failed'] ? 'error' : 'success', $message);
     }
 
     private function normalizePhone(string $phone): string

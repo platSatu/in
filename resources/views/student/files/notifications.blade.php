@@ -21,6 +21,12 @@
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
+    @if (session('error'))
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            {{ session('error') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
     @if ($errors->any())
         <div class="alert alert-danger">
             <div class="fw-bold mb-1">Pengaturan belum tersimpan:</div>
@@ -90,6 +96,15 @@
                         <button type="button" class="btn btn-sm btn-outline-primary" data-add="email"><i class="bi bi-plus"></i> Tambah email</button>
                     </div>
                 </div>
+
+                @if ($canEdit)
+                    <div class="d-flex align-items-center gap-2 mt-3">
+                        <button type="submit" form="notification-test-form" class="btn btn-sm btn-outline-success">
+                            <i class="bi bi-send"></i> Kirim Tes ke Admin
+                        </button>
+                        <span class="text-muted small">Simpan pengaturan dulu, lalu kirim pesan contoh untuk memastikan WhatsApp & email admin sudah sampai.</span>
+                    </div>
+                @endif
 
                 <div class="bg-light rounded p-3 mt-3 small">
                     <div class="fw-bold mb-1">Contoh pesan:</div>
@@ -200,6 +215,11 @@
             @endif
         </div>
     </form>
+
+    {{-- Form terpisah untuk tombol "Kirim Tes" (form tidak boleh bersarang di dalam form pengaturan). --}}
+    @if ($canEdit)
+        <form method="POST" action="{{ route('student.files.notifications.test') }}" id="notification-test-form" class="d-none">@csrf</form>
+    @endif
 
     {{-- Template baris baru untuk tombol "Tambah nomor/email". --}}
     <template id="row-wa">
