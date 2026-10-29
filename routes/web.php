@@ -946,9 +946,11 @@ Route::middleware(['auth', 'permission:absensi.academic-calendar,edit'])->prefix
 });
 
 
-// Students > File Student: daftar file yang diunggah student (lihat StudentFileController).
+// Students > File Student: daftar file yang diunggah student + unduh ZIP (lihat StudentFileController).
 Route::middleware(['auth', 'permission:student.files'])->prefix('dashboard/superadmin/student/files')->group(function () {
     Route::get('/', [StudentFileController::class, 'index'])->name('student.files.index');
+    Route::get('/download-all', [StudentFileController::class, 'downloadAll'])->middleware('throttle:5,1')->name('student.files.download-all');
+    Route::get('/{student}/download', [StudentFileController::class, 'download'])->middleware('throttle:30,1')->name('student.files.download');
 });
 
 // student.student: show (GET /{id}) didaftarkan asli SETELAH create/store,

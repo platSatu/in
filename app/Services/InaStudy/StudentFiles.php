@@ -9,7 +9,10 @@ use App\Models\UniversityApplication;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use RuntimeException;
+use ZipArchive;
 
 /**
  * Menu Students > File Student (29 Oktober 2026): semua file yang diunggah student
@@ -26,7 +29,7 @@ class StudentFiles
     public function query(User $user, ?string $search = null): Builder
     {
         return Student::query()
-            ->with('companyBranch')
+            ->with(['companyBranch', 'applications:id,student_id,application_no'])
             ->whereHas('applications', fn (Builder $application) => $application->where(fn (Builder $w) => $w
                 ->whereHas('documents')
                 ->orWhereHas('formDetail', fn (Builder $form) => $form->whereNotNull('photo_path')->where('photo_path', '!=', ''))))
@@ -99,12 +102,81 @@ class StudentFiles
         ];
     }
 
-    /** Nama folder student di dalam ZIP, mis. "Budi-Santoso_INA-2026-012". */
+    /** Nomor aplikasi kuliah student (bisa lebih dari satu), dipakai di tabel & nama ZIP. */
+    public function applicationNumbers(Student $student): Collection
+    {
+        return $student->applications->pluck('application_no')
+            ->prepend($student->application_no)
+            ->filter()->unique()->values();
+    }
+
+    /** Nama folder student di dalam ZIP, mis. "budi-santoso_INA-2026-012". */
     public function studentFolder(Student $student): string
     {
         $name = trim($student->first_name.' '.$student->last_name) ?: 'Student';
+        $number = $this->applicationNumbers($student)->first() ?: Str::substr($student->id, 0, 8);
 
-        return $this->safe(Str::slug($name).($student->application_no ? '_'.$student->application_no : '_'.Str::substr($student->id, 0, 8)));
+        return $this->safe(Str::slug($name).'_'.$number);
+    }
+
+    /**
+     * Buat ZIP berisi file beberapa student: {folder student}/{universitas - jurusan}/{file}.
+     * File ZIP dibuat di folder sementara privat dan dihapus setelah selesai diunduh (lihat controller).
+     *
+     * @param  iterable<Student>  $students
+     */
+    public function zip(iterable $students): string
+    {
+        if (! class_exists(ZipArchive::class)) {
+            throw new RuntimeException('Modul zip PHP belum terpasang di server.');
+        }
+
+        $dir = storage_path('app/private/tmp/student-files');
+        File::ensureDirectoryExists($dir);
+        // Sisa ZIP lama yang gagal terhapus (mis. unduhan terputus) dibersihkan setelah 1 hari.
+        collect(File::files($dir))->filter(fn ($f) => $f->getMTime() < now()->subDay()->getTimestamp())->each(fn ($f) => File::delete($f->getPathname()));
+
+        $path = $dir.DIRECTORY_SEPARATOR.Str::uuid().'.zip';
+        $zip = new ZipArchive();
+
+        if ($zip->open($path, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            throw new RuntimeException('File ZIP tidak bisa dibuat.');
+        }
+
+        $count = 0;
+        foreach ($students as $student) {
+            $root = $this->studentFolder($student);
+            $used = [];
+
+            foreach ($this->files($student) as $file) {
+                $entry = $this->unique($root.'/'.$file['folder'].'/'.$file['name'], $used);
+                $zip->addFile($file['path'], $entry);
+                // File dokumen umumnya sudah terkompres (PDF/JPG): disimpan apa adanya supaya cepat.
+                $zip->setCompressionName($entry, ZipArchive::CM_STORE);
+                $count++;
+            }
+        }
+
+        if ($count === 0) {
+            $zip->addFromString('KOSONG.txt', 'Tidak ada file student yang bisa diunduh.');
+        }
+
+        $zip->close();
+
+        return $path;
+    }
+
+    /** Nama entri ZIP yang sama (mis. 2 file "Passport.pdf") diberi nomor: "Passport (2).pdf". */
+    private function unique(string $entry, array &$used): string
+    {
+        $candidate = $entry;
+        $info = pathinfo($entry);
+        for ($i = 2; isset($used[strtolower($candidate)]); $i++) {
+            $candidate = $info['dirname'].'/'.$info['filename'].' ('.$i.')'.(isset($info['extension']) ? '.'.$info['extension'] : '');
+        }
+        $used[strtolower($candidate)] = true;
+
+        return $candidate;
     }
 
     /** Folder per aplikasi: "Universitas - Jurusan", ditandai kalau Cancelled. */

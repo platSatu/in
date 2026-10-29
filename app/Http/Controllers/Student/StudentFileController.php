@@ -3,14 +3,20 @@
 namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
+use App\Models\Student;
 use App\Services\InaStudy\StudentFiles;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use RuntimeException;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 /**
  * Menu Students > File Student (29 Oktober 2026): daftar student yang punya file
- * (dokumen aplikasi & foto formulir) beserta jumlah & ukurannya, untuk backup.
- * Logika pengumpulan file ada di App\Services\InaStudy\StudentFiles.
+ * (dokumen aplikasi & foto formulir) beserta jumlah & ukurannya, dan unduh ZIP
+ * per student atau semua sekaligus. Logika pengumpulan file ada di App\Services\InaStudy\StudentFiles.
+ * Setiap unduhan dicatat di log (siapa mengunduh file siapa), karena berisi dokumen pribadi.
  */
 class StudentFileController extends Controller
 {
@@ -25,7 +31,53 @@ class StudentFileController extends Controller
         return view('student.files.index', [
             'students' => $students,
             'summaries' => $summaries,
+            'numbers' => $students->getCollection()->mapWithKeys(fn ($student) => [$student->id => $files->applicationNumbers($student)]),
             'search' => $search,
+            'files' => $files,
         ]);
+    }
+
+    /** ZIP semua file 1 student. Student di luar cakupan akses user = 404. */
+    public function download(Request $request, StudentFiles $files, string $student): BinaryFileResponse|RedirectResponse
+    {
+        $model = $files->query($request->user())->whereKey($student)->first();
+        abort_unless($model instanceof Student, 404);
+
+        return $this->send($request, $files, [$model], $files->studentFolder($model).'.zip');
+    }
+
+    /** ZIP semua student yang terlihat (mengikuti pencarian yang sedang aktif). */
+    public function downloadAll(Request $request, StudentFiles $files): BinaryFileResponse|RedirectResponse
+    {
+        $search = trim((string) $request->query('search'));
+        $students = $files->query($request->user(), $search)->get();
+
+        if ($students->isEmpty()) {
+            return back()->with('error', 'Tidak ada file student untuk diunduh.');
+        }
+
+        return $this->send($request, $files, $students, 'file-student-'.now()->format('Y-m-d_His').'.zip');
+    }
+
+    private function send(Request $request, StudentFiles $files, iterable $students, string $name): BinaryFileResponse|RedirectResponse
+    {
+        set_time_limit(0);
+
+        try {
+            $path = $files->zip($students);
+        } catch (RuntimeException $e) {
+            report($e);
+
+            return back()->with('error', $e->getMessage());
+        }
+
+        Log::info('File Student diunduh', [
+            'user_id' => $request->user()->id,
+            'user' => $request->user()->email,
+            'students' => collect($students)->pluck('id')->all(),
+            'file' => $name,
+        ]);
+
+        return response()->download($path, $name, ['Content-Type' => 'application/zip'])->deleteFileAfterSend();
     }
 }
