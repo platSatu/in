@@ -14,6 +14,12 @@ use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
+    private const MAX_ATTEMPTS_PER_EMAIL = 5;
+
+    private const MAX_ATTEMPTS_PER_IP = 20;
+
+    private const LOCKOUT_SECONDS = 900; // 15 menit
+
     /**
      * Determine if the user is authorized to make this request.
      */
@@ -46,7 +52,8 @@ class LoginRequest extends FormRequest
         $this->ensureIsNotRateLimited();
 
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
-            RateLimiter::hit($this->throttleKey());
+            RateLimiter::hit($this->throttleKey(), self::LOCKOUT_SECONDS);
+            RateLimiter::hit($this->ipThrottleKey(), self::LOCKOUT_SECONDS);
 
             throw ValidationException::withMessages([
                 'email' => trans('auth.failed'),
@@ -68,24 +75,36 @@ class LoginRequest extends FormRequest
     /**
      * Ensure the login request is not rate limited.
      *
+     * FIX 29 Okt 2026: dulu hanya 5x gagal per email+IP lalu dikunci 60 detik.
+     * Sekarang:
+     *   - 5x gagal untuk email yang sama dari IP yang sama -> dikunci 15 menit;
+     *   - 20x gagal dari satu IP (email apa pun) -> IP itu dikunci 15 menit,
+     *     supaya tidak bisa mencoba banyak email berbeda dari satu tempat.
+     * Login yang berhasil hanya menghapus hitungan email itu, bukan hitungan IP.
+     *
      * @throws ValidationException
      */
     public function ensureIsNotRateLimited(): void
     {
-        if (! RateLimiter::tooManyAttempts($this->throttleKey(), 5)) {
-            return;
+        foreach ([$this->throttleKey() => self::MAX_ATTEMPTS_PER_EMAIL, $this->ipThrottleKey() => self::MAX_ATTEMPTS_PER_IP] as $key => $max) {
+            if (! RateLimiter::tooManyAttempts($key, $max)) {
+                continue;
+            }
+
+            event(new Lockout($this));
+
+            $minutes = max(1, (int) ceil(RateLimiter::availableIn($key) / 60));
+
+            throw ValidationException::withMessages([
+                'email' => "Terlalu banyak percobaan login yang gagal. Silakan coba lagi dalam {$minutes} menit, atau gunakan \"Forgot Password\" jika lupa password.",
+            ]);
         }
+    }
 
-        event(new Lockout($this));
-
-        $seconds = RateLimiter::availableIn($this->throttleKey());
-
-        throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
-                'seconds' => $seconds,
-                'minutes' => ceil($seconds / 60),
-            ]),
-        ]);
+    /** Hitungan gagal per IP (semua email). */
+    public function ipThrottleKey(): string
+    {
+        return 'login-ip|'.$this->ip();
     }
 
     /**

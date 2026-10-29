@@ -66,6 +66,18 @@ class GoogleAuthController extends Controller
                 ->withErrors(['email' => 'Akun Google Anda tidak memiliki email yang bisa diverifikasi.']);
         }
 
+        // FIX 29 Okt 2026: hanya terima email yang sudah diverifikasi Google.
+        // Akun Gmail selalu terverifikasi; ini menjaga akun Google dengan email
+        // non-Gmail yang belum diverifikasi supaya tidak bisa masuk ke akun orang lain.
+        $emailVerified = $googleUser->user['email_verified'] ?? $googleUser->user['verified_email'] ?? true;
+        if (filter_var($emailVerified, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE) === false) {
+            Log::warning('Google login ditolak: email belum diverifikasi Google', ['email' => $googleUser->getEmail()]);
+
+            return redirect()
+                ->route('login')
+                ->withErrors(['email' => 'Email akun Google Anda belum diverifikasi oleh Google. Silakan verifikasi dulu atau daftar dengan email dan password.']);
+        }
+
         $user = User::where('email', $googleUser->getEmail())->first();
 
         // FIX keamanan (14 Oktober 2026): akun yang dinonaktifkan admin tidak
