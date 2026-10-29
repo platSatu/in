@@ -7,16 +7,18 @@ use App\Models\Role;
 use App\Models\RoleUser;
 use App\Models\User;
 use App\Rules\Turnstile;
+use App\Services\Whatsapp\WhatsappMessenger;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
-use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class RegisteredUserController extends Controller
 {
@@ -38,82 +40,88 @@ class RegisteredUserController extends Controller
         $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:' . User::class],
-            // Dulu tidak divalidasi sama sekali padahal field-nya wajib diisi
-            // di form (auth/register.blade.php) dan langsung dipakai buat
-            // kirim WA selamat datang (sendWhatsapp() di bawah) — kalau
-            // kosong, WA welcome message-nya gagal terkirim ke nomor kosong.
+            // Wajib diisi di form dan dipakai untuk WA selamat datang.
             'handphone' => ['required', 'string', 'max:20'],
             'password' => ['required', 'confirmed', Rules\Password::defaults()],
             'cf-turnstile-response' => [new Turnstile()],
         ]);
 
-        $user = User::create([
-            'name' => $request->name,
-            'email' => $request->email,
-            'handphone' => $request->handphone,
-            'password' => Hash::make($request->password),
-            // Akun baru selalu dimulai inactive. Baru berubah menjadi active
-            // otomatis lewat VerifyEmailController setelah link verifikasi
-            // di email diklik.
-            'status' => User::STATUS_INACTIVE,
-        ]);
+        // User + role dibuat bersamaan: kalau salah satu gagal, tidak ada akun setengah jadi.
+        $user = DB::transaction(function () use ($request) {
+            $user = User::create([
+                'name' => $request->name,
+                'email' => $request->email,
+                'handphone' => $request->handphone,
+                'password' => Hash::make($request->password),
+                // Akun baru selalu inactive, baru active setelah link verifikasi
+                // di email diklik (VerifyEmailController).
+                'status' => User::STATUS_INACTIVE,
+            ]);
 
-        RoleUser::create([
-            'user_id' => $user->id,
-            'role_id' => $this->resolveStudentRoleId(),
-            'status' => RoleUser::STATUS_ACTIVE,
-        ]);
+            RoleUser::create([
+                'user_id' => $user->id,
+                'role_id' => $this->resolveStudentRoleId(),
+                'status' => RoleUser::STATUS_ACTIVE,
+            ]);
 
-        // FIX keamanan (14 Oktober 2026): Student (CRM) TIDAK lagi dicari/
-        // ditautkan di sini. Dulu dicocokkan lewat HP ATAU email sebelum email
-        // terverifikasi -- siapa pun bisa daftar pakai HP orang lain lalu
-        // otomatis "memiliki" data Student orang itu. Sekarang ditautkan
-        // setelah link verifikasi diklik (VerifyEmailController), lewat
-        // StudentIdentityResolver::resolveForUser() (cocok lewat email saja).
+            return $user;
+        });
 
-        // Kirim WhatsApp
-        $this->sendWhatsapp(
-            $user->handphone,
-            "Halo {$user->name},\n\nTerima kasih telah mendaftar di aplikasi kami.\n\nSelamat bergabung 😊"
-        );
+        // FIX keamanan (14 Oktober 2026): Student (CRM) TIDAK ditautkan di sini,
+        // baru setelah email terverifikasi (VerifyEmailController ->
+        // StudentIdentityResolver::resolveForUser(), cocok lewat email saja).
 
-        // Event ini otomatis mengirimkan email verifikasi ke user (lewat
-        // listener bawaan Laravel), karena User sekarang implements
-        // MustVerifyEmail.
-        event(new Registered($user));
-
-        // Tetap login-kan user supaya link verifikasi (yang route-nya
-        // butuh middleware 'auth') bisa langsung dibuka. Tapi selama status
-        // masih inactive, middleware 'verified' pada route dashboard akan
-        // otomatis mengarahkan user ke halaman "cek email Anda" sampai dia
-        // klik link verifikasi.
+        // Login-kan dulu supaya link verifikasi (route butuh 'auth') bisa langsung dibuka.
+        // Selama belum verifikasi, middleware 'verified' mengarahkan ke halaman "cek email".
         Auth::login($user);
 
-        return redirect()
-            ->route('verification.notice')
-            ->with('status', 'Registrasi berhasil! Kami sudah mengirimkan email verifikasi ke ' . $user->email . '. Silakan cek email Anda (termasuk folder spam) dan klik link verifikasi untuk mengaktifkan akun.');
+        // Email verifikasi (listener bawaan Laravel, karena User implements MustVerifyEmail).
+        // FIX 29 Okt 2026: kalau SMTP gagal, dulu user melihat error 500 padahal akunnya
+        // sudah terbuat (daftar ulang ditolak "email sudah terdaftar"). Sekarang tetap
+        // lanjut ke halaman verifikasi dengan pesan untuk menekan "Kirim Ulang".
+        try {
+            event(new Registered($user));
+            $flash = ['status' => 'Registrasi berhasil! Kami sudah mengirimkan email verifikasi ke ' . $user->email . '. Silakan cek email Anda (termasuk folder spam) dan klik link verifikasi untuk mengaktifkan akun.'];
+        } catch (Throwable $e) {
+            Log::error('[Register] Email verifikasi gagal dikirim', [
+                'user_id' => $user->id,
+                'email' => $user->email,
+                'error' => $e->getMessage(),
+            ]);
+            $flash = ['warning' => 'Akun Anda sudah terdaftar, tetapi email verifikasi belum berhasil terkirim. Silakan tekan tombol "Kirim Ulang Email Verifikasi" di bawah beberapa saat lagi.'];
+        }
+
+        // WA selamat datang lewat gateway aktif (Konexa), sama seperti balasan quiz
+        // dan pengingat dokumen. FIX 29 Okt 2026: dulu menembak Wablas langsung dengan
+        // token lama di .env ("token invalid or device expired"), jadi tidak pernah
+        // terkirim. Dikirim setelah halaman tampil supaya register tidak menunggu WA.
+        $this->sendWelcomeWhatsappAfterResponse($user);
+
+        return redirect()->route('verification.notice')->with($flash);
     }
 
+    private function sendWelcomeWhatsappAfterResponse(User $user): void
+    {
+        $phone = trim((string) $user->handphone);
+        if ($phone === '') {
+            return;
+        }
 
-    // Fix (14 September 2026, permintaan user -- BUGFIX): dulu role_id di
-    // atas di-hardcode langsung sebagai string UUID. ID role itu ternyata
-    // dipakai sama di 3 tempat berbeda (di sini, GoogleAuthController, &
-    // StudentController::addUser() -- lihat catatan bugfix di
-    // StudentController) -- begitu role dengan ID itu di-EDIT namanya lewat
-    // halaman Roles (mis. tanpa sadar jadi "Sales"), SEMUA pendaftar baru di
-    // ketiga jalur itu ikut ke-assign role yang salah, karena ID-nya tidak
-    // berubah walau namanya sudah beda. Sekarang dicari dinamis lewat slug
-    // "student".
-    //
-    // FIX v2 (permintaan user, 16 September 2026 -- BUGFIX): abort(500) di
-    // atas ternyata KEJADIAN beneran -- slug "student" juga bisa hilang
-    // diam-diam kalau admin edit NAMA role itu lewat halaman Roles tanpa
-    // isi field Slug secara eksplisit (slug ikut di-generate ulang dari nama
-    // baru, lihat RoleController::update()), jadi semua pendaftar baru (di
-    // sini, GoogleAuthController, & tombol "+ User" di StudentController)
-    // ikut error 500. Sekarang role-nya di-auto-provision (dibuat sekali
-    // kalau belum/tidak ketemu) supaya ketiga jalur ini tidak lagi
-    // bergantung ke 1 baris role yang bisa berubah sewaktu-waktu.
+        $message = "Halo {$user->name},\n\nTerima kasih telah mendaftar di aplikasi kami.\n\nSelamat bergabung 😊";
+
+        app()->terminating(function () use ($phone, $message) {
+            try {
+                (new WhatsappMessenger())->send($phone, $message);
+            } catch (Throwable $e) {
+                Log::error('[Register] WA selamat datang gagal', ['phone' => $phone, 'error' => $e->getMessage()]);
+            }
+        });
+    }
+
+    // Fix (14 & 16 September 2026, BUGFIX): role student dicari lewat slug dan dibuat
+    // otomatis kalau belum ada, supaya tidak bergantung ke ID hardcode atau slug yang
+    // bisa berubah saat nama role diedit di halaman Roles. Pola yang sama dipakai di
+    // GoogleAuthController & StudentController::addUser().
     private function resolveStudentRoleId(): string
     {
         return Role::firstOrCreate(
@@ -123,40 +131,5 @@ class RegisteredUserController extends Controller
                 'status' => Role::STATUS_ACTIVE,
             ]
         )->id;
-    }
-
-    private function sendWhatsapp($phone, $message)
-    {
-        try {
-
-            $response = Http::withHeaders([
-                'Authorization' => env('WABLAS_TOKEN') . '.' . env('WABLAS_SECRET'),
-                'Content-Type' => 'application/json',
-            ])->post('https://smg.wablas.com/api/v2/send-message', [
-                        'data' => [
-                            [
-                                'phone' => $phone,
-                                'message' => $message,
-                            ]
-                        ]
-                    ]);
-
-            // Simpan response ke log
-            Log::info('Wablas Response', [
-                'phone' => $phone,
-                'body' => $response->json(),
-            ]);
-
-            return $response->json();
-
-        } catch (\Exception $e) {
-
-            Log::error('Wablas Error', [
-                'phone' => $phone,
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
     }
 }

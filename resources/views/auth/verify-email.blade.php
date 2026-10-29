@@ -65,6 +65,13 @@
                                 </div>
                             @endif
 
+                            @if (session('warning'))
+                                <div class="alert alert-warning alert-dismissible fade show mt-4" role="alert">
+                                    {{ session('warning') }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                                </div>
+                            @endif
+
                             <div class="mt-4 d-grid gap-2">
                                 <form method="POST" action="{{ route('verification.send') }}">
                                     @csrf
