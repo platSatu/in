@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\AcademicCalendar;
+use App\Services\Dashboard\DashboardStats;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 
 class DashboardController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $user = Auth::user();
 
@@ -70,6 +72,17 @@ class DashboardController extends Controller
         // resources/views/student-portal/inastudy/index.blade.php), dituju
         // langsung lewat menu "InaStudy" di sidebar -- supaya halaman
         // Dashboard ini murni cuma Academic Calendar seperti semula.
-        return view('dashboard.index', compact('calendars'));
+        // Tab "Chart" (29 Oktober 2026, permintaan user): untuk semua role
+        // SELAIN student. Tiap bagian chart hanya muncul kalau user punya izin
+        // menu terkait (lihat App\Services\Dashboard\DashboardStats). Student
+        // tidak punya izin menu admin sama sekali, jadi $sections kosong dan
+        // halaman tetap seperti sebelumnya (hanya Academic Calendar).
+        $period = DashboardStats::normalizePeriod($request->query('months'));
+        $stats = new DashboardStats($user, $period);
+        $sections = $stats->sections();
+        $monthLabels = $sections ? $stats->monthLabels() : [];
+        $periodOptions = DashboardStats::PERIOD_OPTIONS;
+
+        return view('dashboard.index', compact('calendars', 'sections', 'monthLabels', 'period', 'periodOptions'));
     }
 }

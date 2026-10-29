@@ -10,6 +10,32 @@
     murni cuma Academic Calendar.
 --}}
 
+{{--
+    29 Oktober 2026: role selain student melihat 2 tab -- "Chart" (ringkasan
+    sesuai hak akses, lihat dashboard/_charts.blade.php) dan "Kalender"
+    (Academic Calendar seperti sebelumnya). Student (tidak punya izin menu
+    admin, $sections kosong) tetap hanya melihat kalender tanpa tab.
+--}}
+@if (!empty($sections))
+<div class="col-12">
+    <ul class="nav nav-tabs mb-3" id="dashboardTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="dash-tab-chart" data-bs-toggle="tab" data-bs-target="#dash-pane-chart" type="button" role="tab" aria-controls="dash-pane-chart" aria-selected="true">
+                <i class="bi bi-bar-chart-line"></i> Chart
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="dash-tab-calendar" data-bs-toggle="tab" data-bs-target="#dash-pane-calendar" type="button" role="tab" aria-controls="dash-pane-calendar" aria-selected="false">
+                <i class="bi bi-calendar3"></i> Kalender
+            </button>
+        </li>
+    </ul>
+    <div class="tab-content">
+        <div class="tab-pane fade show active" id="dash-pane-chart" role="tabpanel" aria-labelledby="dash-tab-chart">
+            @include('dashboard._charts')
+        </div>
+        <div class="tab-pane fade" id="dash-pane-calendar" role="tabpanel" aria-labelledby="dash-tab-calendar">
+@endif
 <div class="row">
     <div class="col-12">
         <div class="widget-content widget-content-area br-8 mb-4">
@@ -87,6 +113,11 @@
         </div>
     </div>
 </div>
+@if (!empty($sections))
+        </div>
+    </div>
+</div>
+@endif
 
 <style>
 .calendar-grid {
@@ -322,6 +353,21 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     renderCalendar();
+
+    // Tab terakhir yang dibuka (Chart/Kalender) diingat di browser ini.
+    const tabButtons = document.querySelectorAll('#dashboardTabs [data-bs-toggle="tab"]');
+    tabButtons.forEach(function (btn) {
+        btn.addEventListener('shown.bs.tab', function () {
+            try { localStorage.setItem('ina.dashboard.tab', btn.id); } catch (e) {}
+        });
+    });
+    try {
+        const saved = localStorage.getItem('ina.dashboard.tab');
+        const savedBtn = saved ? document.getElementById(saved) : null;
+        if (savedBtn && window.bootstrap && !new URLSearchParams(location.search).has('months')) {
+            bootstrap.Tab.getOrCreateInstance(savedBtn).show();
+        }
+    } catch (e) {}
 });
 </script>
 
