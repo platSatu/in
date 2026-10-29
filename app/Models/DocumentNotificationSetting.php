@@ -18,8 +18,13 @@ class DocumentNotificationSetting extends Model
 {
     use HasUuids;
 
-    /** Pilihan jadwal pengingat: H+n hari sejak student selesai mengisi Formulir. */
-    public const REMINDER_DAY_OPTIONS = [1, 5, 7, 10];
+    /** Jadwal pengingat awal: H+n hari sejak student selesai mengisi Formulir (bisa diubah admin). */
+    public const DEFAULT_REMINDER_DAYS = [1, 5, 7, 10];
+
+    public const MAX_REMINDER_DAY = 60;
+
+    /** Pilihan jam kirim pengingat (WIB). */
+    public const REMINDER_HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 
     protected $table = 'document_notification_settings';
 
@@ -32,6 +37,7 @@ class DocumentNotificationSetting extends Model
         'reminder_whatsapp',
         'reminder_email',
         'reminder_days',
+        'reminder_hour',
         'complete_notify_student',
         'complete_notify_admin',
         'updated_by',
@@ -46,6 +52,7 @@ class DocumentNotificationSetting extends Model
         'reminder_whatsapp' => 'boolean',
         'reminder_email' => 'boolean',
         'reminder_days' => 'array',
+        'reminder_hour' => 'integer',
         'complete_notify_student' => 'boolean',
         'complete_notify_admin' => 'boolean',
     ];
@@ -53,12 +60,18 @@ class DocumentNotificationSetting extends Model
     public static function current(): self
     {
         return static::query()->oldest('created_at')->first()
-            ?? static::create(['reminder_days' => self::REMINDER_DAY_OPTIONS]);
+            ?? static::create(['reminder_days' => self::DEFAULT_REMINDER_DAYS, 'reminder_hour' => 10]);
     }
 
     public function updatedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /** Hari pengingat terurut, mis. [1, 5, 7, 10]. */
+    public function reminderDays(): array
+    {
+        return collect($this->reminder_days ?? [])->map(fn ($d) => (int) $d)->filter(fn ($d) => $d >= 1)->unique()->sort()->values()->all();
     }
 
     /** Nomor WA admin yang aktif (kosong kalau saklar WhatsApp admin mati). */

@@ -21,7 +21,8 @@ class StudentFileNotificationController extends Controller
     {
         return view('student.files.notifications', [
             'setting' => DocumentNotificationSetting::current()->load('updatedBy'),
-            'dayOptions' => DocumentNotificationSetting::REMINDER_DAY_OPTIONS,
+            'hourOptions' => DocumentNotificationSetting::REMINDER_HOURS,
+            'maxDay' => DocumentNotificationSetting::MAX_REMINDER_DAY,
             'canEdit' => (bool) $request->user()?->canAccessPermission('student.files', 'edit'),
         ]);
     }
@@ -34,6 +35,8 @@ class StudentFileNotificationController extends Controller
                 ->map(fn ($n) => $this->normalizePhone((string) $n))->filter()->unique()->values()->all(),
             'admin_emails' => collect($request->input('admin_emails', []))
                 ->map(fn ($e) => strtolower(trim((string) $e)))->filter()->unique()->values()->all(),
+            'reminder_days' => collect($request->input('reminder_days', []))
+                ->filter(fn ($d) => trim((string) $d) !== '')->values()->all(),
         ]);
 
         $data = $request->validate([
@@ -46,8 +49,9 @@ class StudentFileNotificationController extends Controller
             'reminder_enabled' => ['boolean'],
             'reminder_whatsapp' => ['boolean'],
             'reminder_email' => ['boolean'],
-            'reminder_days' => ['array', Rule::requiredIf($request->boolean('reminder_enabled'))],
-            'reminder_days.*' => [Rule::in(DocumentNotificationSetting::REMINDER_DAY_OPTIONS)],
+            'reminder_days' => ['array', 'max:10', Rule::requiredIf($request->boolean('reminder_enabled'))],
+            'reminder_days.*' => ['integer', 'min:1', 'max:'.DocumentNotificationSetting::MAX_REMINDER_DAY],
+            'reminder_hour' => ['required', 'integer', Rule::in(DocumentNotificationSetting::REMINDER_HOURS)],
             'complete_notify_student' => ['boolean'],
             'complete_notify_admin' => ['boolean'],
         ], [
@@ -55,7 +59,11 @@ class StudentFileNotificationController extends Controller
             'admin_whatsapp_numbers.*.regex' => 'Nomor WhatsApp admin tidak valid. Contoh: 081234567890.',
             'admin_emails.required' => 'Isi minimal 1 email admin, atau matikan saklarnya.',
             'admin_emails.*.email' => 'Format email admin tidak valid.',
-            'reminder_days.required' => 'Pilih minimal 1 jadwal pengingat, atau matikan pengingatnya.',
+            'reminder_days.required' => 'Isi minimal 1 jadwal pengingat, atau matikan pengingatnya.',
+            'reminder_days.max' => 'Maksimal 10 jadwal pengingat.',
+            'reminder_days.*.integer' => 'Jadwal pengingat harus berupa angka hari, mis. 1, 5, 7.',
+            'reminder_days.*.min' => 'Jadwal pengingat paling cepat H+1.',
+            'reminder_days.*.max' => 'Jadwal pengingat paling lama H+'.DocumentNotificationSetting::MAX_REMINDER_DAY.'.',
         ]);
 
         if ($request->boolean('reminder_enabled') && ! $request->boolean('reminder_whatsapp') && ! $request->boolean('reminder_email')) {
@@ -73,6 +81,7 @@ class StudentFileNotificationController extends Controller
             'reminder_whatsapp' => $request->boolean('reminder_whatsapp'),
             'reminder_email' => $request->boolean('reminder_email'),
             'reminder_days' => $days,
+            'reminder_hour' => (int) $data['reminder_hour'],
             'complete_notify_student' => $request->boolean('complete_notify_student'),
             'complete_notify_admin' => $request->boolean('complete_notify_admin'),
             'updated_by' => $request->user()->id,

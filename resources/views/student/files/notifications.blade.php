@@ -6,7 +6,8 @@
 @php
     $numbers = old('admin_whatsapp_numbers', $setting->admin_whatsapp_numbers ?: ['']);
     $emails = old('admin_emails', $setting->admin_emails ?: ['']);
-    $days = array_map('intval', old('reminder_days', $setting->reminder_days ?? []));
+    $days = old('reminder_days', $setting->reminderDays() ?: \App\Models\DocumentNotificationSetting::DEFAULT_REMINDER_DAYS);
+    $hour = (int) old('reminder_hour', $setting->reminder_hour ?? 10);
     $on = fn (string $field) => (bool) old($field, $setting->{$field});
 @endphp
 
@@ -120,7 +121,7 @@
             <div class="card-body p-4">
                 <h5 class="mb-1"><i class="bi bi-alarm"></i> Pengingat ke Student yang Dokumennya Belum Lengkap</h5>
                 <p class="text-muted small mb-4">
-                    Student diingatkan secara otomatis sekitar jam 10.00 WIB, dihitung sejak student selesai mengisi Formulir.
+                    Student diingatkan secara otomatis pada jam yang dipilih, dihitung sejak student selesai mengisi Formulir.
                     Pengingat berhenti sendiri begitu semua dokumen wajib sudah diunggah.
                 </p>
 
@@ -148,12 +149,24 @@
                         </div>
 
                         <label class="form-label small text-muted d-block">Jadwal pengingat (hari setelah Formulir diisi)</label>
-                        <div class="d-flex flex-wrap gap-2">
-                            @foreach ($dayOptions as $day)
-                                <input type="checkbox" class="btn-check" name="reminder_days[]" value="{{ $day }}" id="reminder_day_{{ $day }}" @checked(in_array($day, $days, true))>
-                                <label class="btn btn-outline-primary" for="reminder_day_{{ $day }}">H+{{ $day }}</label>
+                        <div class="d-flex flex-wrap gap-2 align-items-center mb-2" data-list="day">
+                            @foreach ($days as $day)
+                                <div class="input-group input-group-sm" style="width: 130px;" data-row>
+                                    <span class="input-group-text">H+</span>
+                                    <input type="number" name="reminder_days[]" value="{{ $day }}" min="1" max="{{ $maxDay }}" class="form-control text-center">
+                                    <button type="button" class="btn btn-outline-danger" data-remove title="Hapus jadwal">&times;</button>
+                                </div>
                             @endforeach
                         </div>
+                        <button type="button" class="btn btn-sm btn-outline-primary mb-3" data-add="day"><i class="bi bi-plus"></i> Tambah jadwal</button>
+                        <div class="form-text mt-0 mb-3">Contoh: H+1 = sehari setelah student mengisi Formulir. Maksimal 10 jadwal, paling lama H+{{ $maxDay }}.</div>
+
+                        <label for="reminder_hour" class="form-label small text-muted d-block">Jam kirim (WIB)</label>
+                        <select id="reminder_hour" name="reminder_hour" class="form-select form-select-sm" style="width: 130px;">
+                            @foreach ($hourOptions as $option)
+                                <option value="{{ $option }}" @selected($hour === $option)>{{ sprintf('%02d.00', $option) }}</option>
+                            @endforeach
+                        </select>
                     </div>
                 </div>
 
@@ -227,6 +240,13 @@
             <span class="input-group-text"><i class="bi bi-whatsapp"></i></span>
             <input type="text" name="admin_whatsapp_numbers[]" class="form-control" placeholder="mis. 081234567890" inputmode="tel">
             <button type="button" class="btn btn-outline-danger" data-remove title="Hapus nomor">&times;</button>
+        </div>
+    </template>
+    <template id="row-day">
+        <div class="input-group input-group-sm" style="width: 130px;" data-row>
+            <span class="input-group-text">H+</span>
+            <input type="number" name="reminder_days[]" min="1" max="{{ $maxDay }}" class="form-control text-center">
+            <button type="button" class="btn btn-outline-danger" data-remove title="Hapus jadwal">&times;</button>
         </div>
     </template>
     <template id="row-email">

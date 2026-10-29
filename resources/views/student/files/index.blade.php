@@ -76,6 +76,7 @@
                                 <th>Branch</th>
                                 <th class="text-center">Aplikasi</th>
                                 <th class="text-center">File</th>
+                                <th>Kelengkapan</th>
                                 <th>Ukuran</th>
                                 <th>Upload Terakhir</th>
                                 <th class="no-content text-center">Action</th>
@@ -98,6 +99,16 @@
                                     <td>{{ $student->companyBranch->name ?? '-' }}</td>
                                     <td class="text-center">{{ $summary['applications'] }}</td>
                                     <td class="text-center"><span class="badge badge-primary">{{ $summary['files'] }}</span></td>
+                                    <td class="text-nowrap">
+                                        @php($status = $completeness[$student->id])
+                                        @if ($status['status'] === 'complete')
+                                            <span class="badge badge-success">✅ Lengkap</span>
+                                        @elseif ($status['status'] === 'incomplete')
+                                            <span class="badge badge-warning" title="Dokumen wajib yang belum diunggah / ditolak">⏳ Kurang {{ $status['missing'] }}</span>
+                                        @else
+                                            <span class="text-muted small">-</span>
+                                        @endif
+                                    </td>
                                     <td class="text-nowrap">{{ $summary['size'] ? \Illuminate\Support\Number::fileSize($summary['size'], 1) : '-' }}</td>
                                     <td class="text-nowrap">
                                         {{ $summary['last'] ? \Illuminate\Support\Carbon::createFromTimestamp($summary['last'], config('app.timezone'))->translatedFormat('d M Y H:i') : '-' }}
@@ -111,7 +122,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center">
+                                    <td colspan="11" class="text-center">
                                         {{ $search !== '' ? 'Tidak ada student yang cocok dengan pencarian.' : 'Belum ada student yang mengunggah file.' }}
                                     </td>
                                 </tr>

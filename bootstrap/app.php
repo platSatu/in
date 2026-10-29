@@ -28,6 +28,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $schedule->command('teacher-honor:sync-periods')->hourly()->withoutOverlapping();
         // Backup database harian, hasilnya di Settings > Backup Database (14 terbaru disimpan).
         $schedule->command('db:backup')->dailyAt('01:00')->timezone('Asia/Jakarta')->withoutOverlapping();
+        // Pengingat dokumen student (Students > File Student > tab Notifikasi); jam kirimnya diatur di menu itu.
+        $schedule->command('student-documents:remind')->hourly()->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

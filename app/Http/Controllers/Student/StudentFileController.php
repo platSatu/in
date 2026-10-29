@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Student;
 
 use App\Http\Controllers\Controller;
 use App\Models\Student;
+use App\Services\InaStudy\DocumentCompleteness;
 use App\Services\InaStudy\StudentFiles;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -20,7 +21,7 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
  */
 class StudentFileController extends Controller
 {
-    public function index(Request $request, StudentFiles $files): View
+    public function index(Request $request, StudentFiles $files, DocumentCompleteness $completeness): View
     {
         $user = $request->user() ?? abort(401);
         $search = trim((string) $request->query('search'));
@@ -32,6 +33,8 @@ class StudentFileController extends Controller
             'students' => $students,
             'summaries' => $summaries,
             'numbers' => $students->getCollection()->mapWithKeys(fn ($student) => [$student->id => $files->applicationNumbers($student)]),
+            // Kelengkapan dokumen wajib (lihat App\Services\InaStudy\DocumentCompleteness).
+            'completeness' => $students->getCollection()->mapWithKeys(fn ($student) => [$student->id => $completeness->studentStatus($student)]),
             'search' => $search,
             'files' => $files,
         ]);

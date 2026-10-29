@@ -10,6 +10,7 @@ use App\Models\ApplicationFormDetail;
 use App\Models\ApplicationPayment;
 use App\Models\DocumentType;
 use App\Models\UniversityApplication;
+use App\Services\InaStudy\DocumentCompleteness;
 use App\Services\InaStudy\DocumentNotifier;
 use App\Services\InaStudy\MultipleDocumentUploader;
 use Illuminate\Http\RedirectResponse;
@@ -279,9 +280,12 @@ class ApplicationDocumentController extends Controller
 
         app()->terminating(function () use ($applicationId, $labels) {
             try {
-                $fresh = UniversityApplication::with(['student', 'university'])->find($applicationId);
+                $fresh = UniversityApplication::with(['student', 'university', 'documents'])->find($applicationId);
                 if ($fresh) {
-                    app(DocumentNotifier::class)->documentsUploaded($fresh, $labels);
+                    $notifier = app(DocumentNotifier::class);
+                    $notifier->documentsUploaded($fresh, $labels);
+                    // Card 3: kalau upload ini membuat dokumen wajib lengkap, kirim terima kasih & info admin (sekali).
+                    $notifier->notifyIfComplete($fresh, app(DocumentCompleteness::class));
                 }
             } catch (\Throwable $e) {
                 report($e);
