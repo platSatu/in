@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\StudentIdentityResolver;
 use Illuminate\Auth\Events\PasswordReset;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -47,6 +49,28 @@ class NewPasswordController extends Controller
                     'password' => Hash::make($request->password),
                     'remember_token' => Str::random(60),
                 ])->save();
+
+                // FIX 29 Okt 2026: password baru -> semua sesi login lama di perangkat
+                // lain ikut dikeluarkan (mis. kalau password lama sempat bocor).
+                $user->logoutEverywhere();
+
+                // FIX 29 Okt 2026: link reset dibuka dari inbox email ini, jadi
+                // kepemilikan email sudah terbukti. Akun yang belum sempat verifikasi
+                // langsung diverifikasi & diaktifkan (sama seperti VerifyEmailController),
+                // supaya tidak tertahan di halaman "cek email". Akun yang sudah
+                // terverifikasi tidak diubah statusnya -- akun yang dinonaktifkan
+                // admin tetap nonaktif.
+                if (! $user->hasVerifiedEmail()) {
+                    if ($user->markEmailAsVerified()) {
+                        event(new Verified($user));
+                    }
+
+                    $user->forceFill(['status' => User::STATUS_ACTIVE])->save();
+
+                    if ($user->hasRole('student')) {
+                        (new StudentIdentityResolver())->resolveForUser($user);
+                    }
+                }
 
                 event(new PasswordReset($user));
             }

@@ -28,13 +28,17 @@ Route::prefix('auth')->middleware('guest')->group(function () {
     Route::get('forgot-password', [PasswordResetLinkController::class, 'create'])
         ->name('password.request');
 
+    // Maks 5 permintaan link reset per menit per IP.
     Route::post('forgot-password', [PasswordResetLinkController::class, 'store'])
+        ->middleware('throttle:5,1')
         ->name('password.email');
 
     Route::get('reset-password/{token}', [NewPasswordController::class, 'create'])
         ->name('password.reset');
 
+    // Maks 10 percobaan ganti password per menit per IP (mencegah tebak token).
     Route::post('reset-password', [NewPasswordController::class, 'store'])
+        ->middleware('throttle:10,1')
         ->name('password.store');
 
     // Login / register pakai Google (Gmail). Facebook login sudah dihapus.
