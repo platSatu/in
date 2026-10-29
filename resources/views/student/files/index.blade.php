@@ -5,6 +5,9 @@
 {{-- Students > File Student (App\Http\Controllers\Student\StudentFileController). --}}
 <div class="middle-content container-xxl p-0">
 
+    <div class="layout-top-spacing"></div>
+    @include('student.files._tabs', ['active' => 'files'])
+
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             {{ session('success') }}
@@ -18,7 +21,7 @@
         </div>
     @endif
 
-    <div class="row layout-top-spacing">
+    <div class="row">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
             <div class="widget-content widget-content-area br-8 p-4">
 

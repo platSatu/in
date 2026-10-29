@@ -49,6 +49,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\BackendInvitationController;
 use App\Http\Controllers\Student\StudentController;
 use App\Http\Controllers\Student\StudentFileController;
+use App\Http\Controllers\Student\StudentFileNotificationController;
 use App\Http\Controllers\StudentPortal\ApplyController;
 use App\Http\Controllers\StudentPortal\ApplicationController;
 use App\Http\Controllers\StudentPortal\ApplicationDocumentController;
@@ -952,6 +953,11 @@ Route::middleware(['auth', 'permission:student.files'])->prefix('dashboard/super
     Route::get('/download-all', [StudentFileController::class, 'downloadAll'])->middleware('throttle:5,1')->name('student.files.download-all');
     Route::post('/download-selected', [StudentFileController::class, 'downloadSelected'])->middleware('throttle:10,1')->name('student.files.download-selected');
     Route::get('/{student}/download', [StudentFileController::class, 'download'])->middleware('throttle:30,1')->name('student.files.download');
+    // Tab Notifikasi: lihat = semua yang punya akses File Student, simpan = butuh akses kelola.
+    Route::get('/notifications', [StudentFileNotificationController::class, 'edit'])->name('student.files.notifications');
+});
+Route::middleware(['auth', 'permission:student.files,edit'])->prefix('dashboard/superadmin/student/files')->group(function () {
+    Route::put('/notifications', [StudentFileNotificationController::class, 'update'])->name('student.files.notifications.update');
 });
 
 // student.student: show (GET /{id}) didaftarkan asli SETELAH create/store,
