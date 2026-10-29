@@ -3,10 +3,7 @@
 namespace App\Services\Dashboard;
 
 use App\Helpers\DataScope;
-use App\Models\ApplicationPayment;
 use App\Models\ClassSession;
-use App\Models\CoursePackagePurchase;
-use App\Models\FormPayment;
 use App\Models\Student;
 use App\Models\UniversityApplication;
 use App\Models\User;
@@ -21,11 +18,9 @@ use Illuminate\Database\Eloquent\Builder;
  * yang di menunya sendiri tidak boleh dilihat:
  *   - Student & leads   : izin 'student.student', cakupan DataScope (company/branch/divisi/self).
  *   - Aplikasi kampus   : izin 'quiz.university-application', hanya student yang terlihat (visibleStudentIds).
- *   - Pendapatan        : per sumber, masing-masing ikut izin & cakupan menunya:
- *                         biaya aplikasi (quiz.university-application), paket kursus (course.report,
- *                         sama seperti menu Laporan = seluruh perusahaan), form berbayar (quiz.form).
  *   - Kelas & sesi      : izin 'class-session', dibatasi cabang (visibleBranchIds).
  * Bagian yang tidak boleh dilihat bernilai null dan tidak ditampilkan.
+ * Pendapatan sengaja tidak ditampilkan di dashboard (permintaan user, 29 Okt 2026).
  */
 class DashboardStats
 {
@@ -81,7 +76,6 @@ class DashboardStats
         return array_filter([
             'students' => $this->students(),
             'applications' => $this->applications(),
-            'revenue' => $this->revenue(),
             'classes' => $this->classes(),
         ]);
     }
@@ -189,74 +183,6 @@ class DashboardStats
         ];
     }
 
-    public function revenue(): ?array
-    {
-        $series = [];
-
-        if ($this->user->canAccessPermission('quiz.university-application')) {
-            $applicationPaid = fn () => ApplicationPayment::query()
-                ->where('application_payments.status', ApplicationPayment::STATUS_PAID)
-                ->whereHas('application', fn (Builder $q) => $this->scopeToVisibleStudents($q, 'student_id'));
-
-            $series['Biaya Pendaftaran Kampus'] = $this->perMonth(
-                $applicationPaid()->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE),
-                'application_payments.paid_at',
-                'application_payments.amount'
-            );
-            $series['Biaya Keberangkatan'] = $this->perMonth(
-                $applicationPaid()->where('purpose', ApplicationPayment::PURPOSE_DEPARTURE_FEE),
-                'application_payments.paid_at',
-                'application_payments.amount'
-            );
-        }
-
-        if ($this->user->canAccessPermission('course.report')) {
-            // Sama dengan menu Laporan: pembelian paket selesai, tanpa klaim trial gratis.
-            $series['Paket Kursus'] = $this->perMonth(
-                CoursePackagePurchase::query()
-                    ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
-                    ->where('source', '!=', CoursePackagePurchase::SOURCE_TRIAL_CLAIM),
-                'course_package_purchases.created_at',
-                'course_package_purchases.price_paid'
-            );
-        }
-
-        if ($this->user->canAccessPermission('quiz.form')) {
-            $formIds = DataScope::visibleFormIds($this->user);
-            $series['Form Berbayar'] = $this->perMonth(
-                FormPayment::query()
-                    ->where('status', 'paid')
-                    ->when($formIds !== null, fn (Builder $q) => $q->whereIn('form_id', $formIds)),
-                'form_payments.paid_at',
-                'form_payments.amount'
-            );
-        }
-
-        if ($series === []) {
-            return null;
-        }
-
-        // Sumber tanpa pemasukan sama sekali di periode ini tidak ditampilkan,
-        // supaya warna chart batang & donut "Per sumber" tetap sama urutannya.
-        $nonEmpty = array_filter($series, fn (array $values) => array_sum($values) > 0);
-        if ($nonEmpty !== []) {
-            $series = $nonEmpty;
-        }
-
-        $lastIndex = count($this->monthKeys()) - 1;
-        $thisMonth = array_sum(array_map(fn (array $values) => $values[$lastIndex] ?? 0, $series));
-        $period = array_sum(array_map('array_sum', $series));
-
-        return [
-            'kpi' => [
-                'this_month' => $thisMonth,
-                'period' => $period,
-            ],
-            'series' => collect($series)->map(fn ($data, $name) => ['name' => $name, 'data' => $data])->values()->all(),
-            'by_source' => $this->toChart(collect($series)->map(fn ($values) => array_sum($values))->filter()),
-        ];
-    }
-
     public function classes(): ?array
     {
         if (! $this->user->canAccessPermission('class-session')) {
@@ -294,23 +220,21 @@ class DashboardStats
     }
 
     /**
-     * Jumlah (COUNT) atau total (SUM $sumColumn) per bulan dalam periode, bulan kosong = 0.
+     * Jumlah per bulan dalam periode, bulan kosong = 0.
      *
-     * @return array<int, float|int>
+     * @return array<int, int>
      */
-    private function perMonth(Builder $query, string $dateColumn, ?string $sumColumn = null): array
+    private function perMonth(Builder $query, string $dateColumn): array
     {
-        $aggregate = $sumColumn ? "COALESCE(SUM({$sumColumn}), 0)" : 'COUNT(*)';
-
         $rows = $query->toBase()
             ->whereNotNull($dateColumn)
             ->where($dateColumn, '>=', $this->start)
-            ->selectRaw("DATE_FORMAT({$dateColumn}, '%Y-%m') as ym, {$aggregate} as total")
+            ->selectRaw("DATE_FORMAT({$dateColumn}, '%Y-%m') as ym, COUNT(*) as total")
             ->groupBy('ym')
             ->pluck('total', 'ym');
 
         return array_map(
-            fn (string $ym) => $sumColumn ? (float) ($rows[$ym] ?? 0) : (int) ($rows[$ym] ?? 0),
+            fn (string $ym) => (int) ($rows[$ym] ?? 0),
             $this->monthKeys()
         );
     }

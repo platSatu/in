@@ -60,21 +60,6 @@
         </div>
     @endisset
 
-    @isset($sections['revenue'])
-        @php($r = $sections['revenue'])
-        <div class="widget-content widget-content-area br-8 mb-4">
-            <h5 class="mb-3"><i class="bi bi-cash-stack"></i> Pendapatan</h5>
-            <div class="row g-3 mb-3">
-                <div class="col-12 col-md-6"><div class="dash-kpi"><span>Bulan ini</span><strong>Rp {{ number_format($r['kpi']['this_month'], 0, ',', '.') }}</strong></div></div>
-                <div class="col-12 col-md-6"><div class="dash-kpi"><span>Total {{ $period }} bulan</span><strong>Rp {{ number_format($r['kpi']['period'], 0, ',', '.') }}</strong></div></div>
-            </div>
-            <div class="row g-3">
-                <div class="col-lg-8"><h6 class="dash-chart-title">Pembayaran lunas per bulan</h6><div id="chart-revenue-month" class="dash-chart"></div></div>
-                <div class="col-lg-4"><h6 class="dash-chart-title">Per sumber</h6><div id="chart-revenue-source" class="dash-chart"></div></div>
-            </div>
-        </div>
-    @endisset
-
     @isset($sections['classes'])
         @php($c = $sections['classes'])
         <div class="widget-content widget-content-area br-8 mb-4">
@@ -115,13 +100,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const sections = @json($sections);
     const palette = ['#c8102e', '#4361ee', '#00ab55', '#e2a03f', '#805dca', '#2196f3', '#e7515a', '#888ea8'];
     const num = new Intl.NumberFormat('id-ID');
-    const rupiah = v => 'Rp ' + num.format(Math.round(v));
-    const rupiahShort = v => {
-        if (v >= 1e9) return 'Rp ' + num.format(+(v / 1e9).toFixed(1)) + ' M';
-        if (v >= 1e6) return 'Rp ' + num.format(+(v / 1e6).toFixed(1)) + ' jt';
-        if (v >= 1e3) return 'Rp ' + num.format(+(v / 1e3).toFixed(0)) + ' rb';
-        return 'Rp ' + num.format(v);
-    };
     const base = { fontFamily: 'Nunito, sans-serif', toolbar: { show: false }, zoom: { enabled: false } };
 
     function hasData(values) { return (values || []).some(v => Number(v) > 0); }
@@ -144,8 +122,8 @@ document.addEventListener('DOMContentLoaded', function () {
             plotOptions: { bar: { borderRadius: 4, columnWidth: '50%' } },
             dataLabels: { enabled: false },
             legend: { position: 'top', show: series.length > 1 },
-            yaxis: { labels: { formatter: opts.money ? rupiahShort : (v => num.format(Math.round(v))) } },
-            tooltip: { y: { formatter: opts.money ? rupiah : (v => num.format(v)) } },
+            yaxis: { labels: { formatter: v => num.format(Math.round(v)) } },
+            tooltip: { y: { formatter: v => num.format(v) } },
             grid: { borderColor: '#eef0f3' },
         }, series.flatMap(s => s.data));
     }
@@ -157,7 +135,7 @@ document.addEventListener('DOMContentLoaded', function () {
             colors: opts.colors || palette,
             legend: { position: 'bottom' },
             dataLabels: { enabled: false },
-            tooltip: { y: { formatter: opts.money ? rupiah : (v => num.format(v)) } },
+            tooltip: { y: { formatter: v => num.format(v) } },
             plotOptions: { pie: { donut: { size: '62%' } } },
         }, data.values);
     }
@@ -184,10 +162,6 @@ document.addEventListener('DOMContentLoaded', function () {
         columns('chart-apps-month', [{ name: 'Aplikasi baru', data: sections.applications.per_month }], { colors: ['#4361ee'] });
         donut('chart-apps-status', sections.applications.status);
         hbar('chart-apps-univ', sections.applications.universities, '#00ab55');
-    }
-    if (sections.revenue) {
-        columns('chart-revenue-month', sections.revenue.series, { stacked: true, money: true });
-        donut('chart-revenue-source', sections.revenue.by_source, { money: true });
     }
     if (sections.classes) {
         columns('chart-classes-month', sections.classes.per_month, { colors: ['#e2a03f', '#00ab55'] });
