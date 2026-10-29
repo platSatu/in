@@ -43,6 +43,9 @@
                             </div>
                         </form>
                         @if ($students->total() > 0)
+                            <button type="submit" form="student-files-form" class="btn btn-sm btn-outline-primary text-nowrap" id="download-selected" disabled>
+                                <i class="bi bi-check2-square"></i> Download Terpilih (<span data-selected-count>0</span>)
+                            </button>
                             {{-- Ikut pencarian yang sedang aktif: kosongkan pencarian untuk mengunduh semua student. --}}
                             <a href="{{ route('student.files.download-all', array_filter(['search' => $search])) }}" class="btn btn-sm btn-primary text-nowrap"
                                 title="{{ $search !== '' ? 'Unduh semua student hasil pencarian ini' : 'Unduh file semua student dalam 1 ZIP' }}">
@@ -52,10 +55,18 @@
                     </div>
                 </div>
 
+                @error('ids') <div class="alert alert-danger">{{ $message }}</div> @enderror
+
+                {{-- Centang student lalu "Download Terpilih": 1 ZIP berisi folder student yang dipilih. --}}
+                <form method="POST" action="{{ route('student.files.download-selected') }}" id="student-files-form" class="m-0">
+                @csrf
                 <div class="table-responsive">
                     <table class="table dt-table-hover" style="width:100%">
                         <thead>
                             <tr>
+                                <th style="width: 40px;">
+                                    <input type="checkbox" class="form-check-input" data-check-all title="Centang semua di halaman ini" aria-label="Centang semua">
+                                </th>
                                 <th>No</th>
                                 <th>Nama Student</th>
                                 <th>No. Aplikasi</th>
@@ -71,6 +82,10 @@
                             @forelse ($students as $index => $student)
                                 @php($summary = $summaries[$student->id])
                                 <tr>
+                                    <td>
+                                        <input type="checkbox" class="form-check-input" name="ids[]" value="{{ $student->id }}" data-check-row
+                                            aria-label="Pilih {{ trim($student->first_name.' '.$student->last_name) }}">
+                                    </td>
                                     <td>{{ $students->firstItem() + $index }}</td>
                                     <td>
                                         <div class="fw-bold">{{ trim($student->first_name.' '.$student->last_name) ?: '-' }}</div>
@@ -93,7 +108,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="9" class="text-center">
+                                    <td colspan="10" class="text-center">
                                         {{ $search !== '' ? 'Tidak ada student yang cocok dengan pencarian.' : 'Belum ada student yang mengunggah file.' }}
                                     </td>
                                 </tr>
@@ -101,6 +116,7 @@
                         </tbody>
                     </table>
                 </div>
+                </form>
 
                 <div class="mt-4">
                     {{ $students->links('pagination::bootstrap-5') }}
@@ -111,5 +127,31 @@
     </div>
 
 </div>
+
+{{-- Layout ini tidak punya @stack('scripts'), jadi script ditaruh langsung di akhir konten. --}}
+<script>
+    (function () {
+        var all = document.querySelector('[data-check-all]');
+        var rows = Array.prototype.slice.call(document.querySelectorAll('[data-check-row]'));
+        var button = document.getElementById('download-selected');
+        var count = document.querySelector('[data-selected-count]');
+        if (!all || !button) return;
+
+        function refresh() {
+            var checked = rows.filter(function (r) { return r.checked; }).length;
+            count.textContent = checked;
+            button.disabled = checked === 0;
+            all.checked = checked > 0 && checked === rows.length;
+            all.indeterminate = checked > 0 && checked < rows.length;
+        }
+
+        all.addEventListener('change', function () {
+            rows.forEach(function (r) { r.checked = all.checked; });
+            refresh();
+        });
+        rows.forEach(function (r) { r.addEventListener('change', refresh); });
+        refresh();
+    })();
+</script>
 
 @endsection

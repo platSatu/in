@@ -59,6 +59,26 @@ class StudentFileController extends Controller
         return $this->send($request, $files, $students, 'file-student-'.now()->format('Y-m-d_His').'.zip');
     }
 
+    /** ZIP student yang dicentang di tabel (maksimal 200 sekali unduh). Hanya student dalam cakupan akses user. */
+    public function downloadSelected(Request $request, StudentFiles $files): BinaryFileResponse|RedirectResponse
+    {
+        $ids = $request->validate([
+            'ids' => ['required', 'array', 'max:200'],
+            'ids.*' => ['string', 'max:64'],
+        ], [
+            'ids.required' => 'Centang dulu student yang mau diunduh.',
+            'ids.max' => 'Maksimal 200 student sekali unduh.',
+        ])['ids'];
+
+        $students = $files->query($request->user())->whereKey($ids)->get();
+
+        if ($students->isEmpty()) {
+            return back()->with('error', 'Student yang dipilih tidak ditemukan atau tidak punya file.');
+        }
+
+        return $this->send($request, $files, $students, 'file-student-terpilih-'.now()->format('Y-m-d_His').'.zip');
+    }
+
     private function send(Request $request, StudentFiles $files, iterable $students, string $name): BinaryFileResponse|RedirectResponse
     {
         set_time_limit(0);
