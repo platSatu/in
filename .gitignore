@@ -24,3 +24,6 @@ Homestead.yaml
 Thumbs.db
 public/image/video_ina.mp4
 public/image/sakura.mov
+
+*.unused
+/nul

@@ -118,6 +118,8 @@ return [
     ['key' => 'settings.payment-gateway', 'label' => 'Payment Gateway', 'route' => 'settings.payment-gateway.index', 'group' => 'Settings', 'icon' => 'list'],
     ['key' => 'settings.whatsapp-gateway', 'label' => 'WhatsApp Gateway', 'route' => 'settings.whatsapp-gateway.index', 'group' => 'Settings', 'icon' => 'list'],
     ['key' => 'qrcodes', 'label' => 'Generate Link to Qrcode', 'route' => 'qrcodes.index', 'group' => 'Settings', 'icon' => 'list'],
+    // Backup database harian yang bisa diunduh (29 Oktober 2026). Lihat App\Services\Backup\DatabaseBackup.
+    ['key' => 'settings.backup', 'label' => 'Backup Database', 'route' => 'settings.backup.index', 'group' => 'Settings', 'icon' => 'list'],
 
     // ========= Terdaftar sbg permission, sengaja TANPA link sidebar =========
     // (route-nya sudah ada & tetap di-scope 'role:superadmin' style sebelumnya,

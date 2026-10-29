@@ -40,6 +40,7 @@
         'student.student' => 'Data Student',
         'student' => 'Data Student', // route student.student.* setelah dedupe segmen
         'settings.whatsapp-gateway' => 'WhatsApp Gateway',
+        'settings.backup' => 'Backup Database',
         'roleuser' => 'Role User',
         'historyuserlogin' => 'History User Login',
         'qrcodes' => 'QR Codes',

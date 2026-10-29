@@ -71,6 +71,7 @@ use App\Http\Controllers\Company\CompanyBranchController;
 use App\Http\Controllers\Company\CompanyDivisionController;
 use App\Http\Controllers\Settings\PaymentGatewayController;
 use App\Http\Controllers\Settings\WhatsappGatewayController;
+use App\Http\Controllers\Settings\DatabaseBackupController;
 use App\Http\Controllers\Settings\ZoomSettingController;
 use App\Http\Controllers\Zoom\MeetingController as ZoomMeetingController;
 use App\Http\Controllers\Zoom\MeetingSettingController as ZoomMeetingSettingController;
@@ -1033,6 +1034,15 @@ Route::middleware('auth')->group(function () {
     Route::post('/profile', [ProfileController::class, 'update'])->name('profile.update');
 });
 
+
+// Settings > Backup Database: lihat = daftar & unduh, edit = Backup Sekarang (lihat DatabaseBackupController).
+Route::middleware(['auth', 'permission:settings.backup'])->prefix('dashboard/superadmin/settings/backup')->group(function () {
+    Route::get('/', [DatabaseBackupController::class, 'index'])->name('settings.backup.index');
+    Route::get('/{file}/download', [DatabaseBackupController::class, 'download'])->name('settings.backup.download');
+});
+Route::middleware(['auth', 'permission:settings.backup,edit'])->prefix('dashboard/superadmin/settings/backup')->group(function () {
+    Route::post('/', [DatabaseBackupController::class, 'store'])->middleware('throttle:5,1')->name('settings.backup.store');
+});
 
 Route::middleware(['auth', 'permission:settings.zoom'])->prefix('dashboard/superadmin/settings/zoom')->group(function () {
     Route::get('/', [ZoomSettingController::class, 'index'])->name('settings.zoom.index');

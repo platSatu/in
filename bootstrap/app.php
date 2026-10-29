@@ -26,6 +26,8 @@ return Application::configure(basePath: dirname(__DIR__))
         // Periode Honor Pengajar 26 -> 25: buka tiap tanggal 26, tutup otomatis
         // kalau sudah bersih (lihat TeacherHonorService::syncPeriods()).
         $schedule->command('teacher-honor:sync-periods')->hourly()->withoutOverlapping();
+        // Backup database harian, hasilnya di Settings > Backup Database (14 terbaru disimpan).
+        $schedule->command('db:backup')->dailyAt('01:00')->timezone('Asia/Jakarta')->withoutOverlapping();
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //
