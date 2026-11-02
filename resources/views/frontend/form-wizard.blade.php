@@ -618,6 +618,16 @@
                 <div class="alert alert-danger">{{ $message }}</div>
             @enderror
 
+            {{-- === BATAS PESERTA ===
+                 Kuota penuh (lihat Form::isFull()): URL tetap bisa dibuka, tapi form &
+                 seluruh script wizard tidak dirender sama sekali -- hanya pesan ini. --}}
+            @if($quotaFull)
+                <div class="alert alert-warning text-center mb-0">
+                    <i class="bi bi-people-fill fs-3 d-block mb-2"></i>
+                    <strong>Kuota peserta sudah penuh.</strong><br>
+                    Terima kasih atas minat Anda. Pendaftaran untuk quiz ini sudah ditutup.
+                </div>
+            @else
             <div class="progress mb-3">
                 <div class="progress-bar" id="progressBar" style="width: 25%"></div>
             </div>
@@ -928,6 +938,7 @@
                 </div>
 
             </form>
+            @endif
 
         </div>
 
@@ -939,6 +950,7 @@
     &copy; {{ date('Y') }} InaStudy. All rights reserved.
 </footer>
 
+@unless($quotaFull)
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 <script>
     // Urutan step tergantung apakah form ini butuh pembayaran atau tidak, dan kalau
@@ -2355,6 +2367,7 @@
         }
     });
 </script>
+@endunless
 
 </body>
 

@@ -481,7 +481,13 @@ class FrontendController extends Controller
             }
         }
 
+        // === BATAS PESERTA ===
+        // Kuota penuh: URL tetap bisa dibuka, tapi yang tampil pesan "kuota penuh",
+        // bukan form (lihat @if($quotaFull) di frontend/form-wizard.blade.php).
+        $quotaFull = $selectedForm ? $selectedForm->isFull() : false;
+
         return view('frontend.form-wizard', compact(
+            'quotaFull',
             'forms',
             'selectedForm',
             'questions',
@@ -755,13 +761,17 @@ class FrontendController extends Controller
                 'student_id' => $student->id,
             ]);
 
-            // Create submission record
-            $submission = FormSubmission::create([
-                'user_id' => $student->id,
-                'form_id' => $validated['form_id'],
-                'status' => 'active',
+            // Create submission record -- lewat gerbang batas peserta (lihat createSubmissionWithinQuota()).
+            $submission = $this->createSubmissionWithinQuota($form, $student->id, (bool) $payment, [
                 'start_at' => $this->parseQuizStartedAt($request->input('quiz_started_at')),
             ]);
+
+            if (!$submission) {
+                Log::info('[FORM-WIZARD] Submit ditolak, kuota peserta penuh', ['form_id' => $form->id, 'student_id' => $student->id]);
+
+                return redirect($this->buildWizardRedirectRoute($form))
+                    ->withErrors(['submit' => 'Maaf, kuota peserta quiz ini sudah penuh, jadi jawaban Anda tidak dapat disimpan.']);
+            }
 
             Log::info('[FORM-WIZARD] FormSubmission dibuat', ['submission_id' => $submission->id]);
 
@@ -841,6 +851,33 @@ class FrontendController extends Controller
                 ->withErrors(['submit' => 'Maaf, terjadi kendala saat menyimpan jawaban Anda. Jawaban belum tersimpan -- silakan coba submit ulang. Kalau masih gagal, hubungi penyelenggara.'])
                 ->withInput();
         }
+    }
+
+    /**
+     * Buat FormSubmission hanya kalau kuota peserta masih ada (Form::admits()).
+     * Baris form dikunci di dalam transaksi pendek, jadi dua submit bersamaan
+     * di kursi terakhir tidak bisa sama-sama lolos. Form tanpa batas
+     * (max_participants null) langsung dibuatkan seperti sebelumnya.
+     *
+     * @return FormSubmission|null  null = kuota penuh
+     */
+    private function createSubmissionWithinQuota(Form $form, string $studentId, bool $paid, array $attributes): ?FormSubmission
+    {
+        $create = fn () => FormSubmission::create($attributes + [
+            'user_id' => $studentId,
+            'form_id' => $form->id,
+            'status' => 'active',
+        ]);
+
+        if ($form->max_participants === null) {
+            return $create();
+        }
+
+        return DB::transaction(function () use ($form, $studentId, $paid, $create) {
+            $locked = Form::whereKey($form->id)->lockForUpdate()->first();
+
+            return $locked && $locked->admits($studentId, $paid) ? $create() : null;
+        });
     }
 
     /**
@@ -1453,13 +1490,14 @@ class FrontendController extends Controller
             'company_division_id' => $form->company_division_id,
         ]);
 
-        $submission = FormSubmission::create([
-            'user_id' => $student->id,
-            'form_id' => $form->id,
-            'status' => 'active',
+        $submission = $this->createSubmissionWithinQuota($form, $student->id, (bool) $payment, [
             'is_timeout_partial' => true,
             'start_at' => $this->parseQuizStartedAt($request->input('quiz_started_at')),
         ]);
+
+        if (!$submission) {
+            return response()->json(['message' => 'Kuota peserta quiz ini sudah penuh, jawaban tidak disimpan.'], 422);
+        }
 
         // Kunci FormPayment ke submission ini HANYA kalau ini percobaan terakhir — sama
         // seperti formWizardSubmit(), supaya order_id yang sama tidak bisa dipakai lagi.

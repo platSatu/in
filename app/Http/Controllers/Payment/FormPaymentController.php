@@ -50,6 +50,11 @@ class FormPaymentController extends Controller
             return response()->json(['message' => 'Form ini tidak membutuhkan pembayaran.'], 422);
         }
 
+        // Kuota peserta penuh: jangan sampai peserta membayar untuk quiz yang sudah tertutup.
+        if ($form->isFull()) {
+            return response()->json(['message' => 'Maaf, kuota peserta quiz ini sudah penuh.'], 422);
+        }
+
         // BUGFIX (per keputusan owner, sama seperti WhatsappMessenger::send()):
         // gateway pembayaran SEKARANG berlaku system-wide, tidak di-scope lagi
         // ke user_id pembuat form -- sebelumnya form yang dibuat admin lain

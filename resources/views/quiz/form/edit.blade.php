@@ -367,6 +367,21 @@
                     </div>
 
                     <div class="row mb-4">
+                        <div class="col-sm-6">
+                            <label for="max_participants" class="mb-2">Batas Peserta (Optional)</label>
+                            <input type="number" min="1" step="1" class="form-control @error('max_participants') is-invalid @enderror"
+                                id="max_participants" name="max_participants" value="{{ old('max_participants', $data->max_participants) }}" placeholder="Tanpa batas">
+                            <div class="form-text">
+                                Kalau diisi (mis. 30), form otomatis tertutup begitu sudah 30 peserta yang submit. URL tetap bisa dibuka, tapi yang tampil pesan "kuota penuh". Kosongkan kalau tanpa batas.
+                                Saat ini: <strong>{{ $data->participantCount() }}</strong> peserta.
+                            </div>
+                            @error('max_participants')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
                         <div class="col-sm-12">
                             <label for="name" class="mb-2">Form Name</label>
                             <input type="text" class="form-control @error('name') is-invalid @enderror"

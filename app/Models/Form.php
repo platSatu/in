@@ -44,6 +44,7 @@ class Form extends Model
         'status',
         'start_date',
         'end_date',
+        'max_participants',
         'timer_enabled',
         'timer_duration_minutes',
         'timer_auto_save',
@@ -59,6 +60,7 @@ class Form extends Model
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'view_count' => 'integer',
+        'max_participants' => 'integer',
         'timer_enabled' => 'boolean',
         'timer_duration_minutes' => 'integer',
         'timer_auto_save' => 'boolean',
@@ -113,6 +115,38 @@ class Form extends Model
     public function formResults()
     {
         return $this->hasMany(FormResult::class, 'form_id');
+    }
+
+    /**
+     * Jumlah peserta = student BERBEDA yang sudah submit form ini (submit ulang /
+     * percobaan timeout dari orang yang sama dihitung sekali). Satu query
+     * count(distinct) memakai indeks (form_id, user_id).
+     */
+    public function participantCount(): int
+    {
+        return $this->formSubmissions()->distinct()->count('user_id');
+    }
+
+    /** Batas peserta terisi & sudah tercapai: form tertutup (URL tetap bisa dibuka). */
+    public function isFull(): bool
+    {
+        return $this->max_participants !== null && $this->participantCount() >= $this->max_participants;
+    }
+
+    /**
+     * Boleh menyimpan submission baru untuk student ini? Dipanggil SETELAH baris form
+     * dikunci (lockForUpdate) supaya dua submit bersamaan tidak sama-sama lolos di
+     * kursi terakhir. Yang tetap boleh walau kuota penuh: student yang sudah tercatat
+     * sebagai peserta (tidak menambah jumlah) dan peserta yang sudah membayar.
+     */
+    public function admits(string $studentId, bool $paid = false): bool
+    {
+        if ($this->max_participants === null || $paid) {
+            return true;
+        }
+
+        return $this->formSubmissions()->where('user_id', $studentId)->exists()
+            || $this->participantCount() < $this->max_participants;
     }
 
     /**
