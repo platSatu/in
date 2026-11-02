@@ -1543,6 +1543,15 @@ class FrontendController extends Controller
 
         $answers = $this->saveQuestionAnswers($request, $submission, $student, $questions, $isAutoResultForm);
 
+        // Form tanpa identitas: peserta langsung masuk ke soal, jadi timer sudah berjalan
+        // walau halaman cuma dibuka lalu ditinggal. Simpanan timeout tanpa satu jawaban pun
+        // dibuang -- tidak ada isinya dan tidak boleh ikut terhitung sebagai peserta (kuota).
+        if ($student === null && !FormAnswer::where('submission_id', $submission->id)->exists()) {
+            $submission->delete();
+
+            return response()->json(['ok' => true, 'final' => false, 'saved' => false]);
+        }
+
         Log::info('[FORM-WIZARD] Timeout auto-save tersimpan', [
             'form_id' => $form->id,
             'submission_id' => $submission->id,
