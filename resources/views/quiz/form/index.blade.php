@@ -129,7 +129,7 @@
                                         @endif
                                         @if ($form->max_participants)
                                             {{-- Sama seperti Form::participantCount(), dihitung dari relasi yang sudah di-eager-load (tanpa query tambahan). --}}
-                                            @php($peserta = $form->participantCountFromLoaded())
+                                            @php $peserta = $form->participantCountFromLoaded(); @endphp
                                             <br>
                                             <small class="{{ $peserta >= $form->max_participants ? 'text-danger fw-bold' : 'text-muted' }}">
                                                 Kuota {{ $peserta }} / {{ $form->max_participants }}{{ $peserta >= $form->max_participants ? ' · Penuh' : '' }}
