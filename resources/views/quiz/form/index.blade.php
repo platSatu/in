@@ -128,8 +128,8 @@
                                             <span class="badge badge-danger">Inactive</span>
                                         @endif
                                         @if ($form->max_participants)
-                                            {{-- Peserta = student berbeda (sama seperti Form::participantCount()), dari relasi yang sudah di-eager-load. --}}
-                                            @php($peserta = $form->formSubmissions->pluck('user_id')->unique()->count())
+                                            {{-- Sama seperti Form::participantCount(), dihitung dari relasi yang sudah di-eager-load (tanpa query tambahan). --}}
+                                            @php($peserta = $form->participantCountFromLoaded())
                                             <br>
                                             <small class="{{ $peserta >= $form->max_participants ? 'text-danger fw-bold' : 'text-muted' }}">
                                                 Kuota {{ $peserta }} / {{ $form->max_participants }}{{ $peserta >= $form->max_participants ? ' · Penuh' : '' }}

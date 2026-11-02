@@ -106,6 +106,9 @@
                                     <td class="fw-bold">
                                         @if ($submission->student)
                                             {{ trim($submission->student->first_name . ' ' . $submission->student->last_name) }}
+                                        @elseif ($submission->user_id === null)
+                                            {{-- Form tanpa identitas (collect_identity mati): memang tidak ada nama/email/HP. --}}
+                                            <span class="text-muted fst-italic">Peserta tanpa identitas</span>
                                         @else
                                             <span class="text-muted">Data peserta tidak ditemukan</span>
                                         @endif

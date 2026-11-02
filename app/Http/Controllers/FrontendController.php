@@ -673,12 +673,13 @@ class FrontendController extends Controller
             'ip' => $request->ip(),
         ]);
 
+        // Form tanpa identitas (collect_identity mati): Nama/Email/HP tidak ditampilkan & tidak diwajibkan.
+        $collectIdentity = $this->formCollectsIdentity($request->input('form_id'));
+
         try {
             $validated = $request->validate([
                 'form_id' => 'required|exists:forms,id',
-                'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s.\'-]+$/u'],
-                'email' => ['required', 'email', 'max:255'],
-                'handphone' => ['required', 'digits_between:9,16'],
+                ...$this->identityRules($collectIdentity),
                 'payment_order_id' => ['nullable', 'string', 'max:50'],
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -739,7 +740,8 @@ class FrontendController extends Controller
                 }
             }
 
-            $student = (new StudentIdentityResolver())->findOrCreate($validated);
+            // Form tanpa identitas: tidak ada Student; submission & jawaban tersimpan dengan user_id null.
+            $student = $collectIdentity ? (new StudentIdentityResolver())->findOrCreate($validated) : null;
 
             // === STUDENT BRANCH/FORM TRACKING ===
             // Simpan branch & form yang baru diisi student ini di tabel students, dipakai
@@ -747,7 +749,7 @@ class FrontendController extends Controller
             // (row students dipakai bareng lintas form via handphone) — history LENGKAP
             // tiap submission (termasuk yang sebelum-sebelumnya) tetap utuh lewat relasi
             // Student::formSubmissions(), lihat StudentController::show().
-            $student->update([
+            $student?->update([
                 'branch_id' => $form->branch_id,
                 'form_id' => $form->id,
                 // Dicatat bareng branch_id di atas (lihat App\Helpers\DataScope) —
@@ -758,16 +760,16 @@ class FrontendController extends Controller
             ]);
 
             Log::info('[FORM-WIZARD] Lanjut ke proses FormSubmission & FormAnswer', [
-                'student_id' => $student->id,
+                'student_id' => $student?->id,
             ]);
 
             // Create submission record -- lewat gerbang batas peserta (lihat createSubmissionWithinQuota()).
-            $submission = $this->createSubmissionWithinQuota($form, $student->id, (bool) $payment, [
+            $submission = $this->createSubmissionWithinQuota($form, $student?->id, (bool) $payment, [
                 'start_at' => $this->parseQuizStartedAt($request->input('quiz_started_at')),
             ]);
 
             if (!$submission) {
-                Log::info('[FORM-WIZARD] Submit ditolak, kuota peserta penuh', ['form_id' => $form->id, 'student_id' => $student->id]);
+                Log::info('[FORM-WIZARD] Submit ditolak, kuota peserta penuh', ['form_id' => $form->id, 'student_id' => $student?->id]);
 
                 return redirect($this->buildWizardRedirectRoute($form))
                     ->withErrors(['submit' => 'Maaf, kuota peserta quiz ini sudah penuh, jadi jawaban Anda tidak dapat disimpan.']);
@@ -827,7 +829,7 @@ class FrontendController extends Controller
             );
 
             Log::info('[FORM-WIZARD] === END formWizardSubmit, redirect sukses ===', [
-                'student_id' => $student->id,
+                'student_id' => $student?->id,
             ]);
 
             return redirect($this->buildWizardRedirectRoute($form))
@@ -854,6 +856,25 @@ class FrontendController extends Controller
     }
 
     /**
+     * Form ini meminta Nama/Email/HP peserta? Default true (perilaku lama) kalau form
+     * tidak ketemu -- validasi 'exists' di pemanggil yang menolak form_id yang salah.
+     */
+    private function formCollectsIdentity(?string $formId): bool
+    {
+        return (bool) (Form::whereKey((string) $formId)->value('collect_identity') ?? true);
+    }
+
+    /** Aturan Nama/Email/HP: wajib seperti biasa, atau diabaikan sama sekali untuk form tanpa identitas. */
+    private function identityRules(bool $collectIdentity): array
+    {
+        return $collectIdentity ? [
+            'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s.\'-]+$/u'],
+            'email' => ['required', 'email', 'max:255'],
+            'handphone' => ['required', 'digits_between:9,16'],
+        ] : [];
+    }
+
+    /**
      * Buat FormSubmission hanya kalau kuota peserta masih ada (Form::admits()).
      * Baris form dikunci di dalam transaksi pendek, jadi dua submit bersamaan
      * di kursi terakhir tidak bisa sama-sama lolos. Form tanpa batas
@@ -861,7 +882,7 @@ class FrontendController extends Controller
      *
      * @return FormSubmission|null  null = kuota penuh
      */
-    private function createSubmissionWithinQuota(Form $form, string $studentId, bool $paid, array $attributes): ?FormSubmission
+    private function createSubmissionWithinQuota(Form $form, ?string $studentId, bool $paid, array $attributes): ?FormSubmission
     {
         $create = fn () => FormSubmission::create($attributes + [
             'user_id' => $studentId,
@@ -906,7 +927,7 @@ class FrontendController extends Controller
      */
     private function finalizeCompletedSubmission(
         Form $form,
-        Student $student,
+        ?Student $student,
         FormSubmission $submission,
         string $ringkasanJawaban,
         float $autoScore,
@@ -1019,7 +1040,8 @@ class FrontendController extends Controller
         // form ini (lihat toggle di quiz/form/create & edit). Sebelum ini ditambahkan,
         // WA selalu terkirim ke SEMUA form tanpa terkecuali — sekarang jadi opsional
         // per form, sesuai pengaturan admin.
-        if ($form->use_whatsapp_notification) {
+        // Tanpa identitas (collect_identity mati) tidak ada nomor tujuan, jadi WA dilewati.
+        if ($form->use_whatsapp_notification && $student) {
             $message = $this->buildMessageFromTemplate($form, [
                 'name' => trim($student->first_name . ' ' . $student->last_name),
                 'form_name' => $form->name,
@@ -1096,7 +1118,7 @@ class FrontendController extends Controller
      */
     private function sendPerOptionWhatsappMessages(
         Form $form,
-        Student $student,
+        ?Student $student,
         FormSubmission $submission,
         string $ringkasanJawaban,
         ?string $callbackLink,
@@ -1433,12 +1455,12 @@ class FrontendController extends Controller
      */
     public function formWizardTimeoutSave(Request $request)
     {
+        $collectIdentity = $this->formCollectsIdentity($request->input('form_id'));
+
         try {
             $validated = $request->validate([
                 'form_id' => 'required|exists:forms,id',
-                'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s.\'-]+$/u'],
-                'email' => ['required', 'email', 'max:255'],
-                'handphone' => ['required', 'digits_between:9,16'],
+                ...$this->identityRules($collectIdentity),
                 'payment_order_id' => ['nullable', 'string', 'max:50'],
             ]);
         } catch (\Illuminate\Validation\ValidationException $e) {
@@ -1478,9 +1500,9 @@ class FrontendController extends Controller
             }
         }
 
-        $student = (new StudentIdentityResolver())->findOrCreate($validated);
+        $student = $collectIdentity ? (new StudentIdentityResolver())->findOrCreate($validated) : null;
 
-        $student->update([
+        $student?->update([
             'branch_id' => $form->branch_id,
             'form_id' => $form->id,
             // Dicatat bareng branch_id di atas (lihat App\Helpers\DataScope) —
@@ -1490,7 +1512,7 @@ class FrontendController extends Controller
             'company_division_id' => $form->company_division_id,
         ]);
 
-        $submission = $this->createSubmissionWithinQuota($form, $student->id, (bool) $payment, [
+        $submission = $this->createSubmissionWithinQuota($form, $student?->id, (bool) $payment, [
             'is_timeout_partial' => true,
             'start_at' => $this->parseQuizStartedAt($request->input('quiz_started_at')),
         ]);
@@ -1524,7 +1546,7 @@ class FrontendController extends Controller
         Log::info('[FORM-WIZARD] Timeout auto-save tersimpan', [
             'form_id' => $form->id,
             'submission_id' => $submission->id,
-            'student_id' => $student->id,
+            'student_id' => $student?->id,
             'is_final' => $isFinal,
         ]);
 
@@ -1562,7 +1584,7 @@ class FrontendController extends Controller
         }
 
         Log::info('[FORM-WIZARD] === END formWizardTimeoutSave (final), redirect sukses ===', [
-            'student_id' => $student->id,
+            'student_id' => $student?->id,
         ]);
 
         return response()->json([
@@ -1597,7 +1619,7 @@ class FrontendController extends Controller
     private function saveQuestionAnswers(
         Request $request,
         FormSubmission $submission,
-        Student $student,
+        ?Student $student,
         $questions,
         bool $isAutoResultForm
     ): array {
@@ -1645,7 +1667,7 @@ class FrontendController extends Controller
     private function processQuestionBranch(
         Request $request,
         FormSubmission $submission,
-        Student $student,
+        ?Student $student,
         FormQuestion $question,
         $childrenByParentOption,
         bool $isAutoResultForm,
@@ -1710,7 +1732,7 @@ class FrontendController extends Controller
     private function saveSingleQuestionAnswer(
         Request $request,
         FormSubmission $submission,
-        Student $student,
+        ?Student $student,
         FormQuestion $question,
         bool $isAutoResultForm
     ): array {
@@ -1726,7 +1748,7 @@ class FrontendController extends Controller
 
             if ($answerText) {
                 FormAnswer::create([
-                    'user_id' => $student->id,
+                    'user_id' => $student?->id,
                     'submission_id' => $submission->id,
                     'question_id' => $question->id,
                     'option_id' => null,
@@ -1743,7 +1765,7 @@ class FrontendController extends Controller
                 $answerValue = $option ? ($option->option_text ?: '[Gambar]') : '-';
 
                 FormAnswer::create([
-                    'user_id' => $student->id,
+                    'user_id' => $student?->id,
                     'submission_id' => $submission->id,
                     'question_id' => $question->id,
                     'option_id' => $optionId,
@@ -1782,7 +1804,7 @@ class FrontendController extends Controller
                     $selectedOptions[] = $hasOtherText ? $otherText : ($option->option_text ?: '[Gambar]');
 
                     FormAnswer::create([
-                        'user_id' => $student->id,
+                        'user_id' => $student?->id,
                         'submission_id' => $submission->id,
                         'question_id' => $question->id,
                         'option_id' => $optionId,
@@ -1806,7 +1828,7 @@ class FrontendController extends Controller
 
             if ($majorIdInput && $major) {
                 FormAnswer::create([
-                    'user_id' => $student->id,
+                    'user_id' => $student?->id,
                     'submission_id' => $submission->id,
                     'question_id' => $question->id,
                     'option_id' => null,
@@ -1827,7 +1849,7 @@ class FrontendController extends Controller
 
             if ($answerText !== null && $answerText !== '') {
                 FormAnswer::create([
-                    'user_id' => $student->id,
+                    'user_id' => $student?->id,
                     'submission_id' => $submission->id,
                     'question_id' => $question->id,
                     'option_id' => null,
@@ -1864,7 +1886,7 @@ class FrontendController extends Controller
                     $answerValue = '[File: ' . $uploadedFile->getClientOriginalName() . ']';
 
                     FormAnswer::create([
-                        'user_id' => $student->id,
+                        'user_id' => $student?->id,
                         'submission_id' => $submission->id,
                         'question_id' => $question->id,
                         'option_id' => null,

@@ -33,6 +33,7 @@ class Form extends Model
         'use_whatsapp_notification',
         'whatsapp_template_id',
         'has_personal_data_stage',
+        'collect_identity',
         'personal_data_stage_position',
         'result_mode',
         'section_fail_threshold',
@@ -57,6 +58,7 @@ class Form extends Model
         'is_callback_enabled' => 'boolean',
         'use_whatsapp_notification' => 'boolean',
         'has_personal_data_stage' => 'boolean',
+        'collect_identity' => 'boolean',
         'start_date' => 'datetime',
         'end_date' => 'datetime',
         'view_count' => 'integer',
@@ -119,12 +121,29 @@ class Form extends Model
 
     /**
      * Jumlah peserta = student BERBEDA yang sudah submit form ini (submit ulang /
-     * percobaan timeout dari orang yang sama dihitung sekali). Satu query
-     * count(distinct) memakai indeks (form_id, user_id).
+     * percobaan timeout dari orang yang sama dihitung sekali; count(distinct) memakai
+     * indeks (form_id, user_id)), ditambah submission tanpa identitas (form dengan
+     * collect_identity mati). Submission anonim tidak bisa dikenali orangnya, jadi
+     * dihitung per submit; simpanan timeout yang nanti diulang (timer_auto_restart)
+     * tidak ikut dihitung karena peserta yang sama masih akan submit lagi.
      */
     public function participantCount(): int
     {
-        return $this->formSubmissions()->distinct()->count('user_id');
+        $known = $this->formSubmissions()->whereNotNull('user_id')->distinct()->count('user_id');
+        $anonymous = $this->formSubmissions()->whereNull('user_id')
+            ->when($this->timer_auto_restart, fn ($q) => $q->where('is_timeout_partial', false))
+            ->count();
+
+        return $known + $anonymous;
+    }
+
+    /** Versi tanpa query untuk daftar admin (relasi formSubmissions sudah di-eager-load). */
+    public function participantCountFromLoaded(): int
+    {
+        $rows = $this->formSubmissions;
+
+        return $rows->whereNotNull('user_id')->pluck('user_id')->unique()->count()
+            + $rows->whereNull('user_id')->filter(fn ($s) => !$this->timer_auto_restart || !$s->is_timeout_partial)->count();
     }
 
     /** Batas peserta terisi & sudah tercapai: form tertutup (URL tetap bisa dibuka). */
@@ -139,13 +158,13 @@ class Form extends Model
      * kursi terakhir. Yang tetap boleh walau kuota penuh: student yang sudah tercatat
      * sebagai peserta (tidak menambah jumlah) dan peserta yang sudah membayar.
      */
-    public function admits(string $studentId, bool $paid = false): bool
+    public function admits(?string $studentId, bool $paid = false): bool
     {
         if ($this->max_participants === null || $paid) {
             return true;
         }
 
-        return $this->formSubmissions()->where('user_id', $studentId)->exists()
+        return ($studentId !== null && $this->formSubmissions()->where('user_id', $studentId)->exists())
             || $this->participantCount() < $this->max_participants;
     }
 

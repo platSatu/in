@@ -483,6 +483,7 @@ class FormController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'max_participants' => 'nullable|integer|min:1|max:1000000',
             'has_personal_data_stage' => 'nullable|boolean',
+            'collect_identity' => 'nullable|boolean',
             'personal_data_stage_position' => 'nullable|in:first,last',
             'result_mode' => 'nullable|in:none,auto,manual,section_threshold',
             'section_fail_threshold' => 'nullable|integer|min:1|max:50',
@@ -512,6 +513,7 @@ class FormController extends Controller
         }
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
+        $validated['collect_identity'] = $this->collectIdentity($request, $validated);
         // Default 'first' = perilaku SEBELUMNYA (Data Pribadi selalu di depan) --
         // form yang sudah berjalan/tidak sengaja mengganti setting ini tidak
         // berubah sama sekali. Lihat migration
@@ -658,6 +660,7 @@ class FormController extends Controller
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'max_participants' => 'nullable|integer|min:1|max:1000000',
             'has_personal_data_stage' => 'nullable|boolean',
+            'collect_identity' => 'nullable|boolean',
             'personal_data_stage_position' => 'nullable|in:first,last',
             'result_mode' => 'nullable|in:none,auto,manual,section_threshold',
             'section_fail_threshold' => 'nullable|integer|min:1|max:50',
@@ -687,6 +690,7 @@ class FormController extends Controller
         }
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
+        $validated['collect_identity'] = $this->collectIdentity($request, $validated, (bool) ($existing->collect_identity ?? true));
         // Default 'first' -- lihat catatan yang sama di store().
         $validated['personal_data_stage_position'] = $validated['personal_data_stage_position'] ?? 'first';
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
@@ -781,6 +785,26 @@ class FormController extends Controller
      * dan kedua toggle auto-save/auto-restart ikut dipaksa kosong/false, supaya tidak ada
      * nilai lama yang "nyangkut" nyala di database padahal timer-nya sendiri sudah off.
      */
+    /**
+     * Saklar "Minta Nama, Email & WhatsApp peserta" (default aktif = perilaku lama).
+     * Dimatikan = peserta langsung ke pertanyaan tanpa identitas. Tidak boleh digabung
+     * dengan pembayaran atau notifikasi WhatsApp, karena keduanya butuh nama/email/nomor.
+     */
+    private function collectIdentity(Request $request, array $validated, bool $current = true): bool
+    {
+        // Form edit selalu mengirim field ini (hidden 0 + checkbox 1). Request lain yang tidak
+        // membawanya tidak boleh diam-diam mematikan identitas: pakai nilai yang sudah tersimpan.
+        $collect = $request->has('collect_identity') ? $request->boolean('collect_identity') : $current;
+
+        if (!$collect && ($validated['requires_payment'] || $validated['use_whatsapp_notification'])) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'collect_identity' => 'Form berbayar atau yang memakai notifikasi WhatsApp wajib meminta Nama, Email & WhatsApp peserta. Matikan pembayaran/notifikasi WhatsApp dulu kalau form ini mau tanpa identitas.',
+            ]);
+        }
+
+        return $collect;
+    }
+
     private function applyTimerFields(Request $request, array $validated): array
     {
         $validated['timer_enabled'] = $request->boolean('timer_enabled');
@@ -949,6 +973,7 @@ class FormController extends Controller
                 'use_whatsapp_notification',
                 'whatsapp_template_id',
                 'has_personal_data_stage',
+                'collect_identity',
                 'personal_data_stage_position',
                 'result_mode',
                 'section_fail_threshold',

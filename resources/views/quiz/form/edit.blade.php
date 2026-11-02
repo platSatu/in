@@ -191,6 +191,27 @@
                     </div>
 
                     <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <label class="mb-2 d-block">Nama, Email & WhatsApp Peserta</label>
+                            {{-- hidden 0: saklar mati tetap terkirim, supaya bisa dibedakan dari request yang tidak membawa field ini --}}
+                            <input type="hidden" name="collect_identity" value="0">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input @error('collect_identity') is-invalid @enderror" type="checkbox" role="switch" id="collect_identity"
+                                    name="collect_identity" value="1" {{ old('collect_identity', $data->collect_identity ?? true) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="collect_identity">
+                                    Minta Nama, Email & WhatsApp peserta
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Aktif (bawaan): peserta mengisi Nama, Email & nomor WhatsApp seperti biasa. Matikan supaya langkah itu tidak ditampilkan sama sekali dan peserta langsung ke pertanyaan (tercatat sebagai peserta tanpa nama). Tidak bisa dimatikan untuk form berbayar atau yang memakai notifikasi WhatsApp.
+                            </div>
+                            @error('collect_identity')
+                                <div class="invalid-feedback d-block">{{ $message }}</div>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
                         <div class="col-sm-4">
                             <label class="mb-2 d-block">Step Data Pribadi</label>
                             <div class="form-check form-switch">

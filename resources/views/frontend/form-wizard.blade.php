@@ -685,6 +685,11 @@
                                 Next <i class="bi bi-arrow-right"></i>
                             </button>
                         </div>
+                    @elseif(! $selectedForm->collect_identity)
+                        {{-- Form tanpa identitas (Edit Form > "Minta Nama, Email & WhatsApp peserta" mati):
+                             input Nama/Email/HP SENGAJA tidak dirender sama sekali (termasuk atribut
+                             required-nya), dan step ini tidak masuk stepOrder -- peserta langsung
+                             mulai dari pertanyaan. --}}
                     @else
                         {{-- User Info --}}
                         <div class="mb-3">
@@ -960,6 +965,10 @@
     const paymentPosition = @json($selectedForm->payment_position ?? 'before_questions');
     const hasPersonalDataStage = {{ $selectedForm && $selectedForm->has_personal_data_stage ? 'true' : 'false' }};
 
+    // Form tanpa identitas: step-info (Nama/Email/HP) tidak dipakai sama sekali (lihat
+    // collect_identity di Edit Form). Default true = perilaku lama untuk semua form.
+    const collectIdentity = {{ $selectedForm && ! $selectedForm->collect_identity ? 'false' : 'true' }};
+
     // FITUR TAMBAHAN: posisi step "Nama/Email/HP" (step-info -- BUKAN
     // step-personal-data yang di atas, itu step TERPISAH untuk pertanyaan
     // custom "Data Pribadi" opsional). Default 'first' = perilaku SEBELUMNYA
@@ -1000,9 +1009,8 @@
     // KEDUANYA tidak pernah berubah oleh fitur personalDataStagePosition di
     // bawah, cuma POSISI blok ini secara keseluruhan (di depan/di akhir) yang
     // bisa diatur. Ini pola/urutan PERSIS yang sudah berjalan sebelumnya.
-    const identityBlock = hasPersonalDataStage
-        ? ['step-info', 'step-personal-data']
-        : ['step-info'];
+    const identityBlock = (collectIdentity ? ['step-info'] : [])
+        .concat(hasPersonalDataStage ? ['step-personal-data'] : []);
 
     // personalDataStagePosition === 'first' (DEFAULT): identityBlock di depan,
     // urutan selebihnya PERSIS SAMA seperti sebelum fitur ini ada (payment
@@ -2323,7 +2331,7 @@
         // selesai dijalankan sekali dari atas ke bawah, jadi semua
         // const/let sudah aman diakses.
         if (stepOrder[0] !== 'step-info') {
-            showStep(hasValidationErrors ? stepOrder.indexOf('step-info') : 0);
+            showStep(hasValidationErrors ? Math.max(0, stepOrder.indexOf('step-info')) : 0);
         }
 
         showFlashNotifications();
