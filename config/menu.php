@@ -45,6 +45,8 @@ return [
     ['key' => 'student.student', 'label' => 'Data Student', 'route' => 'student.student.index', 'group' => 'Students', 'icon' => 'list'],
     // File Student (29 Oktober 2026): backup file yang diunggah student, unduh per student/semua dalam ZIP.
     ['key' => 'student.files', 'label' => 'File Student', 'route' => 'student.files.index', 'group' => 'Students', 'icon' => 'list'],
+    // Ina Visa (3 November 2026): peserta yang mengisi quiz berjenis "Ina Visa" (Edit Form > Jenis Form), terpisah dari quiz lain.
+    ['key' => 'student.ina-visa', 'label' => 'Ina Visa', 'route' => 'student.ina-visa.index', 'group' => 'Students', 'icon' => 'list'],
 
     // ================= Invitation =================
     // Sebelumnya menu "Invitations" ini statis (hardcoded, tanpa pengecekan

@@ -40,6 +40,7 @@
         'student.student' => 'Data Student',
         'student' => 'Data Student', // route student.student.* setelah dedupe segmen
         'student.files' => 'File Student',
+        'student.ina-visa' => 'Ina Visa',
         'settings.whatsapp-gateway' => 'WhatsApp Gateway',
         'settings.backup' => 'Backup Database',
         'roleuser' => 'Role User',

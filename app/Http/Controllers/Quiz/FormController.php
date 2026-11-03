@@ -482,6 +482,7 @@ class FormController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'max_participants' => 'nullable|integer|min:1|max:1000000',
+            'form_type' => 'nullable|in:' . implode(',', array_keys(Form::TYPES)),
             'has_personal_data_stage' => 'nullable|boolean',
             'collect_identity' => 'nullable|boolean',
             'personal_data_stage_position' => 'nullable|in:first,last',
@@ -514,6 +515,7 @@ class FormController extends Controller
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
         $validated['collect_identity'] = $this->collectIdentity($request, $validated);
+        $validated['form_type'] = $validated['form_type'] ?? Form::TYPE_GENERAL;
         // Default 'first' = perilaku SEBELUMNYA (Data Pribadi selalu di depan) --
         // form yang sudah berjalan/tidak sengaja mengganti setting ini tidak
         // berubah sama sekali. Lihat migration
@@ -659,6 +661,7 @@ class FormController extends Controller
             'start_date' => 'nullable|date',
             'end_date' => 'nullable|date|after_or_equal:start_date',
             'max_participants' => 'nullable|integer|min:1|max:1000000',
+            'form_type' => 'nullable|in:' . implode(',', array_keys(Form::TYPES)),
             'has_personal_data_stage' => 'nullable|boolean',
             'collect_identity' => 'nullable|boolean',
             'personal_data_stage_position' => 'nullable|in:first,last',
@@ -691,6 +694,8 @@ class FormController extends Controller
 
         $validated['has_personal_data_stage'] = $request->boolean('has_personal_data_stage');
         $validated['collect_identity'] = $this->collectIdentity($request, $validated, (bool) ($existing->collect_identity ?? true));
+        // Request yang tidak membawa field ini tidak boleh mengubah jenis form yang tersimpan.
+        $validated['form_type'] = $validated['form_type'] ?? ($existing->form_type ?? Form::TYPE_GENERAL);
         // Default 'first' -- lihat catatan yang sama di store().
         $validated['personal_data_stage_position'] = $validated['personal_data_stage_position'] ?? 'first';
         $validated['result_mode'] = $validated['result_mode'] ?? 'none';
@@ -974,6 +979,7 @@ class FormController extends Controller
                 'whatsapp_template_id',
                 'has_personal_data_stage',
                 'collect_identity',
+                'form_type',
                 'personal_data_stage_position',
                 'result_mode',
                 'section_fail_threshold',

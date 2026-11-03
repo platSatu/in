@@ -22,6 +22,7 @@ class Form extends Model
         'branch_id',
         'company_division_id',
         'name',
+        'form_type',
         'slug',
         'booth_slug',
         'no_booth',
@@ -69,6 +70,15 @@ class Form extends Model
         'timer_auto_restart' => 'boolean',
         'section_fail_threshold' => 'integer',
         'section_pass_threshold' => 'integer',
+    ];
+
+    /** Jenis form: menentukan menu admin tempat submission-nya ditampilkan. Bawaan 'general'. */
+    public const TYPE_GENERAL = 'general';
+    public const TYPE_INA_VISA = 'ina_visa';
+
+    public const TYPES = [
+        self::TYPE_GENERAL => 'Umum',
+        self::TYPE_INA_VISA => 'Ina Visa',
     ];
 
     public function whatsappTemplate()

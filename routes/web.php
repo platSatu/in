@@ -49,6 +49,7 @@ use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\BackendInvitationController;
 use App\Http\Controllers\Student\StudentController;
 use App\Http\Controllers\Student\StudentFileController;
+use App\Http\Controllers\Student\InaVisaController;
 use App\Http\Controllers\Student\StudentFileNotificationController;
 use App\Http\Controllers\StudentPortal\ApplyController;
 use App\Http\Controllers\StudentPortal\ApplicationController;
@@ -955,6 +956,11 @@ Route::middleware(['auth', 'permission:student.files'])->prefix('dashboard/super
     Route::get('/{student}/download', [StudentFileController::class, 'download'])->middleware('throttle:30,1')->name('student.files.download');
     // Tab Notifikasi: lihat = semua yang punya akses File Student, simpan = butuh akses kelola.
     Route::get('/notifications', [StudentFileNotificationController::class, 'edit'])->name('student.files.notifications');
+});
+// Students > Ina Visa: peserta form/quiz berjenis "Ina Visa" (lihat InaVisaController), read-only.
+Route::middleware(['auth', 'permission:student.ina-visa'])->prefix('dashboard/superadmin/student/ina-visa')->group(function () {
+    Route::get('/', [InaVisaController::class, 'index'])->name('student.ina-visa.index');
+    Route::get('/{submissionId}/answers', [InaVisaController::class, 'answers'])->name('student.ina-visa.answers');
 });
 Route::middleware(['auth', 'permission:student.files,edit'])->prefix('dashboard/superadmin/student/files')->group(function () {
     Route::put('/notifications', [StudentFileNotificationController::class, 'update'])->name('student.files.notifications.update');

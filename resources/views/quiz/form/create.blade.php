@@ -408,6 +408,18 @@
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
                             </div>
+                            <div class="col-sm-6">
+                                <label for="form_type" class="mb-2">Jenis Form</label>
+                                <select class="form-select @error('form_type') is-invalid @enderror" id="form_type" name="form_type">
+                                    @foreach (\App\Models\Form::TYPES as $typeKey => $typeLabel)
+                                        <option value="{{ $typeKey }}" {{ old('form_type', 'general') === $typeKey ? 'selected' : '' }}>{{ $typeLabel }}</option>
+                                    @endforeach
+                                </select>
+                                <div class="form-text">Pilih <b>Ina Visa</b> supaya peserta form ini tampil terpisah di menu Students &rsaquo; Ina Visa. Semua fitur form tetap sama.</div>
+                                @error('form_type')
+                                    <div class="invalid-feedback">{{ $message }}</div>
+                                @enderror
+                            </div>
                         </div>
 
                         <div class="row mb-4">

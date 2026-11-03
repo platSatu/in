@@ -127,6 +127,9 @@
                                         @else
                                             <span class="badge badge-danger">Inactive</span>
                                         @endif
+                                        @if ($form->form_type === \App\Models\Form::TYPE_INA_VISA)
+                                            <br><span class="badge badge-info">Ina Visa</span>
+                                        @endif
                                         @if ($form->max_participants)
                                             {{-- Sama seperti Form::participantCount(), dihitung dari relasi yang sudah di-eager-load (tanpa query tambahan). --}}
                                             @php $peserta = $form->participantCountFromLoaded(); @endphp
