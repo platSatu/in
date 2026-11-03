@@ -93,6 +93,10 @@
             text-transform: uppercase;
         }
 
+        .package-total { background: #f5f7fb; border: 1px solid #e3e8f2; font-size: 1.05rem; }
+        .package-price { font-weight: 600; color: #6c757d; font-size: .95rem; }
+        .option-item.selected .package-price { color: inherit; }
+
         .wizard-card {
             max-width: 620px;
             margin: auto;
@@ -832,6 +836,42 @@
                     </div>
                 @endif
 
+                {{-- STEP: Pilih Paket (hanya ada kalau form punya pertanyaan bertipe 'package').
+                     Selalu SEBELUM pembayaran: tagihan = nominal tetap form + harga pilihan
+                     (dihitung ulang di server, lihat App\Services\Quiz\PackagePricing). --}}
+                @if($selectedForm && $packageQuestions->isNotEmpty())
+                    @php $packagePaid = $paymentPrefill && $paymentPrefill->status === 'paid' ? (array) $paymentPrefill->package_option_ids : []; @endphp
+                    <div class="step" id="step-package" data-base-amount="{{ (float) ($selectedForm->requires_payment ? ($selectedForm->payment_amount ?? 0) : 0) }}">
+                        @foreach($packageQuestions as $index => $question)
+                            @include('frontend.partials.question-card', [
+                                'question' => $question,
+                                'index' => $index,
+                                'majors' => $majors,
+                                'packageChecked' => $packagePaid,
+                            ])
+                        @endforeach
+
+                        @if($selectedForm->requires_payment)
+                            <div class="package-total d-flex justify-content-between align-items-center rounded-3 p-3 mt-2">
+                                <span>Total pembayaran</span>
+                                <strong id="packageTotalDisplay">Rp 0</strong>
+                            </div>
+                        @endif
+                        <div class="small text-muted mt-2 {{ $packagePaid ? '' : 'd-none' }}" id="packageLockedNote">
+                            <i class="bi bi-lock"></i> Paket sudah dibayar dan tidak bisa diganti.
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="button" class="btn btn-outline-brand" id="btnPackageBack" onclick="prevStep()">
+                                <i class="bi bi-arrow-left"></i> Back
+                            </button>
+                            <button type="button" class="btn btn-brand" onclick="nextStep()">
+                                Next <i class="bi bi-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                @endif
+
                 {{-- STEP: Payment (hanya ada kalau form ini requires_payment) --}}
                 @if($selectedForm && $selectedForm->requires_payment)
                     <div class="step" id="step-payment">
@@ -983,6 +1023,11 @@
     // stepOrder di bawah. Kalau kosong, step ini otomatis di-skip sepenuhnya.
     const hasPreTestNotice = {{ $selectedForm && filled($selectedForm->pre_test_notice) ? 'true' : 'false' }};
 
+    // Pilihan Paket: step "Pilih Paket" (pertanyaan bertipe 'package') selalu tepat SEBELUM
+    // pembayaran, karena tagihan mengikuti paket yang dipilih. Form tanpa paket: false,
+    // urutan step lama tidak berubah sama sekali.
+    const hasPackageStep = {{ $selectedForm && $packageQuestions->isNotEmpty() ? 'true' : 'false' }};
+
     // True kalau redirect balik ke halaman ini itu HASIL dari submit akhir yang
     // gagal validasi server (misalnya name/email/handphone kosong/tidak valid).
     // Dulu tidak dicek sama sekali -> begitu ?order_id= masih ada di URL, JS di
@@ -1025,7 +1070,10 @@
     // diletakkan sebelum identityBlock (Opsi B yang sudah disepakati).
     let stepOrder;
 
-    if (personalDataStagePosition === 'last') {
+    if (hasPackageStep) {
+        // Identitas -> Pilih Paket -> Bayar (kalau berbayar) -> Pertanyaan -> Review.
+        stepOrder = identityBlock.concat(['step-package'], requiresPayment ? ['step-payment'] : [], ['step-questions', 'step-review']);
+    } else if (personalDataStagePosition === 'last') {
         stepOrder = requiresPayment
             ? ['step-questions'].concat(identityBlock, ['step-payment', 'step-review'])
             : ['step-questions'].concat(identityBlock, ['step-review']);
@@ -1049,7 +1097,7 @@
     //   sudah pindah ke BELAKANG placement test, jadi "sebelum test" di sini
     //   berarti paling depan, tepat sebelum step-questions.
     if (hasPreTestNotice) {
-        if (personalDataStagePosition === 'last') {
+        if (personalDataStagePosition === 'last' && !hasPackageStep) {
             stepOrder.splice(stepOrder.indexOf('step-questions'), 0, 'step-notice');
         } else {
             const insertAfter = hasPersonalDataStage ? 'step-personal-data' : 'step-info';
@@ -1480,6 +1528,10 @@
             return;
         }
 
+        if (currentStepId === 'step-package' && !validateQuestionsStep('step-package')) {
+            return;
+        }
+
         if (currentStepId === 'step-questions' && !validateQuestionsStep('step-questions')) {
             return;
         }
@@ -1527,6 +1579,43 @@
     }
 
     // Single choice toggle
+    // === PILIHAN PAKET =========================================================
+    function selectedPackageOptionIds() {
+        return Array.from(document.querySelectorAll('#step-package input[type="radio"]:checked')).map(function (el) { return el.value; });
+    }
+
+    // Total di layar hanya tampilan; angka yang ditagih tetap dihitung server.
+    function refreshPackageTotal() {
+        const step = document.getElementById('step-package');
+        const display = document.getElementById('packageTotalDisplay');
+        if (!step || !display) return;
+
+        let total = parseFloat(step.getAttribute('data-base-amount') || '0') || 0;
+        step.querySelectorAll('input[type="radio"]:checked').forEach(function (el) {
+            total += parseFloat(el.getAttribute('data-price') || '0') || 0;
+        });
+        display.textContent = 'Rp ' + Math.round(total).toLocaleString('id-ID');
+    }
+
+    // Setelah lunas, paket tidak bisa diganti (submit juga dicek ulang di server).
+    function lockPackageStep() {
+        const step = document.getElementById('step-package');
+        if (!step) return;
+        step.querySelectorAll('.option-item').forEach(function (el) { el.style.pointerEvents = 'none'; });
+        const note = document.getElementById('packageLockedNote');
+        if (note) note.classList.remove('d-none');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        const step = document.getElementById('step-package');
+        if (!step) return;
+        step.addEventListener('click', function () { window.setTimeout(refreshPackageTotal, 0); });
+        refreshPackageTotal();
+        if (document.getElementById('packageLockedNote') && !document.getElementById('packageLockedNote').classList.contains('d-none')) {
+            lockPackageStep();
+        }
+    });
+
     function toggleSingleOption(element, questionId) {
         // Remove selected class from all options in this group. Di-scope supaya
         // CUMA opsi milik kartu `parent` sendiri yang ke-uncheck — kartu anak
@@ -2134,6 +2223,8 @@
             name: document.getElementById('wizard-name').value.trim(),
             email: document.getElementById('wizard-email').value.trim(),
             handphone: document.getElementById('wizard-handphone').value.trim(),
+            // Pilihan paket (kalau ada); harganya dihitung ulang di server.
+            package_options: selectedPackageOptionIds(),
         };
 
         postJson('{{ route('frontend.payment.init') }}', payload)
@@ -2254,6 +2345,7 @@
                     stopPaymentPolling();
                     stopPaymentCountdown();
                     document.getElementById('paymentOrderIdInput').value = currentOrderId;
+                    lockPackageStep();
                     paymentStatusBox('<p class="text-success mb-0"><i class="bi bi-check-circle-fill"></i> Pembayaran berhasil dikonfirmasi!</p>');
                     paymentContent('');
                     window.setTimeout(function () { nextStep(); }, 800);

@@ -47,6 +47,7 @@ class InaVisaController extends Controller
         return view('student.ina-visa.index', [
             'submissions' => $submissions,
             'files' => $this->fileAnswers($submissions->getCollection()->modelKeys()),
+            'packages' => $this->packageAnswers($submissions->getCollection()->modelKeys()),
             'forms' => $forms,
             'formId' => $formId,
             'search' => $search,
@@ -94,6 +95,21 @@ class InaVisaController extends Controller
         DataScope::applyBranchDivisionScope($query, $user, 'user_id');
 
         return $query;
+    }
+
+    /** Paket yang dipilih peserta (pertanyaan bertipe 'package'), dikelompokkan per submission. */
+    private function packageAnswers(array $submissionIds)
+    {
+        if ($submissionIds === []) {
+            return collect();
+        }
+
+        return FormAnswer::whereIn('submission_id', $submissionIds)
+            ->whereNotNull('option_id')
+            ->whereHas('question', fn (Builder $q) => $q->where('type', 'package'))
+            ->with('option:id,option_text,price')
+            ->get()
+            ->groupBy('submission_id');
     }
 
     /**

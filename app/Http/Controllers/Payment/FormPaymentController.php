@@ -9,6 +9,7 @@ use App\Models\FormPayment;
 use App\Models\PaymentGateway;
 use App\Models\UniversityApplication;
 use App\Services\Payment\PaymentGatewayFactory;
+use App\Services\Quiz\PackagePricing;
 use App\Services\Payment\PaymentSignatureMismatchException;
 use App\Services\Whatsapp\WhatsappMessenger;
 use Closure;
@@ -42,6 +43,9 @@ class FormPaymentController extends Controller
             'name' => ['required', 'string', 'max:255', 'regex:/^[\pL\s.\'-]+$/u'],
             'email' => ['required', 'email', 'max:255'],
             'handphone' => ['required', 'digits_between:9,16'],
+            // Pilihan Paket: id pilihan yang dipilih peserta (harganya dihitung ulang di server).
+            'package_options' => ['nullable', 'array', 'max:20'],
+            'package_options.*' => ['string', 'max:64'],
         ]);
 
         $form = Form::findOrFail($validated['form_id']);
@@ -77,6 +81,28 @@ class FormPaymentController extends Controller
         // countdown di wizard (lihat form-wizard.blade.php) dan penanda "expired" di
         // status() di bawah, supaya berlaku SAMA untuk semua gateway (Duitku/Midtrans/
         // iPaymu), bukan cuma Duitku.
+        // === PILIHAN PAKET ===
+        // Form dengan pertanyaan bertipe 'package': tagihan = nominal tetap form + harga pilihan
+        // (dihitung dari database, lihat PackagePricing). Form tanpa paket: nominal tetap seperti biasa.
+        $amount = (float) ($form->payment_amount ?? 0);
+        $packageOptionIds = null;
+        $pricing = app(PackagePricing::class);
+
+        if ($pricing->hasPackages($form)) {
+            try {
+                $quote = $pricing->quote($form, (array) ($validated['package_options'] ?? []));
+            } catch (\InvalidArgumentException $e) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
+            $amount = $quote['amount'];
+            $packageOptionIds = $quote['option_ids'];
+
+            if ($amount <= 0) {
+                return response()->json(['message' => 'Harga paket belum diatur. Silakan hubungi penyelenggara.'], 422);
+            }
+        }
+
         $payment = FormPayment::create([
             'form_id' => $form->id,
             'payment_gateway_id' => $gateway->id,
@@ -85,7 +111,8 @@ class FormPaymentController extends Controller
             'name' => $validated['name'],
             'email' => $validated['email'],
             'handphone' => $validated['handphone'],
-            'amount' => $form->payment_amount ?? 0,
+            'amount' => $amount,
+            'package_option_ids' => $packageOptionIds,
             'status' => 'pending',
             'expires_at' => now()->addMinutes($gateway->expiry_minutes ?? 60),
         ]);

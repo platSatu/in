@@ -324,7 +324,7 @@ class FormQuestionController extends Controller
             'questions' => 'required|array|min:1',
             'questions.*.question_text' => 'nullable|string',
             'questions.*.description' => 'nullable|string',
-            'questions.*.type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file,exact_match',
+            'questions.*.type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file,exact_match,package',
             'questions.*.stage_group' => 'nullable|in:personal_data,placement_test',
             'questions.*.parent_option_id' => 'nullable|string|exists:form_question_options,id',
             'questions.*.section_id' => 'nullable|string|exists:form_sections,id',
@@ -334,6 +334,10 @@ class FormQuestionController extends Controller
             'questions.*.status' => 'nullable|in:active,inactive',
             'questions.*.image' => 'nullable|image|max:4096',
             'questions.*.audio' => 'nullable|file|mimes:mp3,wav,ogg,m4a,aac|max:8192',
+            // Pilihan Paket: baris nama + harga (lihat packageRows()).
+            'questions.*.packages' => 'nullable|array|max:50',
+            'questions.*.packages.*.name' => 'nullable|string|max:255',
+            'questions.*.packages.*.price' => 'nullable|numeric|min:0|max:1000000000',
         ]);
 
         $validator->after(function ($validator) use ($request) {
@@ -347,6 +351,10 @@ class FormQuestionController extends Controller
                         'questions',
                         'Baris ke-' . ((int) $key + 1) . ': isi minimal salah satu dari teks, audio, atau gambar.'
                     );
+                }
+
+                if (($row['type'] ?? null) === 'package' && ($message = $this->packageRowsError((array) ($row['packages'] ?? [])))) {
+                    $validator->errors()->add('questions', 'Baris ke-' . ((int) $key + 1) . ': ' . $message);
                 }
             }
         });
@@ -421,10 +429,13 @@ class FormQuestionController extends Controller
                 ? $this->storeQuestionFile($request->file("questions.$key.audio"), 'audio')
                 : null;
 
-            FormQuestion::create([
+            $isPackage = $row['type'] === 'package';
+
+            $question = FormQuestion::create([
                 'user_id' => (string) $userId,
                 'form_id' => $validated['form_id'],
-                'parent_option_id' => $row['parent_option_id'] ?? null,
+                // Pilihan Paket selalu pertanyaan utama (punya step sendiri sebelum pembayaran).
+                'parent_option_id' => $isPackage ? null : ($row['parent_option_id'] ?? null),
                 'stage_group' => $row['stage_group'] ?? 'placement_test',
                 'section_id' => $row['section_id'] ?? null,
                 'question_text' => $row['question_text'] ?? null,
@@ -438,6 +449,10 @@ class FormQuestionController extends Controller
                 'order' => $nextOrder + $position,
                 'status' => $row['status'] ?? 'active',
             ]);
+
+            if ($isPackage) {
+                $this->syncPackageOptions($question, (array) ($row['packages'] ?? []), (string) $userId);
+            }
 
             $position++;
         }
@@ -597,7 +612,7 @@ class FormQuestionController extends Controller
             'form_id' => 'required|string|exists:forms,id',
             'question_text' => 'nullable|string',
             'description' => 'nullable|string',
-            'type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file,exact_match',
+            'type' => 'required|in:text,textarea,number,date,single_choice,multiple_choice,dropdown,major,file,exact_match,package',
             'stage_group' => 'nullable|in:personal_data,placement_test',
             'parent_option_id' => 'nullable|string|exists:form_question_options,id',
             'section_id' => 'nullable|string|exists:form_sections,id',
@@ -610,6 +625,10 @@ class FormQuestionController extends Controller
             'audio' => 'nullable|file|mimes:mp3,wav,ogg,m4a,aac|max:8192',
             'remove_image' => 'nullable|boolean',
             'remove_audio' => 'nullable|boolean',
+            'packages' => 'nullable|array|max:50',
+            'packages.*.id' => 'nullable|string|max:64',
+            'packages.*.name' => 'nullable|string|max:255',
+            'packages.*.price' => 'nullable|numeric|min:0|max:1000000000',
         ]);
 
         $validator->after(function ($validator) use ($request, $existing) {
@@ -621,6 +640,10 @@ class FormQuestionController extends Controller
 
             if (!$hasText && !$willHaveImage && !$willHaveAudio) {
                 $validator->errors()->add('question_text', 'Isi minimal salah satu dari teks, audio, atau gambar.');
+            }
+
+            if ($request->input('type') === 'package' && ($message = $this->packageRowsError((array) $request->input('packages', [])))) {
+                $validator->errors()->add('packages', $message);
             }
 
             // Pertanyaan bercabang: cegah referensi lintas-form dan cegah cycle
@@ -689,7 +712,18 @@ class FormQuestionController extends Controller
             $validated['match_score'] = null;
         }
 
+        $packageRows = (array) ($validated['packages'] ?? []);
+        unset($validated['packages']);
+
+        if ($validated['type'] === 'package') {
+            $validated['parent_option_id'] = null;
+        }
+
         AdminCrud::update(FormQuestion::class, $id, $validated, null);
+
+        if ($validated['type'] === 'package') {
+            $this->syncPackageOptions($existing, $packageRows, (string) $userId);
+        }
 
         return redirect()
             ->route('quiz.form-question.index')
@@ -718,6 +752,69 @@ class FormQuestionController extends Controller
      * Simpan file upload pertanyaan (gambar/audio) ke public/form-question/{folder},
      * mengikuti pola yang sama dengan UniversityController::storeUniversityFile().
      */
+    /** Pesan error kalau baris Pilihan Paket belum lengkap; null = valid. */
+    private function packageRowsError(array $rows): ?string
+    {
+        $filled = 0;
+
+        foreach ($rows as $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+            $price = $row['price'] ?? null;
+
+            if ($name === '' && ($price === null || $price === '')) {
+                continue; // baris kosong diabaikan
+            }
+
+            if ($name === '' || $price === null || $price === '') {
+                return 'setiap pilihan paket wajib punya nama dan harga.';
+            }
+
+            $filled++;
+        }
+
+        return $filled === 0 ? 'Pilihan Paket butuh minimal satu pilihan (nama + harga).' : null;
+    }
+
+    /**
+     * Simpan baris Pilihan Paket sebagai opsi pertanyaan (option_text + price, urut sesuai baris).
+     * Baris yang punya id = ubah opsi lama; tanpa id = opsi baru; opsi lama yang barisnya dihapus
+     * dinonaktifkan (status inactive), TIDAK dihapus -- supaya jawaban & pembayaran lama yang
+     * merujuk ke opsi itu tetap utuh.
+     */
+    private function syncPackageOptions(FormQuestion $question, array $rows, string $userId): void
+    {
+        $existing = FormQuestionOption::where('question_id', $question->id)->get()->keyBy('id');
+        $kept = [];
+        $order = 0;
+
+        foreach ($rows as $row) {
+            $name = trim((string) ($row['name'] ?? ''));
+            if ($name === '' || ($row['price'] ?? '') === '' || ($row['price'] ?? null) === null) {
+                continue;
+            }
+
+            $values = ['option_text' => $name, 'price' => $row['price'], 'order' => $order++, 'status' => 'active'];
+            $option = $existing->get((string) ($row['id'] ?? ''));
+
+            if ($option) {
+                $option->update($values);
+                $kept[] = $option->id;
+            } else {
+                FormQuestionOption::create($values + [
+                    'user_id' => $userId,
+                    'question_id' => $question->id,
+                    'is_other' => false,
+                    'is_correct' => false,
+                ]);
+            }
+        }
+
+        FormQuestionOption::where('question_id', $question->id)
+            ->whereNotIn('id', $kept)
+            ->whereIn('id', $existing->keys())
+            ->update(['status' => 'inactive']);
+    }
+
     private function storeQuestionFile(UploadedFile $file, string $folder): string
     {
         $destination = public_path('form-question/' . $folder);

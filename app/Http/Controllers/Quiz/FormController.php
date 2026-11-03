@@ -1111,6 +1111,8 @@ class FormController extends Controller
                         'option_text' => $option->option_text,
                         'image' => $this->copyPublicFile($option->image),
                         'score' => $option->score,
+                        // Harga Pilihan Paket ikut disalin (null untuk opsi biasa).
+                        'price' => $option->price,
                         'is_other' => $option->is_other,
                         // FIX (10 September 2026): dua kolom ini sebelumnya
                         // tidak ikut di-copy, jadi selalu jatuh ke default

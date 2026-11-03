@@ -78,6 +78,7 @@ use App\Models\FormSubmission;
 use App\Models\Major;
 use App\Models\Student;
 use App\Services\StudentIdentityResolver;
+use App\Services\Quiz\PackagePricing;
 use App\Models\SettingUniversity;
 use App\Models\User;
 use App\Models\University;
@@ -371,6 +372,7 @@ class FrontendController extends Controller
         $questions = collect();
         $personalDataQuestions = collect();
         $placementTestQuestions = collect();
+        $packageQuestions = collect();
         $sections = collect();
 
         // === PREFILL SETELAH KEMBALI DARI GATEWAY PEMBAYARAN ===
@@ -424,6 +426,12 @@ class FrontendController extends Controller
                 // secara rekursif, lewat @include di dalam question-card.blade.php
                 // sendiri begitu opsi pemicunya muncul di antara $question->options.
                 $rootQuestions = $questions->filter(fn ($q) => $q->parent_option_id === null);
+
+                // === PILIHAN PAKET ===
+                // Pertanyaan bertipe 'package' punya step sendiri ("Pilih Paket") SEBELUM
+                // pembayaran (tagihan mengikuti pilihan), jadi dikeluarkan dari step lain.
+                $packageQuestions = $rootQuestions->where('type', 'package')->values();
+                $rootQuestions = $rootQuestions->where('type', '!=', 'package');
 
                 if ($selectedForm->has_personal_data_stage) {
                     $personalDataQuestions = $rootQuestions->where('stage_group', 'personal_data')->values();
@@ -488,6 +496,7 @@ class FrontendController extends Controller
 
         return view('frontend.form-wizard', compact(
             'quotaFull',
+            'packageQuestions',
             'forms',
             'selectedForm',
             'questions',
@@ -740,6 +749,20 @@ class FrontendController extends Controller
                 }
             }
 
+            // === PILIHAN PAKET ===
+            // Paket yang dikirim harus sama dengan paket yang dibayar (harga dihitung dari
+            // pilihan itu saat pembayaran dibuat). Form tanpa paket: dilewati.
+            if ($payment && !$this->packageMatchesPayment($form, $request, $payment)) {
+                Log::warning('[FORM-WIZARD] Submit ditolak, pilihan paket berbeda dengan yang dibayar', [
+                    'form_id' => $form->id,
+                    'order_id' => $payment->order_id,
+                ]);
+
+                return redirect($this->buildWizardRedirectRoute($form))
+                    ->withErrors(['payment' => 'Pilihan paket berbeda dengan paket yang sudah dibayar. Silakan pilih paket yang sesuai pembayaran Anda.'])
+                    ->withInput();
+            }
+
             // Form tanpa identitas: tidak ada Student; submission & jawaban tersimpan dengan user_id null.
             $student = $collectIdentity ? (new StudentIdentityResolver())->findOrCreate($validated) : null;
 
@@ -853,6 +876,15 @@ class FrontendController extends Controller
                 ->withErrors(['submit' => 'Maaf, terjadi kendala saat menyimpan jawaban Anda. Jawaban belum tersimpan -- silakan coba submit ulang. Kalau masih gagal, hubungi penyelenggara.'])
                 ->withInput();
         }
+    }
+
+    /** Form tanpa pertanyaan paket selalu lolos; form berpaket: pilihan harus sama dengan yang dibayar. */
+    private function packageMatchesPayment(Form $form, Request $request, FormPayment $payment): bool
+    {
+        $pricing = app(PackagePricing::class);
+
+        return !$pricing->hasPackages($form)
+            || $pricing->matchesPayment($pricing->selectedFromRequest($form, $request), $payment->package_option_ids);
     }
 
     /**
@@ -1500,6 +1532,10 @@ class FrontendController extends Controller
             }
         }
 
+        if ($payment && !$this->packageMatchesPayment($form, $request, $payment)) {
+            return response()->json(['message' => 'Pilihan paket berbeda dengan paket yang sudah dibayar, jawaban tidak disimpan.'], 422);
+        }
+
         $student = $collectIdentity ? (new StudentIdentityResolver())->findOrCreate($validated) : null;
 
         $student?->update([
@@ -1765,7 +1801,8 @@ class FrontendController extends Controller
                     'status' => 'active',
                 ]);
             }
-        } elseif ($question->type === 'single_choice') {
+        } elseif (in_array($question->type, ['single_choice', 'package'], true)) {
+            // 'package' (Pilihan Paket) disimpan persis seperti single_choice: satu option_id.
             $optionId = $request->input($questionKey);
 
             if ($optionId) {

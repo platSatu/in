@@ -112,6 +112,7 @@
                     <option value="major">Major</option>
                     <option value="file">File Upload (jpg/jpeg/png/pdf)</option>
                     <option value="exact_match">Exact Match (harus diketik persis)</option>
+                    <option value="package">Pilihan Paket (nama + harga)</option>
                 </select>
             </div>
         </div>
@@ -178,6 +179,21 @@
             </div>
         </div>
 
+        {{-- Pilihan Paket: baris nama + harga. Tampil di step "Pilih Paket" sebelum pembayaran;
+             tagihan = nominal tetap form + harga pilihan yang dipilih peserta. --}}
+        <div class="package-fields mt-3" style="display:none;">
+            <div class="rounded-3 p-3" style="background:#f5f7fb; border:1px solid #e3e8f2;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div>
+                        <div class="fw-bold small">Pilihan Paket</div>
+                        <div class="text-muted small">Isi nama dan harga tiap pilihan. Peserta memilih satu, lalu membayar sesuai harganya.</div>
+                    </div>
+                    <button type="button" class="btn btn-sm btn-outline-primary package-add-btn"><i class="bi bi-plus-lg"></i> Tambah Pilihan</button>
+                </div>
+                <div class="package-rows"></div>
+            </div>
+        </div>
+
         <div class="row g-3 mt-1 exact-match-fields" style="display:none;">
             <div class="col-md-8">
                 <label class="form-label small">Jawaban Benar <span class="text-muted">(harus diketik persis oleh peserta, huruf besar/kecil dihitung)</span></label>
@@ -222,6 +238,17 @@
                 </select>
             </div>
         </div>
+    </div>
+</template>
+
+<template id="packageRowTemplate">
+    <div class="package-row d-flex gap-2 align-items-center mb-2">
+        <input type="text" class="form-control form-control-sm" data-field="name" placeholder="Nama pilihan, mis. Double L">
+        <div class="input-group input-group-sm" style="max-width: 220px;">
+            <span class="input-group-text">Rp</span>
+            <input type="number" min="0" step="1" class="form-control" data-field="price" placeholder="1700000">
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger package-remove-btn" title="Hapus pilihan">&times;</button>
     </div>
 </template>
 
@@ -441,9 +468,49 @@
         // Delegasi 1 listener untuk semua baris (termasuk yang ditambah belakangan
         // lewat "+ Tambah Baris") — lebih sederhana daripada mem-bind listener baru
         // tiap kali addRow() dipanggil.
+        // === PILIHAN PAKET — baris nama + harga, cuma tampil kalau Type 'package' ===
+        const packageTemplate = document.getElementById('packageRowTemplate');
+
+        function addPackageRow(row) {
+            const list = row.querySelector('.package-rows');
+            const base = row.getAttribute('data-name');
+            const index = row.packageCounter = (row.packageCounter || 0) + 1;
+            const fragment = packageTemplate.content.cloneNode(true);
+            fragment.querySelectorAll('[data-field]').forEach(function (el) {
+                el.setAttribute('name', base + '[packages][' + index + '][' + el.getAttribute('data-field') + ']');
+            });
+            list.appendChild(fragment);
+        }
+
+        function applyPackageVisibility(row) {
+            const typeSelect = row.querySelector('.type-select');
+            const fields = row.querySelector('.package-fields');
+            if (!typeSelect || !fields) return;
+
+            const isPackage = typeSelect.value === 'package';
+            fields.style.display = isPackage ? '' : 'none';
+            if (isPackage && !row.querySelector('.package-row')) {
+                addPackageRow(row);
+                addPackageRow(row);
+            }
+        }
+
+        container.addEventListener('click', function (event) {
+            const addBtn = event.target.closest('.package-add-btn');
+            if (addBtn) {
+                addPackageRow(addBtn.closest('.question-row'));
+                return;
+            }
+            const removeBtn = event.target.closest('.package-remove-btn');
+            if (removeBtn) {
+                removeBtn.closest('.package-row').remove();
+            }
+        });
+
         container.addEventListener('change', function (event) {
             if (event.target.classList.contains('type-select')) {
                 applyExactMatchVisibility(event.target.closest('.question-row'));
+                applyPackageVisibility(event.target.closest('.question-row'));
             }
         });
 
@@ -470,6 +537,7 @@
             });
 
             const row = fragment.querySelector('.question-row');
+            row.setAttribute('data-name', name);
             row.querySelector('.remove-row-btn').addEventListener('click', function () {
                 if (container.querySelectorAll('.question-row').length > 1) {
                     row.remove();

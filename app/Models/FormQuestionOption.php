@@ -24,6 +24,7 @@ class FormQuestionOption extends Model
         'option_text',
         'image',
         'score',
+        'price',
         'is_other',
         'is_correct',
         'status',
@@ -32,6 +33,7 @@ class FormQuestionOption extends Model
 
     protected $casts = [
         'is_other' => 'boolean',
+        'price' => 'decimal:2',
         'is_correct' => 'boolean',
     ];
 

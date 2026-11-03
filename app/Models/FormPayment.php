@@ -29,6 +29,7 @@ class FormPayment extends Model implements Payable
         'email',
         'handphone',
         'amount',
+        'package_option_ids',
         'status',
         'payment_method',
         'payment_url',
@@ -41,6 +42,7 @@ class FormPayment extends Model implements Payable
 
     protected $casts = [
         'amount' => 'decimal:2',
+        'package_option_ids' => 'array',
         'raw_response' => 'array',
         'raw_callback' => 'array',
         'paid_at' => 'datetime',

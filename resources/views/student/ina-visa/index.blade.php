@@ -47,6 +47,7 @@
                                 <th>Nama</th>
                                 <th>WhatsApp</th>
                                 <th>Form</th>
+                                <th>Paket</th>
                                 <th>File</th>
                                 <th>Pembayaran</th>
                                 <th>Tanggal</th>
@@ -72,6 +73,18 @@
                                     </td>
                                     <td class="text-nowrap">{{ $student->handphone ?? '-' }}</td>
                                     <td>{{ $submission->form->name ?? '-' }}</td>
+                                    <td>
+                                        @forelse ($packages->get($submission->id, collect()) as $pkg)
+                                            <div class="text-nowrap">
+                                                {{ $pkg->option->option_text ?? '-' }}
+                                                @if ($pkg->option && $pkg->option->price !== null)
+                                                    <span class="text-muted small">· Rp{{ number_format((float) $pkg->option->price, 0, ',', '.') }}</span>
+                                                @endif
+                                            </div>
+                                        @empty
+                                            <span class="text-muted small">-</span>
+                                        @endforelse
+                                    </td>
                                     <td>
                                         @forelse ($files->get($submission->id, collect()) as $file)
                                             <div class="text-nowrap">
@@ -111,7 +124,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center">
+                                    <td colspan="9" class="text-center">
                                         @if ($forms->isEmpty())
                                             Belum ada form berjenis Ina Visa. Buka Quiz Form &rsaquo; Edit, lalu pilih <b>Jenis Form: Ina Visa</b>.
                                         @elseif ($search !== '')

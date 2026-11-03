@@ -87,6 +87,31 @@
         <input type="date"
             name="question_{{ $question->id }}"
             class="form-control">
+    @elseif($question->type === 'package')
+        {{-- Pilihan Paket: pilihan tunggal dengan harga di bawah namanya. data-price hanya untuk
+             total di layar; nominal yang ditagih dihitung ulang di server (PackagePricing).
+             $packageChecked: pilihan yang sudah dibayar (diisi ulang setelah kembali dari gateway). --}}
+        @foreach($question->options as $option)
+            @php $isPicked = in_array((string) $option->id, $packageChecked ?? [], true); @endphp
+            <div class="form-check option-item {{ $isPicked ? 'selected' : '' }}" onclick="toggleSingleOption(this, '{{ $question->id }}')">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="option-check"></span>
+                    <input type="radio"
+                        name="question_{{ $question->id }}"
+                        value="{{ $option->id }}"
+                        data-price="{{ (float) ($option->price ?? 0) }}"
+                        class="form-check-input d-none"
+                        id="option_{{ $option->id }}"
+                        {{ $isPicked ? 'checked' : '' }}>
+                    <label class="form-check-label mb-0" for="option_{{ $option->id }}">
+                        <span class="d-block fw-semibold">{{ $option->option_text }}</span>
+                        @if ($option->price !== null)
+                            <span class="package-price">Rp{{ number_format((float) $option->price, 0, ',', '.') }}</span>
+                        @endif
+                    </label>
+                </div>
+            </div>
+        @endforeach
     @elseif($question->type === 'single_choice')
         @php $hasImageOptions = $question->options->contains(fn ($o) => !empty($o->image)); @endphp
         <div class="{{ $hasImageOptions ? 'row g-3' : '' }}">

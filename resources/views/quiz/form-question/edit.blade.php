@@ -126,6 +126,8 @@
                                             {{ old('type', $data->type) === 'file' ? 'selected' : '' }}>File Upload (jpg/jpeg/png/pdf)</option>
                                         <option value="exact_match"
                                             {{ old('type', $data->type) === 'exact_match' ? 'selected' : '' }}>Exact Match (harus diketik persis)</option>
+                                        <option value="package"
+                                            {{ old('type', $data->type) === 'package' ? 'selected' : '' }}>Pilihan Paket (nama + harga)</option>
                                     </select>
                                     <div class="form-text">
                                         Single Choice, Multiple Choice, dan Dropdown ambil pilihan jawabannya dari menu "Options" di pertanyaan ini.
@@ -134,6 +136,43 @@
                                     </div>
                                     @error('type')
                                         <div class="invalid-feedback">{{ $message }}</div>
+                                    @enderror
+                                </div>
+
+                                {{-- Pilihan Paket: baris nama + harga (opsi pertanyaan ini). Baris yang dihapus
+                                     dinonaktifkan, bukan dihapus, supaya jawaban & pembayaran lama tetap utuh. --}}
+                                @php
+                                    $packageRows = old('packages') !== null
+                                        ? array_values((array) old('packages'))
+                                        : $data->options->map(fn ($o) => ['id' => $o->id, 'name' => $o->option_text, 'price' => $o->price !== null ? (int) round((float) $o->price) : null])->values()->all();
+                                @endphp
+                                <div class="col-xxl-12 mb-4" id="packageFields" style="display:none;">
+                                    <div class="rounded-3 p-3" style="background:#f5f7fb; border:1px solid #e3e8f2;">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <div>
+                                                <div class="fw-bold">Pilihan Paket</div>
+                                                <div class="text-muted small">Isi nama dan harga tiap pilihan. Peserta memilih satu, lalu membayar sesuai harganya.</div>
+                                            </div>
+                                            <button type="button" class="btn btn-sm btn-outline-primary" id="packageAddBtn"><i class="bi bi-plus-lg"></i> Tambah Pilihan</button>
+                                        </div>
+                                        <div id="packageRows">
+                                            @foreach ($packageRows as $i => $pkg)
+                                                <div class="package-row d-flex gap-2 align-items-center mb-2">
+                                                    @if (!empty($pkg['id']))
+                                                        <input type="hidden" name="packages[{{ $i }}][id]" value="{{ $pkg['id'] }}">
+                                                    @endif
+                                                    <input type="text" class="form-control form-control-sm" name="packages[{{ $i }}][name]" value="{{ $pkg['name'] ?? '' }}" placeholder="Nama pilihan, mis. Double L">
+                                                    <div class="input-group input-group-sm" style="max-width: 220px;">
+                                                        <span class="input-group-text">Rp</span>
+                                                        <input type="number" min="0" step="1" class="form-control" name="packages[{{ $i }}][price]" value="{{ $pkg['price'] ?? '' }}" placeholder="1700000">
+                                                    </div>
+                                                    <button type="button" class="btn btn-sm btn-outline-danger package-remove-btn" title="Hapus pilihan">&times;</button>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    @error('packages')
+                                        <div class="invalid-feedback d-block">{{ $message }}</div>
                                     @enderror
                                 </div>
 
@@ -282,6 +321,42 @@
         if (typeSelect) {
             typeSelect.addEventListener('change', applyExactMatchVisibility);
             applyExactMatchVisibility();
+        }
+
+        // === PILIHAN PAKET ===
+        const packageFields = document.getElementById('packageFields');
+        const packageRows = document.getElementById('packageRows');
+        let packageCounter = {{ count($packageRows) + 1 }};
+
+        function addPackageRow() {
+            const i = packageCounter++;
+            const row = document.createElement('div');
+            row.className = 'package-row d-flex gap-2 align-items-center mb-2';
+            row.innerHTML = '<input type="text" class="form-control form-control-sm" name="packages[' + i + '][name]" placeholder="Nama pilihan, mis. Double L">'
+                + '<div class="input-group input-group-sm" style="max-width: 220px;"><span class="input-group-text">Rp</span>'
+                + '<input type="number" min="0" step="1" class="form-control" name="packages[' + i + '][price]" placeholder="1700000"></div>'
+                + '<button type="button" class="btn btn-sm btn-outline-danger package-remove-btn" title="Hapus pilihan">&times;</button>';
+            packageRows.appendChild(row);
+        }
+
+        function applyPackageVisibility() {
+            if (!typeSelect || !packageFields) return;
+            const isPackage = typeSelect.value === 'package';
+            packageFields.style.display = isPackage ? '' : 'none';
+            if (isPackage && !packageRows.querySelector('.package-row')) {
+                addPackageRow();
+                addPackageRow();
+            }
+        }
+
+        if (packageFields) {
+            document.getElementById('packageAddBtn').addEventListener('click', addPackageRow);
+            packageRows.addEventListener('click', function (event) {
+                const btn = event.target.closest('.package-remove-btn');
+                if (btn) btn.closest('.package-row').remove();
+            });
+            typeSelect.addEventListener('change', applyPackageVisibility);
+            applyPackageVisibility();
         }
     })();
 </script>
