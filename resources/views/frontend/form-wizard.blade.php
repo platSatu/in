@@ -739,7 +739,8 @@
                             @enderror
                         </div>
 
-                        @if($selectedForm->requires_payment)
+                        {{-- 4 Nov 2026: tidak ditampilkan untuk form berjenis Ina Visa (nominal mengikuti paket yang dipilih) --}}
+                        @if($selectedForm->requires_payment && ($selectedForm->form_type ?? null) !== \App\Models\Form::TYPE_INA_VISA)
                             <div class="form-text mb-3">
                                 <i class="bi bi-info-circle"></i>
                                 Form ini membutuhkan pembayaran sebesar
