@@ -49,7 +49,7 @@
             </strong>
 
             @if($question->description)
-                <div class="text-muted mt-1" style="font-size: 14px;">{{ $question->description }}</div>
+                <div class="text-muted mt-1 form-description form-description-kecil">{{ \App\Helpers\FormDescription::toHtml($question->description) }}</div>
             @endif
 
             @if($question->audio)

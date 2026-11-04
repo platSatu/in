@@ -115,6 +115,8 @@
         .form-description p:last-child { margin-bottom: 0; }
         .form-description ul, .form-description ol { margin: 0 0 .65rem; padding-left: 1.3rem; }
         .form-description li { margin-bottom: .3rem; }
+        .form-description-kecil { font-size: 14px; line-height: 1.55; }
+        .form-description-kecil p, .form-description-kecil ul, .form-description-kecil ol { margin-bottom: .35rem; }
         .form-description.is-panjang { text-align: left; background: #faf7f2; border: 1px solid #efe7db;
             border-radius: 14px; padding: 18px 22px; }
 
@@ -943,7 +945,7 @@
                                         <div class="quiz-section-header mb-3">
                                             <h5 class="mb-1">{{ $group->name }}</h5>
                                             @if($group->description)
-                                                <div class="text-muted" style="font-size: 14px;">{{ $group->description }}</div>
+                                                <div class="text-muted form-description form-description-kecil">{{ \App\Helpers\FormDescription::toHtml($group->description) }}</div>
                                             @endif
                                         </div>
                                     @endif
