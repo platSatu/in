@@ -109,6 +109,15 @@
             background: #fff;
         }
 
+        /* 4 Nov 2026: description form */
+        .form-description { color: #4b5563; font-size: .98rem; line-height: 1.65; }
+        .form-description p { margin: 0 0 .65rem; }
+        .form-description p:last-child { margin-bottom: 0; }
+        .form-description ul, .form-description ol { margin: 0 0 .65rem; padding-left: 1.3rem; }
+        .form-description li { margin-bottom: .3rem; }
+        .form-description.is-panjang { text-align: left; background: #faf7f2; border: 1px solid #efe7db;
+            border-radius: 14px; padding: 18px 22px; }
+
         .wizard-card .card-body {
             padding: 45px !important;
         }
@@ -585,9 +594,14 @@
                 {{ $selectedForm->name ?? 'Choose a Form' }}
             </h3>
 
-            <p class="text-center text-muted mb-4">
-                {{ $selectedForm->description ?? 'Please select the form you would like to fill out.' }}
-            </p>
+            {{-- 4 Nov 2026: description tersusun rapi (baris baru, paragraf, poin "- ") — App\Helpers\FormDescription --}}
+            @if (filled($selectedForm->description ?? null))
+                <div class="form-description {{ \App\Helpers\FormDescription::isPanjang($selectedForm->description) ? 'is-panjang' : 'text-center' }} mb-4">
+                    {{ \App\Helpers\FormDescription::toHtml($selectedForm->description) }}
+                </div>
+            @elseif (! ($selectedForm ?? null))
+                <p class="text-center text-muted mb-4">Please select the form you would like to fill out.</p>
+            @endif
 
             @if(session('success'))
                 <div class="alert alert-success">

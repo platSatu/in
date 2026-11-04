@@ -437,10 +437,11 @@
                             <div class="col-sm-12">
                                 <label for="description" class="mb-2">Description (Optional)</label>
                                 <textarea class="form-control @error('description') is-invalid @enderror" id="description" name="description"
-                                    rows="4" placeholder="Form Description">{{ old('description') }}</textarea>
+                                    rows="6" placeholder="Form Description">{{ old('description') }}</textarea>
                                 @error('description')
                                     <div class="invalid-feedback">{{ $message }}</div>
                                 @enderror
+                                <small class="text-muted d-block mt-1">Tekan <b>Enter</b> untuk baris baru, beri <b>baris kosong</b> untuk paragraf baru, dan awali baris dengan <b>- </b> (atau <b>1. </b>) untuk poin.</small>
                             </div>
                         </div>
 
