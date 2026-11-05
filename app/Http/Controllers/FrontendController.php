@@ -103,6 +103,10 @@ class FrontendController extends Controller
      */
     private const QUESTION_FILE_ALLOWED_MIMES = 'jpg,jpeg,png,pdf';
     private const QUESTION_FILE_MAX_KB = 5120; // 5MB
+    // 5 Nov 2026: folder file jawaban tipe 'file' (relatif ke public/). Lihat storeQuestionAnswerFile().
+    public const QUESTION_FILE_DIR = 'uploads/quiz-answers';
+    // Awalan path yang dikenali sebagai file jawaban (lama + baru), dipakai halaman Form Answer.
+    public const QUESTION_FILE_PREFIXES = ['quiz/file-upload/', 'uploads/quiz-answers/'];
 
     public function index()
     {
@@ -1958,22 +1962,36 @@ class FrontendController extends Controller
     }
 
     /**
-     * Simpan file jawaban pertanyaan tipe 'file' ke public/quiz/file-upload,
+     * Simpan file jawaban pertanyaan tipe 'file' ke public/uploads/quiz-answers,
      * kembalikan path relatifnya — pola yang sama dengan storeUniversityFile()
      * di UniversityController / storeFormFile() di FormController.
+     *
+     * 5 Nov 2026: dulu disimpan ke public/quiz/file-upload. Folder public/quiz itu
+     * bentrok dengan alamat halaman /quiz: begitu folder terbentuk, nginx membalas
+     * 403 untuk semua halaman quiz. Folder baru TIDAK BOLEH bernama sama dengan
+     * route mana pun. File lama tetap di tempatnya (path lama di database tetap
+     * berlaku, dilayani nginx lewat aturan location /quiz/file-upload/).
+     *
+     * Ekstensi diambil dari ISI file (guessExtension), bukan dari nama file kiriman
+     * peserta, supaya file yang lolos validasi tidak bisa tersimpan sebagai .php.
      */
     private function storeQuestionAnswerFile(UploadedFile $file): string
     {
-        $destination = public_path('quiz/file-upload');
+        $destination = public_path(self::QUESTION_FILE_DIR);
 
         if (!file_exists($destination)) {
             mkdir($destination, 0755, true);
         }
 
-        $filename = Str::uuid() . '.' . strtolower($file->getClientOriginalExtension());
+        $extension = strtolower((string) $file->guessExtension());
+        if (!in_array($extension, explode(',', self::QUESTION_FILE_ALLOWED_MIMES), true)) {
+            $extension = 'bin';
+        }
+
+        $filename = Str::uuid() . '.' . $extension;
         $file->move($destination, $filename);
 
-        return 'quiz/file-upload/' . $filename;
+        return self::QUESTION_FILE_DIR . '/' . $filename;
     }
 
     /**

@@ -71,7 +71,7 @@
                                     </td>
                                     <td>{{ \Illuminate\Support\Str::limit(optional($item->option)->option_text, 30) ?? '-' }}</td>
                                     <td>
-                                        @if ($item->answer_text && str_starts_with($item->answer_text, 'quiz/file-upload/'))
+                                        @if ($item->answer_text && \Illuminate\Support\Str::startsWith($item->answer_text, \App\Http\Controllers\FrontendController::QUESTION_FILE_PREFIXES))
                                             {{-- Jawaban pertanyaan tipe 'file' (lihat FrontendController::saveQuestionAnswers()) —
                                                  answer_text-nya adalah path relatif ke public/, bukan teks bebas. --}}
                                             <a href="{{ asset($item->answer_text) }}" target="_blank" rel="noopener">Lihat File</a>
