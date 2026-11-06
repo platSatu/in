@@ -84,15 +84,10 @@ class BbGateway implements PaymentGatewayInterface
         $invoice = is_array($event['data'] ?? null) ? $event['data'] : [];
         $orderId = (string) ($invoice['external_id'] ?? '');
         $name = (string) ($event['event'] ?? '');
-        $amount = null;
-        $isPaid = false;
-
         // Lunas dipastikan lagi ke BB (bukan hanya dari isi webhook).
-        if ($name === 'invoice.paid' && $orderId !== '') {
-            $current = $this->request('GET', '/api/v1/invoices/'.rawurlencode($orderId));
-            $isPaid = ($current['status'] ?? null) === 'paid' && ($current['external_id'] ?? null) === $orderId;
-            $amount = isset($current['amount']) ? (int) $current['amount'] : null;
-        }
+        $current = $name === 'invoice.paid' && $orderId !== '' ? $this->fetchStatus($orderId) : null;
+        $isPaid = (bool) ($current['is_paid'] ?? false);
+        $amount = $current['amount'] ?? null;
 
         return [
             'order_id' => $orderId,
@@ -103,6 +98,24 @@ class BbGateway implements PaymentGatewayInterface
             'raw' => ['event' => $name, 'id' => $invoice['id'] ?? null, 'status' => $invoice['status'] ?? null,
                 'amount' => $invoice['amount'] ?? null, 'payment_method' => $invoice['payment_method'] ?? null],
             'amount' => $amount,
+        ];
+    }
+
+    /**
+     * Status invoice langsung dari BB (server ke server). Dipakai webhook di atas dan oleh halaman peserta
+     * yang sedang menunggu (FormPaymentController::syncBbStatus), supaya tidak bergantung pada webhook saja.
+     *
+     * @return array{order_id: string, is_paid: bool, reference: ?string, amount: ?int}
+     */
+    public function fetchStatus(string $orderId): array
+    {
+        $current = $this->request('GET', '/api/v1/invoices/'.rawurlencode($orderId));
+
+        return [
+            'order_id' => $orderId,
+            'is_paid' => ($current['status'] ?? null) === 'paid' && ($current['external_id'] ?? null) === $orderId,
+            'reference' => $current['id'] ?? null,
+            'amount' => isset($current['amount']) ? (int) $current['amount'] : null,
         ];
     }
 

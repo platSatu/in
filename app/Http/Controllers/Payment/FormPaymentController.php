@@ -16,6 +16,7 @@ use Closure;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Throwable;
@@ -219,6 +220,9 @@ class FormPaymentController extends Controller
     {
         $payment = FormPayment::where('order_id', $orderId)->firstOrFail();
 
+        // Gateway BB: ikut mengecek ke BB supaya peserta tidak menunggu webhook (gateway lain tidak terpengaruh).
+        $this->syncBbStatus($payment);
+
         if ($payment->status === 'pending' && $payment->expires_at && now()->greaterThanOrEqualTo($payment->expires_at)) {
             $expired = FormPayment::where('id', $payment->id)
                 ->where('status', 'pending')
@@ -379,6 +383,51 @@ class FormPaymentController extends Controller
         }
 
         return response()->json(['message' => 'OK']);
+    }
+
+    /**
+     * Khusus gateway BB (6 November 2026): saat peserta menunggu di halaman bayar, tanya status langsung ke BB,
+     * maksimal 1x per 10 detik per transaksi. Lunas hanya kalau BB bilang "paid" DAN nominalnya sama dengan
+     * tagihan. Perubahan status memakai update bersyarat (pending -> paid), jadi kalau webhook datang hampir
+     * bersamaan, efek samping (buka step Apply, kirim WA invoice) tetap hanya terjadi sekali.
+     * Gateway selain BB langsung dilewati: alurnya tidak berubah sama sekali.
+     */
+    public function syncBbStatus(FormPayment|ApplicationPayment $payment): void
+    {
+        $gateway = $payment->paymentGateway;
+
+        if ($payment->status !== 'pending' || $gateway?->gateway !== 'bb' || ! Cache::add('bb-status:'.$payment->order_id, 1, 10)) {
+            return;
+        }
+
+        try {
+            $result = PaymentGatewayFactory::make($gateway)->fetchStatus($payment->order_id);
+        } catch (Throwable $e) {
+            Log::warning('[PAYMENT][BB] Cek status gagal, menunggu webhook', ['order_id' => $payment->order_id, 'message' => $e->getMessage()]);
+
+            return;
+        }
+
+        if (! $result['is_paid'] || $result['amount'] !== (int) round((float) $payment->getAmount())) {
+            return;
+        }
+
+        $updated = $payment->newQuery()->whereKey($payment->getKey())->where('status', 'pending')->update([
+            'status' => 'paid',
+            'paid_at' => now(),
+            'gateway_reference' => $result['reference'] ?? $payment->gateway_reference,
+        ]);
+
+        if ($updated !== 1) {
+            return;
+        }
+
+        $payment->refresh();
+        Log::info('[PAYMENT] Lunas dari cek status BB', ['order_id' => $payment->order_id]);
+
+        if ($payment instanceof ApplicationPayment) {
+            $this->onApplicationPaymentPaid($payment);
+        }
     }
 
     /**

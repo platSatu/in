@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Payment\FormPaymentController;
 use App\Models\ApplicationPayment;
 use App\Models\PaymentGateway;
 use App\Models\UniversityApplication;
@@ -269,6 +270,9 @@ class ApplicationPaymentController extends Controller
         $payment = ApplicationPayment::where('order_id', $orderId)->firstOrFail();
 
         $this->assertOwnsPayment($request, $payment);
+
+        // Gateway BB: ikut mengecek ke BB (lihat FormPaymentController::syncBbStatus). Gateway lain dilewati.
+        app(FormPaymentController::class)->syncBbStatus($payment);
 
         if ($payment->status === ApplicationPayment::STATUS_PENDING
             && $payment->expires_at
