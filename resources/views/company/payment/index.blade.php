@@ -13,16 +13,7 @@
     ];
 @endphp
 
-<div class="middle-content container-xxl p-0">
-
-    <div class="page-meta mb-3">
-        <nav class="breadcrumb-style-one" aria-label="breadcrumb">
-            <ol class="breadcrumb">
-                <li class="breadcrumb-item">Company</li>
-                <li class="breadcrumb-item active" aria-current="page">Payment</li>
-            </ol>
-        </nav>
-    </div>
+<div class="middle-content container-xxl p-0 pt-3">
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
@@ -36,7 +27,7 @@
             <a class="nav-link {{ $tab === 'history' ? 'active' : '' }}" href="{{ route('company.payment.index') }}">Riwayat Transaksi</a>
         </li>
         <li class="nav-item">
-            <a class="nav-link {{ $tab === 'payout' ? 'active' : '' }}" href="{{ route('company.payment.index', ['tab' => 'payout']) }}">Penarikan</a>
+            <a class="nav-link {{ $tab === 'payout' ? 'active' : '' }}" href="{{ route('company.payment.index', ['tab' => 'payout']) }}">Rekening &amp; Penarikan</a>
         </li>
     </ul>
 
@@ -44,11 +35,11 @@
         {{-- ================= TAB 1: riwayat transaksi lewat BB ================= --}}
         <div class="widget-content widget-content-area br-8 p-4">
             <form method="GET" action="{{ route('company.payment.index') }}" class="row g-2 align-items-end mb-3">
-                <div class="col-md-4">
+                <div class="col-12 col-lg-3">
                     <label class="form-label small mb-1">Cari</label>
                     <input type="text" name="search" class="form-control" maxlength="100" value="{{ request('search') }}" placeholder="Order ID / nama / email">
                 </div>
-                <div class="col-6 col-md-2">
+                <div class="col-6 col-lg-2">
                     <label class="form-label small mb-1">Modul</label>
                     <select name="module" class="form-select">
                         <option value="">Semua</option>
@@ -56,7 +47,7 @@
                         <option value="apply" @selected(request('module') === 'apply')>Apply</option>
                     </select>
                 </div>
-                <div class="col-6 col-md-2">
+                <div class="col-6 col-lg-2">
                     <label class="form-label small mb-1">Status</label>
                     <select name="status" class="form-select">
                         <option value="">Semua</option>
@@ -65,25 +56,27 @@
                         @endforeach
                     </select>
                 </div>
-                <div class="col-6 col-md-2">
+                <div class="col-6 col-lg-2">
                     <label class="form-label small mb-1">Dari</label>
                     <input type="date" name="date_from" class="form-control" value="{{ request('date_from') }}">
                 </div>
-                <div class="col-6 col-md-2">
+                <div class="col-6 col-lg-2">
                     <label class="form-label small mb-1">Sampai</label>
                     <input type="date" name="date_to" class="form-control" value="{{ request('date_to') }}">
                 </div>
-                <div class="col-12 d-flex gap-2 justify-content-end">
-                    @if (request()->hasAny(['search', 'module', 'status', 'date_from', 'date_to']))
-                        <a href="{{ route('company.payment.index') }}" class="btn btn-outline-secondary">Reset</a>
-                    @endif
-                    <button type="submit" class="btn btn-primary">Filter</button>
+                <div class="col-12 col-lg-1">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
                 </div>
             </form>
 
-            <div class="alert alert-light border mb-3">
-                Lunas: <strong>{{ number_format((int) $paid->total, 0, ',', '.') }}</strong> transaksi,
-                total <strong>{{ $rp($paid->amount) }}</strong> (sesuai filter). Potongan payment gateway terlihat di mutasi tab Penarikan.
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 small text-muted mb-2">
+                <span>
+                    Lunas <strong class="text-dark">{{ number_format((int) $paid->total, 0, ',', '.') }}</strong> transaksi ·
+                    total <strong class="text-dark">{{ $rp($paid->amount) }}</strong>
+                </span>
+                @if (request()->hasAny(['search', 'module', 'status', 'date_from', 'date_to']))
+                    <a href="{{ route('company.payment.index') }}">Hapus filter</a>
+                @endif
             </div>
 
             <div class="table-responsive">
@@ -96,13 +89,12 @@
                             <th>Modul</th>
                             <th class="text-end">Nominal</th>
                             <th>Status</th>
-                            <th>Lunas</th>
                         </tr>
                     </thead>
                     <tbody>
                         @forelse ($rows as $row)
                             <tr>
-                                <td class="text-nowrap">{{ $date($row->created_at)?->format('d/m/Y H:i') }}</td>
+                                <td class="text-nowrap">{{ $date($row->created_at)?->format('d/m/Y') }}<div class="small text-muted">{{ $date($row->created_at)?->format('H:i') }}</div></td>
                                 <td class="text-nowrap fw-bold">{{ $row->order_id }}<div class="small text-muted fw-normal">{{ $row->payment_method ?: '' }}</div></td>
                                 <td>{{ $row->payer ?: '-' }}<div class="small text-muted">{{ $row->email }}</div></td>
                                 <td>{{ $row->module === 'quiz' ? 'Quiz' : 'Apply' }}<div class="small text-muted">{{ $row->item ?: '-' }}</div></td>
@@ -110,11 +102,13 @@
                                 <td>
                                     @php([$tone, $label] = $statusBadge[$row->status] ?? ['secondary', ucfirst((string) $row->status)])
                                     <span class="badge badge-{{ $tone }}">{{ $label }}</span>
+                                    @if ($row->paid_at)
+                                        <div class="small text-muted text-nowrap mt-1">{{ $date($row->paid_at)->format('d/m/Y H:i') }}</div>
+                                    @endif
                                 </td>
-                                <td class="text-nowrap">{{ $date($row->paid_at)?->format('d/m/Y H:i') ?? '-' }}</td>
                             </tr>
                         @empty
-                            <tr><td colspan="7" class="text-center text-muted py-4">Belum ada transaksi lewat BB.</td></tr>
+                            <tr><td colspan="6" class="text-center text-muted py-4">Belum ada transaksi lewat BB.</td></tr>
                         @endforelse
                     </tbody>
                 </table>
@@ -152,7 +146,12 @@
                 <div class="widget-content widget-content-area br-8 p-4 h-100">
                     <h6 class="mb-3">Daftarkan Rekening</h6>
                     @if ($accountsError)
-                        <div class="alert alert-warning small mb-0">{{ $accountsError }}</div>
+                        <div class="small text-muted mb-2">Form rekening belum bisa dibuka. Pastikan:</div>
+                        <ol class="small text-muted ps-3 mb-2">
+                            <li>Penarikan lewat API sudah diaktifkan di akun BB (Invoice › Disbursement › Pengaturan &amp; API).</li>
+                            <li>Server BB sudah versi terbaru.</li>
+                        </ol>
+                        <div class="small text-danger">{{ $accountsError }}</div>
                     @else
                         @error('account') <div class="alert alert-danger small">{{ $message }}</div> @enderror
                         <form method="POST" action="{{ route('company.payment.accounts.store') }}">
@@ -187,7 +186,7 @@
                 <div class="widget-content widget-content-area br-8 p-4 h-100">
                     <h6 class="mb-3">Tarik Dana</h6>
                     @if ($accountsError)
-                        <div class="small text-muted">Penarikan belum bisa dipakai.</div>
+                        <div class="small text-muted">Bisa dipakai setelah rekening terdaftar.</div>
                     @elseif ($accounts->where('status', 'active')->isEmpty())
                         <div class="small text-muted">Daftarkan rekening dulu.</div>
                     @else
@@ -231,7 +230,7 @@
                 <h6 class="mb-0">Mutasi</h6>
                 <form method="GET" action="{{ route('company.payment.index') }}" class="d-flex flex-wrap gap-2 align-items-end">
                     <input type="hidden" name="tab" value="payout">
-                    <select name="direction" class="form-select form-select-sm" style="width:auto">
+                    <select name="direction" class="form-select form-select-sm" style="min-width:170px">
                         <option value="">Masuk &amp; keluar</option>
                         <option value="credit" @selected(request('direction') === 'credit')>Masuk</option>
                         <option value="debit" @selected(request('direction') === 'debit')>Keluar</option>
@@ -246,7 +245,7 @@
             </div>
 
             @if ($mutationsError)
-                <div class="alert alert-warning small">{{ $mutationsError }}</div>
+                <div class="small text-danger mb-2">Mutasi belum bisa dimuat: {{ $mutationsError }}</div>
             @endif
 
             <div class="table-responsive">
