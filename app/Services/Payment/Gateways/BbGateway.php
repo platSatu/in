@@ -109,7 +109,8 @@ class BbGateway implements PaymentGatewayInterface
     /** Request bertanda tangan ke API BB. @return array isi "data" dari respons */
     private function request(string $method, string $path, ?array $payload = null): array
     {
-        $base = rtrim($this->credential('base_url'), '/');
+        // Base URL cukup domain; kalau terlanjur diisi dengan /api atau /api/v1, bagian itu dibuang.
+        $base = preg_replace('#/api(/v1)?$#i', '', rtrim($this->credential('base_url'), '/'));
 
         if (! preg_match('#^https?://#i', $base)) {
             throw new RuntimeException('Base URL gateway BB belum benar.');

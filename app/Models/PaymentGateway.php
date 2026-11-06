@@ -66,7 +66,7 @@ class PaymentGateway extends Model
             ],
             // Lihat App\Services\Payment\Gateways\BbGateway. Hanya untuk pendaftaran & quiz (gateway aktif).
             'bb' => [
-                'base_url' => 'Base URL (mis. https://domain-bb.com)',
+                'base_url' => 'Base URL (cukup domain, tanpa /api, mis. https://domain-bb.com)',
                 'api_key' => 'API Key',
                 'secret_key' => 'Secret Key',
                 'webhook_secret' => 'Webhook Secret',
