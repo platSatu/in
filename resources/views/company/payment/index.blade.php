@@ -200,7 +200,7 @@
                                 <select name="payout_account_id" class="form-select" required>
                                     @foreach ($accounts->where('status', 'active') as $account)
                                         <option value="{{ $account['id'] }}" @selected(old('payout_account_id') === $account['id'])>
-                                            {{ $account['bank_name'] }} ****{{ $account['account_last4'] }} · {{ $account['account_name'] }}{{ $account['label'] ? ' ('.$account['label'].')' : '' }}
+                                            {{ $account['account_name'] }} · ****{{ $account['account_last4'] }} · {{ $account['label'] ?: $account['bank_name'] }}
                                         </option>
                                     @endforeach
                                 </select>
@@ -226,23 +226,36 @@
 
         {{-- ================= TAB 2 (bawah): mutasi ================= --}}
         <div class="widget-content widget-content-area br-8 p-4">
-            <div class="d-flex flex-wrap justify-content-between align-items-end gap-2 mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
                 <h6 class="mb-0">Mutasi</h6>
-                <form method="GET" action="{{ route('company.payment.index') }}" class="d-flex flex-wrap gap-2 align-items-end">
-                    <input type="hidden" name="tab" value="payout">
-                    <select name="direction" class="form-select form-select-sm" style="min-width:170px">
+                @if (request()->hasAny(['direction', 'date_from', 'date_to']))
+                    <a href="{{ route('company.payment.index', ['tab' => 'payout']) }}" class="small">Hapus filter</a>
+                @endif
+            </div>
+
+            {{-- Pola sama dengan filter tab Riwayat Transaksi: satu baris, tombol sejajar. --}}
+            <form method="GET" action="{{ route('company.payment.index') }}" class="row g-2 align-items-end mb-3">
+                <input type="hidden" name="tab" value="payout">
+                <div class="col-12 col-lg-4">
+                    <label class="form-label small mb-1">Jenis</label>
+                    <select name="direction" class="form-select">
                         <option value="">Masuk &amp; keluar</option>
                         <option value="credit" @selected(request('direction') === 'credit')>Masuk</option>
                         <option value="debit" @selected(request('direction') === 'debit')>Keluar</option>
                     </select>
-                    <input type="date" name="date_from" class="form-control form-control-sm" style="width:auto" value="{{ request('date_from') }}">
-                    <input type="date" name="date_to" class="form-control form-control-sm" style="width:auto" value="{{ request('date_to') }}">
-                    <button type="submit" class="btn btn-sm btn-primary">Filter</button>
-                    @if (request()->hasAny(['direction', 'date_from', 'date_to']))
-                        <a href="{{ route('company.payment.index', ['tab' => 'payout']) }}" class="btn btn-sm btn-outline-secondary">Reset</a>
-                    @endif
-                </form>
-            </div>
+                </div>
+                <div class="col-6 col-lg-3">
+                    <label class="form-label small mb-1">Dari</label>
+                    <input type="date" name="date_from" class="form-control" value="{{ request('date_from') }}">
+                </div>
+                <div class="col-6 col-lg-3">
+                    <label class="form-label small mb-1">Sampai</label>
+                    <input type="date" name="date_to" class="form-control" value="{{ request('date_to') }}">
+                </div>
+                <div class="col-12 col-lg-2">
+                    <button type="submit" class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
 
             @if ($mutationsError)
                 <div class="small text-danger mb-2">Mutasi belum bisa dimuat: {{ $mutationsError }}</div>
