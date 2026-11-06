@@ -126,9 +126,12 @@ class BbGateway implements PaymentGatewayInterface
         ])->withBody($body, 'application/json')->send($method, $base.$path);
 
         if ($response->failed() || ! $response->json('success')) {
-            Log::error('[PAYMENT][BB] Request gagal', ['path' => $path, 'status' => $response->status(), 'message' => $response->json('message')]);
+            // errors = nama field & pesan validasi saja (tanpa isi data / kunci).
+            $errors = (array) $response->json('errors');
+            Log::error('[PAYMENT][BB] Request gagal', ['path' => $path, 'status' => $response->status(), 'message' => $response->json('message'), 'errors' => $errors]);
 
-            throw new RuntimeException('Gagal menghubungi gateway BB: '.($response->json('message') ?? 'HTTP '.$response->status()));
+            $detail = collect($errors)->flatten()->implode(' ');
+            throw new RuntimeException('Gagal menghubungi gateway BB: '.($response->json('message') ?? 'HTTP '.$response->status()).($detail !== '' ? ' '.$detail : ''));
         }
 
         return (array) $response->json('data');
@@ -136,6 +139,7 @@ class BbGateway implements PaymentGatewayInterface
 
     private function credential(string $key): string
     {
-        return (string) ($this->config->credentials[$key] ?? '');
+        // Spasi / baris baru yang ikut tersalin saat menempel kunci membuat signature tidak cocok.
+        return trim((string) ($this->config->credentials[$key] ?? ''));
     }
 }
