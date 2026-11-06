@@ -83,6 +83,8 @@ return [
     ['key' => 'company.profile', 'label' => 'Company Profile', 'route' => 'company.profile.index', 'group' => 'Company', 'icon' => 'list'],
     ['key' => 'company.branch', 'label' => 'Company Branch', 'route' => 'company.branch.index', 'group' => 'Company', 'icon' => 'list'],
     ['key' => 'company.division', 'label' => 'Division / Unit', 'route' => 'company.division.index', 'group' => 'Company', 'icon' => 'list'],
+    // Hanya superadmin (route juga dijaga role:superadmin). Riwayat transaksi BB, saldo, rekening, penarikan & mutasi.
+    ['key' => 'company.payment', 'label' => 'Payment', 'route' => 'company.payment.index', 'group' => 'Company', 'icon' => 'list'],
     ['key' => 'user', 'label' => 'Data User', 'route' => 'user.index', 'group' => 'Company', 'icon' => 'list'],
     ['key' => 'roleuser', 'label' => 'Role to user', 'route' => 'roleuser.index', 'group' => 'Company', 'icon' => 'list'],
     ['key' => 'roles', 'label' => 'Roles', 'route' => 'roles.index', 'group' => 'Company', 'icon' => 'list'],

@@ -122,6 +122,16 @@ class BbGateway implements PaymentGatewayInterface
     /** Request bertanda tangan ke API BB. @return array isi "data" dari respons */
     private function request(string $method, string $path, ?array $payload = null): array
     {
+        return (array) ($this->api($method, $path, $payload)['data'] ?? []);
+    }
+
+    /**
+     * Request bertanda tangan ke API BB, dengan seluruh isi respons (data + meta / rules).
+     * Dipakai juga oleh Company › Payment (saldo, mutasi, rekening, penarikan).
+     * $query hanya untuk filter GET: BB menandatangani path tanpa query string.
+     */
+    public function api(string $method, string $path, ?array $payload = null, array $query = []): array
+    {
         // Base URL cukup domain; kalau terlanjur diisi dengan /api atau /api/v1, bagian itu dibuang.
         $base = preg_replace('#/api(/v1)?$#i', '', rtrim($this->credential('base_url'), '/'));
 
@@ -131,12 +141,13 @@ class BbGateway implements PaymentGatewayInterface
 
         $body = $payload === null ? '' : json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
         $timestamp = (string) time();
+        $query = array_filter($query, fn ($value) => $value !== null && $value !== '');
 
         $response = Http::timeout(20)->acceptJson()->withHeaders([
             self::HEADER.'Key' => $this->credential('api_key'),
             self::HEADER.'Timestamp' => $timestamp,
             self::HEADER.'Signature' => hash_hmac('sha256', $timestamp."\n".$method."\n".$path."\n".$body, $this->credential('secret_key')),
-        ])->withBody($body, 'application/json')->send($method, $base.$path);
+        ])->withBody($body, 'application/json')->send($method, $base.$path.($query ? '?'.http_build_query($query) : ''));
 
         if ($response->failed() || ! $response->json('success')) {
             // errors = nama field & pesan validasi saja (tanpa isi data / kunci).
@@ -147,7 +158,7 @@ class BbGateway implements PaymentGatewayInterface
             throw new RuntimeException('Gagal menghubungi gateway BB: '.($response->json('message') ?? 'HTTP '.$response->status()).($detail !== '' ? ' '.$detail : ''));
         }
 
-        return (array) $response->json('data');
+        return (array) $response->json();
     }
 
     private function credential(string $key): string

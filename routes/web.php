@@ -72,6 +72,7 @@ use App\Http\Controllers\Quiz\UniversityApplicationController;
 use App\Http\Controllers\Company\CompanyProfileController;
 use App\Http\Controllers\Company\CompanyBranchController;
 use App\Http\Controllers\Company\CompanyDivisionController;
+use App\Http\Controllers\Company\CompanyPaymentController;
 use App\Http\Controllers\Settings\PaymentGatewayController;
 use App\Http\Controllers\Settings\WhatsappGatewayController;
 use App\Http\Controllers\Settings\DatabaseBackupController;
@@ -821,6 +822,15 @@ Route::middleware(['auth', 'permission:company.branch,edit'])->prefix('dashboard
     Route::get('/{id}/edit', [CompanyBranchController::class, 'edit'])->name('company.branch.edit');
     Route::put('/{id}', [CompanyBranchController::class, 'update'])->name('company.branch.update');
     Route::delete('/{id}', [CompanyBranchController::class, 'destroy'])->name('company.branch.destroy');
+});
+
+// company.payment: hanya superadmin (role) DAN harus punya permission-nya. Uang keluar butuh akses kelola.
+Route::middleware(['auth', 'role:superadmin', 'permission:company.payment'])->prefix('dashboard/superadmin/company/payment')->group(function () {
+    Route::get('/', [CompanyPaymentController::class, 'index'])->name('company.payment.index');
+});
+Route::middleware(['auth', 'role:superadmin', 'permission:company.payment,edit', 'throttle:10,1'])->prefix('dashboard/superadmin/company/payment')->group(function () {
+    Route::post('/accounts', [CompanyPaymentController::class, 'storeAccount'])->name('company.payment.accounts.store');
+    Route::post('/payouts', [CompanyPaymentController::class, 'storePayout'])->name('company.payment.payouts.store');
 });
 
 // company.division: show (GET /{id}) didaftarkan asli SETELAH create/store,

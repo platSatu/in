@@ -275,7 +275,9 @@ class FormPaymentController extends Controller
     /** Gateway BB (lihat BbGateway). Event "ping" (tes dari BB) dijawab OK tanpa mengubah data apa pun. */
     public function bbWebhook(Request $request): JsonResponse
     {
-        if ($request->json('event') === 'ping') {
+        // payout.* = kabar penarikan dari Company › Payment. ina tidak menyimpan status penarikan
+        // (selalu dibaca langsung dari BB), jadi cukup dijawab 200 supaya BB tidak mengirim ulang.
+        if ($request->json('event') === 'ping' || str_starts_with((string) $request->json('event'), 'payout.')) {
             return response()->json(['message' => 'OK']);
         }
 
