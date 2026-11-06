@@ -155,7 +155,7 @@ class PaymentGatewayController extends Controller
     private function validateGateway(Request $request): array
     {
         $validated = $request->validate([
-            'gateway' => 'required|in:duitku,midtrans,ipaymu',
+            'gateway' => 'required|in:duitku,midtrans,ipaymu,bb',
             'environment' => 'required|in:sandbox,production',
             'status' => 'nullable|in:active,inactive',
             'is_active' => 'nullable|boolean',

@@ -18,6 +18,7 @@ Route::get('/user', function (Request $request) {
 Route::post('/payment/webhook/midtrans', [FormPaymentController::class, 'midtransWebhook'])->name('payment.webhook.midtrans');
 Route::post('/payment/webhook/duitku', [FormPaymentController::class, 'duitkuWebhook'])->name('payment.webhook.duitku');
 Route::post('/payment/webhook/ipaymu', [FormPaymentController::class, 'ipaymuWebhook'])->name('payment.webhook.ipaymu');
+Route::post('/payment/webhook/bb', [FormPaymentController::class, 'bbWebhook'])->middleware('throttle:120,1')->name('payment.webhook.bb');
 
 // Webhook topup saldo -- jalur TERPISAH dari webhook form_payments di atas
 // (lihat App\Services\DepositPayment\* & App\Http\Controllers\Dashboard\

@@ -4,6 +4,7 @@ namespace App\Services\Payment;
 
 use App\Models\PaymentGateway;
 use App\Services\Payment\Contracts\PaymentGatewayInterface;
+use App\Services\Payment\Gateways\BbGateway;
 use App\Services\Payment\Gateways\DuitkuGateway;
 use App\Services\Payment\Gateways\IpaymuGateway;
 use App\Services\Payment\Gateways\MidtransGateway;
@@ -21,6 +22,7 @@ class PaymentGatewayFactory
             'midtrans' => new MidtransGateway($config),
             'duitku' => new DuitkuGateway($config),
             'ipaymu' => new IpaymuGateway($config),
+            'bb' => new BbGateway($config),
             default => throw new RuntimeException("Gateway pembayaran '{$config->gateway}' tidak dikenal."),
         };
     }

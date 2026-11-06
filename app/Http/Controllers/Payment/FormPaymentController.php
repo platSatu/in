@@ -268,6 +268,16 @@ class FormPaymentController extends Controller
         return $this->handleWebhook($request, fn () => $request->input('reference_id'));
     }
 
+    /** Gateway BB (lihat BbGateway). Event "ping" (tes dari BB) dijawab OK tanpa mengubah data apa pun. */
+    public function bbWebhook(Request $request): JsonResponse
+    {
+        if ($request->json('event') === 'ping') {
+            return response()->json(['message' => 'OK']);
+        }
+
+        return $this->handleWebhook($request, fn () => $request->json('data.external_id'));
+    }
+
     /**
      * Alur umum semua webhook gateway:
      *   1. Ambil order_id dari BODY payload (bukan dari URL) supaya kita
@@ -332,6 +342,18 @@ class FormPaymentController extends Controller
             ]);
 
             return response()->json(['message' => 'Invalid signature.'], 403);
+        }
+
+        // Gateway yang mengirim nominal terverifikasi (BB): nominal harus sama dengan tagihan, kalau tidak jangan diubah.
+        if (($result['amount'] ?? null) !== null && (int) $result['amount'] !== (int) round((float) $payment->getAmount())) {
+            Log::warning('[PAYMENT] Nominal callback tidak cocok, transaksi TIDAK diubah', [
+                'order_id' => $orderId,
+                'gateway' => $gateway->gateway,
+                'expected' => $payment->getAmount(),
+                'received' => $result['amount'],
+            ]);
+
+            return response()->json(['message' => 'Amount mismatch.'], 422);
         }
 
         $payment->update([

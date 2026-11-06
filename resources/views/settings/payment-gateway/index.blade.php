@@ -36,7 +36,7 @@
                             @forelse ($data as $index => $item)
                                 <tr>
                                     <td>{{ $data->firstItem() + $index }}</td>
-                                    <td class="fw-bold">{{ ucfirst($item->gateway) }}</td>
+                                    <td class="fw-bold">{{ $item->gateway === 'bb' ? 'BB' : ucfirst($item->gateway) }}</td>
                                     <td>{{ optional($item->user)->name ?? '-' }}</td>
                                     <td>
                                         @if ($item->environment === 'production')

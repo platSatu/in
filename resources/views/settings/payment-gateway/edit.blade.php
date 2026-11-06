@@ -20,6 +20,7 @@
                                 <option value="duitku" {{ old('gateway', $data->gateway) === 'duitku' ? 'selected' : '' }}>Duitku</option>
                                 <option value="midtrans" {{ old('gateway', $data->gateway) === 'midtrans' ? 'selected' : '' }}>Midtrans</option>
                                 <option value="ipaymu" {{ old('gateway', $data->gateway) === 'ipaymu' ? 'selected' : '' }}>iPaymu</option>
+                                <option value="bb" {{ old('gateway', $data->gateway) === 'bb' ? 'selected' : '' }}>BB</option>
                             </select>
                             @error('gateway')
                                 <div class="invalid-feedback">{{ $message }}</div>
