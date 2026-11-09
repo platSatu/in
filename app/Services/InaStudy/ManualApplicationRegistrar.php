@@ -15,11 +15,11 @@ use Illuminate\Validation\ValidationException;
 
 /**
  * Register Aplikasi Kuliah MANUAL tanpa Registration Fee (1 Oktober 2026).
- * Satu tempat aturan untuk dua pintu:
- * - siswa sendiri dari halaman InaStudy (StudentPortal\InaStudyController);
- * - admin/sales lewat tombol "Add to InaStudy" di index Student
- *   (Student\StudentController::addToInaStudy), supaya admin bisa membantu
- *   mendaftarkan lalu mengisi formulir & dokumen dari halaman Progress InaStudy.
+ * HANYA untuk admin/sales lewat tombol "Add to InaStudy" di index Student
+ * (Student\StudentController::addToInaStudy), supaya admin bisa membantu
+ * mendaftarkan lalu mengisi formulir & dokumen dari halaman Progress InaStudy.
+ * Pintu untuk siswa (Register di halaman InaStudy) ditutup 9 November 2026:
+ * siswa wajib lewat Apply & bayar Registration Fee.
  *
  * Aplikasi dibuat seperti biasa lalu langsung dibuatkan 1 ApplicationPayment
  * PAID (amount 0, metode 'manual') untuk registration_fee, sehingga formulir &

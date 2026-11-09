@@ -246,13 +246,14 @@ Route::get('/dashboard', [DashboardController::class, 'index'])
 
 // FIX (14 September 2026, permintaan user -- "dashboard itu hanya tanggal
 // saja, InaStudy dibuat halaman terpisah"): halaman "InaStudy" (widget "My
-// University Applications" + Register manual tanpa pembayaran) sekarang
+// University Applications") sekarang
 // punya route & controller sendiri, TERPISAH dari /dashboard -- lihat
 // docblock App\Http\Controllers\StudentPortal\InaStudyController untuk
 // detail lengkap. Menu "InaStudy" di sidebar diarahkan ke 'inastudy.index'.
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/inastudy', [InaStudyController::class, 'index'])->name('inastudy.index');
-    Route::post('/inastudy/register', [InaStudyController::class, 'registerApplication'])->name('inastudy.register');
+    // POST /inastudy/register (Register manual tanpa Registration Fee oleh siswa) DIHAPUS 9 November 2026:
+    // siswa wajib lewat Apply berbayar; registrasi manual hanya lewat admin ("Add to InaStudy").
 
     // STEP 1 (15 September 2026): halaman "InaYule" (modul kursus Mandarin:
     // Buy Packages / History / Schedule) awalnya cuma tampilan skeleton,
