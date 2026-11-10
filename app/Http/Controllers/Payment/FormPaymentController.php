@@ -493,6 +493,20 @@ class FormPaymentController extends Controller
                 'application_id' => $application->id,
                 'order_id' => $payment->order_id,
             ]);
+        } elseif ($payment->purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE && $application->registration_fee_due) {
+            // Pelunasan kekurangan setelah upgrade jurusan (10 November 2026): kunci Formulir & Dokumen dibuka lagi.
+            // Pembayaran lebih kecil (mis. tagihan lama yang sudah ditutup tapi tetap dibayar) tidak membuka kunci.
+            if ((int) $payment->amount >= (int) $application->registration_fee_due) {
+                $application->update([
+                    'registration_fee_due' => null,
+                    'admission_status' => UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW,
+                ]);
+            } else {
+                Log::warning('[PAYMENT] Pembayaran Registration Fee lebih kecil dari kekurangannya, cek manual', [
+                    'application_id' => $application->id,
+                    'order_id' => $payment->order_id,
+                ]);
+            }
         } elseif ($payment->purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
             && empty($application->admission_status)) {
             $application->update([

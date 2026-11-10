@@ -42,6 +42,9 @@ class UniversityApplication extends Model
     public const ADMISSION_STATUS_UNDER_REVIEW = 'under_review';
     public const ADMISSION_STATUS_PROCESSING = 'processing';
     public const ADMISSION_STATUS_ACCEPTED = 'accepted';
+    // Upgrade kampus/jurusan (10 November 2026): diset otomatis saat admin memindahkan aplikasi yang sudah bayar
+    // ke jurusan dengan Registration Fee lebih mahal; kembali 'under_review' begitu kekurangannya lunas.
+    public const ADMISSION_STATUS_AWAITING_PAYMENT = 'awaiting_payment';
 
     protected $fillable = [
         'application_no',
@@ -65,6 +68,8 @@ class UniversityApplication extends Model
         'duration',
         'whatsapp',
         'registration_fee_amount',
+        // Kekurangan Registration Fee setelah upgrade jurusan (lihat ApplicationAdminService::changeCourse()).
+        'registration_fee_due',
         'registration_fee_paid_at',
         'deposit_fee_china_amount',
         'status',
@@ -79,6 +84,7 @@ class UniversityApplication extends Model
     protected $casts = [
         'intake_year' => 'integer',
         'registration_fee_amount' => 'integer',
+        'registration_fee_due' => 'integer',
         'registration_fee_paid_at' => 'date',
         'deposit_fee_china_amount' => 'integer',
         'submitted_at' => 'datetime',
@@ -111,6 +117,12 @@ class UniversityApplication extends Model
             'intake' => $course->intake,
             'duration' => $course->duration,
         ];
+    }
+
+    /** Nominal Registration Fee yang ditagih sekarang: kekurangan setelah upgrade jurusan, kalau ada; selain itu fee penuh. */
+    public function registrationFeeToCharge(): int
+    {
+        return (int) ($this->registration_fee_due ?: $this->registration_fee_amount);
     }
 
     public function isCancelled(): bool

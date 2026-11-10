@@ -54,10 +54,7 @@ class ApplicationPaymentController extends Controller
         // SEBELUMNYA (Fase 2) langsung ke Upload Documents, tapi Step 1
         // (Formulir web) sekarang berada DI ANTARA pembayaran & Upload
         // Documents.
-        $alreadyPaid = ApplicationPayment::where('application_id', $application->id)
-            ->where('purpose', $purpose)
-            ->where('status', ApplicationPayment::STATUS_PAID)
-            ->exists();
+        $alreadyPaid = $this->isSettled($application, $purpose);
 
         if ($alreadyPaid) {
             return redirect()->route(
@@ -92,7 +89,7 @@ class ApplicationPaymentController extends Controller
         }
 
         $amount = $purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
-            ? $application->registration_fee_amount
+            ? $application->registrationFeeToCharge()
             : $application->deposit_fee_china_amount;
 
         $pendingPayment = ApplicationPayment::where('application_id', $application->id)
@@ -104,7 +101,9 @@ class ApplicationPaymentController extends Controller
         return view('student-portal.applications.payment', [
             'application' => $application,
             'purpose' => $purpose,
-            'purposeLabel' => $purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE ? 'Registration Fee' : 'Departure Fee',
+            'purposeLabel' => $purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
+                ? ($application->registration_fee_due ? 'Kekurangan Registration Fee' : 'Registration Fee')
+                : 'Departure Fee',
             'amount' => $amount,
             'pendingPayment' => $pendingPayment,
         ]);
@@ -132,7 +131,7 @@ class ApplicationPaymentController extends Controller
         }
 
         $amount = $validated['purpose'] === ApplicationPayment::PURPOSE_REGISTRATION_FEE
-            ? $application->registration_fee_amount
+            ? $application->registrationFeeToCharge()
             : $application->deposit_fee_china_amount;
 
         // FIX: nominal KEDUA purpose ini diisi manual oleh admin per
@@ -145,12 +144,7 @@ class ApplicationPaymentController extends Controller
             ], 422);
         }
 
-        $alreadyPaid = ApplicationPayment::where('application_id', $application->id)
-            ->where('purpose', $validated['purpose'])
-            ->where('status', ApplicationPayment::STATUS_PAID)
-            ->exists();
-
-        if ($alreadyPaid) {
+        if ($this->isSettled($application, $validated['purpose'])) {
             return response()->json(['message' => 'Pembayaran ini sudah lunas.'], 422);
         }
 
@@ -313,6 +307,19 @@ class ApplicationPaymentController extends Controller
     /**
      * Sama persis pola ApplicationDocumentController::ownedApplicationOrFail().
      */
+    /** Sudah lunas: ada pembayaran lunas untuk purpose ini, dan (Registration Fee) tidak ada kekurangan setelah upgrade jurusan. */
+    private function isSettled(UniversityApplication $application, string $purpose): bool
+    {
+        if ($purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE && $application->registration_fee_due) {
+            return false;
+        }
+
+        return ApplicationPayment::where('application_id', $application->id)
+            ->where('purpose', $purpose)
+            ->where('status', ApplicationPayment::STATUS_PAID)
+            ->exists();
+    }
+
     private function ownedApplicationOrFail(Request $request, string $applicationId): UniversityApplication
     {
         $application = UniversityApplication::findOrFail($applicationId);

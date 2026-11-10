@@ -191,6 +191,10 @@
                                         <span class="badge badge-warning text-capitalize">Processing</span>
                                     @elseif ($application->admission_status === 'under_review')
                                         <span class="badge badge-secondary text-capitalize">Under Review</span>
+                                    @elseif ($application->registration_fee_due)
+                                        {{-- Upgrade jurusan: berubah otomatis jadi Under Review begitu kekurangan lunas. --}}
+                                        <span class="badge badge-danger">Menunggu Pelunasan</span>
+                                        <div class="small text-muted mt-1">Kekurangan Registration Fee Rp {{ number_format($application->registration_fee_due, 0, ',', '.') }}</div>
                                     @else
                                         <span class="text-muted">-</span>
                                     @endif
@@ -201,6 +205,7 @@
                                         diset otomatis oleh webhook (lihat
                                         FormPaymentController::onApplicationPaymentPaid()).
                                     --}}
+                                    @unless ($application->registration_fee_due)
                                     <form method="POST" action="{{ route('quiz.university-application.admission-status.update', $application->id) }}" class="d-flex gap-1 mt-1">
                                         @csrf
                                         <select name="admission_status" class="form-select form-select-sm" style="max-width:180px;" onchange="this.form.submit()">
@@ -210,6 +215,7 @@
                                             <option value="accepted" {{ $application->admission_status === 'accepted' ? 'selected' : '' }}>Accepted</option>
                                         </select>
                                     </form>
+                                    @endunless
                                 </td>
                             </tr>
                             <tr>

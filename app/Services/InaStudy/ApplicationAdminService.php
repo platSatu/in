@@ -85,8 +85,12 @@ class ApplicationAdminService
      * dengan Register manual (ManualApplicationRegistrar::rules()/resolveCourse()).
      * Registration Fee: belum lunas -> ikut fee jurusan baru & tagihan lama
      * ditutup; sudah lunas -> nominal yang dibayar tetap.
+     * Upgrade (10 November 2026): sudah lunas & jurusan baru lebih mahal -> selisihnya jadi kekurangan
+     * (registration_fee_due), status "Menunggu Pelunasan", Formulir & Dokumen terkunci sampai lunas.
+     * Fee yang sudah tertutup = fee aplikasi dikurangi kekurangan yang belum dibayar (Register manual Rp 0
+     * dianggap menutup fee jurusan awalnya). Lebih murah -> tetap peringatan, selisih diurus manual.
      *
-     * @return array{application: UniversityApplication, fee_warning: ?string}
+     * @return array{application: UniversityApplication, fee_warning: ?string, fee_due: ?int}
      *
      * @throws ValidationException tidak boleh diubah / jurusan tidak valid
      */
@@ -111,19 +115,45 @@ class ApplicationAdminService
             ];
 
             $feeWarning = null;
+            $feeDue = null;
+            $registrationPayments = $payments->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE);
 
             if (! $feePaid) {
                 $data['registration_fee_amount'] = $course->registration_fee_amount;
-                $this->expirePending($payments->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE));
-            } elseif ((int) $application->registration_fee_amount !== (int) $course->registration_fee_amount) {
-                $feeWarning = 'Registration Fee jurusan baru (Rp '.number_format((int) $course->registration_fee_amount, 0, ',', '.')
-                    .') berbeda dengan yang sudah dibayar (Rp '.number_format((int) $application->registration_fee_amount, 0, ',', '.')
-                    .'). Selisihnya diurus manual ya.';
+                $this->expirePending($registrationPayments);
+            } else {
+                $covered = (int) $application->registration_fee_amount - (int) $application->registration_fee_due;
+                $due = (int) $course->registration_fee_amount - $covered;
+
+                if ($due > 0) {
+                    $feeDue = $due;
+                    $data += [
+                        'registration_fee_amount' => $course->registration_fee_amount,
+                        'registration_fee_due' => $due,
+                        'admission_status' => UniversityApplication::ADMISSION_STATUS_AWAITING_PAYMENT,
+                    ];
+                    // Tagihan kekurangan lama (nominal lain) ditutup, siswa membayar nominal yang baru.
+                    $this->expirePending($registrationPayments);
+                } elseif ($application->registration_fee_due) {
+                    // Kekurangan sebelumnya tidak berlaku lagi (pindah ke jurusan yang tidak lebih mahal).
+                    $data += [
+                        'registration_fee_amount' => $covered,
+                        'registration_fee_due' => null,
+                        'admission_status' => UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW,
+                    ];
+                    $this->expirePending($registrationPayments);
+                }
+
+                if ($due < 0) {
+                    $feeWarning = 'Registration Fee jurusan baru (Rp '.number_format((int) $course->registration_fee_amount, 0, ',', '.')
+                        .') berbeda dengan yang sudah dibayar (Rp '.number_format($covered, 0, ',', '.')
+                        .'). Selisihnya diurus manual ya.';
+                }
             }
 
             $application->update($data);
 
-            return ['application' => $application, 'fee_warning' => $feeWarning];
+            return ['application' => $application, 'fee_warning' => $feeWarning, 'fee_due' => $feeDue];
         });
     }
 

@@ -146,7 +146,16 @@
             card ini disembunyikan total supaya tidak membingungkan siswa
             yang belum bayar.
         --}}
-        @if($application->admission_status)
+        @if($application->registration_fee_due)
+            {{-- Upgrade jurusan (10 November 2026): Formulir & Dokumen terkunci sampai kekurangan lunas. --}}
+            <div class="card-box">
+                <h6 class="fw-bold mb-2">Menunggu Pelunasan</h6>
+                <p class="mb-3">Aplikasi Anda dipindahkan ke <strong>{{ optional($application->university)->name }} - {{ $application->major_label }}</strong>.
+                    Masih ada kekurangan Registration Fee <strong>Rp {{ number_format($application->registration_fee_due, 0, ',', '.') }}</strong>.
+                    Formulir & dokumen terbuka kembali setelah pembayaran ini lunas.</p>
+                <a href="{{ route('student-portal.applications.payment.show', [$application->id, \App\Models\ApplicationPayment::PURPOSE_REGISTRATION_FEE]) }}" class="btn btn-danger btn-sm">Bayar Kekurangan</a>
+            </div>
+        @elseif($application->admission_status)
             @php
                 $admissionSteps = [
                     'under_review' => 'Under Review',

@@ -7,6 +7,7 @@ use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationDocumentHistory;
+use App\Models\ApplicationPayment;
 use App\Models\DocumentType;
 use App\Models\University;
 use App\Models\UniversityApplication;
@@ -14,6 +15,7 @@ use App\Models\UniversityProfileDegree;
 use App\Services\InaStudy\ApplicationAdminService;
 use App\Services\InaStudy\ManualApplicationRegistrar;
 use App\Services\InaStudy\MultipleDocumentUploader;
+use App\Services\Whatsapp\WhatsappMessenger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -236,10 +238,40 @@ class UniversityApplicationController extends Controller
             return back()->withInput()->withErrors($e->errors());
         }
 
+        $application = $result['application'];
+        $success = 'Kampus/jurusan berhasil diubah ke '.optional($application->university)->name.' - '.$application->major_label.'.';
+
+        // Upgrade ke jurusan lebih mahal: kirim link pembayaran kekurangan ke WhatsApp siswa.
+        if ($result['fee_due']) {
+            $success .= ' Kekurangan Registration Fee Rp '.number_format($result['fee_due'], 0, ',', '.').' ditagihkan ke siswa'
+                .($this->sendFeeDueNotice($application, $result['fee_due']) ? ' (link pembayaran terkirim via WhatsApp).' : ', tapi nomor WhatsApp kosong: kirim link pembayaran manual.');
+        }
+
         return redirect()
             ->route('quiz.university-application.show', $id)
-            ->with('success', 'Kampus/jurusan berhasil diubah ke '.optional($result['application']->university)->name.' - '.$result['application']->major_label.'.')
+            ->with('success', $success)
             ->with('warning', $result['fee_warning']);
+    }
+
+    /** WhatsApp ke siswa: link halaman bayar kekurangan Registration Fee (wajib login sebagai siswa pemilik aplikasi). */
+    private function sendFeeDueNotice(UniversityApplication $application, int $due): bool
+    {
+        $application->loadMissing('student');
+        $phone = $application->whatsapp ?: ($application->student->handphone ?? null);
+
+        if (empty($phone)) {
+            return false;
+        }
+
+        $name = trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) ?: 'Calon Mahasiswa';
+
+        (new WhatsappMessenger())->send($phone, "Halo {$name},\n\n"
+            . "Aplikasi *{$application->application_no}* sudah dipindahkan ke *" . optional($application->university)->name . ' - ' . $application->major_label . "*.\n"
+            . 'Terdapat kekurangan Registration Fee sebesar *Rp ' . number_format($due, 0, ',', '.') . "*. Formulir & dokumen akan terbuka kembali setelah pembayaran ini lunas.\n\n"
+            . "Bayar lewat link berikut:\n"
+            . route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE]));
+
+        return true;
     }
 
     /**
@@ -442,6 +474,11 @@ class UniversityApplicationController extends Controller
     {
         $application = UniversityApplication::findOrFail($id);
         $this->assertVisibleApplication($request->user(), $application);
+
+        // Status "Menunggu Pelunasan" hanya berubah otomatis begitu kekurangan Registration Fee lunas.
+        if ($application->registration_fee_due) {
+            return back()->with('error', 'Aplikasi ini masih menunggu pelunasan kekurangan Registration Fee.');
+        }
 
         $validated = $request->validate([
             'admission_status' => ['nullable', 'in:' . implode(',', [

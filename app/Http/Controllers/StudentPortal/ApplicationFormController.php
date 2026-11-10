@@ -198,13 +198,14 @@ class ApplicationFormController extends Controller
             ->where('status', ApplicationPayment::STATUS_PAID)
             ->exists();
 
-        if ($isPaid) {
+        // Upgrade jurusan (10 November 2026): kekurangan Registration Fee harus lunas dulu.
+        if ($isPaid && ! $application->registration_fee_due) {
             return null;
         }
 
         return redirect()
             ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
-            ->with('status', 'Selesaikan pembayaran Registration Fee terlebih dahulu untuk membuka Formulir & Upload Documents.');
+            ->with('status', 'Selesaikan pembayaran '.($application->registration_fee_due ? 'kekurangan ' : '').'Registration Fee terlebih dahulu untuk membuka Formulir & Upload Documents.');
     }
 
     private function ownedApplicationOrFail(Request $request, string $applicationId): UniversityApplication
