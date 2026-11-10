@@ -1,7 +1,8 @@
 <!--
     FASE 6 (Alur Pembayaran 2 Arah Apply Kampus, 10 September 2026) -- halaman
-    invoice publik, dibuka dari link yang dikirim via WhatsApp setelah
-    Registration Fee/Departure Fee lunas (lihat
+    invoice publik, dibuka dari link yang dikirim setelah Registration Fee /
+    Departure Fee / pembayaran Ina Visa lunas (baris detail disusun di
+    InvoiceController, lihat
     Payment\FormPaymentController::sendInvoiceNotification() &
     InvoiceController).
 
@@ -18,7 +19,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invoice {{ $application->application_no }} | INASTUDY</title>
+    <title>Invoice {{ $number }} | INASTUDY</title>
     <link rel="icon" type="image/png" href="{{ asset('frontend/img/Logo.png') }}">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
@@ -106,34 +107,12 @@
 
             <hr>
 
-            <div class="detail-row">
-                <span class="label">Application No.</span>
-                <span class="value">{{ $application->application_no }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Student</span>
-                <span class="value">{{ trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) ?: '-' }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">University</span>
-                <span class="value">{{ $application->university->name ?? '-' }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Description</span>
-                <span class="value">{{ $purposeLabel }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Payment Method</span>
-                <span class="value text-uppercase">{{ $payment->gateway ?? '-' }}{{ $payment->payment_method ? ' · ' . $payment->payment_method : '' }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Order ID</span>
-                <span class="value">{{ $payment->order_id }}</span>
-            </div>
-            <div class="detail-row">
-                <span class="label">Paid At</span>
-                <span class="value">{{ optional($payment->paid_at)->format('d M Y, H:i') }}</span>
-            </div>
+            @foreach ($rows as $label => $value)
+                <div class="detail-row">
+                    <span class="label">{{ $label }}</span>
+                    <span class="value">{{ $value }}</span>
+                </div>
+            @endforeach
 
             <div class="amount-box">
                 <div class="amount-label">TOTAL PAID</div>

@@ -13,7 +13,9 @@ use RuntimeException;
 
 /**
  * Gateway "BB" (6 November 2026): pembayaran lewat API invoice BB, yang meneruskan ke Duitku.
- * Hosted checkout (tanpa langkah pilih metode), sama seperti iPaymu.
+ * 10 November 2026: pilih metode di halaman kita sendiri (sama seperti gateway Duitku langsung): daftar metode
+ * dari BB, lalu invoice dibuat dengan metode itu sehingga peserta langsung ke halaman bayar metodenya.
+ * Kalau daftar metode gagal diambil, kembali ke hosted checkout (peserta memilih metode di halaman bayar).
  *
  * Kredensial (Settings > Payment Gateway): base_url, api_key, secret_key, webhook_secret.
  * URL webhook yang didaftarkan di BB: {APP_URL}/api/payment/webhook/bb
@@ -36,12 +38,26 @@ class BbGateway implements PaymentGatewayInterface
 
     public function requiresMethodSelection(): bool
     {
-        return false;
+        return true;
     }
 
+    /** Format sama dengan DuitkuGateway (code, name, image, fee). Kosong = BB tidak bisa dihubungi, pakai hosted checkout. */
     public function getPaymentMethods(Payable $payment): array
     {
-        return [];
+        try {
+            $methods = $this->api('GET', '/api/v1/payment-methods', null, ['amount' => (int) round($payment->getAmount())])['data'] ?? [];
+        } catch (RuntimeException) {
+            return [];
+        }
+
+        return collect(is_array($methods) ? $methods : [])
+            ->filter(fn ($m) => is_array($m) && is_string($m['code'] ?? null) && preg_match('/^[A-Z0-9]{1,5}$/', $m['code']))
+            ->map(fn (array $m) => [
+                'code' => $m['code'],
+                'name' => (string) ($m['name'] ?? $m['code']),
+                'image' => is_string($m['image'] ?? null) && str_starts_with($m['image'], 'https://') ? $m['image'] : null,
+                'fee' => (int) ($m['fee'] ?? 0),
+            ])->values()->all();
     }
 
     public function createTransaction(Payable $payment, ?string $paymentMethod = null): array
@@ -58,6 +74,7 @@ class BbGateway implements PaymentGatewayInterface
             // Sama dengan batas waktu pembayaran di sisi kita (Settings > Payment Gateway).
             'expiry_minutes' => max(5, (int) ($this->config->expiry_minutes ?: 60)),
             'return_url' => $payment->getReturnUrl(),
+            'payment_method' => $paymentMethod,
         ]);
 
         return [

@@ -181,12 +181,14 @@ class ApplicationPaymentController extends Controller
 
         try {
             $driver = PaymentGatewayFactory::make($gateway);
+            $methods = $driver->requiresMethodSelection() ? $driver->getPaymentMethods($payment) : [];
 
-            if ($driver->requiresMethodSelection()) {
+            // BB yang daftar metodenya gagal diambil (kosong): lanjut ke halaman bayar BB. Gateway lain tidak berubah.
+            if ($driver->requiresMethodSelection() && ($methods !== [] || $gateway->gateway !== 'bb')) {
                 return response()->json([
                     'mode' => 'select-method',
                     'order_id' => $payment->order_id,
-                    'methods' => $driver->getPaymentMethods($payment),
+                    'methods' => $methods,
                     'expires_at' => optional($payment->expires_at)->toIso8601String(),
                     'server_time' => now()->toIso8601String(),
                 ]);
@@ -235,7 +237,8 @@ class ApplicationPaymentController extends Controller
 
         $gateway = $payment->paymentGateway;
 
-        if (!$gateway || $gateway->gateway !== 'duitku') {
+        // Pilih metode di halaman kita: Duitku langsung & BB (10 November 2026).
+        if (!$gateway || !in_array($gateway->gateway, ['duitku', 'bb'], true)) {
             return response()->json(['message' => 'Transaksi tidak valid.'], 422);
         }
 

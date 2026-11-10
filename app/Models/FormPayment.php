@@ -38,6 +38,7 @@ class FormPayment extends Model implements Payable
         'raw_callback',
         'paid_at',
         'expires_at',
+        'invoice_token',
     ];
 
     protected $casts = [

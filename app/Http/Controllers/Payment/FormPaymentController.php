@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Payment;
 
 use App\Http\Controllers\Controller;
+use App\Mail\DocumentNotificationMail;
 use App\Models\ApplicationPayment;
 use App\Models\Form;
 use App\Models\FormPayment;
@@ -18,6 +19,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Throwable;
 
@@ -120,12 +122,14 @@ class FormPaymentController extends Controller
 
         try {
             $driver = PaymentGatewayFactory::make($gateway);
+            $methods = $driver->requiresMethodSelection() ? $driver->getPaymentMethods($payment) : [];
 
-            if ($driver->requiresMethodSelection()) {
+            // BB yang daftar metodenya gagal diambil (kosong): lanjut ke halaman bayar BB. Gateway lain tidak berubah.
+            if ($driver->requiresMethodSelection() && ($methods !== [] || $gateway->gateway !== 'bb')) {
                 return response()->json([
                     'mode' => 'select-method',
                     'order_id' => $payment->order_id,
-                    'methods' => $driver->getPaymentMethods($payment),
+                    'methods' => $methods,
                     'expires_at' => optional($payment->expires_at)->toIso8601String(),
                     'server_time' => now()->toIso8601String(),
                 ]);
@@ -172,7 +176,8 @@ class FormPaymentController extends Controller
 
         $gateway = $payment->paymentGateway;
 
-        if (!$gateway || $gateway->gateway !== 'duitku') {
+        // Pilih metode di halaman kita: Duitku langsung & BB (10 November 2026).
+        if (!$gateway || !in_array($gateway->gateway, ['duitku', 'bb'], true)) {
             return response()->json(['message' => 'Transaksi tidak valid.'], 422);
         }
 
@@ -380,8 +385,8 @@ class FormPaymentController extends Controller
         // dipisah jadi method sendiri & hanya jalan kalau tipe modelnya
         // ApplicationPayment, supaya alur FormPayment/Quiz sama sekali
         // tidak tersentuh oleh logic ini.
-        if ($payment instanceof ApplicationPayment && $result['is_paid']) {
-            $this->onApplicationPaymentPaid($payment->fresh());
+        if ($result['is_paid']) {
+            $this->onPaid($payment->fresh());
         }
 
         return response()->json(['message' => 'OK']);
@@ -427,9 +432,7 @@ class FormPaymentController extends Controller
         $payment->refresh();
         Log::info('[PAYMENT] Lunas dari cek status BB', ['order_id' => $payment->order_id]);
 
-        if ($payment instanceof ApplicationPayment) {
-            $this->onApplicationPaymentPaid($payment);
-        }
+        $this->onPaid($payment);
     }
 
     /**
@@ -444,6 +447,19 @@ class FormPaymentController extends Controller
     {
         return FormPayment::where('order_id', $orderId)->first()
             ?? ApplicationPayment::where('order_id', $orderId)->first();
+    }
+
+    /**
+     * Efek sekali setelah lunas (webhook atau cek status BB). Quiz biasa tidak terpengaruh:
+     * hanya Apply (lihat onApplicationPaymentPaid) & form berjenis Ina Visa (invoice, 10 November 2026).
+     */
+    private function onPaid(FormPayment|ApplicationPayment $payment): void
+    {
+        if ($payment instanceof ApplicationPayment) {
+            $this->onApplicationPaymentPaid($payment);
+        } elseif ($payment->form?->form_type === Form::TYPE_INA_VISA) {
+            $this->sendInvoiceNotification($payment);
+        }
     }
 
     /**
@@ -484,56 +500,67 @@ class FormPaymentController extends Controller
             ]);
         }
 
-        $this->sendInvoiceNotification($payment, $application);
+        $this->sendInvoiceNotification($payment);
     }
 
     /**
-     * FASE 6 -- generate invoice_token (kalau belum ada, idempotent terhadap
-     * webhook yang mungkin terkirim dobel -- lihat guard isPaid() di
-     * handleWebhook() yang sudah mencegah baris ini dieksekusi 2x untuk
-     * transaksi yang sama, tapi dicek lagi di sini untuk jaga-jaga) + kirim
-     * link invoice-nya via WhatsApp ke nomor yang diisi siswa saat Apply
-     * (application->whatsapp, fallback ke handphone Student).
+     * FASE 6 -- generate invoice_token (kalau belum ada, idempotent terhadap webhook dobel) + kirim link invoice.
+     *  - Apply (Registration/Departure Fee): WhatsApp ke nomor saat Apply (fallback HP Student), isi pesan tidak berubah.
+     *  - Ina Visa (10 November 2026): WhatsApp & email ke data pembayar di form.
+     * Gagal kirim hanya dicatat di log: status lunas tidak terpengaruh.
      */
-    private function sendInvoiceNotification(ApplicationPayment $payment, UniversityApplication $application): void
+    private function sendInvoiceNotification(FormPayment|ApplicationPayment $payment): void
     {
         if (empty($payment->invoice_token)) {
             $payment->update(['invoice_token' => $this->generateInvoiceToken()]);
         }
 
-        $phone = $application->whatsapp ?: ($application->student->handphone ?? null);
-
-        if (empty($phone)) {
-            Log::warning('[PAYMENT][Invoice] Tidak ada nomor WhatsApp untuk kirim link invoice', [
-                'application_id' => $application->id,
-                'payment_id' => $payment->id,
-            ]);
-
-            return;
+        if ($payment instanceof ApplicationPayment) {
+            $application = $payment->application;
+            $phone = $application->whatsapp ?: ($application->student->handphone ?? null);
+            $email = null;
+            $name = trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) ?: 'Calon Mahasiswa';
+            $purposeLabel = $payment->purpose === ApplicationPayment::PURPOSE_DEPARTURE_FEE ? 'Departure Fee' : 'Registration Fee';
+            $paidFor = "*{$purposeLabel}* untuk aplikasi *{$application->application_no}*";
+        } else {
+            $phone = $payment->handphone;
+            $email = $payment->email;
+            $name = $payment->name ?: 'Peserta';
+            $paidFor = '*' . ($payment->form->name ?? 'Ina Visa') . '*';
         }
 
-        $purposeLabel = $payment->purpose === ApplicationPayment::PURPOSE_DEPARTURE_FEE
-            ? 'Departure Fee'
-            : 'Registration Fee';
-
-        $studentName = trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? ''));
-        // update() di atas juga men-sync attribute 'invoice_token' ke $payment
-        // itu sendiri, jadi bisa langsung dibaca di sini tanpa query ulang.
         $invoiceUrl = route('invoice.show', $payment->invoice_token);
+        $lines = [
+            "Halo {$name},",
+            "Pembayaran {$paidFor} sudah kami terima. Terima kasih!",
+            'Invoice Anda bisa dilihat, diprint, atau didownload sebagai PDF lewat link berikut:',
+        ];
 
-        $message = "Halo " . ($studentName ?: 'Calon Mahasiswa') . ",\n\n"
-            . "Pembayaran *{$purposeLabel}* untuk aplikasi *{$application->application_no}* sudah kami terima. Terima kasih!\n\n"
-            . "Invoice Anda bisa dilihat, diprint, atau didownload sebagai PDF lewat link berikut:\n"
-            . $invoiceUrl;
+        if (!empty($phone)) {
+            (new WhatsappMessenger())->send($phone, implode("\n\n", $lines) . "\n" . $invoiceUrl);
+        } else {
+            Log::warning('[PAYMENT][Invoice] Tidak ada nomor WhatsApp untuk kirim link invoice', ['order_id' => $payment->order_id]);
+        }
 
-        (new WhatsappMessenger())->send($phone, $message);
+        if (!empty($email)) {
+            try {
+                Mail::to($email)->send(new DocumentNotificationMail(
+                    'Invoice ' . $payment->order_id,
+                    array_map(fn ($line) => str_replace('*', '', $line), array_slice($lines, 0, 2)),
+                    $invoiceUrl,
+                    'Lihat / Download Invoice',
+                ));
+            } catch (Throwable $e) {
+                Log::warning('[PAYMENT][Invoice] Email invoice gagal dikirim', ['order_id' => $payment->order_id, 'message' => $e->getMessage()]);
+            }
+        }
     }
 
     private function generateInvoiceToken(): string
     {
         do {
             $token = Str::random(40);
-        } while (ApplicationPayment::where('invoice_token', $token)->exists());
+        } while (ApplicationPayment::where('invoice_token', $token)->exists() || FormPayment::where('invoice_token', $token)->exists());
 
         return $token;
     }
