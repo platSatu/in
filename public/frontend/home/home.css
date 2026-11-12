@@ -73,6 +73,14 @@ a { color: inherit; }
 .class-filter__reset { height: 46px; padding: 0 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: 500 .9rem var(--sans); color: var(--muted); cursor: pointer; transition: color .2s, border-color .2s; }
 .class-filter__reset:hover { color: var(--red); border-color: var(--red); }
 .class-card[hidden] { display: none; }
+/* Tombol "Lihat Selengkapnya" di tengah bawah daftar kelas beranda. */
+.class-more { display: flex; flex-direction: column; align-items: center; gap: .6rem; margin-top: clamp(1.75rem, 4vw, 2.5rem); }
+.class-more small { font-size: .82rem; color: var(--muted); }
+.btn-more { display: inline-flex; align-items: center; gap: .9rem; padding: .45rem .45rem .45rem 1.6rem; border: 1.5px solid var(--red); border-radius: 999px; background: #fff; color: var(--red); font: 600 .95rem var(--sans); text-decoration: none; box-shadow: 0 12px 28px -18px rgba(200, 16, 46, .55); transition: background-color .25s, color .25s, box-shadow .25s; }
+.btn-more__icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: var(--red); color: #fff; transition: transform .25s, background-color .25s, color .25s; }
+.btn-more:hover { background: var(--red); color: #fff; box-shadow: 0 16px 32px -16px rgba(200, 16, 46, .7); }
+.btn-more:hover .btn-more__icon { background: #fff; color: var(--red); transform: translateX(4px); }
+.btn-more:focus-visible { outline: 3px solid rgba(200, 16, 46, .35); outline-offset: 3px; }
 .class-count { margin: -.5rem 0 1.25rem; font-size: .85rem; color: var(--muted); }
 .class-count strong { color: var(--ink); }
 

@@ -77,5 +77,16 @@
         </div>
 
         <p class="empty-note" data-class-empty hidden>Belum ada kelas yang cocok. Coba ubah atau reset filternya.</p>
+
+        @if ($limit)
+            {{-- Beranda: ajakan ke halaman Semua Kelas, di tengah bawah kartu. --}}
+            <div class="class-more">
+                <a href="{{ route('frontend.inayule.classes') }}" class="btn-more">
+                    Lihat Selengkapnya
+                    <span class="btn-more__icon" aria-hidden="true"><i class="bi bi-arrow-right"></i></span>
+                </a>
+                <small>{{ $packages->count() }} kelas Mandarin tersedia</small>
+            </div>
+        @endif
     </div>
 @endif
