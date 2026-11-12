@@ -58,8 +58,13 @@
                                 <td>{{ optional($myApplication->submitted_at)->format('Y/m/d') }}</td>
                                 <td class="text-center text-nowrap">
                                     <a href="{{ route('student-portal.applications.show', $myApplication->id) }}" class="btn btn-sm btn-outline-primary">Summary</a>
-                                    <a href="{{ route('student-portal.applications.form.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-warning">Form</a>
-                                    <a href="{{ route('student-portal.applications.documents.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-success">Documents</a>
+                                    @if($myApplication->fee_paid)
+                                        <a href="{{ route('student-portal.applications.form.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-warning">Form</a>
+                                        <a href="{{ route('student-portal.applications.documents.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-success">Documents</a>
+                                    @else
+                                        {{-- Belum bayar (mis. keluar dari halaman bayar): lanjutkan pembayaran dulu, Formulir & Dokumen terbuka setelahnya. --}}
+                                        <a href="{{ route('student-portal.applications.payment.show', [$myApplication->id, 'registration_fee']) }}" class="btn btn-sm btn-danger">Pay Registration Fee</a>
+                                    @endif
                                 </td>
                             </tr>
                         @empty

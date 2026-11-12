@@ -101,6 +101,17 @@
             <h4 class="fw-bold mb-2">Application Submitted</h4>
             <p class="text-muted mb-3">Your application number is</p>
             <div class="app-no">{{ $application->application_no }}</div>
+
+            @unless($registrationFeePaid)
+                {{-- 12 November 2026: siswa yang keluar dari halaman bayar bisa langsung melanjutkan dari sini. --}}
+                <div class="mt-4 p-3 text-start" style="background:#fff7f8;border-radius:12px;">
+                    <div class="fw-bold mb-1">One more step to go</div>
+                    <p class="mb-3 text-muted" style="font-size:14px;">Complete your Registration Fee payment to unlock the application form and document upload.</p>
+                    <a href="{{ route('student-portal.applications.payment.show', [$application->id, \App\Models\ApplicationPayment::PURPOSE_REGISTRATION_FEE]) }}" class="btn btn-danger btn-sm">
+                        <i class="bi bi-credit-card"></i> Pay Registration Fee
+                    </a>
+                </div>
+            @endunless
         </div>
 
         <div class="card-box">

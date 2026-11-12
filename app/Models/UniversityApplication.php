@@ -300,6 +300,19 @@ class UniversityApplication extends Model
         ]);
     }
 
+    /**
+     * Penanda progress (12 November 2026): fee_paid (Registration Fee sudah masuk) & form_submitted (Formulir
+     * terkirim). Dipakai daftar admin (bedakan yang coba-coba) & dashboard student (tombol Bayar).
+     */
+    public function scopeWithProgressFlags($query)
+    {
+        return $query->withExists([
+            'payments as fee_paid' => fn ($payment) => $payment->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+                ->where('status', ApplicationPayment::STATUS_PAID),
+            'formDetail as form_submitted' => fn ($form) => $form->whereNotNull('terms_accepted_at'),
+        ]);
+    }
+
     public function handledBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'handled_by_user_id');

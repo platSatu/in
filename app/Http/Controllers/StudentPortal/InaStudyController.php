@@ -25,7 +25,7 @@ class InaStudyController extends Controller
         $myApplications = $student
             // Aplikasi yang sudah di-Cancel admin tidak ditampilkan ke siswa (20 Oktober 2026).
             ? $student->applications()->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
-                ->with(['university', 'universityProfile'])->withDocumentProgress()->orderByDesc('submitted_at')->get()
+                ->with(['university', 'universityProfile'])->withDocumentProgress()->withProgressFlags()->orderByDesc('submitted_at')->get()
             : collect();
 
         // Staff biasa tanpa data Student tidak melihat widget ini.

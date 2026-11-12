@@ -58,6 +58,12 @@ class ApplicationController extends Controller
         // begitu admission_status === 'accepted' (gerbangnya sudah dicek
         // ganda di ApplicationPaymentController::show()/init(), ini cuma
         // buat tampilan).
+        // Belum bayar Registration Fee (mis. keluar dari halaman bayar): tampilkan ajakan lanjut bayar.
+        $registrationFeePaid = ApplicationPayment::where('application_id', $application->id)
+            ->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+            ->where('status', ApplicationPayment::STATUS_PAID)
+            ->exists();
+
         $departureFeePaid = ApplicationPayment::where('application_id', $application->id)
             ->where('purpose', ApplicationPayment::PURPOSE_DEPARTURE_FEE)
             ->where('status', ApplicationPayment::STATUS_PAID)
@@ -77,6 +83,7 @@ class ApplicationController extends Controller
             'adminDocuments' => $adminDocuments,
             'certificates' => $certificates,
             'departureFeePaid' => $departureFeePaid,
+            'registrationFeePaid' => $registrationFeePaid,
         ]);
     }
 }

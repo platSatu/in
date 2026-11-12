@@ -70,11 +70,7 @@ class UniversityApplicationController extends Controller
         $query = UniversityApplication::with(['student', 'university', 'universityProfile'])
             ->withDocumentProgress()
             // Kolom Progress (12 November 2026): bedakan aplikasi serius dari yang coba-coba sebelum batal massal.
-            ->withExists([
-                'payments as fee_paid' => fn ($payment) => $payment->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
-                    ->where('status', ApplicationPayment::STATUS_PAID)->where('amount', '>', 0),
-                'formDetail as form_submitted' => fn ($form) => $form->whereNotNull('terms_accepted_at'),
-            ]);
+            ->withProgressFlags();
 
         // FIX (15 September 2026): batasi ke aplikasi milik student yang jadi
         // cakupan user ini (lihat docblock class & DataScope::visibleStudentIds()).
