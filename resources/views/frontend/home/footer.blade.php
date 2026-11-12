@@ -9,3 +9,9 @@
         </nav>
     </div>
 </footer>
+
+{{-- Tombol WhatsApp mengambang di kanan bawah (beranda, Semua Kelas, Universities, detail universitas). --}}
+<a href="https://wa.me/6281287625661?text={{ rawurlencode('Halo InaStudy, saya ingin bertanya.') }}" class="wa-float" target="_blank" rel="noopener" aria-label="Chat WhatsApp +62 812-8762-5661">
+    <i class="bi bi-whatsapp" aria-hidden="true"></i>
+    <span class="wa-float__label">Chat WhatsApp</span>
+</a>
