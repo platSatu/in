@@ -103,6 +103,20 @@
     items.forEach(function (el) { observer.observe(el); });
 })();
 
+// Section bertanda data-reveal (CTA konsultasi) dianimasikan masuk saat pertama terlihat; mode kurangi animasi langsung tampil.
+(function () {
+    var sections = document.querySelectorAll('[data-reveal]');
+    if (!sections.length || !('IntersectionObserver' in window) || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            observer.unobserve(entry.target);
+            entry.target.classList.remove('is-waiting');
+        });
+    }, { threshold: 0.25 });
+    sections.forEach(function (el) { el.classList.add('is-waiting'); observer.observe(el); });
+})();
+
 // Tombol WhatsApp: tetap di pojok kanan bawah, naik sebanyak bagian footer yang terlihat supaya ikon sosmed tidak tertutup.
 (function () {
     var wa = document.querySelector('.wa-float');
