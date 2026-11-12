@@ -161,7 +161,7 @@ class UniversityApplication extends Model
             ->whereNull('registration_fee_due')
             ->whereDoesntHave('payments', fn ($query) => $query->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
                 ->where('status', ApplicationPayment::STATUS_PAID))
-            ->orderBy('submitted_at')
+            ->latest('submitted_at')
             ->get();
     }
 
