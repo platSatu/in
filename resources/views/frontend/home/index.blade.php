@@ -9,5 +9,6 @@
         <div class="container"><span class="eyebrow">InaTrip</span><h2 class="section-title">Sedang disiapkan</h2></div>
     </section>
     @include('frontend.home.cta')
+    @include('frontend.home.faq')
     @include('frontend.home.lokasi')
 @endsection
