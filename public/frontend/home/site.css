@@ -72,6 +72,16 @@
 .wa-float:focus-visible { outline: 3px solid rgba(37, 211, 102, .45); outline-offset: 3px; }
 .wa-float::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #25D366; z-index: -1; animation: wa-pulse 2.4s ease-out infinite; }
 @keyframes wa-pulse { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.35); opacity: 0; } }
+/* Goyang singkat tiap 4 detik supaya tombol WhatsApp menarik perhatian. */
+.wa-float i { animation: wa-shake 4s ease-in-out infinite; transform-origin: 50% 60%; }
+@keyframes wa-shake {
+    0%, 78%, 100% { transform: rotate(0); }
+    81% { transform: rotate(-16deg) scale(1.08); }
+    85% { transform: rotate(14deg) scale(1.08); }
+    89% { transform: rotate(-10deg); }
+    93% { transform: rotate(6deg); }
+    97% { transform: rotate(-2deg); }
+}
 
 @media (max-width: 991.98px) {
     :root { --header-h: 76px; }
@@ -91,5 +101,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-    .wa-float::before { animation: none; }
+    .wa-float::before, .wa-float i { animation: none; }
 }

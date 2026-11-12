@@ -149,3 +149,39 @@
     window.addEventListener('load', draw);
     draw();
 })();
+
+// Kampus partner di hero bergiliran ke atas tiap 2,6 detik; item pertama disalin ke akhir supaya putarannya mulus.
+(function () {
+    var ticker = document.querySelector('[data-ticker]');
+    if (!ticker || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    var list = ticker.querySelector('.uni-ticker__list');
+    var items = list.children;
+    if (items.length < 2) return;
+
+    var win = ticker.querySelector('.uni-ticker__window');
+    list.appendChild(items[0].cloneNode(true));
+    var index = 0;
+
+    // Lebar jendela mengikuti nama yang sedang tampil, jadi kapsulnya tidak menyisakan ruang kosong.
+    function fit() {
+        var item = items[index];
+        var logo = item.firstElementChild, name = item.lastElementChild;
+        win.style.width = Math.ceil(logo.offsetWidth + 8 + name.scrollWidth + 4) + 'px'; // logo + jarak .5rem + nama
+    }
+    fit();
+    window.addEventListener('resize', fit);
+
+    setInterval(function () {
+        index++;
+        list.style.transition = '';
+        list.style.transform = 'translateY(' + (-index * items[0].offsetHeight) + 'px)';
+        fit();
+        if (index === items.length - 1) {
+            setTimeout(function () {
+                list.style.transition = 'none';
+                list.style.transform = 'translateY(0)';
+                index = 0;
+            }, 600);
+        }
+    }, 2600);
+})();

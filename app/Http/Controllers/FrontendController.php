@@ -113,7 +113,11 @@ class FrontendController extends Controller
     {
         // Semua kelas aktif dikirim supaya filter di section InaYule mencari ke seluruh kelas;
         // yang tampil tetap maksimal 8 (2 baris x 4), lihat _packages.blade.php.
-        return view('frontend.home.index', ['packages' => $this->publicPackages()->get()]);
+        return view('frontend.home.index', [
+            'packages' => $this->publicPackages()->get(),
+            // Kampus partner yang bergiliran tampil di section InaStudy (sama dengan katalog: status active).
+            'universities' => University::where('status', 'active')->orderBy('name')->get(['id', 'name', 'logo']),
+        ]);
     }
 
     /** Halaman publik semua kelas InaYule (tombol "Lihat semua kelas" di halaman depan). */
