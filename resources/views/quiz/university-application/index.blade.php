@@ -85,6 +85,7 @@
                                 <th>Major</th>
                                 <th>Intake</th>
                                 <th>Status</th>
+                                <th>Progress</th>
                                 <th style="width:140px;">Documents</th>
                                 <th>Submitted</th>
                                 <th class="no-content text-center">Action</th>
@@ -95,7 +96,8 @@
                                 <tr>
                                     @if ($canEdit)
                                         <td>
-                                            @unless ($item->status === \App\Models\UniversityApplication::STATUS_CANCELLED)
+                                            {{-- Yang sudah bayar tidak bisa dibatalkan dari sini, jadi tidak bisa dicentang. --}}
+                                            @unless ($item->status === \App\Models\UniversityApplication::STATUS_CANCELLED || $item->fee_paid)
                                                 <input type="checkbox" name="ids[]" value="{{ $item->id }}" form="cancelManyForm" class="form-check-input js-app-check">
                                             @endunless
                                         </td>
@@ -111,6 +113,16 @@
                                     <td>{{ $item->intake ?: '-' }} {{ $item->intake_year }}</td>
                                     <td>
                                         <span class="badge badge-info text-capitalize">{{ str_replace('_', ' ', $item->status) }}</span>
+                                    </td>
+                                    <td class="text-nowrap" style="font-size:12px;">
+                                        @if ($item->fee_paid)
+                                            <span class="badge badge-success">Sudah bayar</span>
+                                        @else
+                                            <span class="badge bg-light text-dark border">Belum bayar</span>
+                                        @endif
+                                        <div class="mt-1 {{ $item->form_submitted ? 'text-success' : 'text-muted' }}">
+                                            {{ $item->form_submitted ? 'Formulir terkirim' : 'Formulir belum diisi' }}
+                                        </div>
                                     </td>
                                     <td>
                                         @php
@@ -136,7 +148,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ $canEdit ? 11 : 10 }}" class="text-center">Belum ada aplikasi kuliah masuk.</td>
+                                    <td colspan="{{ $canEdit ? 12 : 11 }}" class="text-center">Belum ada aplikasi kuliah masuk.</td>
                                 </tr>
                             @endforelse
                         </tbody>
