@@ -4,7 +4,7 @@
 @section('description', 'Daftar kelas kursus Mandarin InaYule: level, durasi, jumlah sesi, dan harga.')
 
 @section('content')
-    <section class="page-section">
+    <section class="page-section page-section--catalog">
         <div class="container">
             <div class="section-head">
                 <div>

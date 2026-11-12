@@ -61,6 +61,28 @@ a { color: inherit; }
 .empty-note { padding: 2rem; border: 1px dashed var(--line); border-radius: 16px; text-align: center; color: var(--muted); background: #fff; }
 
 /* ---------- Section 2: InaYule (8 kelas = 2 baris x 4) ---------- */
+/* Filter kelas: satu baris sejajar (Type, Class, Level, cari, Reset), tinggi semua kotak sama. */
+.class-filter { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 1.5fr) auto; gap: .75rem; margin-bottom: 1.5rem; }
+.class-filter select, .class-filter__search input { width: 100%; height: 46px; padding: 0 1rem; border: 1px solid var(--line); border-radius: 12px; background-color: var(--cream); font: 400 .9rem var(--sans); color: var(--ink); outline: none; transition: border-color .2s, box-shadow .2s; }
+.class-filter select { appearance: none; -webkit-appearance: none; padding-right: 2.5rem; cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 16 16'%3E%3Cpath fill='none' stroke='%236B7280' stroke-width='2' d='M2 5l6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 1rem center; }
+.class-filter select:focus, .class-filter__search input:focus { border-color: var(--red); box-shadow: 0 0 0 3px rgba(200, 16, 46, .12); }
+.class-filter__search { position: relative; margin: 0; }
+.class-filter__search i { position: absolute; left: 1rem; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: .9rem; pointer-events: none; }
+.class-filter__search input { padding-left: 2.6rem; }
+.class-filter__reset { height: 46px; padding: 0 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: 500 .9rem var(--sans); color: var(--muted); cursor: pointer; transition: color .2s, border-color .2s; }
+.class-filter__reset:hover { color: var(--red); border-color: var(--red); }
+.class-card[hidden] { display: none; }
+.class-count { margin: -.5rem 0 1.25rem; font-size: .85rem; color: var(--muted); }
+.class-count strong { color: var(--ink); }
+
+/* Halaman Semua Kelas: latar katalog dibedakan dari kartu, filter jadi panel yang ikut menempel saat discroll. */
+.page-section--catalog { background: var(--cream-2); }
+.page-section--catalog .class-card { background: #fff; border-color: transparent; box-shadow: 0 1px 2px rgba(31, 41, 55, .05), 0 14px 30px -22px rgba(31, 41, 55, .35); }
+.page-section--catalog .class-card:hover { border-color: rgba(200, 16, 46, .3); }
+.page-section--catalog .class-filter { position: sticky; top: calc(var(--header-h) + .75rem); z-index: 5; padding: .75rem; border-radius: 18px; background: rgba(255, 255, 255, .94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 16px 36px -24px rgba(31, 41, 55, .4); }
+.page-section--catalog .class-count { margin-top: 0; }
+
 .inayule { background: #fff; padding-top: calc(var(--header-h) + 1rem); padding-bottom: 2rem; }
 .inayule .section-lead { max-width: 46em; }
 .page-section { padding: calc(var(--header-h) + 2.5rem) 0 4rem; min-height: 70vh; }
@@ -105,6 +127,8 @@ a { color: inherit; }
         linear-gradient(180deg, rgba(250, 243, 236, .35) 0%, rgba(250, 243, 236, .9) 45%, var(--cream) 100%); }
     .hero__inner { grid-template-columns: 1fr; }
     .class-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .class-filter { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .class-filter__search { grid-column: 1 / 3; }
     .hero__art { order: -1; justify-self: center; width: min(46vw, 230px); }
 }
 
@@ -117,6 +141,9 @@ a { color: inherit; }
     .inayule .class-grid::-webkit-scrollbar { display: none; }
     .inayule .class-card { scroll-snap-align: start; }
     .page-section .class-grid { grid-template-columns: 1fr; }
+    .class-filter { grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .class-filter__search { grid-column: 1 / -1; order: -1; }
+    .page-section--catalog .class-filter { position: static; }
     /* HP: peta tetap penuh, kartu info lebih ringkas di bawah. */
     .lokasi__card .btn { width: 100%; }
     .contact-list { gap: .6rem; margin: 1rem 0 1.1rem; }

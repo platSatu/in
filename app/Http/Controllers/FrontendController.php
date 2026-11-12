@@ -111,8 +111,9 @@ class FrontendController extends Controller
 
     public function index()
     {
-        // Section InaYule menampilkan 8 kelas (2 baris x 4), sisanya di halaman Kelas InaYule.
-        return view('frontend.home.index', ['packages' => $this->publicPackages()->limit(8)->get()]);
+        // Semua kelas aktif dikirim supaya filter di section InaYule mencari ke seluruh kelas;
+        // yang tampil tetap maksimal 8 (2 baris x 4), lihat _packages.blade.php.
+        return view('frontend.home.index', ['packages' => $this->publicPackages()->get()]);
     }
 
     /** Halaman publik semua kelas InaYule (tombol "Lihat semua kelas" di halaman depan). */

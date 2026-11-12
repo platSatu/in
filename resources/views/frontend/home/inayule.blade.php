@@ -9,6 +9,6 @@
             <a href="{{ route('frontend.inayule.classes') }}" class="link-arrow">Lihat semua kelas</a>
         </div>
 
-        @include('frontend.home._packages', ['packages' => $packages])
+        @include('frontend.home._packages', ['packages' => $packages, 'limit' => 8])
     </div>
 </section>
