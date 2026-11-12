@@ -93,6 +93,7 @@ use Illuminate\Support\Facades\Route;
 
 
 Route::get('/', [FrontendController::class, 'index'])->name('home');
+Route::get('/kelas-mandarin', [FrontendController::class, 'inayuleClasses'])->name('frontend.inayule.classes');
 
 Route::get('/frontend/universities-by-city/{city}', [FrontendController::class, 'universitiesByCity'])
     ->name('frontend.universities-by-city');

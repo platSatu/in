@@ -394,17 +394,17 @@
     </nav>
 
     {{-- ================= SECTIONS ================= --}}
-    @include('frontend.partials.section1')
-    @include('frontend.partials.section2')
-    @include('frontend.partials.section7')
-    @include('frontend.partials.section3')
-    @include('frontend.partials.section4')
-    @include('frontend.partials.section6')
-    @include('frontend.partials.section5')
+    @include('frontend_old.partials.section1')
+    @include('frontend_old.partials.section2')
+    @include('frontend_old.partials.section7')
+    @include('frontend_old.partials.section3')
+    @include('frontend_old.partials.section4')
+    @include('frontend_old.partials.section6')
+    @include('frontend_old.partials.section5')
 
 
     {{-- ================= FOOTER ================= --}}
-    @include('frontend.partials.footer')
+    @include('frontend_old.partials.footer')
     <!-- <footer class="site-footer">
         <p><strong>Inastudy</strong> &mdash; &copy; {{ date('Y') }}. All rights reserved.</p>
     </footer> -->

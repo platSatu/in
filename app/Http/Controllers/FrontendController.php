@@ -67,6 +67,7 @@ namespace App\Http\Controllers;
 
 use App\Models\City;
 use App\Models\ClassSchedule;
+use App\Models\CoursePackage;
 use App\Models\Form;
 use App\Models\FormAnswer;
 use App\Models\FormPayment;
@@ -110,7 +111,20 @@ class FrontendController extends Controller
 
     public function index()
     {
-        return view('frontend.index');
+        // Section InaYule menampilkan 8 kelas (2 baris x 4), sisanya di halaman Kelas InaYule.
+        return view('frontend.home.index', ['packages' => $this->publicPackages()->limit(8)->get()]);
+    }
+
+    /** Halaman publik semua kelas InaYule (tombol "Lihat semua kelas" di halaman depan). */
+    public function inayuleClasses()
+    {
+        return view('frontend.home.classes', ['packages' => $this->publicPackages()->get()]);
+    }
+
+    /** Paket kursus aktif yang boleh tampil di halaman publik, urutan sama dengan katalog di portal siswa. */
+    private function publicPackages()
+    {
+        return CoursePackage::where('status', 'active')->with(['type', 'courseClass', 'level'])->orderBy('name');
     }
 
     public function universitiesByCity(Request $request, string $city)
