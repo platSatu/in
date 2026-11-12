@@ -305,7 +305,7 @@ a { color: inherit; }
 }
 
 /* ---------- Ajakan konsultasi (antara InaTrip dan Location) ---------- */
-.cta { padding: clamp(3.5rem, 8vw, 6rem) 0; background: var(--cream); }
+.cta { padding: clamp(3.5rem, 8vw, 6rem) 0; background: #fff; } /* putih: selang-seling dengan InaTrip (krem) */
 .cta__box { position: relative; overflow: hidden; isolation: isolate; padding: clamp(2.25rem, 5vw, 4rem) clamp(1.25rem, 5vw, 4rem) clamp(2rem, 4vw, 3rem); border-radius: clamp(22px, 3vw, 36px); text-align: center; color: #fff;
     background:
         radial-gradient(circle at 1px 1px, rgba(255, 255, 255, .13) 1px, transparent 0) 0 0 / 22px 22px,
