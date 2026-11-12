@@ -83,8 +83,9 @@
 
     <div class="topbar">
         <div class="container">
-            <a href="{{ route('frontend.university.catalog') }}">
-                <i class="bi bi-arrow-left"></i> Back to University List
+            {{-- 12 November 2026: kembali ke daftar aplikasi siswa (dashboard InaStudy), bukan katalog kampus. --}}
+            <a href="{{ route('inastudy.index') }}">
+                <i class="bi bi-arrow-left"></i> Back to My Applications
             </a>
         </div>
     </div>
