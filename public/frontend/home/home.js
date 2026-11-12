@@ -70,3 +70,34 @@
         form.addEventListener('reset', function () { setTimeout(apply, 0); });
     });
 })();
+
+// Angka pencapaian InaYule dihitung naik saat pertama terlihat. Tanpa JS / mode kurangi animasi, angka asli tetap tampil.
+(function () {
+    var items = document.querySelectorAll('[data-count]');
+    if (!items.length || !('IntersectionObserver' in window)) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    function run(el) {
+        var to = parseFloat(el.dataset.count);
+        var decimals = parseInt(el.dataset.decimals || '0', 10);
+        var suffix = el.dataset.suffix || '';
+        var start = null;
+        function frame(t) {
+            if (start === null) start = t;
+            var p = Math.min((t - start) / 1400, 1);
+            var value = to * (1 - Math.pow(1 - p, 3));
+            el.innerHTML = value.toFixed(decimals).replace('.', ',') + suffix;
+            if (p < 1) requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+    }
+
+    var observer = new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (!entry.isIntersecting) return;
+            observer.unobserve(entry.target);
+            run(entry.target);
+        });
+    }, { threshold: 0.6 });
+    items.forEach(function (el) { observer.observe(el); });
+})();
