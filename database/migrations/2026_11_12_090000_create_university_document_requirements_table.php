@@ -28,6 +28,10 @@ return new class extends Migration
 
     public function up(): void
     {
+        // Sisa percobaan migrate pertama yang gagal (nama index unik terlalu panjang untuk MySQL): tabelnya
+        // sempat terbuat tanpa index & migration-nya belum tercatat, jadi dibuat ulang dari awal di sini.
+        Schema::dropIfExists('university_document_requirements');
+
         Schema::create('university_document_requirements', function (Blueprint $table) {
             $table->uuid('id')->primary();
             $table->foreignUuid('university_id')->constrained('universities')->cascadeOnDelete();
@@ -39,7 +43,8 @@ return new class extends Migration
             $table->string('template_file_path')->nullable(); // contoh/template khusus kampus, path relatif ke public/
             $table->timestamps();
 
-            $table->unique(['university_id', 'document_type_id']);
+            // Nama index ditulis pendek: nama otomatisnya melebihi batas 64 karakter MySQL.
+            $table->unique(['university_id', 'document_type_id'], 'udr_university_document_unique');
         });
 
         foreach (self::TYPES as $type) {
