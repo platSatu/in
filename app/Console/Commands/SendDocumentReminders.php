@@ -41,12 +41,6 @@ class SendDocumentReminders extends Command
         $dryRun = (bool) $this->option('dry-run');
         $preview = [];
 
-        if ($completeness->requiredTypes()->isEmpty()) {
-            $this->warn('Belum ada jenis dokumen wajib (is_required) yang aktif, tidak ada yang diproses.');
-
-            return self::SUCCESS;
-        }
-
         $completeness->openApplications()
             ->with(['student', 'university', 'formDetail', 'documents:id,application_id,document_type_id,review_status'])
             ->chunkById(100, function ($applications) use ($completeness, $notifier, $setting, $now, $reminderTime, $days, $dryRun, &$preview, &$reminded, &$completed) {

@@ -115,6 +115,7 @@
                                     <td>
                                         @php
                                             $docsCount = $item->documents_count ?? 0;
+                                            $totalDocumentTypes = $item->documentTypes()->count(); // per kampus (12 November 2026)
                                             $docsPercent = $totalDocumentTypes > 0 ? min(100, round(($docsCount / $totalDocumentTypes) * 100)) : 0;
                                             $isComplete = $totalDocumentTypes > 0 && $docsCount >= $totalDocumentTypes;
                                         @endphp

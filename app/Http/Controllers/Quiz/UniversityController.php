@@ -6,9 +6,12 @@ use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
 use App\Models\University;
 use App\Models\City;
+use App\Models\DocumentType;
+use App\Models\UniversityDocumentRequirement;
 use App\Models\Major;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class UniversityController extends Controller
 {
@@ -271,7 +274,11 @@ class UniversityController extends Controller
             ->orderBy('name')
             ->get();
 
-        return view('quiz.university.edit', compact('data', 'cities', 'majors'));
+        // Dokumen Persyaratan kampus (12 November 2026), lihat _document-requirements.blade.php.
+        $documentTypes = DocumentType::active()->studentUpload()->orderBy('sort_order')->get();
+        $requirements = $data->documentRequirements()->get()->keyBy('document_type_id');
+
+        return view('quiz.university.edit', compact('data', 'cities', 'majors', 'documentTypes', 'requirements'));
     }
 
 
@@ -299,7 +306,17 @@ class UniversityController extends Controller
             'attachment' => 'nullable|mimes:jpg,jpeg,pdf|max:15360',
             'why_study_here' => 'nullable|array|max:10',
             'why_study_here.*' => 'nullable|string|max:255',
+            'requirements' => 'nullable|array',
+            'requirements.*.use' => 'nullable|boolean',
+            'requirements.*.is_required' => 'nullable|boolean',
+            'requirements.*.remove_template' => 'nullable|boolean',
+            'requirements.*.note' => 'nullable|string|max:500',
+            'requirements.*.degree_scope' => ['nullable', Rule::in(array_keys(UniversityDocumentRequirement::DEGREE_SCOPES))],
+            'requirements.*.language_scope' => ['nullable', Rule::in(array_keys(UniversityDocumentRequirement::LANGUAGE_SCOPES))],
+            'requirements.*.template' => 'nullable|file|mimes:pdf,doc,docx,jpg,jpeg|max:10240',
         ]);
+        $requirementRows = $validated['requirements'] ?? null;
+        unset($validated['requirements']);
 
         // Sama seperti store(): kolom `status` NOT NULL tanpa default. Kalau
         // form dikirim tanpa status (mis. "Choose..." kepilih tidak sengaja),
@@ -333,9 +350,54 @@ class UniversityController extends Controller
 
         AdminCrud::update(University::class, $id, $validated, null);
 
+        if ($request->boolean('requirements_form')) {
+            $this->saveDocumentRequirements($request, $existing, $requirementRows ?? []);
+        }
+
         return redirect()
             ->route('quiz.university.index')
             ->with('success', 'University berhasil diupdate.');
+    }
+
+    /**
+     * Dokumen Persyaratan (12 November 2026): yang dicentang disimpan/diperbarui, yang tidak dicentang dihapus.
+     * Tidak ada yang dicentang = kampus belum diatur, student melihat semua dokumen seperti sebelumnya.
+     */
+    private function saveDocumentRequirements(Request $request, University $university, array $rows): void
+    {
+        $existing = $university->documentRequirements()->get()->keyBy('document_type_id');
+
+        foreach (DocumentType::active()->studentUpload()->pluck('id') as $typeId) {
+            $row = $rows[$typeId] ?? [];
+            $current = $existing->get($typeId);
+
+            if (empty($row['use'])) {
+                if ($current) {
+                    $this->deleteUniversityFile($current->template_file_path);
+                    $current->delete();
+                }
+
+                continue;
+            }
+
+            $template = $current?->template_file_path;
+
+            if ($request->hasFile("requirements.{$typeId}.template")) {
+                $this->deleteUniversityFile($template);
+                $template = $this->storeUniversityFile($request->file("requirements.{$typeId}.template"), 'document-templates');
+            } elseif (! empty($row['remove_template'])) {
+                $this->deleteUniversityFile($template);
+                $template = null;
+            }
+
+            $university->documentRequirements()->updateOrCreate(['document_type_id' => $typeId], [
+                'is_required' => ! empty($row['is_required']),
+                'note' => $row['note'] ?? null,
+                'degree_scope' => $row['degree_scope'] ?? null,
+                'language_scope' => $row['language_scope'] ?? null,
+                'template_file_path' => $template,
+            ]);
+        }
     }
 
     /**

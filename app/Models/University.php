@@ -90,4 +90,10 @@ class University extends Model
     {
         return $this->hasMany(UniversityProfile::class, 'university_id');
     }
+
+    /** Dokumen Persyaratan kampus ini (kosong = belum diatur, student melihat semua dokumen). */
+    public function documentRequirements()
+    {
+        return $this->hasMany(UniversityDocumentRequirement::class, 'university_id');
+    }
 }

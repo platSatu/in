@@ -69,6 +69,12 @@ class DocumentType extends Model
         return array_filter(array_map('trim', explode(',', (string) $this->allowed_extensions)));
     }
 
+    /** Batas ukuran upload (KB): video perkenalan diri 50MB, dokumen lain 5MB. */
+    public function maxKilobytes(): int
+    {
+        return in_array('mp4', $this->allowedExtensionsArray(), true) ? 51200 : 5120;
+    }
+
     public function applicationDocuments(): HasMany
     {
         return $this->hasMany(ApplicationDocument::class, 'document_type_id');
@@ -93,12 +99,6 @@ class DocumentType extends Model
     public function scopeAdminProvided($query)
     {
         return $query->where('provided_by', self::PROVIDED_BY_ADMIN);
-    }
-
-    /** Jumlah jenis dokumen aktif yang diupload student (penyebut progress "x / total"). */
-    public static function studentUploadTotal(): int
-    {
-        return static::active()->studentUpload()->count();
     }
 
     /** Jumlah jenis dokumen aktif yang diupload INA (Offer Letter, JW, VISA, ...). */

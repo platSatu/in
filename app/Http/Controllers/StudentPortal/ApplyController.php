@@ -12,6 +12,8 @@ use App\Services\ApplicationNumberGenerator;
 use App\Services\StudentIdentityResolver;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -141,11 +143,13 @@ class ApplyController extends Controller
         ]);
     }
 
+    /** Cart "Pilihan Kampus" (12 November 2026): disimpan di session, maksimal 3 kampus sekali bayar. */
+    private const CART = 'apply_cart';
+    public const CART_MAX = 3;
+
     /**
-     * Submit form Apply -- buat 1 baris university_applications baru untuk
-     * Student milik user yang login, snapshot degree/intake/duration/
-     * language/registration_fee_amount dari pilihan saat submit (lihat
-     * catatan snapshot di migration create_university_applications_table).
+     * Submit form Apply -- jurusan yang dipilih masuk ke cart "Pilihan Kampus" (12 November 2026).
+     * Aplikasi baru dibuat saat checkout, lalu Registration Fee semua kampus dibayar sekaligus.
      */
     public function store(Request $request, string $universityProfileId): RedirectResponse
     {
@@ -166,14 +170,12 @@ class ApplyController extends Controller
             ->where('university_profile_id', $profile->id)
             ->firstOrFail();
 
-        $user = $request->user();
-
         // FIX keamanan (14 Oktober 2026): Student milik akun ini diambil lewat
         // resolveForUser() -- nomor WhatsApp yang diketik di form ini TIDAK
         // lagi dipakai untuk mencocokkan ke Student lain (dulu bisa "menyambar"
         // data Student orang lain cukup dengan mengetik nomornya). Nomor ini
         // tetap disimpan di aplikasi & mengisi HP Student kalau masih kosong.
-        $student = (new StudentIdentityResolver())->resolveForUser($user, $validated['whatsapp']);
+        $student = (new StudentIdentityResolver())->resolveForUser($request->user(), $validated['whatsapp']);
 
         if (! $student) {
             return redirect()
@@ -181,17 +183,13 @@ class ApplyController extends Controller
                 ->with('apply_conflict', StudentIdentityResolver::CONFLICT_MESSAGE);
         }
 
-        // FIX v2 (permintaan user, 16 September 2026): registration_fee_amount
-        // TIDAK LAGI diisi manual admin SETELAH siswa submit (alur FASE 2 yang
-        // lama) -- sekarang di-snapshot LANGSUNG dari Registration Fee yang
-        // sudah ditentukan admin DI DEPAN per Course ($degreeRow, lihat
-        // UniversityProfileDegree::registration_fee_amount & form Degree &
-        // Course di Quiz\UniversityProfileController), supaya begitu siswa
-        // submit, langsung bisa lanjut ke halaman pembayaran tanpa nunggu
-        // admin isi nominal dulu. Kalau admin belum sempat isi Registration
-        // Fee Course ini (masih null), ApplicationPaymentController::init()
-        // tetap menolak transaksi dengan pesan jelas -- SAMA seperti perilaku
-        // sebelumnya kalau nominal kosong, cuma sumbernya sekarang dari Course.
+        // Jurusan & intake yang sudah pernah diajukan tidak dibuat dua kali, supaya tidak bayar dobel.
+        if ($existing = $this->activeApplication($student, $degreeRow->id, (int) $validated['intake_year'])) {
+            return redirect()
+                ->route('student-portal.applications.show', $existing->id)
+                ->with('success', 'You have already applied to this program for the '.$validated['intake_year'].' intake, so here is your application.');
+        }
+
         // Data paspor opsional: yang diisi saja yang disimpan, isian kosong
         // tidak menghapus data yang sudah ada.
         $student->savePassport(array_filter([
@@ -199,31 +197,118 @@ class ApplyController extends Controller
             'number_pasport' => $validated['number_pasport'] ?? null,
         ], 'filled'));
 
-        $degreeRow->setRelation('profile', $profile);
+        $cart = session(self::CART, []);
+        $key = $degreeRow->id.':'.$validated['intake_year'];
 
-        // Snapshot kampus & jurusan: satu sumber, lihat UniversityApplication::courseSnapshot().
-        $application = UniversityApplication::create(UniversityApplication::courseSnapshot($degreeRow) + [
-            'application_no' => (new ApplicationNumberGenerator())->next(),
-            'student_id' => $student->id,
-            'intake_year' => $validated['intake_year'],
-            'whatsapp' => $validated['whatsapp'],
-            'registration_fee_amount' => $degreeRow->registration_fee_amount,
-            'status' => UniversityApplication::STATUS_SUBMITTED,
-            'submitted_at' => now(),
-        ]);
+        if (! isset($cart[$key]) && count($cart) >= self::CART_MAX) {
+            return redirect()
+                ->route('student-portal.apply.cart')
+                ->with('cart_error', 'You can choose up to '.self::CART_MAX.' universities at once. Remove one first if you would like to swap it.');
+        }
 
-        // FASE 2 -- sebelum Fase 2, tujuan redirect ini adalah langsung ke
-        // halaman upload dokumen (student-portal.applications.documents.edit).
-        // Sekarang harus lewat gerbang pembayaran Registration Fee dulu (Step
-        // 3 di alur yang disepakati): Study Plan & Upload Documents (Step 1 &
-        // 2 versi lama, sekarang jadi tahap SETELAH bayar) baru terbuka
-        // setelah ApplicationPayment purpose=registration_fee berstatus
-        // "paid" (ditandai oleh webhook gateway, lihat
-        // FormPaymentController::onApplicationPaymentPaid()). Guard di sisi
-        // ApplicationDocumentController::edit()/update() menolak akses kalau
-        // belum lunas (lihat komentar di sana).
+        $cart[$key] = ['course_id' => $degreeRow->id, 'intake_year' => (int) $validated['intake_year'], 'whatsapp' => $validated['whatsapp']];
+        session([self::CART => $cart]);
+
         return redirect()
-            ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
-            ->with('success', 'Aplikasi berhasil dikirim! Nomor aplikasi Anda: ' . $application->application_no);
+            ->route('student-portal.apply.cart')
+            ->with('cart_added', $profile->university->name);
+    }
+
+    /** Halaman cart: daftar kampus pilihan, perkiraan biaya, pilih kampus lagi / hapus / kosongkan / checkout. */
+    public function cart(Request $request): View
+    {
+        $items = $this->cartItems();
+        $student = Student::where('user_id', $request->user()->id)->first();
+        $otherApplications = $student
+            ? $student->applications()->where('status', '!=', UniversityApplication::STATUS_CANCELLED)->count()
+            : 0;
+
+        return view('student-portal.apply.cart', [
+            'items' => $items,
+            // Lebih dari 1 kampus (termasuk yang sudah pernah diajukan): tiap kampus cukup DP 50%.
+            'isDeposit' => $items->count() + $otherApplications > 1,
+            'max' => self::CART_MAX,
+        ]);
+    }
+
+    public function removeFromCart(string $key): RedirectResponse
+    {
+        session([self::CART => array_diff_key(session(self::CART, []), [$key => true])]);
+
+        return redirect()->route('student-portal.apply.cart')->with('cart_status', 'The university has been removed from your list.');
+    }
+
+    public function clearCart(): RedirectResponse
+    {
+        session()->forget(self::CART);
+
+        return redirect()->route('student-portal.apply.cart')->with('cart_status', 'Your list is empty now.');
+    }
+
+    /**
+     * Checkout: buat aplikasi untuk tiap kampus di cart, lalu ke halaman bayar. Registration Fee semua
+     * kampus yang belum dibayar ditagih dalam satu transaksi (lihat ApplicationPaymentController).
+     */
+    public function checkout(Request $request): RedirectResponse
+    {
+        $items = $this->cartItems();
+
+        if ($items->isEmpty()) {
+            return redirect()->route('student-portal.apply.cart')->with('cart_status', 'Your list is empty. Choose a university first.');
+        }
+
+        $student = (new StudentIdentityResolver())->resolveForUser($request->user(), $items->first()['whatsapp']);
+
+        if (! $student) {
+            return redirect()->route('student-portal.apply.cart')->with('cart_error', StudentIdentityResolver::CONFLICT_MESSAGE);
+        }
+
+        $applications = DB::transaction(function () use ($items, $student) {
+            // Kunci data student supaya klik "Checkout" dua kali tidak membuat aplikasi dobel.
+            Student::whereKey($student->id)->lockForUpdate()->first();
+
+            return $items->map(fn (array $item) => $this->activeApplication($student, $item['course']->id, $item['intake_year'])
+                ?? UniversityApplication::create(UniversityApplication::courseSnapshot($item['course']) + [
+                    'application_no' => (new ApplicationNumberGenerator())->next(),
+                    'student_id' => $student->id,
+                    'intake_year' => $item['intake_year'],
+                    'whatsapp' => $item['whatsapp'],
+                    // Snapshot Registration Fee dari Course (16 September 2026), lihat UniversityProfileDegree.
+                    'registration_fee_amount' => $item['course']->registration_fee_amount,
+                    'status' => UniversityApplication::STATUS_SUBMITTED,
+                    'submitted_at' => now(),
+                ]));
+        });
+
+        session()->forget(self::CART);
+
+        // Registration Fee dulu (Formulir & Dokumen terbuka setelah lunas, lihat ApplicationDocumentController).
+        return redirect()
+            ->route('student-portal.applications.payment.show', [$applications->first()->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
+            ->with('success', 'Your application'.($applications->count() > 1 ? 's have' : ' has').' been created: '.$applications->pluck('application_no')->implode(', ').'.');
+    }
+
+    /** Isi cart yang masih valid (jurusan & program aktif), lengkap dengan kampusnya. */
+    private function cartItems(): Collection
+    {
+        $cart = session(self::CART, []);
+        $courses = UniversityProfileDegree::with('profile.university')
+            ->whereIn('id', array_column($cart, 'course_id'))
+            ->whereHas('profile', fn ($query) => $query->where('status', 'active'))
+            ->get()
+            ->keyBy('id');
+
+        return collect($cart)
+            ->filter(fn (array $item) => $courses->has($item['course_id']))
+            ->map(fn (array $item, string $key) => $item + ['key' => $key, 'course' => $courses[$item['course_id']]]);
+    }
+
+    private function activeApplication(Student $student, string $courseId, int $intakeYear): ?UniversityApplication
+    {
+        return UniversityApplication::where('student_id', $student->id)
+            ->where('degree_intake_id', $courseId)
+            ->where('intake_year', $intakeYear)
+            ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+            ->first();
     }
 }

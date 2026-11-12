@@ -11,6 +11,8 @@ use App\Services\Payment\PaymentGatewayFactory;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -88,9 +90,9 @@ class ApplicationPaymentController extends Controller
                 ->with('status', 'Departure Fee bisa dibayar setelah aplikasi Anda berstatus "Accepted". Silakan tunggu proses review dokumen oleh tim kami.');
         }
 
-        $amount = $purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
-            ? $application->registrationFeeToCharge()
-            : $application->deposit_fee_china_amount;
+        // Cart "Pilihan Kampus" (12 November 2026): Registration Fee semua kampus yang belum dibayar ditagih sekaligus.
+        $bundle = $this->payingApplications($application, $purpose);
+        $amount = $bundle->sum(fn (UniversityApplication $item) => $this->amountFor($item, $purpose));
 
         $pendingPayment = ApplicationPayment::where('application_id', $application->id)
             ->where('purpose', $purpose)
@@ -98,13 +100,19 @@ class ApplicationPaymentController extends Controller
             ->latest('created_at')
             ->first();
 
+        // Dibayar sekaligus dengan kampus lain: lanjutkan transaksi gabungannya (yang dikirim ke gateway).
+        if ($pendingPayment?->group_order_id) {
+            $pendingPayment = ApplicationPayment::where('order_id', $pendingPayment->group_order_id)->first() ?? $pendingPayment;
+        }
+
         return view('student-portal.applications.payment', [
             'application' => $application,
             'purpose' => $purpose,
             'purposeLabel' => $purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
-                ? ($application->registration_fee_due ? 'Kekurangan Registration Fee' : 'Registration Fee')
+                ? ($application->registration_fee_due ? ($application->isAwaitingUpgradePayment() ? 'Kekurangan Registration Fee' : 'Pelunasan Registration Fee') : 'Registration Fee')
                 : 'Departure Fee',
             'amount' => $amount,
+            'bundle' => $bundle,
             'pendingPayment' => $pendingPayment,
         ]);
     }
@@ -130,15 +138,13 @@ class ApplicationPaymentController extends Controller
             ], 422);
         }
 
-        $amount = $validated['purpose'] === ApplicationPayment::PURPOSE_REGISTRATION_FEE
-            ? $application->registrationFeeToCharge()
-            : $application->deposit_fee_china_amount;
+        $bundle = $this->payingApplications($application, $validated['purpose']);
 
         // FIX: nominal KEDUA purpose ini diisi manual oleh admin per
         // aplikasi (bukan otomatis dari data kampus/major) -- kalau admin
         // belum sempat mengisi, tolak dengan pesan jelas alih-alih transaksi
-        // Rp 0.
-        if (empty($amount) || $amount <= 0) {
+        // Rp 0. Berlaku untuk tiap kampus yang dibayar sekaligus.
+        if ($bundle->contains(fn (UniversityApplication $item) => $this->amountFor($item, $validated['purpose']) <= 0)) {
             return response()->json([
                 'message' => 'Nominal pembayaran belum diatur oleh admin. Silakan hubungi admin kami.',
             ], 422);
@@ -162,16 +168,21 @@ class ApplicationPaymentController extends Controller
             ], 422);
         }
 
-        $payment = ApplicationPayment::create([
-            'application_id' => $application->id,
+        // Satu baris per aplikasi (nominal bagiannya). Baris aplikasi ini yang dikirim ke gateway; kalau lebih
+        // dari 1 kampus, semua disatukan lewat group_order_id dan getAmount() mengirim totalnya.
+        $leadOrderId = $this->generateOrderId();
+        $payments = DB::transaction(fn () => $bundle->map(fn (UniversityApplication $item) => ApplicationPayment::create([
+            'application_id' => $item->id,
             'purpose' => $validated['purpose'],
             'payment_gateway_id' => $gateway->id,
-            'order_id' => $this->generateOrderId(),
+            'order_id' => $item->is($application) ? $leadOrderId : $this->generateOrderId(),
+            'group_order_id' => $bundle->count() > 1 ? $leadOrderId : null,
             'gateway' => $gateway->gateway,
-            'amount' => $amount,
+            'amount' => $this->amountFor($item, $validated['purpose']),
             'status' => ApplicationPayment::STATUS_PENDING,
             'expires_at' => now()->addMinutes($gateway->expiry_minutes ?? 60),
-        ]);
+        ])));
+        $payment = $payments->firstWhere('order_id', $leadOrderId);
 
         try {
             $driver = PaymentGatewayFactory::make($gateway);
@@ -302,6 +313,23 @@ class ApplicationPaymentController extends Controller
 
         return redirect()->route('student-portal.applications.payment.show', [$payment->application_id, $payment->purpose])
             ->with('resume_order_id', $orderId);
+    }
+
+    /** Aplikasi yang dibayar dalam transaksi ini: aplikasi ini dulu, lalu kampus lain yang belum dibayar (Registration Fee). */
+    private function payingApplications(UniversityApplication $application, string $purpose): Collection
+    {
+        if ($purpose !== ApplicationPayment::PURPOSE_REGISTRATION_FEE) {
+            return collect([$application]);
+        }
+
+        return collect([$application])->merge($application->registrationBundle()->reject(fn ($item) => $item->is($application)));
+    }
+
+    private function amountFor(UniversityApplication $application, string $purpose): int
+    {
+        return (int) ($purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE
+            ? $application->registrationFeeToCharge()
+            : $application->deposit_fee_china_amount);
     }
 
     /**

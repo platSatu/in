@@ -205,7 +205,7 @@
                                         diset otomatis oleh webhook (lihat
                                         FormPaymentController::onApplicationPaymentPaid()).
                                     --}}
-                                    @unless ($application->registration_fee_due)
+                                    @unless ($application->isAwaitingUpgradePayment())
                                     <form method="POST" action="{{ route('quiz.university-application.admission-status.update', $application->id) }}" class="d-flex gap-1 mt-1">
                                         @csrf
                                         <select name="admission_status" class="form-select form-select-sm" style="max-width:180px;" onchange="this.form.submit()">
@@ -282,6 +282,38 @@
                             value="{{ $application->registration_fee_amount !== null ? 'Rp ' . number_format($application->registration_fee_amount, 0, ',', '.') : 'Belum diatur di Course' }}">
                         <div class="form-text" style="font-size:12px;">Otomatis dari Registration Fee Course yang dipilih siswa saat Apply -- diatur di halaman Degree &amp; Course pada University Profile, bukan di sini.</div>
                     </div>
+
+                    {{-- Pelunasan DP 50% apply lebih dari 1 kampus (12 November 2026): admin yang mengirim atau membatalkan tagihan. --}}
+                    @php
+                        $feePaid = $payments->contains(fn ($payment) => $payment->isPaid() && $payment->purpose === 'registration_fee');
+                        $remaining = $feePaid ? $application->registrationFeeRemaining() : 0;
+                    @endphp
+                    @if ($canEdit && $feePaid && ! $application->isAwaitingUpgradePayment() && ! $application->isCancelled() && ($remaining > 0 || $application->registration_fee_due))
+                        <div class="col-md-6">
+                            <label class="form-label" style="font-size:13px;">Pelunasan Registration Fee</label>
+                            <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="border rounded p-2">
+                                @csrf
+                                @if ($application->registration_fee_due)
+                                    @php
+                                        $waNumber = preg_replace('/^0/', '62', preg_replace('/\D/', '', (string) $application->whatsapp));
+                                        $waText = 'Halo, tagihan pelunasan Registration Fee '.($application->university->name ?? '').' sebesar Rp '.number_format($application->registration_fee_due, 0, ',', '.').' sudah bisa dibayar di sini: '.route('student-portal.applications.payment.show', [$application->id, 'registration_fee']);
+                                    @endphp
+                                    <div style="font-size:13px;">Tagihan <strong>Rp {{ number_format($application->registration_fee_due, 0, ',', '.') }}</strong> aktif, menunggu dibayar student.</div>
+                                    <div class="d-flex flex-wrap gap-2 mt-2">
+                                        @if ($waNumber)
+                                            <a href="https://wa.me/{{ $waNumber }}?text={{ rawurlencode($waText) }}" target="_blank" rel="noopener" class="btn btn-success btn-sm">Kirim via WhatsApp</a>
+                                        @endif
+                                        <button type="submit" name="balance" value="cancel" class="btn btn-outline-secondary btn-sm"
+                                            onclick="return confirm('Batalkan tagihan pelunasan ini?')">Batalkan Tagihan</button>
+                                    </div>
+                                @else
+                                    <div style="font-size:13px;">Sudah dibayar sebagian (DP). Sisa <strong>Rp {{ number_format($remaining, 0, ',', '.') }}</strong>.</div>
+                                    <button type="submit" name="balance" value="send" class="btn btn-primary btn-sm mt-2"
+                                        onclick="return confirm('Aktifkan tagihan pelunasan Rp {{ number_format($remaining, 0, ',', '.') }}?')">Tagih Pelunasan</button>
+                                @endif
+                            </form>
+                        </div>
+                    @endif
                 </div>
 
                 <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="row g-3 mb-4">

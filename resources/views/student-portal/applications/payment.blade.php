@@ -144,6 +144,21 @@
             @else
                 <div class="payment-amount">Rp {{ number_format((float) $amount, 0, ',', '.') }}</div>
 
+                {{-- Cart "Pilihan Kampus" (12 November 2026): beberapa kampus dibayar sekaligus, masing-masing DP 50%. --}}
+                @if($bundle->count() > 1 || ($purpose === 'registration_fee' && ! $application->registration_fee_due && $amount < $application->registration_fee_amount))
+                    <div class="mb-3" style="border:1px solid #eef1f8;border-radius:12px;padding:12px 14px;font-size:13.5px;">
+                        @foreach($bundle->count() > 1 ? $bundle : [] as $item)
+                            <div class="d-flex justify-content-between gap-3 py-1">
+                                <span>{{ $item->university->name ?? '-' }} <span class="text-muted">&middot; {{ $item->major_label }}</span></span>
+                                <strong class="text-nowrap">Rp {{ number_format($item->registrationFeeToCharge(), 0, ',', '.') }}</strong>
+                            </div>
+                        @endforeach
+                        <div class="text-muted mt-2" style="font-size:12.5px;">
+                            <i class="bi bi-info-circle"></i> Karena kamu apply ke lebih dari 1 kampus, cukup bayar DP 50% per kampus dulu. Sisanya ditagihkan tim kami nanti.
+                        </div>
+                    </div>
+                @endif
+
                 <div class="payment-countdown" id="paymentCountdownBox" style="display:none;">
                     <i class="bi bi-hourglass-split"></i> Selesaikan pembayaran dalam <span id="paymentCountdownDisplay">--:--</span>
                 </div>

@@ -76,8 +76,19 @@ class DocumentTypeSeeder extends Seeder
             // --- Supporting Letter (sebelumnya "Surat Pendukung" -- penamaan
             // ulang 10 September 2026) ---
             ['code' => 'recommendation_letter', 'label' => 'Recommendation Letter', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'template_file_path' => 'document-templates/Recommendation-Letter.pdf', 'is_required' => false, 'sort_order' => 160],
-            ['code' => 'guardian_letter', 'label' => 'Guardian Letter (if student under 17 years old)', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 170],
+            ['code' => 'guardian_letter', 'label' => 'Guardian Letter (if student under 18 years old)', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 170],
             ['code' => 'any_certificate', 'label' => 'Any Certificate', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 180],
+
+            // 12 November 2026 -- dari Google Sheet "Requirements University", juga ditambahkan lewat
+            // migration create_university_document_requirements_table. Kampus mana yang memintanya
+            // diatur di Dokumen Persyaratan per kampus (UniversityDocumentRequirementSeeder).
+            ['code' => 'personal_statement', 'label' => 'Personal Statement', 'group_label' => 'Academic', 'allowed_extensions' => 'pdf', 'is_required' => false, 'sort_order' => 75],
+            ['code' => 'standardized_test', 'label' => 'Standardized Test Scores (SAT / IB / A-Level)', 'group_label' => 'Certificate', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 135],
+            ['code' => 'no_drug_statement', 'label' => 'No Drug Addiction Statement', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 152],
+            ['code' => 'mental_health_survey', 'label' => 'International Student Mental Health Survey', 'group_label' => 'Kesehatan & Legal', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 154],
+            ['code' => 'supervisor_acceptance_letter', 'label' => 'Acceptance Letter from Supervisor', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf,jpg,jpeg', 'is_required' => false, 'sort_order' => 165],
+            ['code' => 'cv', 'label' => 'CV', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'pdf', 'is_required' => false, 'sort_order' => 175],
+            ['code' => 'self_intro_video', 'label' => 'Self-Introduction Video', 'group_label' => 'Supporting Letter', 'allowed_extensions' => 'mp4,mov', 'is_required' => false, 'sort_order' => 185],
 
             // --- Documents from InaStudy (FASE 4, 10 September 2026) ---
             // provided_by = 'admin' -- KEBALIKAN dari semua jenis dokumen di

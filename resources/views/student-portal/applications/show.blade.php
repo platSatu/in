@@ -146,7 +146,17 @@
             card ini disembunyikan total supaya tidak membingungkan siswa
             yang belum bayar.
         --}}
-        @if($application->registration_fee_due)
+        @if($application->registration_fee_due && ! $application->isAwaitingUpgradePayment())
+            {{-- Pelunasan DP 50% apply lebih dari 1 kampus (12 November 2026), ditagih oleh admin. --}}
+            <div class="card-box">
+                <h6 class="fw-bold mb-2">Pelunasan Registration Fee</h6>
+                <p class="mb-3">Terima kasih sudah membayar DP. Sisa Registration Fee untuk <strong>{{ optional($application->university)->name }}</strong>
+                    sebesar <strong>Rp {{ number_format($application->registration_fee_due, 0, ',', '.') }}</strong> sudah bisa dilunasi.</p>
+                <a href="{{ route('student-portal.applications.payment.show', [$application->id, \App\Models\ApplicationPayment::PURPOSE_REGISTRATION_FEE]) }}" class="btn btn-danger btn-sm">Bayar Pelunasan</a>
+            </div>
+        @endif
+
+        @if($application->isAwaitingUpgradePayment())
             {{-- Upgrade jurusan (10 November 2026): Formulir & Dokumen terkunci sampai kekurangan lunas. --}}
             <div class="card-box">
                 <h6 class="fw-bold mb-2">Menunggu Pelunasan</h6>

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\StudentPortal;
 
 use App\Http\Controllers\Controller;
-use App\Models\DocumentType;
 use App\Models\Student;
 use App\Models\UniversityApplication;
 use Illuminate\Support\Facades\Auth;
@@ -29,12 +28,9 @@ class InaStudyController extends Controller
                 ->with(['university', 'universityProfile'])->withDocumentProgress()->orderByDesc('submitted_at')->get()
             : collect();
 
-        // Total jenis dokumen untuk progress bar "x / total", sama dengan halaman admin.
-        $totalDocumentTypes = DocumentType::studentUploadTotal();
-
         // Staff biasa tanpa data Student tidak melihat widget ini.
         $hasStudent = (bool) $student;
 
-        return view('student-portal.inastudy.index', compact('myApplications', 'totalDocumentTypes', 'hasStudent'));
+        return view('student-portal.inastudy.index', compact('myApplications', 'hasStudent'));
     }
 }

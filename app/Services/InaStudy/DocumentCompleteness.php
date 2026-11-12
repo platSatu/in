@@ -14,19 +14,19 @@ use Illuminate\Support\Collection;
 /**
  * Kelengkapan dokumen student (29 Oktober 2026), dipakai pengingat & kolom "Kelengkapan" di File Student.
  *
- * - Dokumen WAJIB = jenis dokumen aktif, diunggah student (provided_by student), is_required = true.
+ * - Dokumen WAJIB = yang wajib menurut Dokumen Persyaratan kampus aplikasinya (12 November 2026);
+ *   kampus yang belum diatur memakai is_required jenis dokumen seperti sebelumnya.
+ *   Lihat UniversityApplication::documentTypes().
  * - Dianggap ada kalau sudah diunggah dan TIDAK berstatus ditolak (yang ditolak harus diunggah ulang).
  * - Aplikasi yang diingatkan: tidak Cancelled, Registration Fee lunas, dan Formulir sudah disubmit
  *   (sama dengan syarat halaman upload dokumen terbuka untuk student). Hari ke-0 = saat Formulir disubmit.
  */
 class DocumentCompleteness
 {
-    private ?Collection $required = null;
-
     /** @return Collection<int, DocumentType> */
-    public function requiredTypes(): Collection
+    public function requiredTypes(UniversityApplication $application): Collection
     {
-        return $this->required ??= DocumentType::active()->studentUpload()->where('is_required', true)->orderBy('sort_order')->get();
+        return $application->documentTypes()->where('is_required', true)->values();
     }
 
     /** Label dokumen wajib yang belum ada, mis. ["Ijazah SMA", "Transkrip Nilai"]. */
@@ -35,12 +35,12 @@ class DocumentCompleteness
         $documents = $application->relationLoaded('documents') ? $application->documents : $application->documents()->get();
         $present = $documents->where('review_status', '!=', ApplicationDocument::REVIEW_REJECTED)->pluck('document_type_id')->unique();
 
-        return $this->requiredTypes()->reject(fn (DocumentType $type) => $present->contains($type->id))->pluck('label')->values();
+        return $this->requiredTypes($application)->reject(fn (DocumentType $type) => $present->contains($type->id))->pluck('label')->values();
     }
 
     public function isComplete(UniversityApplication $application): bool
     {
-        return $this->requiredTypes()->isNotEmpty() && $this->missing($application)->isEmpty();
+        return $this->requiredTypes($application)->isNotEmpty() && $this->missing($application)->isEmpty();
     }
 
     /** Hari ke-0 pengingat: saat student menyetujui & submit Formulir. */
@@ -74,7 +74,9 @@ class DocumentCompleteness
             ->with('documents:id,application_id,document_type_id,review_status')
             ->get();
 
-        if ($applications->isEmpty() || $this->requiredTypes()->isEmpty()) {
+        $applications = $applications->filter(fn (UniversityApplication $application) => $this->requiredTypes($application)->isNotEmpty());
+
+        if ($applications->isEmpty()) {
             return ['status' => 'none', 'missing' => 0];
         }
 

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Support\Collection;
 
 /**
  * Satu Aplikasi Kuliah: satu Student apply ke satu Major (UniversityProfile)
@@ -119,10 +120,54 @@ class UniversityApplication extends Model
         ];
     }
 
-    /** Nominal Registration Fee yang ditagih sekarang: kekurangan setelah upgrade jurusan, kalau ada; selain itu fee penuh. */
+    /**
+     * Nominal Registration Fee yang ditagih sekarang: kekurangan/pelunasan yang ditagih admin, kalau ada.
+     * Apply lebih dari 1 kampus (12 November 2026): tiap kampus cukup DP 50%, sisanya ditagih admin belakangan.
+     */
     public function registrationFeeToCharge(): int
     {
-        return (int) ($this->registration_fee_due ?: $this->registration_fee_amount);
+        if ($this->registration_fee_due) {
+            return (int) $this->registration_fee_due;
+        }
+
+        $multiCampus = static::where('student_id', $this->student_id)->where('status', '!=', self::STATUS_CANCELLED)->count() > 1;
+
+        return $multiCampus ? (int) ceil($this->registration_fee_amount / 2) : (int) $this->registration_fee_amount;
+    }
+
+    /** Sisa Registration Fee yang belum dibayar (dasar tagihan pelunasan dari admin). */
+    public function registrationFeeRemaining(): int
+    {
+        $paid = $this->payments()->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+            ->where('status', ApplicationPayment::STATUS_PAID)->sum('amount');
+
+        return max(0, (int) $this->registration_fee_amount - (int) $paid);
+    }
+
+    /**
+     * Aplikasi yang Registration Fee-nya dibayar sekaligus dalam satu transaksi (cart "Pilihan Kampus"):
+     * semua aplikasi aktif milik student yang sama dan belum dibayar sama sekali. Tagihan pelunasan selalu sendiri.
+     */
+    public function registrationBundle(): Collection
+    {
+        if ($this->registration_fee_due) {
+            return collect([$this]);
+        }
+
+        return static::with('university')
+            ->where('student_id', $this->student_id)
+            ->where('status', '!=', self::STATUS_CANCELLED)
+            ->whereNull('registration_fee_due')
+            ->whereDoesntHave('payments', fn ($query) => $query->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+                ->where('status', ApplicationPayment::STATUS_PAID))
+            ->orderBy('submitted_at')
+            ->get();
+    }
+
+    /** Menunggu kekurangan setelah upgrade jurusan (Formulir & Dokumen terkunci), beda dengan tagihan pelunasan DP. */
+    public function isAwaitingUpgradePayment(): bool
+    {
+        return $this->admission_status === self::ADMISSION_STATUS_AWAITING_PAYMENT;
     }
 
     public function isCancelled(): bool
@@ -161,13 +206,53 @@ class UniversityApplication extends Model
         return $this->course_name.(filled($this->degree) ? ' ('.$this->degree.')' : '');
     }
 
+    /** Cache per request: jenis dokumen aktif & aturan per kampus (dipakai berulang di daftar aplikasi). */
+    private static ?Collection $studentDocumentTypes = null;
+    private static array $campusRules = [];
+
+    /**
+     * Jenis dokumen yang diupload student untuk aplikasi ini (12 November 2026): mengikuti Dokumen
+     * Persyaratan kampusnya (disaring jenjang & bahasa pengantar), ditambah jenis yang sudah telanjur
+     * diupload supaya file lama tidak pernah hilang. Kampus yang belum diatur: semua jenis aktif.
+     * is_required, campus_note & template_file_path ikut aturan kampus (hanya di memori, tidak disimpan).
+     */
+    public function documentTypes(): Collection
+    {
+        $types = (self::$studentDocumentTypes ??= DocumentType::active()->studentUpload()->orderBy('sort_order')->get())
+            ->map(fn (DocumentType $type) => clone $type);
+        $rules = self::$campusRules[$this->university_id] ??= UniversityDocumentRequirement::where('university_id', $this->university_id)
+            ->get()->keyBy('document_type_id');
+
+        if ($rules->isEmpty()) {
+            return $types;
+        }
+
+        $uploaded = $this->documents()->distinct()->pluck('document_type_id');
+
+        return $types->filter(function (DocumentType $type) use ($rules, $uploaded) {
+            $rule = $rules->get($type->id);
+
+            if ($rule && $rule->appliesTo($this)) {
+                $type->is_required = $rule->is_required;
+                $type->campus_note = $rule->note;
+                $type->template_file_path = $rule->template_file_path ?: $type->template_file_path;
+
+                return true;
+            }
+
+            $type->is_required = false;
+
+            return $uploaded->contains($type->id);
+        })->values();
+    }
+
     /**
      * Hitungan dokumen untuk progress (13 Oktober 2026), dipisah supaya
      * dokumen dari INA (Offer Letter, JW, VISA) tidak membuat dokumen
      * student terlihat belum lengkap:
      *  - documents_count: dokumen STUDENT (jenis aktif, provided_by student)
      *  - ina_documents_count: dokumen dari INA (jenis aktif, provided_by admin)
-     * Pasangannya DocumentType::studentUploadTotal() / adminProvidedTotal().
+     * Pasangannya documentTypes()->count() (per kampus) / DocumentType::adminProvidedTotal().
      */
     public function scopeWithDocumentProgress($query)
     {

@@ -71,7 +71,8 @@ class ApplicationDocumentController extends Controller
         // siswa cuma bisa MELIHAT/DOWNLOAD dokumen itu di halaman ringkasan
         // aplikasi (student-portal.applications.show), tidak pernah upload
         // sendiri. Lihat DocumentType::scopeStudentUpload().
-        $documentTypes = DocumentType::active()->studentUpload()->orderBy('sort_order')->get();
+        // 12 November 2026: kolom upload mengikuti Dokumen Persyaratan kampus aplikasi ini.
+        $documentTypes = $application->documentTypes();
 
         $documents = ApplicationDocument::where('application_id', $application->id)
             ->with(['histories.uploadedBy', 'documentType'])
@@ -114,8 +115,8 @@ class ApplicationDocumentController extends Controller
         // FASE 4 -- sama seperti edit(): dibatasi ke studentUpload() supaya
         // POST manual (mis. lewat curl/devtools) tidak bisa menyelundupkan
         // documents.{admin_document_type_id} dan menimpa dokumen yang
-        // seharusnya cuma admin yang boleh isi.
-        $documentTypes = DocumentType::active()->studentUpload()->get()->keyBy('id');
+        // seharusnya cuma admin yang boleh isi. Juga hanya jenis yang diminta kampus aplikasi ini.
+        $documentTypes = $application->documentTypes()->keyBy('id');
 
         // Rule validasi dibangun dinamis per DocumentType supaya ekstensi
         // yang diizinkan (mis. Passport & Pass Photo cuma jpg/jpeg) tetap
@@ -123,14 +124,15 @@ class ApplicationDocumentController extends Controller
         $rules = [];
         foreach ($documentTypes as $documentType) {
             $extensions = implode(',', $documentType->allowedExtensionsArray());
+            $max = $documentType->maxKilobytes();
 
             if ($documentType->allows_multiple) {
                 // Jenis boleh banyak (mis. Any Certificate): baris baru = nama + file.
                 $rules["certificates.{$documentType->id}"] = 'nullable|array|max:'.DocumentType::MAX_MULTIPLE_FILES;
                 $rules["certificates.{$documentType->id}.*.title"] = "nullable|string|max:150|required_with:certificates.{$documentType->id}.*.file";
-                $rules["certificates.{$documentType->id}.*.file"] = "nullable|file|max:5120|mimes:{$extensions}";
+                $rules["certificates.{$documentType->id}.*.file"] = "nullable|file|max:{$max}|mimes:{$extensions}";
             } else {
-                $rules["documents.{$documentType->id}"] = "nullable|file|max:5120|mimes:{$extensions}";
+                $rules["documents.{$documentType->id}"] = "nullable|file|max:{$max}|mimes:{$extensions}";
             }
         }
 
@@ -312,13 +314,14 @@ class ApplicationDocumentController extends Controller
             ->exists();
 
         // Upgrade jurusan (10 November 2026): kekurangan Registration Fee harus lunas dulu.
-        if ($isPaid && ! $application->registration_fee_due) {
+        // Tagihan pelunasan DP 50% (12 November 2026) tidak mengunci dokumen.
+        if ($isPaid && ! $application->isAwaitingUpgradePayment()) {
             return null;
         }
 
         return redirect()
             ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
-            ->with('status', 'Selesaikan pembayaran '.($application->registration_fee_due ? 'kekurangan ' : '').'Registration Fee terlebih dahulu untuk membuka Study Plan & Upload Documents.');
+            ->with('status', 'Selesaikan pembayaran '.($application->isAwaitingUpgradePayment() ? 'kekurangan ' : '').'Registration Fee terlebih dahulu untuk membuka Study Plan & Upload Documents.');
     }
 
     /**

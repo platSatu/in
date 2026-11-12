@@ -163,6 +163,11 @@ Route::get('/invoice/{token}', [InvoiceController::class, 'show'])->name('invoic
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/apply/{universityProfile}', [ApplyController::class, 'store'])->name('student-portal.apply.store');
+    // Cart "Pilihan Kampus" (12 November 2026): maksimal 3 kampus, checkout lalu bayar sekaligus.
+    Route::get('/apply-cart', [ApplyController::class, 'cart'])->name('student-portal.apply.cart');
+    Route::post('/apply-cart/checkout', [ApplyController::class, 'checkout'])->middleware('throttle:10,1')->name('student-portal.apply.cart.checkout');
+    Route::delete('/apply-cart/{key}', [ApplyController::class, 'removeFromCart'])->name('student-portal.apply.cart.remove');
+    Route::delete('/apply-cart', [ApplyController::class, 'clearCart'])->name('student-portal.apply.cart.clear');
     Route::get('/applications/{application}', [ApplicationController::class, 'show'])->name('student-portal.applications.show');
 
     // Fase 2 -- pembayaran Registration Fee (Step 3) & Departure Fee (Step 4)

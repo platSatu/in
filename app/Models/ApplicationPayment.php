@@ -44,6 +44,8 @@ class ApplicationPayment extends Model implements Payable
         'purpose',
         'payment_gateway_id',
         'order_id',
+        // Cart "Pilihan Kampus" (12 November 2026): order_id transaksi gateway yang membayar beberapa aplikasi sekaligus.
+        'group_order_id',
         'gateway',
         'amount',
         'status',
@@ -94,9 +96,12 @@ class ApplicationPayment extends Model implements Payable
         return (string) $this->order_id;
     }
 
+    /** Nominal yang dikirim & dicocokkan ke gateway: total semua aplikasi kalau dibayar sekaligus. */
     public function getAmount(): int
     {
-        return (int) $this->amount;
+        return $this->group_order_id
+            ? (int) static::where('group_order_id', $this->group_order_id)->sum('amount')
+            : (int) $this->amount;
     }
 
     public function getPayerName(): string
@@ -119,6 +124,10 @@ class ApplicationPayment extends Model implements Payable
     public function getDescription(): string
     {
         $label = $this->purpose === self::PURPOSE_DEPARTURE_FEE ? 'Departure Fee' : 'Registration Fee';
+
+        if ($this->group_order_id && ($count = static::where('group_order_id', $this->group_order_id)->count()) > 1) {
+            return $label . ' - ' . $count . ' universities';
+        }
 
         return $label . ' - ' . ($this->application?->application_no ?? 'Aplikasi Kuliah');
     }

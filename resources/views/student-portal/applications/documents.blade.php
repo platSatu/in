@@ -47,6 +47,12 @@
         }
         .doc-row .doc-name { font-weight: 700; font-size: 14.5px; }
         .doc-row .doc-hint { color: #8a90a2; font-size: 12.5px; }
+        .doc-note { margin-top: 6px; padding: 8px 12px; border-radius: 10px; background: #fff7f8; color: #5b2a33; font-size: 12.5px; line-height: 1.55; }
+        .doc-note i { color: var(--brand); }
+        .tag-required { display: inline-block; margin-left: 6px; padding: 2px 8px; border-radius: 20px; background: #fbe6ea; color: var(--brand); font-size: 10.5px; font-weight: 700; vertical-align: middle; }
+        .req-progress { height: 8px; border-radius: 99px; background: #f1f2f6; overflow: hidden; }
+        .req-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--brand), #e8475f); border-radius: 99px; }
+        @media (max-width: 575.98px) { .card-box { padding: 20px 16px; } .doc-row { padding: 14px; } }
         .badge-status { font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; }
         .badge-not-uploaded { background: #f1f2f6; color: #6b7186; }
         .badge-pending { background: #fff4de; color: #b8860b; }
@@ -103,10 +109,27 @@
             <p class="subtitle">
                 {{ $application->university->name ?? '-' }} &middot; {{ $application->application_no }}
             </p>
+
+            {{-- 12 November 2026: daftar di bawah mengikuti persyaratan kampus ini, sesuai jenjang & bahasa programmu. --}}
+            @php
+                $requiredTypes = $groupedTypes->flatten()->where('is_required', true);
+                $requiredDone = $requiredTypes->filter(fn ($type) => $multipleDocuments->get($type->id, collect())->where('review_status', '!=', 'rejected')->isNotEmpty())->count();
+            @endphp
+            @if($requiredTypes->isNotEmpty())
+                <div class="mt-3">
+                    <div class="d-flex justify-content-between mb-1" style="font-size:13px;">
+                        <span>Required documents for this university</span>
+                        <strong>{{ $requiredDone }} / {{ $requiredTypes->count() }}</strong>
+                    </div>
+                    <div class="req-progress"><span style="width: {{ round($requiredDone / $requiredTypes->count() * 100) }}%"></span></div>
+                </div>
+            @endif
         </div>
 
         <div class="card-box">
             <p class="mb-4" style="font-size:14px;color:#6b7186;">
+                Every university asks for slightly different documents, so this list is made just for
+                {{ $application->university->name ?? 'your university' }}{{ $application->degree ? ' ('.$application->degree.')' : '' }}.
                 Upload as many documents as you have ready. You don't need to complete everything at once --
                 you can come back and upload the rest later, or re-upload a document any time to replace it
                 with a newer version.
@@ -128,8 +151,11 @@
                             @endphp
                             <div class="doc-row">
                                 <div class="mb-2">
-                                    <div class="doc-name">{{ $documentType->label }}</div>
-                                    <div class="doc-hint">You can upload more than one ({{ $files->count() }}/{{ \App\Models\DocumentType::MAX_MULTIPLE_FILES }}) &middot; Allowed: {{ strtoupper($documentType->allowed_extensions) }} &middot; max 5MB each</div>
+                                    <div class="doc-name">{{ $documentType->label }}@if($documentType->is_required)<span class="tag-required">Required</span>@endif</div>
+                                    <div class="doc-hint">You can upload more than one ({{ $files->count() }}/{{ \App\Models\DocumentType::MAX_MULTIPLE_FILES }}) &middot; Allowed: {{ strtoupper($documentType->allowed_extensions) }} &middot; max {{ $documentType->maxKilobytes() / 1024 }}MB each</div>
+                                    @if($documentType->campus_note)
+                                        <div class="doc-note"><i class="bi bi-info-circle"></i> {{ $documentType->campus_note }}</div>
+                                    @endif
                                 </div>
 
                                 @foreach($files as $file)
@@ -194,8 +220,11 @@
                         <div class="doc-row">
                             <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
                                 <div>
-                                    <div class="doc-name">{{ $documentType->label }}</div>
-                                    <div class="doc-hint">Allowed: {{ strtoupper($documentType->allowed_extensions) }} &middot; max 5MB</div>
+                                    <div class="doc-name">{{ $documentType->label }}@if($documentType->is_required)<span class="tag-required">Required</span>@endif</div>
+                                    <div class="doc-hint">Allowed: {{ strtoupper($documentType->allowed_extensions) }} &middot; max {{ $documentType->maxKilobytes() / 1024 }}MB</div>
+                                    @if($documentType->campus_note)
+                                        <div class="doc-note"><i class="bi bi-info-circle"></i> {{ $documentType->campus_note }}</div>
+                                    @endif
 
                                     {{--
                                         FIX (10 September 2026): fitur "Download Template" --

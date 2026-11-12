@@ -156,7 +156,7 @@ class DocumentNotifier
         }
 
         $missing = $completeness->missing($application)->all();
-        $complete = $completeness->requiredTypes()->isNotEmpty() && $missing === [];
+        $complete = $missing === [] && $completeness->requiredTypes($application)->isNotEmpty();
 
         if ($complete && $setting->complete_notify_student) {
             return;

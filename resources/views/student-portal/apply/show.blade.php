@@ -82,9 +82,15 @@
 
     <div class="topbar">
         <div class="container">
-            <a href="{{ route('frontend.university.profile', $profile->university_id) }}">
-                <i class="bi bi-arrow-left"></i> Back to {{ $profile->university->name }}
-            </a>
+            <div class="d-flex justify-content-between align-items-center gap-2">
+                <a href="{{ route('frontend.university.profile', $profile->university_id) }}">
+                    <i class="bi bi-arrow-left"></i> Back to {{ $profile->university->name }}
+                </a>
+                {{-- Cart "Pilihan Kampus" (12 November 2026). --}}
+                @if($cartCount = count(session('apply_cart', [])))
+                    <a href="{{ route('student-portal.apply.cart') }}"><i class="bi bi-bag-check"></i> My list ({{ $cartCount }})</a>
+                @endif
+            </div>
         </div>
     </div>
 
@@ -303,7 +309,7 @@
                     </div>
 
                     <button type="submit" class="btn-submit">
-                        <i class="bi bi-send-check me-1"></i> Submit Application
+                        <i class="bi bi-bag-plus me-1"></i> Add to My University List
                     </button>
                 </form>
             @endif

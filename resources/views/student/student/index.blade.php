@@ -420,6 +420,7 @@
                                                     @foreach ($applications as $application)
                                                         @php
                                                             $docsCount = $application->documents_count ?? 0;
+                                                            $totalDocumentTypes = $application->documentTypes()->count(); // per kampus (12 November 2026)
                                                             $docsPercent = $totalDocumentTypes > 0 ? min(100, round(($docsCount / $totalDocumentTypes) * 100)) : 0;
                                                             $docsComplete = $totalDocumentTypes > 0 && $docsCount >= $totalDocumentTypes;
 

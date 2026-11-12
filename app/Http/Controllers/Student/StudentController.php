@@ -184,7 +184,6 @@ class StudentController extends Controller
             ->get()
             ->groupBy('university_id')
             ->sortBy(fn ($rows) => mb_strtolower($rows->first()->university->name ?? ''));
-        $totalDocumentTypes = DocumentType::studentUploadTotal();
         $totalInaDocumentTypes = DocumentType::adminProvidedTotal();
 
         return view('student.student.index', compact(
@@ -202,7 +201,6 @@ class StudentController extends Controller
             'totalForms',
             'studentsCreatedOnDate',
             'applicationsByUniversity',
-            'totalDocumentTypes',
             'totalInaDocumentTypes'
         ));
     }

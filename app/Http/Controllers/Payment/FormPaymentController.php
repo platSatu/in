@@ -480,6 +480,24 @@ class FormPaymentController extends Controller
      */
     private function onApplicationPaymentPaid(ApplicationPayment $payment): void
     {
+        // Cart "Pilihan Kampus" (12 November 2026): satu transaksi membayar beberapa aplikasi. Baris kampus
+        // lain ikut lunas (update bersyarat pending -> paid, jadi webhook dobel tidak memproses dua kali).
+        if ($payment->group_order_id) {
+            ApplicationPayment::where('group_order_id', $payment->group_order_id)
+                ->whereKeyNot($payment->getKey())
+                ->get()
+                ->filter(fn (ApplicationPayment $sibling) => $sibling->newQuery()->whereKey($sibling->getKey())
+                    ->where('status', ApplicationPayment::STATUS_PENDING)
+                    ->update(['status' => ApplicationPayment::STATUS_PAID, 'paid_at' => now(), 'gateway_reference' => $payment->gateway_reference]) === 1)
+                ->each(fn (ApplicationPayment $sibling) => $this->openApplicationAfterPayment($sibling->refresh()));
+        }
+
+        $this->openApplicationAfterPayment($payment);
+    }
+
+    /** Efek lunas untuk satu aplikasi: buka Formulir & Dokumen (Under Review), lalu kirim invoice. */
+    private function openApplicationAfterPayment(ApplicationPayment $payment): void
+    {
         $application = $payment->application;
 
         if (!$application) {
@@ -495,11 +513,14 @@ class FormPaymentController extends Controller
             ]);
         } elseif ($payment->purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE && $application->registration_fee_due) {
             // Pelunasan kekurangan setelah upgrade jurusan (10 November 2026): kunci Formulir & Dokumen dibuka lagi.
+            // Tagihan pelunasan DP 50% dari admin (12 November 2026): status admission tidak berubah.
             // Pembayaran lebih kecil (mis. tagihan lama yang sudah ditutup tapi tetap dibayar) tidak membuka kunci.
             if ((int) $payment->amount >= (int) $application->registration_fee_due) {
                 $application->update([
                     'registration_fee_due' => null,
-                    'admission_status' => UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW,
+                    'admission_status' => $application->isAwaitingUpgradePayment()
+                        ? UniversityApplication::ADMISSION_STATUS_UNDER_REVIEW
+                        : $application->admission_status,
                 ]);
             } else {
                 Log::warning('[PAYMENT] Pembayaran Registration Fee lebih kecil dari kekurangannya, cek manual', [

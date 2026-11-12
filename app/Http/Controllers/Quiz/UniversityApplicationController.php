@@ -107,12 +107,6 @@ class UniversityApplicationController extends Controller
             ->paginate(15)
             ->withQueryString();
 
-        // Dipakai bareng documents_count di atas untuk progress "x / total"
-        // + badge "Documents Complete" di kolom Documents (lihat
-        // index.blade.php) -- total jenis dokumen berlaku sama untuk semua
-        // aplikasi (DocumentType belum per-university/per-major).
-        $totalDocumentTypes = DocumentType::studentUploadTotal();
-
         $universities = University::orderBy('name')->get();
 
         $intakeYears = UniversityApplication::whereNotNull('intake_year')
@@ -141,8 +135,7 @@ class UniversityApplicationController extends Controller
             'search',
             'universityId',
             'intakeYear',
-            'status',
-            'totalDocumentTypes'
+            'status'
         ));
     }
 
@@ -154,7 +147,8 @@ class UniversityApplicationController extends Controller
 
         $this->assertVisibleApplication($request->user(), $application);
 
-        $documentTypes = DocumentType::active()->orderBy('sort_order')->get();
+        // Dokumen student mengikuti persyaratan kampusnya (12 November 2026), lalu dokumen dari INA.
+        $documentTypes = $application->documentTypes()->concat(DocumentType::active()->adminProvided()->orderBy('sort_order')->get());
 
         $documents = ApplicationDocument::where('application_id', $application->id)
             ->with(['histories.uploadedBy', 'histories.reviewedBy', 'uploadedBy', 'reviewedBy'])
@@ -420,6 +414,25 @@ class UniversityApplicationController extends Controller
         $application = UniversityApplication::findOrFail($id);
         $this->assertVisibleApplication($request->user(), $application);
 
+        // Tagihan pelunasan DP 50% (12 November 2026): admin yang memutuskan dikirim atau dibatalkan.
+        if ($request->filled('balance')) {
+            abort_if($application->isAwaitingUpgradePayment() || $application->isCancelled(), 422);
+            $send = $request->input('balance') === 'send';
+            $remaining = $application->registrationFeeRemaining();
+
+            if ($send && $remaining <= 0) {
+                return back()->withErrors(['balance' => 'Registration Fee aplikasi ini sudah lunas.']);
+            }
+
+            $application->update(['registration_fee_due' => $send ? $remaining : null]);
+
+            return redirect()
+                ->route('quiz.university-application.show', $id)
+                ->with('success', $send
+                    ? 'Tagihan pelunasan Rp '.number_format($remaining, 0, ',', '.').' sudah aktif. Student bisa membayarnya dari halaman aplikasinya.'
+                    : 'Tagihan pelunasan dibatalkan.');
+        }
+
         $validated = $request->validate([
             'deposit_fee_china_amount' => 'nullable|integer|min:0',
         ]);
@@ -476,7 +489,7 @@ class UniversityApplicationController extends Controller
         $this->assertVisibleApplication($request->user(), $application);
 
         // Status "Menunggu Pelunasan" hanya berubah otomatis begitu kekurangan Registration Fee lunas.
-        if ($application->registration_fee_due) {
+        if ($application->isAwaitingUpgradePayment()) {
             return back()->with('error', 'Aplikasi ini masih menunggu pelunasan kekurangan Registration Fee.');
         }
 
