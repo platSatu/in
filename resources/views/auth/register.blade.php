@@ -38,7 +38,7 @@
 
                     <div class="card rounded-0 mb-0 border-0 shadow-none bg-transparent">
                         <div class="card-body">
-                            <img src="{{ asset('authLogin') }}/assets/images/auth/register1.png"
+                            <img src="{{ asset('authLogin') }}/assets/images/auth/register1-ina.png"
                                 class="img-fluid auth-img-cover-login" width="650" alt="">
                         </div>
                     </div>
