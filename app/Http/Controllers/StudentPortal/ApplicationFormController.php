@@ -42,10 +42,22 @@ class ApplicationFormController extends Controller
             ->orderBy('sort_order')
             ->get();
 
+        // Apply beberapa kampus (12 November 2026): formulir baru terisi otomatis dari formulir sebelumnya,
+        // student tinggal cek & kirim (Terms & Condition tetap dicentang ulang untuk kampus ini).
+        $previous = $formDetail ? null : $this->previousForm($application);
+
+        if ($previous) {
+            $formDetail = $previous->replicate(['application_id', 'terms_accepted_at']);
+            $educationBackgrounds = ApplicationEducationBackground::where('application_id', $previous->application_id)
+                ->orderBy('sort_order')
+                ->get();
+        }
+
         return view('student-portal.applications.form', [
             'application' => $application,
             'formDetail' => $formDetail,
             'educationBackgrounds' => $educationBackgrounds,
+            'prefilled' => (bool) $previous,
         ]);
     }
 
@@ -113,7 +125,8 @@ class ApplicationFormController extends Controller
 
         $existingFormDetail = ApplicationFormDetail::where('application_id', $application->id)->first();
 
-        $photoPath = $existingFormDetail->photo_path ?? null;
+        // Belum punya foto di aplikasi ini: pakai foto dari formulir sebelumnya (kalau tidak diganti).
+        $photoPath = $existingFormDetail->photo_path ?? $this->previousForm($application)?->photo_path;
         if ($request->hasFile('photo')) {
             $photoPath = $this->storePhotoFile($request->file('photo'));
         }
@@ -232,8 +245,19 @@ class ApplicationFormController extends Controller
     public function photo(Request $request, string $applicationId)
     {
         $application = $this->ownedApplicationOrFail($request, $applicationId);
-        $formDetail = ApplicationFormDetail::where('application_id', $application->id)->firstOrFail();
+        $formDetail = ApplicationFormDetail::where('application_id', $application->id)->first() ?? $this->previousForm($application);
+        abort_unless($formDetail?->photo_path, Response::HTTP_NOT_FOUND);
 
         return ApplicationFiles::response($formDetail->photo_path);
+    }
+
+    /** Formulir terbaru dari aplikasi lain milik student yang sama (dipakai mengisi otomatis). */
+    private function previousForm(UniversityApplication $application): ?ApplicationFormDetail
+    {
+        return ApplicationFormDetail::whereHas('application', fn ($query) => $query
+            ->where('student_id', $application->student_id)
+            ->whereKeyNot($application->getKey()))
+            ->latest('updated_at')
+            ->first();
     }
 }

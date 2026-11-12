@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Satu Aplikasi Kuliah: satu Student apply ke satu Major (UniversityProfile)
@@ -244,6 +245,41 @@ class UniversityApplication extends Model
 
             return $uploaded->contains($type->id);
         })->values();
+    }
+
+    /**
+     * Apply beberapa kampus (12 November 2026): dokumen yang sudah diupload di aplikasi lain milik student yang
+     * sama ikut dipakai di sini (file yang sama, tanpa upload ulang), hanya untuk jenis yang diminta kampus ini
+     * dan belum ada. Statusnya Pending supaya admin tetap memeriksa per kampus. Jenis multi-file tidak ikut.
+     */
+    public function fillDocumentsFromSiblings(): int
+    {
+        return DB::transaction(function () {
+            static::whereKey($this->getKey())->lockForUpdate()->first();
+
+            $wanted = $this->documentTypes()->where('allows_multiple', false)->pluck('id')
+                ->diff($this->documents()->pluck('document_type_id'));
+
+            if ($wanted->isEmpty()) {
+                return 0;
+            }
+
+            $sources = ApplicationDocument::whereIn('document_type_id', $wanted)
+                ->where(fn ($query) => $query->whereNull('review_status')->orWhere('review_status', '!=', ApplicationDocument::REVIEW_REJECTED))
+                ->whereHas('application', fn ($query) => $query->where('student_id', $this->student_id)
+                    ->whereKeyNot($this->getKey())
+                    ->where('status', '!=', self::STATUS_CANCELLED))
+                ->latest('uploaded_at')
+                ->get()
+                ->unique('document_type_id');
+
+            $sources->each(fn (ApplicationDocument $source) => ApplicationDocument::create(
+                $source->only(['document_type_id', 'file_path', 'original_filename', 'uploaded_by_user_id', 'uploaded_at'])
+                + ['application_id' => $this->getKey(), 'review_status' => ApplicationDocument::REVIEW_PENDING]
+            ));
+
+            return $sources->count();
+        });
     }
 
     /**

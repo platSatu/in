@@ -145,6 +145,13 @@
             <p class="subtitle">
                 {{ $application->university->name ?? '-' }} &middot; {{ $application->application_no }}
             </p>
+            @if($prefilled ?? false)
+                {{-- Apply beberapa kampus (12 November 2026): diisi dari formulir sebelumnya. --}}
+                <div class="alert alert-info mt-3 mb-0" style="border-radius:12px;font-size:13.5px;">
+                    <i class="bi bi-magic"></i> Supaya tidak mengisi ulang, formulir ini sudah kami isi dari pendaftaranmu sebelumnya.
+                    Cukup cek lagi, ubah kalau ada yang berbeda untuk kampus ini, lalu kirim.
+                </div>
+            @endif
         </div>
 
         <form method="POST" action="{{ route('student-portal.applications.form.update', $application->id) }}" enctype="multipart/form-data">

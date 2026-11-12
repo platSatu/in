@@ -71,7 +71,9 @@ class ApplicationDocumentController extends Controller
         // siswa cuma bisa MELIHAT/DOWNLOAD dokumen itu di halaman ringkasan
         // aplikasi (student-portal.applications.show), tidak pernah upload
         // sendiri. Lihat DocumentType::scopeStudentUpload().
-        // 12 November 2026: kolom upload mengikuti Dokumen Persyaratan kampus aplikasi ini.
+        // 12 November 2026: kolom upload mengikuti Dokumen Persyaratan kampus aplikasi ini, dan dokumen yang
+        // sudah diupload untuk kampus lain ikut dipakai di sini (tidak perlu upload ulang).
+        $application->fillDocumentsFromSiblings();
         $documentTypes = $application->documentTypes();
 
         $documents = ApplicationDocument::where('application_id', $application->id)
@@ -228,9 +230,17 @@ class ApplicationDocumentController extends Controller
 
         $this->notifyAdminsAfterResponse($application, $uploadedFiles, $newMultiple, $documentTypes);
 
+        // Apply beberapa kampus: dokumen yang sama langsung dipakai juga di kampus lain yang memintanya.
+        $shared = UniversityApplication::where('student_id', $application->student_id)
+            ->whereKeyNot($application->getKey())
+            ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+            ->get()
+            ->sum(fn (UniversityApplication $other) => $other->fillDocumentsFromSiblings());
+
         return redirect()
             ->route('student-portal.applications.documents.edit', $application->id)
-            ->with('success', 'Documents uploaded successfully. Our team will review them shortly.');
+            ->with('success', 'Documents uploaded successfully. Our team will review them shortly.'
+                .($shared ? ' We also added them to your other university applications that ask for the same documents.' : ''));
     }
 
     /**
@@ -253,7 +263,11 @@ class ApplicationDocumentController extends Controller
 
         $filePath = $document->file_path;
         $document->delete();
-        ApplicationFiles::delete($filePath);
+
+        // File yang sama bisa dipakai beberapa aplikasi (apply beberapa kampus): hapus fisiknya hanya kalau sudah tidak dipakai.
+        if (! ApplicationDocument::where('file_path', $filePath)->exists()) {
+            ApplicationFiles::delete($filePath);
+        }
 
         return redirect()
             ->route('student-portal.applications.documents.edit', $application->id)
