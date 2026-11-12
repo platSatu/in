@@ -12,6 +12,14 @@
         <div class="widget-content widget-content-area br-8 mb-4">
             <h4 class="mb-3">My University Applications</h4>
 
+            {{-- Cart "Pilihan Kampus" (12 November 2026): pengingat kalau masih ada kampus yang belum di-checkout. --}}
+            @if($cartCount = count(session('apply_cart', [])))
+                <div class="alert alert-light-danger d-flex flex-wrap justify-content-between align-items-center gap-2" style="border-radius:12px;">
+                    <span>You still have <strong>{{ $cartCount }} {{ \Illuminate\Support\Str::plural('university', $cartCount) }}</strong> in your list that you haven't checked out yet.</span>
+                    <a href="{{ route('student-portal.apply.cart') }}" class="btn btn-sm btn-danger">Continue to checkout</a>
+                </div>
+            @endif
+
             <div class="table-responsive">
                 <table class="table align-middle mb-0">
                     <thead>

@@ -96,7 +96,7 @@ class ApplyController extends Controller
 
             return redirect()
                 ->route('register')
-                ->with('status', 'Silakan daftar akun dulu untuk melanjutkan Apply ke ' . $profile->university->name . '.');
+                ->with('status', 'Silakan daftar akun dulu untuk melanjutkan Apply ke ' . $profile->university->name . '. Sudah punya akun? Klik "Sign in here" di bawah, nanti otomatis kembali ke halaman Apply.');
         }
 
         $user = $request->user();
