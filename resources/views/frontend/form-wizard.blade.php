@@ -93,6 +93,27 @@
             text-transform: uppercase;
         }
 
+        /* Tombol kembali ke halaman depan, pojok kanan atas. */
+        .home-link {
+            position: absolute;
+            top: 20px;
+            right: clamp(16px, 4vw, 48px);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid rgba(224,36,36,.15);
+            box-shadow: 0 6px 18px rgba(20,30,60,.08);
+            color: var(--brand-dark);
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .home-link:hover { background: var(--brand-light); color: var(--brand-dark); }
+
         .package-total { background: #f5f7fb; border: 1px solid #e3e8f2; font-size: 1.05rem; }
         .package-price { font-weight: 600; color: #6c757d; font-size: .95rem; }
         .option-item.selected .package-price { color: inherit; }
@@ -581,6 +602,8 @@
 
 <body>
 
+<a href="{{ route('home') }}" class="home-link"><i class="bi bi-house-door"></i> Home</a>
+
 <div class="brand-header">
     <img src="{{ $wizardLogo }}" alt="InaStudy Logo">
     <div class="brand-name">InaStudy · China Education Consultant</div>
@@ -1009,7 +1032,7 @@
 </div>
 
 <footer class="site-footer">
-    &copy; {{ date('Y') }} InaStudy. All rights reserved.
+    Copyright &copy; {{ date('Y') }} INA Group
 </footer>
 
 @unless($quotaFull)

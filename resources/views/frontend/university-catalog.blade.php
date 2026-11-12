@@ -350,9 +350,13 @@
             .uni-meta .label { font-size: 10px; }
         }
     </style>
+    {{-- Menu & footer seragam dengan halaman depan (resources/views/frontend/home). --}}
+    <link rel="stylesheet" href="{{ asset('frontend/home/site.css') }}?v={{ filemtime(public_path('frontend/home/site.css')) }}">
 </head>
 
-<body>
+<body class="has-site-header">
+
+    @include('frontend.home.header')
 
     <!-- HERO -->
     <div class="hero">
@@ -535,6 +539,8 @@
 
     </div>
 
+    @include('frontend.home.footer')
+    <script src="{{ asset('frontend/home/home.js') }}?v={{ filemtime(public_path('frontend/home/home.js')) }}" defer></script>
 </body>
 
 </html>

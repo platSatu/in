@@ -645,7 +645,7 @@
         }
 
         /* ---------- SIDEBAR ---------- */
-        .sticky-side { position: sticky; top: 24px; }
+        .sticky-side { position: sticky; top: calc(var(--header-h) + 24px); } /* di bawah menu yang menempel di atas */
 
         .price-tag {
             font-size: 1.3rem;
@@ -735,9 +735,13 @@
             .hero h1 { font-size: 1.5rem; }
         }
     </style>
+    {{-- Menu & footer seragam dengan halaman depan (resources/views/frontend/home). --}}
+    <link rel="stylesheet" href="{{ asset('frontend/home/site.css') }}?v={{ filemtime(public_path('frontend/home/site.css')) }}">
 </head>
 
-<body>
+<body class="has-site-header">
+
+    @include('frontend.home.header')
 
     @php
         $hasBanner = !empty($university->banner) && file_exists(public_path($university->banner));
@@ -1423,6 +1427,8 @@
         })();
     </script>
 
+    @include('frontend.home.footer')
+    <script src="{{ asset('frontend/home/home.js') }}?v={{ filemtime(public_path('frontend/home/home.js')) }}" defer></script>
 </body>
 
 </html>
