@@ -75,7 +75,10 @@ a { color: inherit; }
 .class-card[hidden] { display: none; }
 /* Tombol "Lihat Selengkapnya" di tengah bawah daftar kelas beranda. */
 .class-more { display: flex; flex-direction: column; align-items: center; gap: .6rem; margin-top: clamp(1.75rem, 4vw, 2.5rem); }
-.class-more small { font-size: .82rem; color: var(--muted); }
+/* Keunggulan Placement Test, satu baris di bawah tombol (HP: 2 kolom). */
+.test-perks { list-style: none; display: flex; flex-wrap: wrap; justify-content: center; gap: .6rem 1.75rem; margin: .75rem 0 0; padding: 0; font-size: .87rem; color: var(--ink); }
+.test-perks li { display: inline-flex; align-items: center; gap: .5rem; }
+.test-perks i { display: inline-flex; align-items: center; justify-content: center; width: 30px; height: 30px; border-radius: 50%; background: rgba(200, 16, 46, .08); color: var(--red); font-size: .9rem; }
 .class-more__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem 1rem; }
 .btn-more { display: inline-flex; align-items: center; gap: .9rem; padding: .45rem .45rem .45rem 1.6rem; border: 1.5px solid var(--red); border-radius: 999px; background: #fff; color: var(--red); font: 600 .95rem var(--sans); text-decoration: none; box-shadow: 0 12px 28px -18px rgba(200, 16, 46, .55); transition: background-color .25s, color .25s, box-shadow .25s; }
 .btn-more__icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: var(--red); color: #fff; transition: transform .25s, background-color .25s, color .25s; }
@@ -159,6 +162,9 @@ a { color: inherit; }
     .page-section--catalog .class-filter { position: static; }
     .class-more__actions { width: 100%; flex-direction: column; }
     .class-more__actions .btn-more { justify-content: space-between; }
+    .test-perks { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; width: 100%; font-size: .8rem; }
+    .test-perks li { align-items: flex-start; }
+    .test-perks i { flex-shrink: 0; width: 26px; height: 26px; font-size: .8rem; }
     /* HP: peta tetap penuh, kartu info lebih ringkas di bawah. */
     .lokasi__card .btn { width: 100%; }
     .contact-list { gap: .6rem; margin: 1rem 0 1.1rem; }

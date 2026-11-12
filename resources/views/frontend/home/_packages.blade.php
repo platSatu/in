@@ -91,7 +91,12 @@
                         <span class="btn-more__icon" aria-hidden="true"><i class="bi bi-pencil-square"></i></span>
                     </a>
                 </div>
-                <small>{{ $packages->count() }} kelas Mandarin tersedia</small>
+                <ul class="test-perks">
+                    <li><i class="bi bi-globe2" aria-hidden="true"></i> Bisa dikerjakan dari mana saja</li>
+                    <li><i class="bi bi-whatsapp" aria-hidden="true"></i> Hasil langsung dikirim via WhatsApp</li>
+                    <li><i class="bi bi-arrow-repeat" aria-hidden="true"></i> Materi soal selalu update</li>
+                    <li><i class="bi bi-bullseye" aria-hidden="true"></i> Rekomendasi kelas sesuai level</li>
+                </ul>
             </div>
         @endif
     </div>
