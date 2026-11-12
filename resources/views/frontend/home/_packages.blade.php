@@ -79,12 +79,18 @@
         <p class="empty-note" data-class-empty hidden>Belum ada kelas yang cocok. Coba ubah atau reset filternya.</p>
 
         @if ($limit)
-            {{-- Beranda: ajakan ke halaman Semua Kelas, di tengah bawah kartu. --}}
+            {{-- Beranda: ajakan ke halaman Semua Kelas dan Placement Test (quiz), berdampingan di tengah bawah kartu. --}}
             <div class="class-more">
-                <a href="{{ route('frontend.inayule.classes') }}" class="btn-more">
-                    Lihat Selengkapnya
-                    <span class="btn-more__icon" aria-hidden="true"><i class="bi bi-arrow-right"></i></span>
-                </a>
+                <div class="class-more__actions">
+                    <a href="{{ route('frontend.inayule.classes') }}" class="btn-more">
+                        Lihat Selengkapnya
+                        <span class="btn-more__icon" aria-hidden="true"><i class="bi bi-arrow-right"></i></span>
+                    </a>
+                    <a href="{{ route('frontend.form.wizard') }}" class="btn-more btn-more--solid">
+                        Placement Test
+                        <span class="btn-more__icon" aria-hidden="true"><i class="bi bi-pencil-square"></i></span>
+                    </a>
+                </div>
                 <small>{{ $packages->count() }} kelas Mandarin tersedia</small>
             </div>
         @endif

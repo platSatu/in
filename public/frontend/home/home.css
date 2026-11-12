@@ -76,10 +76,15 @@ a { color: inherit; }
 /* Tombol "Lihat Selengkapnya" di tengah bawah daftar kelas beranda. */
 .class-more { display: flex; flex-direction: column; align-items: center; gap: .6rem; margin-top: clamp(1.75rem, 4vw, 2.5rem); }
 .class-more small { font-size: .82rem; color: var(--muted); }
+.class-more__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: .75rem 1rem; }
 .btn-more { display: inline-flex; align-items: center; gap: .9rem; padding: .45rem .45rem .45rem 1.6rem; border: 1.5px solid var(--red); border-radius: 999px; background: #fff; color: var(--red); font: 600 .95rem var(--sans); text-decoration: none; box-shadow: 0 12px 28px -18px rgba(200, 16, 46, .55); transition: background-color .25s, color .25s, box-shadow .25s; }
 .btn-more__icon { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border-radius: 50%; background: var(--red); color: #fff; transition: transform .25s, background-color .25s, color .25s; }
 .btn-more:hover { background: var(--red); color: #fff; box-shadow: 0 16px 32px -16px rgba(200, 16, 46, .7); }
 .btn-more:hover .btn-more__icon { background: #fff; color: var(--red); transform: translateX(4px); }
+/* Varian merah penuh (Placement Test): kebalikan warna tombol garis. */
+.btn-more--solid { background: var(--red); color: #fff; }
+.btn-more--solid .btn-more__icon { background: #fff; color: var(--red); }
+.btn-more--solid:hover { background: var(--red-dark); border-color: var(--red-dark); }
 .btn-more:focus-visible { outline: 3px solid rgba(200, 16, 46, .35); outline-offset: 3px; }
 .class-count { margin: -.5rem 0 1.25rem; font-size: .85rem; color: var(--muted); }
 .class-count strong { color: var(--ink); }
@@ -152,6 +157,8 @@ a { color: inherit; }
     .class-filter { grid-template-columns: 1fr 1fr; gap: .5rem; }
     .class-filter__search { grid-column: 1 / -1; order: -1; }
     .page-section--catalog .class-filter { position: static; }
+    .class-more__actions { width: 100%; flex-direction: column; }
+    .class-more__actions .btn-more { justify-content: space-between; }
     /* HP: peta tetap penuh, kartu info lebih ringkas di bawah. */
     .lokasi__card .btn { width: 100%; }
     .contact-list { gap: .6rem; margin: 1rem 0 1.1rem; }
