@@ -1,6 +1,6 @@
 @extends('frontend.home.layout')
 
-@section('title', 'Kelas Mandarin InaYule | InaStudy')
+@section('title', 'Kelas Mandarin InaYule | INASTUDY | CHINA EDUCATION CONSULTANT')
 @section('description', 'Daftar kelas kursus Mandarin InaYule: level, durasi, jumlah sesi, dan harga.')
 
 @section('content')
