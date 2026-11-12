@@ -116,3 +116,36 @@
     window.addEventListener('resize', place);
     place();
 })();
+
+// Alur perjalanan di hero: garis lengkung digambar melewati tengah tiap ikon langkah, dihitung ulang saat ukuran berubah.
+(function () {
+    var journey = document.querySelector('[data-journey]');
+    if (!journey) return;
+    var track = journey.querySelector('.journey__track');
+    var svg = journey.querySelector('.journey__route');
+    var paths = journey.querySelectorAll('.journey__line, .journey__flow');
+    var icons = journey.querySelectorAll('.journey__icon');
+
+    function draw() {
+        var box = track.getBoundingClientRect();
+        var pts = Array.prototype.map.call(icons, function (icon) {
+            var r = icon.getBoundingClientRect();
+            return [r.left - box.left + r.width / 2, r.top - box.top + r.height / 2];
+        });
+        if (pts.length < 2) return;
+        var d = 'M' + pts[0][0] + ' ' + pts[0][1];
+        for (var i = 1; i < pts.length; i++) {
+            var a = pts[i - 1], b = pts[i], mid = (b[1] - a[1]) / 2;
+            d += ' C' + a[0] + ' ' + (a[1] + mid) + ' ' + b[0] + ' ' + (b[1] - mid) + ' ' + b[0] + ' ' + b[1];
+        }
+        svg.setAttribute('viewBox', '0 0 ' + box.width + ' ' + box.height);
+        paths.forEach(function (p) { p.setAttribute('d', d); });
+        journey.classList.add('is-ready');
+    }
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches && svg.pauseAnimations) svg.pauseAnimations();
+    if ('ResizeObserver' in window) new ResizeObserver(draw).observe(track);
+    else window.addEventListener('resize', draw);
+    window.addEventListener('load', draw);
+    draw();
+})();

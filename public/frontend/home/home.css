@@ -40,13 +40,37 @@ a { color: inherit; }
 .hero__points li { display: inline-flex; align-items: center; gap: .5rem; }
 .hero__points li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
 
-/* Ornamen: gerbang lengkung merah + matahari emas + stempel 印留. */
-.hero__art { position: relative; justify-self: end; width: min(100%, 420px); aspect-ratio: 3 / 4; }
-.hero__art::before { content: ""; position: absolute; width: 46%; aspect-ratio: 1; top: -6%; right: -10%; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #EBD3A0, var(--gold)); opacity: .85; }
-.hero__arch { position: absolute; inset: 0; border-radius: 999px 999px 28px 28px; background: linear-gradient(160deg, #E4032B 0%, var(--red) 45%, var(--red-dark) 100%); box-shadow: 0 50px 90px -40px rgba(163, 13, 37, .6); }
-.hero__arch::before { content: ""; position: absolute; inset: 14px; border-radius: inherit; border: 1px solid rgba(214, 181, 106, .7); }
-.hero__hanzi { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .14em; line-height: 1; font-family: "Noto Serif SC", serif; font-weight: 600; font-size: clamp(1.6rem, 3.6vw, 3rem); color: #fff; }
-.hero__seal { position: absolute; left: -7%; bottom: 9%; display: flex; flex-direction: column; gap: .1em; padding: .45em .4em; line-height: 1; font-family: "Noto Serif SC", serif; font-weight: 600; font-size: clamp(.85rem, 1.4vw, 1.1rem); color: var(--red); background: var(--cream); border: 2px solid var(--red); border-radius: 6px; transform: rotate(-6deg); box-shadow: 0 10px 24px -12px rgba(31, 41, 55, .35); }
+/* Alur perjalanan (pengganti ornamen merah): kartu langkah bergelombang + garis putus-putus yang mengalir
+   + titik merah yang berjalan. Langkah aktif menyala bergiliran (10,5 detik per putaran, 1,5 detik per langkah). */
+.journey { justify-self: end; width: min(100%, 440px); }
+.journey__label { display: inline-flex; align-items: center; gap: .5rem; margin: 0 0 1rem; padding: .35rem .9rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); font-size: .78rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--red); }
+.journey__label::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red); box-shadow: 0 0 0 4px rgba(200, 16, 46, .15); }
+.journey__track { position: relative; }
+.journey__route { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; opacity: 0; transition: opacity .4s; }
+.journey.is-ready .journey__route { opacity: 1; }
+.journey__line { fill: none; stroke: rgba(200, 16, 46, .14); stroke-width: 10; stroke-linecap: round; }
+.journey__flow { fill: none; stroke: var(--red); stroke-width: 2; stroke-dasharray: 6 9; stroke-linecap: round; animation: journey-flow 1.2s linear infinite; }
+.journey__dot { fill: var(--red); }
+.journey__halo { fill: rgba(200, 16, 46, .18); }
+.journey__steps { list-style: none; margin: 0; padding: 0; display: grid; gap: clamp(.55rem, 1.6vh, .9rem); position: relative; }
+.journey__step { display: flex; align-items: center; gap: .85rem; width: fit-content; max-width: 100%; padding: .55rem 1.1rem .55rem .55rem; border-radius: 999px; background: rgba(255, 255, 255, .92); border: 1px solid var(--line); box-shadow: 0 12px 26px -20px rgba(31, 41, 55, .45);
+    animation: journey-active 10.5s infinite; animation-delay: calc(var(--i) * 1.5s); }
+.journey__step:nth-child(even) { margin-left: clamp(2.5rem, 7vw, 5.5rem); }
+.journey__icon { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 50%; background: var(--cream-2); color: var(--red); font-size: 1.05rem; position: relative; z-index: 1;
+    animation: journey-icon 10.5s infinite; animation-delay: calc(var(--i) * 1.5s); }
+.journey__text { display: flex; flex-direction: column; line-height: 1.25; }
+.journey__text strong { font-size: .92rem; font-weight: 600; }
+.journey__text small { font-size: .76rem; color: var(--muted); }
+
+@keyframes journey-flow { to { stroke-dashoffset: -15; } }
+@keyframes journey-active {
+    0%, 13% { border-color: rgba(200, 16, 46, .45); box-shadow: 0 16px 30px -18px rgba(200, 16, 46, .55); transform: translateX(4px); }
+    17%, 100% { border-color: var(--line); box-shadow: 0 12px 26px -20px rgba(31, 41, 55, .45); transform: none; }
+}
+@keyframes journey-icon {
+    0%, 13% { background: var(--red); color: #fff; }
+    17%, 100% { background: var(--cream-2); color: var(--red); }
+}
 
 /* ---------- Bagian umum section ---------- */
 .section-title em { font-style: italic; color: var(--red); }
@@ -161,13 +185,12 @@ a { color: inherit; }
     .stats__grid li:not(:nth-child(3n + 1)) { border-left: 1px solid var(--line); }
     .class-filter { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .class-filter__search { grid-column: 1 / 3; }
-    .hero__art { order: -1; justify-self: center; width: min(46vw, 230px); }
+    .journey { justify-self: stretch; width: 100%; max-width: 520px; margin-top: 1rem; }
 }
 
 @media (max-width: 575.98px) {
     .section { padding-top: calc(var(--header-h) + 1.5rem); }
     .hero__actions .btn { flex: 1 1 100%; }
-    .hero__art { width: min(42vw, 170px); }
     /* HP: kartu kelas digeser ke samping supaya section tidak terlalu panjang. */
     .inayule .class-grid { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) .75rem; scrollbar-width: none; }
     .inayule .class-grid::-webkit-scrollbar { display: none; }
@@ -193,13 +216,8 @@ a { color: inherit; }
     .contact-list i { width: 30px; height: 30px; font-size: .9rem; }
 }
 
-/* Layar pendek (HP landscape): ornamen di samping, jangan menekan teks. */
-@media (max-height: 560px) and (orientation: landscape) {
-    .hero__inner { grid-template-columns: 1fr auto; }
-    .hero__art { order: 0; width: 30vh; }
-}
-
 @media (prefers-reduced-motion: reduce) {
     html { scroll-behavior: auto; }
     *, *::before, *::after { animation: none !important; transition: none !important; }
+    .journey__dot, .journey__halo { display: none; }
 }
