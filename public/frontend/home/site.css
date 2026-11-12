@@ -65,10 +65,10 @@
 .social:hover, .social:focus { opacity: 1; color: #fff; background: rgba(255, 255, 255, .12); }
 .social:focus-visible { outline: 2px solid rgba(255, 255, 255, .6); outline-offset: 2px; }
 
-/* ---------- Tombol WhatsApp mengambang (di atas tinggi footer supaya ikon sosmed tidak tertutup) ---------- */
-.wa-float { position: fixed; right: clamp(16px, 2.5vw, 28px); bottom: 104px; z-index: 60; display: inline-flex; align-items: center; gap: .6rem; height: 56px; padding: 0 16px; border-radius: 999px; background: #25D366; color: #fff; font: 600 .9rem var(--sans); text-decoration: none; box-shadow: 0 14px 30px -10px rgba(37, 211, 102, .65); transition: transform .2s, box-shadow .2s; }
+/* ---------- Tombol WhatsApp mengambang di pojok kanan bawah; saat footer terlihat, home.js menaikkannya supaya ikon sosmed tidak tertutup ---------- */
+.wa-float { position: fixed; right: clamp(16px, 2.5vw, 28px); bottom: clamp(16px, 2.5vw, 28px); z-index: 60; display: inline-flex; align-items: center; gap: .6rem; height: 56px; padding: 0 16px; border-radius: 999px; background: #25D366; color: #fff; font: 600 .9rem var(--sans); text-decoration: none; box-shadow: 0 14px 30px -10px rgba(37, 211, 102, .65); transition: box-shadow .2s; }
 .wa-float i { font-size: 1.6rem; line-height: 1; }
-.wa-float:hover, .wa-float:focus { color: #fff; transform: translateY(-2px); box-shadow: 0 18px 34px -10px rgba(37, 211, 102, .75); }
+.wa-float:hover, .wa-float:focus { color: #fff; box-shadow: 0 18px 34px -10px rgba(37, 211, 102, .75); }
 .wa-float:focus-visible { outline: 3px solid rgba(37, 211, 102, .45); outline-offset: 3px; }
 .wa-float::before { content: ""; position: absolute; inset: 0; border-radius: inherit; background: #25D366; z-index: -1; animation: wa-pulse 2.4s ease-out infinite; }
 @keyframes wa-pulse { 0% { transform: scale(1); opacity: .5; } 100% { transform: scale(1.35); opacity: 0; } }
@@ -85,7 +85,7 @@
 }
 
 @media (max-width: 575.98px) {
-    .wa-float { bottom: 20px; width: 56px; padding: 0; justify-content: center; } /* ikon sosmed footer di tengah, jadi tidak tertutup */
+    .wa-float { width: 56px; padding: 0; justify-content: center; }
     .wa-float__label { display: none; }
     .site-footer__inner { flex-direction: column-reverse; text-align: center; }
 }

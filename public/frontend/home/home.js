@@ -101,3 +101,18 @@
     }, { threshold: 0.6 });
     items.forEach(function (el) { observer.observe(el); });
 })();
+
+// Tombol WhatsApp: tetap di pojok kanan bawah, naik sebanyak bagian footer yang terlihat supaya ikon sosmed tidak tertutup.
+(function () {
+    var wa = document.querySelector('.wa-float');
+    var footer = document.querySelector('.site-footer');
+    if (!wa || !footer) return;
+
+    function place() {
+        var overlap = window.innerHeight - footer.getBoundingClientRect().top;
+        wa.style.marginBottom = overlap > 0 ? overlap + 'px' : '';
+    }
+    window.addEventListener('scroll', place, { passive: true });
+    window.addEventListener('resize', place);
+    place();
+})();
