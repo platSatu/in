@@ -7,25 +7,27 @@
             <p class="hero__lead">Kami dampingi dari memilih kampus dan beasiswa, mengurus dokumen dan visa, sampai kamu tiba dan mulai kuliah di China.</p>
 
             @if ($universities->isNotEmpty())
-                {{-- Kampus partner bergiliran (home.js), mengarah ke katalog universitas. --}}
-                <a href="{{ route('frontend.university.catalog') }}" class="uni-ticker" data-ticker aria-label="Lihat kampus partner InaStudy">
-                    <span class="uni-ticker__spark" aria-hidden="true"><i class="bi bi-stars"></i></span>
-                    <span class="uni-ticker__lead">Kampus partner</span>
+                {{-- Kampus partner bergiliran (home.js): logo, nama, kota; diklik ke halaman detail kampusnya. --}}
+                <div class="uni-ticker" data-ticker>
                     <span class="uni-ticker__window">
                         <span class="uni-ticker__list">
                             @foreach ($universities as $university)
-                                <span class="uni-ticker__item">
+                                @php $cityName = $university->getRelation('city')?->name; @endphp
+                                <a href="{{ route('frontend.university.profile', $university->id) }}" class="uni-ticker__item">
                                     @if ($university->logo && file_exists(public_path($university->logo)))
                                         <img src="{{ asset($university->logo) }}" alt="" width="28" height="28" loading="lazy">
                                     @else
                                         <span class="uni-ticker__initial" aria-hidden="true">{{ \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($university->name, 0, 1)) }}</span>
                                     @endif
                                     <span class="uni-ticker__name">{{ $university->name }}</span>
-                                </span>
+                                    @if ($cityName)
+                                        <span class="uni-ticker__city"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i>{{ $cityName }}</span>
+                                    @endif
+                                </a>
                             @endforeach
                         </span>
                     </span>
-                </a>
+                </div>
             @endif
 
             <div class="hero__actions">

@@ -163,11 +163,9 @@
     list.appendChild(items[0].cloneNode(true));
     var index = 0;
 
-    // Lebar jendela mengikuti nama yang sedang tampil, jadi kapsulnya tidak menyisakan ruang kosong.
+    // Lebar jendela mengikuti kampus yang sedang tampil (logo + nama + kota), jadi kapsulnya tidak menyisakan ruang kosong.
     function fit() {
-        var item = items[index];
-        var logo = item.firstElementChild, name = item.lastElementChild;
-        win.style.width = Math.ceil(logo.offsetWidth + 8 + name.scrollWidth + 4) + 'px'; // logo + jarak .5rem + nama
+        win.style.width = Math.ceil(items[index].getBoundingClientRect().width) + 'px';
     }
     fit();
     window.addEventListener('resize', fit);

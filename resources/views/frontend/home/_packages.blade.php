@@ -76,11 +76,11 @@
                     </ul>
 
                     @if ($step)
-                        {{-- Tangga level: posisi kelas dari Pemula sampai Mahir (kartu besar menampilkan namanya). --}}
-                        <div class="level-path" aria-label="Tingkat {{ $step }} dari 4">
-                            <span class="level-path__label">Tingkat kesulitan <b>{{ $step }}/4</b></span>
+                        {{-- Tangga level: posisi kelas dari Beginner sampai Advanced (kartu besar menampilkan namanya). --}}
+                        <div class="level-path" aria-label="Level {{ $step }} dari 4">
+                            <span class="level-path__label">Level <b>{{ $step }}/4</b></span>
                             <ol>
-                                @foreach (['Pemula', 'Dasar', 'Menengah', 'Mahir'] as $i => $stage)
+                                @foreach (['Beginner', 'Elementary', 'Intermediate', 'Advanced'] as $i => $stage)
                                     <li @class(['is-on' => $i < $step, 'is-here' => $i + 1 === $step])><span>{{ $stage }}</span></li>
                                 @endforeach
                             </ol>

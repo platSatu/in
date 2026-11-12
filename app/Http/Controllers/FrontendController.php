@@ -115,8 +115,8 @@ class FrontendController extends Controller
         // yang tampil tetap maksimal 8 (2 baris x 4), lihat _packages.blade.php.
         return view('frontend.home.index', [
             'packages' => $this->publicPackages()->get(),
-            // Kampus partner yang bergiliran tampil di section InaStudy (sama dengan katalog: status active).
-            'universities' => University::where('status', 'active')->orderBy('name')->get(['id', 'name', 'logo']),
+            // Kampus partner yang bergiliran tampil di section InaStudy (sama dengan katalog: status active), beserta nama kotanya.
+            'universities' => University::where('status', 'active')->with('city:id,name')->orderBy('name')->get(['id', 'name', 'logo', 'city']),
         ]);
     }
 

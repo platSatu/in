@@ -41,16 +41,18 @@ a { color: inherit; }
 .hero__points li::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--red); }
 
 /* Kampus partner bergiliran: kapsul putih, nama + logo berganti ke atas tiap 2,6 detik. */
-.uni-ticker { display: inline-flex; align-items: center; gap: .6rem; max-width: 100%; margin: 0 0 1.5rem; padding: .45rem 1.1rem .45rem .5rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); box-shadow: 0 14px 30px -22px rgba(31, 41, 55, .45); text-decoration: none; color: var(--ink); transition: border-color .2s; }
+.uni-ticker { display: inline-flex; align-items: center; max-width: 100%; margin: 0 0 1.5rem; padding: .45rem 1.1rem .45rem .5rem; border-radius: 999px; background: #fff; border: 1px solid var(--line); box-shadow: 0 14px 30px -22px rgba(31, 41, 55, .45); text-decoration: none; color: var(--ink); transition: border-color .2s; }
 .uni-ticker:hover { border-color: rgba(200, 16, 46, .4); }
-.uni-ticker__spark { flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 50%; background: rgba(200, 16, 46, .08); color: var(--red); }
-.uni-ticker__lead { flex-shrink: 0; font-size: .85rem; color: var(--muted); }
 .uni-ticker__window { position: relative; height: 32px; overflow: hidden; min-width: 0; max-width: 100%; transition: width .45s cubic-bezier(.65, 0, .35, 1); }
 .uni-ticker__list { display: flex; flex-direction: column; transition: transform .55s cubic-bezier(.65, 0, .35, 1); }
-.uni-ticker__item { display: flex; align-items: center; gap: .5rem; height: 32px; min-width: 0; font-weight: 600; font-size: .92rem; color: var(--red); }
+/* Lebar item = isinya (dibaca home.js untuk lebar kapsul); di layar sempit nama dipotong "...". */
+.uni-ticker__item { display: flex; align-items: center; gap: .5rem; width: max-content; max-width: calc(100vw - var(--gutter) * 2 - 2rem); height: 32px; font-weight: 600; font-size: .92rem; color: var(--red); text-decoration: none; }
+.uni-ticker__item:hover .uni-ticker__name { text-decoration: underline; text-underline-offset: 3px; }
+.uni-ticker__city { flex-shrink: 0; display: inline-flex; align-items: center; gap: .25rem; padding-left: .6rem; border-left: 1px solid var(--line); font-weight: 500; font-size: .82rem; color: var(--muted); }
+.uni-ticker__city i { color: var(--red); font-size: .78rem; }
 .uni-ticker__item img, .uni-ticker__initial { flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; object-fit: contain; background: #fff; border: 1px solid var(--line); }
 .uni-ticker__initial { display: inline-flex; align-items: center; justify-content: center; font-size: .8rem; color: var(--red); background: var(--cream-2); }
-.uni-ticker__name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uni-ticker__name { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Alur perjalanan (pengganti ornamen merah): kartu langkah bergelombang + garis putus-putus yang mengalir
    + titik merah yang berjalan. Langkah aktif menyala bergiliran (10,5 detik per putaran, 1,5 detik per langkah). */
