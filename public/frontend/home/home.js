@@ -58,6 +58,7 @@
                 if (match) matched++;
                 var visible = match && (!limit || shown < limit);
                 card.hidden = !visible;
+                if (visible) card.setAttribute('data-slot', shown); else card.removeAttribute('data-slot');
                 if (visible) shown++;
             });
             if (empty) empty.hidden = shown > 0;

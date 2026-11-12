@@ -122,6 +122,69 @@ a { color: inherit; }
 .class-filter__reset { height: 46px; padding: 0 1.25rem; border: 1px solid var(--line); border-radius: 12px; background: #fff; font: 500 .9rem var(--sans); color: var(--muted); cursor: pointer; transition: color .2s, border-color .2s; }
 .class-filter__reset:hover { color: var(--red); border-color: var(--red); }
 .class-card[hidden] { display: none; }
+/* Beranda: kartu kelas disusun bento berwarna (4 kolom: 1 besar 2x2, 1 lebar 2x1, sisanya kotak 1x1).
+   Urutan slot mengikuti kartu yang tampil, jadi tetap rapi setelah difilter. Halaman Semua Kelas tidak terpengaruh. */
+.class-grid--bento { grid-auto-flow: dense; }
+.class-grid--bento .class-card { position: relative; overflow: hidden; border-color: transparent; }
+.class-grid--bento .class-card > * { position: relative; z-index: 1; }
+.class-grid--bento .class-card::after { position: absolute; right: -.05em; bottom: -.18em; z-index: 0; font-family: "Noto Serif SC", serif; font-weight: 600; font-size: 7.5rem; line-height: 1; color: currentColor; opacity: .07; pointer-events: none; content: attr(data-hanzi); }
+.class-grid--bento [data-slot="0"] { grid-column: span 2; grid-row: span 2; padding: clamp(1.5rem, 2.6vw, 2.25rem); }
+.class-grid--bento [data-slot="0"] .class-card__name { font-size: clamp(1.6rem, 2.6vw, 2.3rem); margin-top: 1.1rem; }
+.class-grid--bento [data-slot="0"]::after { font-size: 15rem; }
+.class-grid--bento [data-slot="1"] { grid-column: span 2; }
+
+/* Warna tiap slot: merah & gelap (teks putih), emas muda, merah muda, krem, putih bergaris. */
+.class-grid--bento [data-slot="0"] { background: linear-gradient(150deg, #E4032B, var(--red) 45%, var(--red-dark)); color: #fff; }
+.class-grid--bento [data-slot="4"] { background: var(--ink); color: #fff; }
+.class-grid--bento [data-slot="1"], .class-grid--bento [data-slot="7"] { background: #F6E7C1; }
+.class-grid--bento [data-slot="3"], .class-grid--bento [data-slot="6"] { background: #FBE3E6; }
+.class-grid--bento [data-slot="5"] { background: var(--cream-2); }
+.class-grid--bento [data-slot="2"] { background: #fff; border-color: var(--line); }
+.class-grid--bento [data-slot="0"] .class-card__meta, .class-grid--bento [data-slot="4"] .class-card__meta,
+.class-grid--bento [data-slot="0"] .class-card__price s, .class-grid--bento [data-slot="4"] .class-card__price s { color: rgba(255, 255, 255, .75); }
+.class-grid--bento [data-slot="0"] .class-card__price strong, .class-grid--bento [data-slot="4"] .class-card__price strong { color: #fff; font-size: 1.45rem; }
+.class-grid--bento [data-slot="0"] .class-card__level, .class-grid--bento [data-slot="4"] .class-card__level { background: rgba(255, 255, 255, .16); color: #fff; }
+.class-grid--bento [data-slot="0"] .class-card__facts li, .class-grid--bento [data-slot="4"] .class-card__facts li { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .22); color: #fff; }
+.class-grid--bento [data-slot="0"] .btn--primary, .class-grid--bento [data-slot="4"] .btn--primary { background: #fff; color: var(--red); }
+.class-grid--bento [data-slot="0"] .btn--primary:hover, .class-grid--bento [data-slot="4"] .btn--primary:hover { background: var(--cream); color: var(--red-dark); }
+.class-grid--bento [data-slot="0"] .btn--block { width: auto; align-self: flex-start; padding-inline: 2rem; }
+.class-grid--bento .class-card:hover { border-color: rgba(200, 16, 46, .35); }
+/* Kartu besar: cahaya lembut + pola titik supaya terasa modern. */
+.class-grid--bento [data-slot="0"] { background:
+    radial-gradient(circle at 1px 1px, rgba(255, 255, 255, .14) 1px, transparent 0) 0 0 / 22px 22px,
+    radial-gradient(60% 50% at 100% 0%, rgba(246, 210, 140, .35), transparent 70%),
+    linear-gradient(150deg, #E4032B, var(--red) 45%, var(--red-dark)); }
+
+/* Ornamen bermakna: ikon info, cap hanzi arti level, tangga tingkat kesulitan. */
+.class-grid--bento .class-card__meta i, .class-grid--bento .class-card__facts i { margin-right: .2rem; opacity: .75; }
+.class-card__seal { margin-left: auto; display: inline-flex; align-items: center; gap: .45rem; padding: .2rem .6rem .2rem .25rem; border-radius: 999px; background: rgba(255, 255, 255, .7); box-shadow: inset 0 0 0 1px rgba(31, 41, 55, .08); font-size: .7rem; color: var(--muted); white-space: nowrap; }
+.class-card__seal b { display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px; background: var(--red); color: #fff; font: 600 .85rem "Noto Serif SC", serif; transform: rotate(-4deg); }
+.level-path { margin-top: 1rem; }
+.level-path__label { display: block; font-size: .72rem; letter-spacing: .04em; color: var(--muted); margin-bottom: .4rem; }
+.level-path__label b { color: var(--red); font-weight: 600; }
+.level-path ol { list-style: none; display: flex; gap: 4px; margin: 0; padding: 0; }
+.level-path li { flex: 1; height: 6px; border-radius: 999px; background: rgba(31, 41, 55, .1); }
+.level-path li.is-on { background: var(--red); }
+.level-path li span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+.class-grid--bento [data-slot="0"] .class-card__seal, .class-grid--bento [data-slot="4"] .class-card__seal { background: rgba(255, 255, 255, .12); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .22); color: rgba(255, 255, 255, .85); }
+.class-grid--bento [data-slot="0"] .class-card__seal b, .class-grid--bento [data-slot="4"] .class-card__seal b { background: #fff; color: var(--red); }
+.class-grid--bento [data-slot="0"] .level-path__label, .class-grid--bento [data-slot="4"] .level-path__label { color: rgba(255, 255, 255, .75); }
+.class-grid--bento [data-slot="0"] .level-path__label b, .class-grid--bento [data-slot="4"] .level-path__label b { color: #fff; }
+.class-grid--bento [data-slot="0"] .level-path li, .class-grid--bento [data-slot="4"] .level-path li { background: rgba(255, 255, 255, .18); }
+.class-grid--bento [data-slot="0"] .level-path li.is-on, .class-grid--bento [data-slot="4"] .level-path li.is-on { background: #fff; }
+/* Kartu besar: tangga level tampil lengkap dengan nama tahap dan penanda "posisi kelas ini". */
+.class-grid--bento [data-slot="0"] .level-path { margin-top: auto; padding-top: 1.5rem; max-width: 420px; }
+.class-grid--bento [data-slot="0"] .level-path ol { gap: 0; }
+.class-grid--bento [data-slot="0"] .level-path li { position: relative; height: 3px; border-radius: 0; margin-bottom: 1.6rem; }
+.class-grid--bento [data-slot="0"] .level-path li::before { content: ""; position: absolute; left: 0; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: inherit; box-shadow: 0 0 0 3px rgba(200, 16, 46, .9); }
+.class-grid--bento [data-slot="0"] .level-path li.is-here::before { width: 16px; height: 16px; margin-top: -8px; background: var(--gold); animation: level-pulse 2s ease-out infinite; }
+.class-grid--bento [data-slot="0"] .level-path li span { position: absolute; left: 0; top: .7rem; width: auto; height: auto; clip: auto; overflow: visible; font-size: .75rem; color: rgba(255, 255, 255, .8); white-space: nowrap; }
+.class-grid--bento [data-slot="0"] .level-path li.is-here span { color: #fff; font-weight: 600; }
+.class-grid--bento [data-slot="0"] .level-path li:last-child { flex: 0 0 12px; }
+.class-grid--bento [data-slot="0"] .class-card__price { margin-top: 0; }
+@keyframes level-pulse { 0% { box-shadow: 0 0 0 3px rgba(200, 16, 46, .9), 0 0 0 3px rgba(246, 210, 140, .6); } 100% { box-shadow: 0 0 0 3px rgba(200, 16, 46, .9), 0 0 0 14px rgba(246, 210, 140, 0); } }
+@media (prefers-reduced-motion: reduce) { .class-grid--bento [data-slot="0"] .level-path li.is-here::before { animation: none; } }
+
 /* Tombol "Lihat Selengkapnya" di tengah bawah daftar kelas beranda. */
 .class-more { display: flex; flex-direction: column; align-items: center; gap: .6rem; margin-top: clamp(1.75rem, 4vw, 2.5rem); }
 /* Keunggulan Placement Test, satu baris di bawah tombol (HP: 2 kolom). */
@@ -154,7 +217,7 @@ a { color: inherit; }
 .class-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(1rem, 1.6vw, 1.5rem); }
 .class-card { display: flex; flex-direction: column; padding: 1.15rem 1.15rem 1.2rem; border: 1px solid var(--line); border-radius: 18px; background: var(--cream); transition: transform .2s, box-shadow .2s, border-color .2s; }
 .class-card:hover { transform: translateY(-3px); border-color: rgba(200, 16, 46, .35); box-shadow: 0 18px 36px -24px rgba(31, 41, 55, .35); }
-.class-card__top { display: flex; align-items: center; gap: .4rem; min-height: 26px; }
+.class-card__top { display: flex; flex-wrap: wrap; align-items: center; gap: .4rem; min-height: 26px; }
 .class-card__level, .class-card__promo { font-size: .72rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; padding: .25rem .65rem; border-radius: 999px; }
 .class-card__level { background: rgba(200, 16, 46, .08); color: var(--red); }
 .class-card__promo { background: var(--gold); color: var(--ink); }
@@ -196,6 +259,8 @@ a { color: inherit; }
     .stats__grid li + li { border-left: 0; }
     .stats__grid li:not(:nth-child(3n + 1)) { border-left: 1px solid var(--line); }
     .class-filter { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .class-grid--bento [data-slot="0"] { grid-row: span 1; }
+    .class-grid--bento [data-slot="1"] { grid-column: span 1; }
     .class-filter__search { grid-column: 1 / 3; }
     .journey { justify-self: stretch; width: 100%; max-width: 520px; margin-top: 1rem; }
 }
@@ -207,6 +272,9 @@ a { color: inherit; }
     .inayule .class-grid { grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 calc(var(--gutter) * -1); padding: 0 var(--gutter) .75rem; scrollbar-width: none; }
     .inayule .class-grid::-webkit-scrollbar { display: none; }
     .inayule .class-card { scroll-snap-align: start; }
+    .inayule .class-grid--bento .class-card { grid-column: auto; grid-row: auto; }
+    .class-grid--bento [data-slot="0"] .btn--block { width: 100%; }
+    .class-grid--bento [data-slot="0"] .level-path li:not(.is-here) span { display: none; }
     .page-section .class-grid { grid-template-columns: 1fr; }
     .stats__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats__grid li:not(:nth-child(3n + 1)) { border-left: 0; }
