@@ -83,6 +83,7 @@ use App\Http\Controllers\Course\CourseClassController;
 use App\Http\Controllers\Course\CourseLevelController;
 use App\Http\Controllers\Course\CoursePackageController;
 use App\Http\Controllers\Course\CourseReportController;
+use App\Http\Controllers\Course\CourseStudentController;
 use App\Http\Controllers\Course\CourseTypeController;
 use App\Http\Controllers\Payment\FormPaymentController;
 use Illuminate\Support\Facades\Route;
@@ -1180,6 +1181,15 @@ Route::middleware(['auth', 'permission:course.package,edit'])->prefix('dashboard
 // 'course.package') supaya bisa di-grant terpisah lewat halaman Role.
 Route::middleware(['auth', 'permission:course.report'])->prefix('dashboard/superadmin/course/report')->group(function () {
     Route::get('/', [CourseReportController::class, 'index'])->name('course.report.index');
+});
+
+// Student InaYule (13 November 2026): daftar & detail murid yang punya paket; edit = ganti pengajar tetap.
+Route::middleware(['auth', 'permission:course.student'])->prefix('dashboard/superadmin/course/student')->group(function () {
+    Route::get('/', [CourseStudentController::class, 'index'])->name('course.student.index');
+    Route::get('/{id}', [CourseStudentController::class, 'show'])->whereUuid('id')->name('course.student.show');
+});
+Route::middleware(['auth', 'permission:course.student,edit'])->prefix('dashboard/superadmin/course/student')->group(function () {
+    Route::put('/{id}/teacher', [CourseStudentController::class, 'updateTeacher'])->whereUuid('id')->name('course.student.teacher');
 });
 
 require __DIR__ . '/auth.php';

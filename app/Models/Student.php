@@ -33,6 +33,7 @@ class Student extends Model
         'number_pasport',
         'status',
         'progress_student',
+        'teacher_user_id',
     ];
 
     /*
@@ -130,6 +131,12 @@ class Student extends Model
     public function companyBranch(): BelongsTo
     {
         return $this->belongsTo(CompanyBranch::class, 'branch_id');
+    }
+
+    /** Pengajar tetap murid InaYule (Course > Student InaYule), opsional. */
+    public function teacher(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'teacher_user_id');
     }
 
     /**
