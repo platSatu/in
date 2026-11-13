@@ -314,6 +314,20 @@
                             </form>
                         </div>
                     @endif
+
+                    {{-- Transfer manual (13 November 2026): student bayar di luar gateway, admin tandai lunas supaya Formulir & Dokumen terbuka. --}}
+                    @php $manualAmount = $application->registrationFeeToCharge(); @endphp
+                    @if ($canEdit && ! $application->isCancelled() && $manualAmount > 0 && (! $feePaid || $application->registration_fee_due || $application->isAwaitingUpgradePayment()))
+                        <div class="col-md-6">
+                            <label class="form-label" style="font-size:13px;">Bayar Transfer Manual</label>
+                            <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="border rounded p-2">
+                                @csrf
+                                <div style="font-size:13px;">Student sudah transfer <strong>Rp {{ number_format($manualAmount, 0, ',', '.') }}</strong>?</div>
+                                <button type="submit" name="paid" value="manual" class="btn btn-success btn-sm mt-2"
+                                    onclick="return confirm('Tandai Registration Fee Rp {{ number_format($manualAmount, 0, ',', '.') }} lunas? Pastikan uang transfer sudah masuk.')">Tandai Lunas</button>
+                            </form>
+                        </div>
+                    @endif
                 </div>
 
                 <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="row g-3 mb-4">

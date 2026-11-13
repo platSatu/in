@@ -495,8 +495,11 @@ class FormPaymentController extends Controller
         $this->openApplicationAfterPayment($payment);
     }
 
-    /** Efek lunas untuk satu aplikasi: buka Formulir & Dokumen (Under Review), lalu kirim invoice. */
-    private function openApplicationAfterPayment(ApplicationPayment $payment): void
+    /**
+     * Efek lunas untuk satu aplikasi: buka Formulir & Dokumen (Under Review), lalu kirim invoice.
+     * Public: juga dipakai admin saat mencatat transfer manual (UniversityApplicationController::updateFees).
+     */
+    public function openApplicationAfterPayment(ApplicationPayment $payment): void
     {
         $application = $payment->application;
 

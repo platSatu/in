@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Quiz;
 use App\Helpers\ApplicationFiles;
 use App\Helpers\DataScope;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Payment\FormPaymentController;
 use App\Models\ApplicationDocument;
 use App\Models\ApplicationDocumentHistory;
 use App\Models\ApplicationPayment;
@@ -415,6 +416,43 @@ class UniversityApplicationController extends Controller
     {
         $application = UniversityApplication::findOrFail($id);
         $this->assertVisibleApplication($request->user(), $application);
+
+        // Transfer manual (13 November 2026): admin menandai Registration Fee lunas, efeknya sama dengan bayar lewat gateway.
+        if ($request->input('paid') === 'manual') {
+            $payment = DB::transaction(function () use ($id) {
+                $application = UniversityApplication::whereKey($id)->lockForUpdate()->firstOrFail();
+                $amount = $application->registrationFeeToCharge();
+
+                // Sama dengan kunci di halaman Formulir & Dokumen: belum ada yang lunas, menunggu upgrade, atau ada tagihan pelunasan.
+                $locked = $application->registration_fee_due || $application->isAwaitingUpgradePayment()
+                    || ! $application->payments()->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)->where('status', ApplicationPayment::STATUS_PAID)->exists();
+
+                if ($application->isCancelled() || ! $locked || $amount <= 0) {
+                    return null;
+                }
+
+                return $application->payments()->create([
+                    'purpose' => ApplicationPayment::PURPOSE_REGISTRATION_FEE,
+                    'order_id' => 'MANUAL'.now()->format('ymd').strtoupper(Str::random(8)),
+                    'gateway' => 'manual',
+                    'payment_method' => 'Transfer Manual',
+                    'amount' => $amount,
+                    'status' => ApplicationPayment::STATUS_PAID,
+                    'paid_at' => now(),
+                    'raw_callback' => ['recorded_by' => auth()->id()],
+                ]);
+            });
+
+            if (! $payment) {
+                return back()->withErrors(['balance' => 'Registration Fee tidak bisa ditandai lunas (sudah lunas, dibatalkan, atau nominal belum diatur).']);
+            }
+
+            app(FormPaymentController::class)->openApplicationAfterPayment($payment);
+
+            return redirect()
+                ->route('quiz.university-application.show', $id)
+                ->with('success', 'Registration Fee Rp '.number_format($payment->amount, 0, ',', '.').' ditandai lunas. Formulir & Upload Dokumen student sudah terbuka.');
+        }
 
         // Tagihan pelunasan DP 50% (12 November 2026): admin yang memutuskan dikirim atau dibatalkan.
         if ($request->filled('balance')) {
