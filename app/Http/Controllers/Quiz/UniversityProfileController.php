@@ -377,10 +377,12 @@ public function store(Request $request)
             'language' => 'nullable|string|max:255',
             'scholarship_available' => 'required|boolean',
             'status' => 'required|in:active,inactive',
-            // Degree/Intake & Payment: sama pola "add row" dengan store() —
-            // seluruh baris lama diganti dengan baris yang dikirim form ini
-            // (lihat sinkronisasi delete+recreate di bawah).
+            // Degree/Intake & Payment: sama pola "add row" dengan store().
+            // Baris Degree/Intake disinkronkan lewat ID-nya (lihat sinkronisasi
+            // di bawah); Payment & Scholarship tetap diganti seluruhnya.
             'degree_intakes' => 'nullable|array',
+            // ID baris yang sudah ada (dikirim hidden input di form edit); kosong = baris baru.
+            'degree_intakes.*.id' => 'nullable|uuid',
             'degree_intakes.*.degree' => ['nullable', 'string', Rule::in(UniversityProfileDegree::DEGREES)],
             'degree_intakes.*.course_name' => 'nullable|string|max:255',
             'degree_intakes.*.intake' => 'nullable|string|max:255',
@@ -460,15 +462,14 @@ public function store(Request $request)
 
         $profile = AdminCrud::update(UniversityProfile::class, $id, $validated, null);
 
-        // Sinkronisasi baris Degree/Intake & Payment: hapus semua baris lama
-        // punya profile ini, lalu buat ulang dari yang dikirim form —
-        // paling aman & sederhana untuk child table "add row" begini (tidak
-        // ada tabel lain yang mereferensikan baris-baris ini).
-        $profile->degrees()->delete();
+        // Sinkronisasi baris Degree/Intake (13 November 2026): baris yang sudah ada DIPERBARUI memakai
+        // ID-nya sendiri, baris baru dibuat, baris yang dibuang admin baru dihapus. ID baris Course
+        // dipakai form Apply student & aplikasi yang sudah masuk (degree_intake_id), jadi kalau semua
+        // baris dihapus lalu dibuat ulang (cara lama), student yang halaman Apply-nya sudah terbuka
+        // ditolak "The selected degree intake id is invalid" dan aplikasi lama kehilangan acuannya.
+        $keptDegreeIds = [];
         foreach ($degreeIntakeRows as $index => $row) {
-            UniversityProfileDegree::create([
-                'user_id' => (string) $userId,
-                'university_profile_id' => $profile->id,
+            $attributes = [
                 'degree' => $row['degree'] ?? null,
                 'course_name' => $row['course_name'] ?? null,
                 'intake' => $row['intake'] ?? null,
@@ -480,9 +481,26 @@ public function store(Request $request)
                 'registration_fee_amount' => $row['registration_fee_amount'] ?? null,
                 'csca_subject' => $row['csca_subject'] ?? null,
                 'sort_order' => $index,
-            ]);
+            ];
+            // whereKey dibatasi ke baris milik profile ini, jadi ID dari form tidak bisa menyentuh profile lain.
+            $existing = filled($row['id'] ?? null) ? $profile->degrees()->whereKey($row['id'])->first() : null;
+
+            if ($existing) {
+                $existing->update($attributes);
+                $keptDegreeIds[] = $existing->getKey();
+            } else {
+                $keptDegreeIds[] = UniversityProfileDegree::create($attributes + [
+                    'user_id' => (string) $userId,
+                    'university_profile_id' => $profile->id,
+                ])->getKey();
+            }
         }
 
+        // Baris yang tidak ada lagi di form (dihapus admin). Kalau $keptDegreeIds kosong, semua baris dihapus.
+        $profile->degrees()->when($keptDegreeIds, fn ($query) => $query->whereKeyNot($keptDegreeIds))->delete();
+
+        // Payment & Scholarship tetap pakai pola lama (hapus & buat ulang): tidak ada tabel lain yang
+        // mereferensikan baris-barisnya lewat ID.
         $profile->payments()->delete();
         foreach ($paymentRows as $index => $row) {
             UniversityProfilePayment::create([

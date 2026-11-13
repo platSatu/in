@@ -152,6 +152,9 @@
                         // csca_subject_to_university_profile_degrees_table.
                         $existingDegrees = old('degree_intakes', $data->degrees->map(function ($d) {
                             return [
+                                // 13 November 2026: ID baris ikut dikirim supaya update() memperbarui
+                                // baris yang sama (ID tetap), bukan menghapus & membuat ulang.
+                                'id' => $d->id,
                                 'degree' => $d->degree,
                                 'course_name' => $d->course_name,
                                 'intake' => $d->intake,
@@ -165,13 +168,16 @@
                             ];
                         })->toArray());
                         if (empty($existingDegrees)) {
-                            $existingDegrees = [['degree' => null, 'course_name' => null, 'intake' => null, 'duration' => null, 'starting_date' => null, 'application_deadline' => null, 'language' => null, 'tuition_fee' => null, 'registration_fee_amount' => null, 'csca_subject' => null]];
+                            $existingDegrees = [['id' => null, 'degree' => null, 'course_name' => null, 'intake' => null, 'duration' => null, 'starting_date' => null, 'application_deadline' => null, 'language' => null, 'tuition_fee' => null, 'registration_fee_amount' => null, 'csca_subject' => null]];
                         }
                     @endphp
 
                     <div id="degreeIntakeRows">
                         @foreach ($existingDegrees as $index => $row)
                             <div class="degree-intake-row border rounded p-3 mb-3">
+                                {{-- ID baris yang sudah ada; baris baru dari template tidak punya ini. --}}
+                                <input type="hidden" name="degree_intakes[{{ $index }}][id]"
+                                    value="{{ old('degree_intakes.' . $index . '.id', $row['id'] ?? '') }}">
                                 <div class="row g-3">
                                     <div class="col-md-3">
                                         <label class="form-label">Degree</label>
