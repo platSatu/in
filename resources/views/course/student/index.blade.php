@@ -8,7 +8,31 @@
 
 <div class="middle-content container-xxl p-0">
 
-    <div class="row g-3 mb-3 layout-top-spacing">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 layout-top-spacing mb-3">
+        <h5 class="mb-0">Student InaYule</h5>
+        @if ($canEdit)
+            <div class="d-flex gap-2">
+                <a href="{{ route('course.student.import.template') }}" class="btn btn-sm btn-outline-secondary">Unduh Contoh Excel</a>
+                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#inayule-import">Import Excel</button>
+            </div>
+        @endif
+    </div>
+
+    @foreach (['success' => 'success', 'error' => 'danger'] as $flash => $type)
+        @if (session($flash))
+            <div class="alert alert-{{ $type }}">{{ session($flash) }}</div>
+        @endif
+    @endforeach
+    @if (session('import_failed'))
+        <div class="alert alert-warning">
+            <strong>Beberapa murid gagal diimport:</strong>
+            <ul class="mb-0">@foreach (session('import_failed') as $failed)<li>{{ $failed }}</li>@endforeach</ul>
+        </div>
+    @endif
+    @error('file') <div class="alert alert-danger">{{ $message }}</div> @enderror
+    @error('branch_id') <div class="alert alert-danger">{{ $message }}</div> @enderror
+
+    <div class="row g-3 mb-3">
         @foreach ([
             ['Student InaYule', number_format($summary['students'], 0, ',', '.'), null],
             ['Total Sisa Credit', $creditNum($summary['credits']), null],
@@ -114,4 +138,40 @@
         </div>
     </div>
 </div>
+
+@if ($canEdit)
+    {{-- Import murid dari sistem lama: upload -> pratinjau (belum disimpan) -> konfirmasi. --}}
+    <div class="modal fade" id="inayule-import" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="{{ route('course.student.import.preview') }}" enctype="multipart/form-data" class="modal-content">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title">Import Murid dari Excel</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">
+                        Kolom: <b>nama_murid</b>, <b>email</b>, no_hp, pengajar, paket, sisa_credit, sisa_saldo.
+                        Nama paket & pengajar salin dari sheet di <a href="{{ route('course.student.import.template') }}">contoh Excel</a>.
+                        Setelah upload, Anda melihat pratinjau dulu; data baru disimpan setelah dikonfirmasi.
+                    </p>
+                    <label class="form-label">File Excel</label>
+                    <input type="file" name="file" accept=".xlsx,.xls" class="form-control mb-3" required>
+                    <label class="form-label">Cabang murid baru</label>
+                    <select name="branch_id" class="form-select">
+                        <option value="">-- Tanpa cabang --</option>
+                        @foreach ($branches as $branchOption)
+                            <option value="{{ $branchOption->id }}" @selected(old('branch_id') === $branchOption->id)>{{ $branchOption->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">Hanya untuk murid yang belum ada di sistem. Murid lama (InaStudy/InaYule) tetap di cabangnya.</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-primary" onclick="this.disabled = true; this.form.submit();">Lihat Pratinjau</button>
+                </div>
+            </form>
+        </div>
+    </div>
+@endif
 @endsection

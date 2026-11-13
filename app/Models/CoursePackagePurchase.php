@@ -48,6 +48,9 @@ class CoursePackagePurchase extends Model
     // jadi N credit paket lain -- lihat PackageUpgradeCalculator::convert().
     public const SOURCE_CONVERT_PURCHASE = 'convert_purchase';
 
+    // Sisa credit murid dari sistem lama (13 November 2026), harga Rp0 -- lihat App\Services\InaYule\StudentImportService.
+    public const SOURCE_IMPORT = 'import';
+
     public const STATUS_COMPLETED = 'completed';
     public const STATUS_CANCELLED = 'cancelled';
 

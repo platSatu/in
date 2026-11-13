@@ -1190,6 +1190,10 @@ Route::middleware(['auth', 'permission:course.student'])->prefix('dashboard/supe
 });
 Route::middleware(['auth', 'permission:course.student,edit'])->prefix('dashboard/superadmin/course/student')->group(function () {
     Route::put('/{id}/teacher', [CourseStudentController::class, 'updateTeacher'])->whereUuid('id')->name('course.student.teacher');
+    // Import murid dari sistem lama: contoh Excel -> pratinjau -> simpan.
+    Route::get('/import/contoh', [CourseStudentController::class, 'importTemplate'])->name('course.student.import.template');
+    Route::post('/import', [CourseStudentController::class, 'importPreview'])->middleware('throttle:10,1')->name('course.student.import.preview');
+    Route::post('/import/simpan', [CourseStudentController::class, 'importStore'])->middleware('throttle:10,1')->name('course.student.import.store');
 });
 
 require __DIR__ . '/auth.php';

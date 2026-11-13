@@ -5,19 +5,21 @@ namespace App\Http\Controllers\Course;
 use App\Http\Controllers\Concerns\ScopesToVisibleBranches;
 use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
+use App\Models\CompanyBranch;
 use App\Models\CourseCredit;
 use App\Models\CoursePackagePurchase;
 use App\Models\Deposit;
-use App\Models\Role;
 use App\Models\Student;
-use App\Models\User;
 use App\Services\CourseCredit\CourseCreditDebitService;
+use App\Services\InaYule\StudentImportService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\StreamedResponse;
+use Throwable;
 
 /**
  * Menu Course > Student InaYule (13 November 2026, permintaan user -- "menu khusus murid InaYule, yang membeli paket
@@ -26,6 +28,7 @@ use Illuminate\View\View;
  *
  * Baca-saja kecuali ganti pengajar tetap. Data per cabang dibatasi sama seperti Riwayat Credit Siswa
  * (ScopesToVisibleBranches); riwayat credit memakai partial yang sama (course-credit._ledger).
+ * Import murid dari sistem lama: lihat App\Services\InaYule\StudentImportService (pratinjau dulu, baru disimpan).
  */
 class CourseStudentController extends Controller
 {
@@ -78,6 +81,8 @@ class CourseStudentController extends Controller
 
         return view('course.student.index', [
             'students' => $students,
+            'canEdit' => $request->user()->canAccessPermission('course.student', 'edit'),
+            'branches' => $this->branches($request),
             'teachers' => $this->teachers(),
             'filters' => array_merge($filters, ['search' => $search]),
             'lowCredit' => self::LOW_CREDIT,
@@ -132,6 +137,70 @@ class CourseStudentController extends Controller
         return back()->with('success', 'Pengajar tetap diperbarui.');
     }
 
+    /** Contoh Excel import (berisi daftar paket & pengajar dari sistem). */
+    public function importTemplate(StudentImportService $import): StreamedResponse
+    {
+        return $import->template();
+    }
+
+    /** Langkah 1 import: baca Excel & tampilkan pratinjau per baris (belum ada data yang disimpan). */
+    public function importPreview(Request $request, StudentImportService $import): View|RedirectResponse
+    {
+        $branches = $this->branches($request);
+        $data = $request->validate([
+            'file' => ['required', 'file', 'mimes:xlsx,xls', 'max:5120'],
+            // Admin cabang wajib memilih cabangnya supaya murid baru terlihat di daftarnya.
+            'branch_id' => [$this->visibleBranches($request) === null ? 'nullable' : 'required', Rule::in($branches->pluck('id'))],
+        ], ['file.mimes' => 'File harus Excel (.xlsx/.xls).', 'file.max' => 'Ukuran file maksimal 5 MB.', 'branch_id.required' => 'Pilih cabang murid.']);
+
+        try {
+            $rows = $import->read($request->file('file'));
+        } catch (Throwable) {
+            $rows = false;
+        }
+        if (! $rows) {
+            return back()->with('error', $rows === null
+                ? 'Kolom nama_murid & email tidak ditemukan di baris pertama. Pakai file contoh supaya pas.'
+                : 'File tidak bisa dibaca atau masih kosong. Pakai file contoh supaya pas.');
+        }
+
+        $request->session()->put('inayule_import', ['rows' => $rows, 'branch_id' => $data['branch_id'] ?? null]);
+        $plan = $import->plan($rows);
+
+        return view('course.student.import', [
+            'plan' => $plan,
+            'branch' => $branches->firstWhere('id', $data['branch_id'] ?? null),
+            'fileName' => $request->file('file')->getClientOriginalName(),
+        ]);
+    }
+
+    /** Langkah 2 import: simpan murid yang lolos pengecekan (diperiksa ulang saat disimpan). */
+    public function importStore(Request $request, StudentImportService $import): RedirectResponse
+    {
+        $pending = $request->session()->pull('inayule_import');
+        if (! $pending) {
+            return redirect()->route('course.student.index')->with('error', 'Data import sudah kedaluwarsa. Upload ulang file Excel-nya ya.');
+        }
+
+        $students = $import->plan($pending['rows'])['students'];
+        $result = $import->import($students, $pending['branch_id'], $request->user()->id);
+
+        $message = "Import selesai: {$result['created']} akun baru, {$result['linked']} murid lama, {$result['packages']} paket, {$result['saldo']} saldo awal.";
+
+        return redirect()->route('course.student.index')
+            ->with('success', $message)
+            ->with('import_failed', $result['failed']);
+    }
+
+    /** Cabang yang boleh dipakai user ini (semua untuk role tingkat company). */
+    private function branches(Request $request): Collection
+    {
+        return CompanyBranch::query()
+            ->when($this->visibleBranches($request) !== null, fn ($q) => $q->whereIn('id', $this->visibleBranches($request)))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+    }
+
     /** Murid yang pernah punya paket InaYule, dibatasi cabang yang boleh dilihat user. */
     private function students(Request $request): Builder
     {
@@ -148,9 +217,7 @@ class CourseStudentController extends Controller
     /** Pengajar aktif (role teacher), untuk filter & pilihan pengajar tetap. */
     private function teachers(): Collection
     {
-        return User::whereHas('roles', fn ($query) => $query->where('slug', 'teacher')->where('roles.status', Role::STATUS_ACTIVE))
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        return app(StudentImportService::class)->teachers();
     }
 
     /** Pembelian yang masih bersisa credit: [student_id, name, remaining] per paket. */
