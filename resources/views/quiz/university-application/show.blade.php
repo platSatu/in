@@ -51,41 +51,73 @@
         @include('partials.inastudy-add-campus-modal')
     @endif
 
-    {{-- Apply beberapa kampus (18 November 2026): semua kampus yang di-apply siswa ini, klik untuk pindah.
-         Kampus yang sedang dibuka ditandai. Hanya muncul kalau siswa apply lebih dari 1 kampus. --}}
+    {{-- Apply beberapa kampus (18 November 2026): daftar bernomor semua kampus yang di-apply siswa ini --
+         jurusan, status Registration Fee & dokumen wajib yang masih kurang per kampus. Kampus yang sedang
+         dibuka ditandai; klik nama kampus lain untuk pindah. Hanya muncul kalau lebih dari 1 kampus. --}}
     @if ($studentApplications->count() > 1)
-        <div class="widget-content widget-content-area br-8 mb-3" style="padding:16px 20px;">
-            <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
-                <span class="fw-bold">{{ trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) }} apply {{ $studentApplications->count() }} kampus</span>
-                <span class="text-muted small">Klik kampus untuk membuka aplikasinya. Dokumen yang sama dipakai di semua kampus, tetap direview per kampus.</span>
+        <div class="widget-content widget-content-area br-8 mb-3" style="padding:18px 22px;">
+            <div class="mb-3">
+                <div class="fw-bold" style="font-size:15px;">
+                    {{ trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) }} apply {{ $studentApplications->count() }} kampus
+                </div>
+                <div class="text-muted small">Dokumen yang sama cukup diupload sekali dan otomatis dipakai di kampus lain, tapi tetap direview per kampus.</div>
             </div>
-            <div class="row g-2">
+
+            <ol class="mb-0 ps-0" style="list-style:none;">
                 @foreach ($studentApplications as $item)
                     @php $campusApp = $item['application']; @endphp
-                    <div class="col-md-6 col-xl-4">
-                        <a href="{{ route('quiz.university-application.show', $campusApp->id) }}"
-                           class="d-block h-100 rounded p-3 text-decoration-none text-body"
-                           style="border: {{ $item['current'] ? '2px solid #4361ee' : '1px solid #e0e6ed' }}; background: {{ $item['current'] ? '#f4f6ff' : '#fff' }};">
-                            <div class="d-flex justify-content-between align-items-start gap-2">
-                                <div class="fw-bold" style="font-size:14px;">{{ optional($campusApp->university)->name ?? 'University (sudah dihapus)' }}</div>
+                    <li class="d-flex gap-3 py-3 {{ $loop->last ? '' : 'border-bottom' }}">
+                        <div class="flex-shrink-0 rounded-circle d-flex align-items-center justify-content-center fw-bold"
+                            style="width:32px; height:32px; background: {{ $item['current'] ? '#4361ee' : '#eef1f8' }}; color: {{ $item['current'] ? '#fff' : '#3b3f5c' }};">
+                            {{ $loop->iteration }}
+                        </div>
+                        <div class="flex-grow-1" style="min-width:0;">
+                            <div class="d-flex flex-wrap align-items-center gap-2">
                                 @if ($item['current'])
+                                    <span class="fw-bold" style="font-size:15px;">{{ optional($campusApp->university)->name ?? 'University (sudah dihapus)' }}</span>
                                     <span class="badge badge-info">Sedang dibuka</span>
-                                @elseif ($campusApp->isCancelled())
+                                @else
+                                    <a href="{{ route('quiz.university-application.show', $campusApp->id) }}" class="fw-bold" style="font-size:15px;">
+                                        {{ optional($campusApp->university)->name ?? 'University (sudah dihapus)' }} &rsaquo;
+                                    </a>
+                                @endif
+                                @if ($campusApp->isCancelled())
                                     <span class="badge badge-secondary">Dibatalkan</span>
                                 @endif
                             </div>
-                            <div class="text-muted small">{{ $campusApp->major_label }} &middot; Intake {{ $campusApp->intake_year }} &middot; {{ $campusApp->application_no }}</div>
-                            <div class="d-flex flex-wrap gap-2 mt-2 small">
-                                <span @class(['badge', 'badge-success' => $item['fee'] === 'Lunas', 'badge-warning' => $item['fee'] === 'DP 50%', 'badge-secondary' => $item['fee'] === 'Belum bayar'])>{{ $item['fee'] }}</span>
-                                <span class="text-muted">Dokumen {{ $item['documents'] }}</span>
+
+                            <div class="mt-1" style="font-size:13.5px;">
+                                <span class="text-muted">Jurusan:</span> {{ $campusApp->major_label }}
+                                <span class="text-muted">&middot; Intake {{ $campusApp->intake_year }} &middot; {{ $campusApp->application_no }}</span>
                             </div>
-                            <div class="small mt-1 {{ $item['missing']->isEmpty() ? 'text-success' : 'text-muted' }}">
-                                {{ $item['missing']->isEmpty() ? 'Dokumen wajib lengkap' : 'Kurang: '.$item['missing']->implode(', ') }}
+
+                            <div class="d-flex flex-wrap gap-3 mt-2" style="font-size:13.5px;">
+                                <div>
+                                    <span class="text-muted">Registration Fee:</span>
+                                    <span @class(['badge', 'badge-success' => $item['fee'] === 'Lunas', 'badge-warning' => $item['fee'] === 'DP 50%', 'badge-secondary' => $item['fee'] === 'Belum bayar'])>{{ $item['fee'] }}</span>
+                                </div>
+                                <div>
+                                    <span class="text-muted">Dokumen:</span>
+                                    {{ str_replace('/', ' dari ', $item['documents']) }} sudah diupload
+                                </div>
                             </div>
-                        </a>
-                    </div>
+
+                            <div class="mt-2" style="font-size:13.5px;">
+                                @if ($item['missing']->isEmpty())
+                                    <span class="text-success"><i class="bi bi-check-circle"></i> Dokumen wajib sudah lengkap</span>
+                                @else
+                                    <div class="text-muted mb-1">Masih kurang ({{ $item['missing']->count() }} dokumen wajib):</div>
+                                    <div class="d-flex flex-wrap gap-1">
+                                        @foreach ($item['missing'] as $label)
+                                            <span class="border rounded px-2 py-1" style="font-size:12.5px; background:#fff7f0; border-color:#f5d6b8 !important;">{{ $label }}</span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </li>
                 @endforeach
-            </div>
+            </ol>
         </div>
     @endif
 
