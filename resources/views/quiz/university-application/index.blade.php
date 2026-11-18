@@ -107,6 +107,10 @@
                                     <td>
                                         {{ trim(($item->student->first_name ?? '') . ' ' . ($item->student->last_name ?? '')) ?: '-' }}
                                         <div class="text-muted" style="font-size:12px;">{{ $item->whatsapp }}</div>
+                                        @if (($campusCounts[$item->student_id] ?? 0) > 1)
+                                            {{-- Apply beberapa kampus: lihat semua kampusnya di halaman detail. --}}
+                                            <span class="badge badge-warning mt-1" title="Siswa ini apply {{ $campusCounts[$item->student_id] }} kampus">{{ $campusCounts[$item->student_id] }} kampus</span>
+                                        @endif
                                     </td>
                                     <td>{{ optional($item->university)->name ?? '-' }}</td>
                                     <td>{{ $item->major_label }}</td>
