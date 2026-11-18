@@ -272,7 +272,10 @@ class UniversityApplicationController extends Controller
     {
         $visibleStudentIds = DataScope::visibleStudentIds(request()->user());
 
-        return UniversityApplication::with('university')
+        return UniversityApplication::with(['university', 'payments' => fn ($payment) => $payment
+                ->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+                ->where('status', ApplicationPayment::STATUS_PAID)
+                ->latest('paid_at')])
             ->where('student_id', $application->student_id)
             ->where(fn ($query) => $query->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
                 ->orWhereKey($application->getKey()))
@@ -292,6 +295,14 @@ class UniversityApplicationController extends Controller
                     'missing' => $types->filter(fn ($type) => $type->is_required && ! $uploaded->contains($type->id))->pluck('label')->values(),
                     // Sisa Registration Fee setelah DP & tagihan pelunasan yang sedang aktif (18 November 2026).
                     'remaining' => $item->fee_paid ? $item->registrationFeeRemaining() : 0,
+                    // Rincian biaya per kampus (18 November 2026): total fee, yang sudah dibayar (lewat apa & kapan),
+                    // dan yang ditagih sekarang (DP 50% kalau lebih dari 1 kampus aktif, sama dengan depan).
+                    'fee_amount' => (int) $item->registration_fee_amount,
+                    'paid_amount' => (int) $item->payments->sum('amount'),
+                    'paid_via' => $item->payments->map(fn ($payment) => ($payment->gateway === 'manual' ? 'Transfer manual' : ucfirst((string) $payment->gateway))
+                        .' '.optional($payment->paid_at)->translatedFormat('d M Y'))->unique()->implode(', '),
+                    'charge_now' => $item->fee_paid ? 0 : $item->registrationFeeToCharge(),
+                    'pay_url' => route('student-portal.applications.payment.show', [$item->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE]),
                     'due' => (int) $item->registration_fee_due,
                     'change_blocked' => $admin->changeBlockedReason($item),
                 ];

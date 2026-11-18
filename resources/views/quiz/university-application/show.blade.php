@@ -110,14 +110,46 @@
                                 <div>
                                     <span class="text-muted">Registration Fee:</span>
                                     <span @class(['badge', 'badge-success' => $item['fee'] === 'Lunas', 'badge-warning' => $item['fee'] === 'DP 50%', 'badge-secondary' => $item['fee'] === 'Belum bayar'])>{{ $item['fee'] }}</span>
-                                    @if ($item['remaining'] > 0)
-                                        <span class="ms-1">sisa <strong>Rp {{ number_format($item['remaining'], 0, ',', '.') }}</strong></span>
-                                    @endif
                                 </div>
                                 <div>
                                     <span class="text-muted">Dokumen:</span>
                                     {{ str_replace('/', ' dari ', $item['documents']) }} sudah diupload
                                 </div>
+                            </div>
+
+                            {{-- Rincian biaya per kampus (18 November 2026). DP 50% hanya berlaku kalau siswa punya lebih dari
+                                 1 kampus aktif (aturan sejak 12 November 2026); pembayaran lama yang sudah penuh tetap Lunas. --}}
+                            @php $rp = fn ($n) => 'Rp '.number_format((int) $n, 0, ',', '.'); @endphp
+                            <div class="mt-2 p-2 rounded border" style="font-size:13px; background:#fafbfd;">
+                                @if (! $item['fee_amount'] && $campusApp->fee_paid)
+                                    {{-- Register manual model lama (gratis Rp 0). --}}
+                                    <span class="text-muted">Didaftarkan manual oleh admin tanpa Registration Fee.</span>
+                                @elseif (! $item['fee_amount'])
+                                    <span class="text-muted">Registration Fee jurusan ini belum diatur di Course.</span>
+                                @else
+                                    <div class="d-flex flex-wrap gap-3">
+                                        <span><span class="text-muted">Total fee:</span> <strong>{{ $rp($item['fee_amount']) }}</strong></span>
+                                        @if ($item['paid_amount'] > 0)
+                                            <span><span class="text-muted">Sudah dibayar:</span> <strong>{{ $rp($item['paid_amount']) }}</strong>
+                                                @if ($item['paid_via']) <span class="text-muted">({{ $item['paid_via'] }})</span> @endif</span>
+                                        @endif
+                                        @if ($item['remaining'] > 0)
+                                            <span><span class="text-muted">Sisa pelunasan:</span> <strong class="text-danger">{{ $rp($item['remaining']) }}</strong></span>
+                                        @endif
+                                    </div>
+                                    @if (! $campusApp->isCancelled() && $item['paid_amount'] === 0 && $item['charge_now'] > 0)
+                                        <div class="mt-1">
+                                            @if ($item['charge_now'] < $item['fee_amount'])
+                                                <span class="text-muted">Apply {{ $studentApplications->reject(fn ($row) => $row['application']->isCancelled())->count() }} kampus, jadi dibayar bertahap:</span>
+                                                DP 50% <strong>{{ $rp($item['charge_now']) }}</strong> sekarang, pelunasan 50% <strong>{{ $rp($item['fee_amount'] - $item['charge_now']) }}</strong> nanti.
+                                            @else
+                                                <span class="text-muted">Apply 1 kampus, dibayar penuh:</span> <strong>{{ $rp($item['charge_now']) }}</strong>.
+                                            @endif
+                                        </div>
+                                    @elseif ($item['remaining'] === 0 && $item['paid_amount'] >= $item['fee_amount'])
+                                        <div class="mt-1 text-success"><i class="bi bi-check-circle"></i> Registration Fee kampus ini sudah lunas.</div>
+                                    @endif
+                                @endif
                             </div>
 
                             {{-- Sisa Registration Fee setelah DP 50% (18 November 2026): tagih & kirim link bayar lewat WhatsApp
@@ -128,6 +160,12 @@
                                     @csrf
                                     @if ($item['due'])
                                         <span>Tagihan pelunasan <strong>Rp {{ number_format($item['due'], 0, ',', '.') }}</strong> sudah aktif, menunggu dibayar siswa.</span>
+                                        {{-- Link pelunasan siap kirim (siswa login dulu untuk membuka). --}}
+                                        <div class="input-group input-group-sm w-100 order-last mt-1">
+                                            <input type="text" class="form-control" value="{{ $item['pay_url'] }}" readonly onclick="this.select()">
+                                            <button type="button" class="btn btn-outline-secondary"
+                                                onclick="navigator.clipboard.writeText(this.previousElementSibling.value).then(() => { this.textContent = 'Tersalin'; setTimeout(() => this.textContent = 'Salin link', 1500); })">Salin link</button>
+                                        </div>
                                         <button type="submit" name="balance" value="remind" class="btn btn-success btn-sm ms-auto"
                                             onclick="return confirm('Kirim ulang link pelunasan ke WhatsApp siswa?')"><i class="bi bi-whatsapp"></i> Kirim ulang via WhatsApp</button>
                                     @else
