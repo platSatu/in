@@ -53,15 +53,18 @@
 
     {{-- Apply beberapa kampus (18 November 2026): daftar bernomor semua kampus yang di-apply siswa ini --
          jurusan, status Registration Fee & dokumen wajib yang masih kurang per kampus. Kampus yang sedang
-         dibuka ditandai; klik nama kampus lain untuk pindah. Hanya muncul kalau lebih dari 1 kampus. --}}
-    @php $multiCampus = $studentApplications->count() > 1; @endphp
+         dibuka ditandai; klik nama kampus lain untuk pindah. --}}
+    {{-- 18 November 2026: daftar kampus selalu tampil di atas (1 kampus maupun lebih), supaya tampilannya sama. --}}
+    @php $multiCampus = $studentApplications->isNotEmpty(); @endphp
     @if ($multiCampus)
         <div class="widget-content widget-content-area br-8 mb-3" style="padding:18px 22px;">
             <div class="mb-3">
                 <div class="fw-bold" style="font-size:15px;">
                     {{ trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) }} apply {{ $studentApplications->count() }} kampus
                 </div>
-                <div class="text-muted small">Dokumen yang sama cukup diupload sekali dan otomatis dipakai di kampus lain, tapi tetap direview per kampus.</div>
+                @if ($studentApplications->count() > 1)
+                    <div class="text-muted small">Dokumen yang sama cukup diupload sekali dan otomatis dipakai di kampus lain, tapi tetap direview per kampus.</div>
+                @endif
             </div>
 
             <ol class="mb-0 ps-0" style="list-style:none;">
