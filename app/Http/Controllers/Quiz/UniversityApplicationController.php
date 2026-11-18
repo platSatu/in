@@ -150,6 +150,16 @@ class UniversityApplicationController extends Controller
 
         $this->assertVisibleApplication($request->user(), $application);
 
+        // Apply beberapa kampus (18 November 2026): dokumen yang sudah ada di kampus lain siswa ini langsung
+        // ikut dipakai di sini (sama dengan halaman Upload Dokumen siswa), supaya admin tidak melihat kosong
+        // hanya karena siswa belum membuka halaman dokumen kampus ini. Baru setelah Registration Fee masuk,
+        // sama seperti di depan (dokumen terbuka setelah bayar).
+        if (! $application->isCancelled() && $application->payments()
+            ->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+            ->where('status', ApplicationPayment::STATUS_PAID)->exists()) {
+            $application->fillDocumentsFromSiblings();
+        }
+
         // Dokumen student mengikuti persyaratan kampusnya (12 November 2026), lalu dokumen dari INA.
         $documentTypes = $application->documentTypes()->concat(DocumentType::active()->adminProvided()->orderBy('sort_order')->get());
 
@@ -177,6 +187,9 @@ class UniversityApplicationController extends Controller
         $courseUniversities = $canEdit && ! $changeBlockedReason ? $registrar->options() : collect();
         $degreeOrder = UniversityProfileDegree::DEGREES;
 
+        // Ringkasan kampus lain siswa ini (18 November 2026): bayar & kelengkapan dokumen per kampus.
+        $otherApplications = $this->otherApplicationsSummary($application);
+
         return view('quiz.university-application.show', compact(
             'application',
             'groupedTypes',
@@ -187,8 +200,36 @@ class UniversityApplicationController extends Controller
             'canCancel',
             'changeBlockedReason',
             'courseUniversities',
-            'degreeOrder'
+            'degreeOrder',
+            'otherApplications'
         ));
+    }
+
+    /**
+     * Kampus lain (aktif) milik siswa yang sama: status bayar Registration Fee & dokumen yang masih kurang,
+     * memakai aturan yang sama dengan halaman dokumen (UniversityApplication::documentTypes()).
+     */
+    private function otherApplicationsSummary(UniversityApplication $application)
+    {
+        return UniversityApplication::with('university')
+            ->where('student_id', $application->student_id)
+            ->whereKeyNot($application->getKey())
+            ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+            ->withProgressFlags()
+            ->latest('submitted_at')
+            ->get()
+            ->map(function (UniversityApplication $other) {
+                $types = $other->documentTypes();
+                $uploaded = $other->documents()->pluck('document_type_id')->unique();
+                $missing = $types->filter(fn ($type) => $type->is_required && ! $uploaded->contains($type->id));
+
+                return [
+                    'application' => $other,
+                    'fee' => ! $other->fee_paid ? 'Belum bayar' : ($other->registrationFeeRemaining() > 0 ? 'DP' : 'Lunas'),
+                    'documents' => $types->filter(fn ($type) => $uploaded->contains($type->id))->count().'/'.$types->count(),
+                    'missing' => $missing->pluck('label')->values(),
+                ];
+            });
     }
 
     /** Batalkan 1 aplikasi yang belum ada pembayaran (alasan wajib). */
@@ -384,9 +425,17 @@ class UniversityApplicationController extends Controller
         );
         });
 
+        // Sama dengan upload oleh siswa (ApplicationDocumentController): dokumen yang sama langsung dipakai juga
+        // di kampus lain siswa ini yang memintanya (status Pending, tetap direview per kampus).
+        $shared = $documentType->isAdminProvided() ? 0 : UniversityApplication::where('student_id', $application->student_id)
+            ->whereKeyNot($application->getKey())
+            ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+            ->get()
+            ->sum(fn (UniversityApplication $other) => $other->fillDocumentsFromSiblings());
+
         return redirect()
             ->route('quiz.university-application.show', $id)
-            ->with('success', 'Dokumen berhasil diupload.');
+            ->with('success', 'Dokumen berhasil diupload.'.($shared ? ' Dokumen ini juga dipakai di '.$shared.' kampus lain siswa ini yang memintanya.' : ''));
     }
 
     /**

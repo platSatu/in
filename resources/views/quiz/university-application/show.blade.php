@@ -226,6 +226,36 @@
                     </div>
                 </div>
 
+                {{-- Apply beberapa kampus (18 November 2026): kampus lain siswa ini, status bayar & dokumen yang masih kurang. --}}
+                @if ($otherApplications->isNotEmpty())
+                    <div class="border rounded p-3 mb-4" style="background:#f8fafd;">
+                        <div class="fw-bold mb-2" style="font-size:14px;">Kampus lain siswa ini</div>
+                        <div class="table-responsive">
+                            <table class="table table-sm mb-0" style="font-size:13px;">
+                                <thead>
+                                    <tr><th>Kampus</th><th>Registration Fee</th><th>Dokumen</th><th>Masih kurang</th></tr>
+                                </thead>
+                                <tbody>
+                                    @foreach ($otherApplications as $other)
+                                        <tr>
+                                            <td>
+                                                <a href="{{ route('quiz.university-application.show', $other['application']->id) }}" class="fw-semibold">{{ optional($other['application']->university)->name ?? '-' }}</a>
+                                                <div class="text-muted small">{{ $other['application']->major_label }} &middot; {{ $other['application']->intake_year }}</div>
+                                            </td>
+                                            <td>
+                                                <span @class(['badge', 'badge-success' => $other['fee'] === 'Lunas', 'badge-warning' => $other['fee'] === 'DP', 'badge-secondary' => $other['fee'] === 'Belum bayar'])>{{ $other['fee'] }}</span>
+                                            </td>
+                                            <td>{{ $other['documents'] }}</td>
+                                            <td class="text-muted">{{ $other['missing']->isEmpty() ? 'Lengkap' : $other['missing']->implode(', ') }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="text-muted small mt-2">Dokumen yang sama dari kampus lain otomatis ikut dipakai di sini (status Pending), tetap direview per kampus.</div>
+                    </div>
+                @endif
+
                 <hr>
 
                 {{-- Application No (diisi manual admin) & data paspor -- disimpan di data Student. --}}
@@ -312,6 +342,25 @@
                                         onclick="return confirm('Aktifkan tagihan pelunasan Rp {{ number_format($remaining, 0, ',', '.') }}?')">Tagih Pelunasan</button>
                                 @endif
                             </form>
+                        </div>
+                    @endif
+
+                    {{-- Link bayar Registration Fee pertama (18 November 2026), untuk aplikasi yang didaftarkan admin:
+                         halaman bayar portal siswa (semua kampus yang belum dibayar sekali bayar). Siswa wajib punya akun. --}}
+                    @php $firstFeeLink = ! $feePaid && ! $application->isCancelled() && optional($application->student)->user_id ? app(\App\Services\InaStudy\ManualApplicationRegistrar::class)->paymentLink($application) : null; @endphp
+                    @if ($canEdit && $firstFeeLink && $firstFeeLink['amount'] > 0)
+                        @php
+                            $firstWaNumber = preg_replace('/^0/', '62', preg_replace('/\D/', '', (string) $application->whatsapp));
+                            $firstWaText = 'Halo, Registration Fee pendaftaran kamu'.($firstFeeLink['count'] > 1 ? ' ('.$firstFeeLink['count'].' kampus, DP 50% per kampus)' : ' ke '.($application->university->name ?? '')).' sebesar Rp '.number_format($firstFeeLink['amount'], 0, ',', '.').' sudah bisa dibayar di sini: '.$firstFeeLink['url'];
+                        @endphp
+                        <div class="col-md-6">
+                            <label class="form-label" style="font-size:13px;">Link Bayar Registration Fee</label>
+                            <div class="border rounded p-2">
+                                <div style="font-size:13px;">Menunggu dibayar student: <strong>Rp {{ number_format($firstFeeLink['amount'], 0, ',', '.') }}</strong>{{ $firstFeeLink['count'] > 1 ? ' untuk '.$firstFeeLink['count'].' kampus' : '' }}.</div>
+                                @if ($firstWaNumber)
+                                    <a href="https://wa.me/{{ $firstWaNumber }}?text={{ rawurlencode($firstWaText) }}" target="_blank" rel="noopener" class="btn btn-success btn-sm mt-2">Kirim via WhatsApp</a>
+                                @endif
+                            </div>
                         </div>
                     @endif
 

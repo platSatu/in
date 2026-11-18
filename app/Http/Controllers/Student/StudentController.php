@@ -87,6 +87,9 @@ class StudentController extends Controller
                 // Aplikasi Cancelled (mis. data uji coba yang dilepas dari tab
                 // Progress Student) dianggap tidak ada.
                 'applications' => fn ($query) => $query
+                    ->with('university:id,name')
+                    // fee_paid: penanda "Belum bayar" di dropdown Progress InaStudy (18 November 2026).
+                    ->withProgressFlags()
                     ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
                     ->latest('submitted_at'),
             ])
@@ -698,19 +701,21 @@ class StudentController extends Controller
     }
 
     /**
-     * Tombol "Add to InaStudy" (1 Oktober 2026): admin/sales mendaftarkan
-     * Aplikasi Kuliah untuk siswa yang belum punya, tanpa Registration Fee --
-     * aturan sama persis dengan Register manual siswa, lihat
-     * App\Services\InaStudy\ManualApplicationRegistrar. Setelah itu admin bisa
-     * membantu isi formulir & upload dokumen dari halaman Progress InaStudy.
+     * Popup "Add to InaStudy" (1 Oktober 2026): admin/sales mendaftarkan siswa ke
+     * kampus, lihat App\Services\InaStudy\ManualApplicationRegistrar. Sejak
+     * 18 November 2026 sama dengan Apply di depan: boleh beberapa kampus sekaligus,
+     * Registration Fee ditagih (DP 50% per kampus kalau lebih dari 1).
      */
     public function addToInaStudy(Request $request, string $id, ManualApplicationRegistrar $registrar): RedirectResponse
     {
         $student = $this->resolveVisibleStudent($id);
 
         try {
-            $validated = $request->validate($registrar->rules());
-            $registrar->register($student, $validated);
+            $validated = $request->validate($registrar->registerRules(), [
+                'items.required' => 'Pilih minimal 1 kampus dulu.',
+                'items.max' => 'Maksimal '.\App\Http\Controllers\StudentPortal\ApplyController::CART_MAX.' kampus sekali daftar.',
+            ]);
+            $applications = $registrar->registerMany($student, $validated, $request->user()->id);
         } catch (ValidationException $e) {
             // Form-nya di popup: pesan ditampilkan sebagai alert di atas tabel,
             // back() supaya filter & halaman yang sedang dibuka tetap.
@@ -718,8 +723,29 @@ class StudentController extends Controller
                 ->with('error', collect($e->errors())->flatten()->first());
         }
 
+        $name = trim($student->first_name.' '.$student->last_name);
+        $campuses = $applications->load('university')->map(fn ($application) => optional($application->university)->name)->filter()->implode(', ');
+        $message = $name.' sudah didaftarkan ke '.$campuses.'.';
+
+        if ($validated['payment'] === ManualApplicationRegistrar::PAYMENT_MANUAL) {
+            return back()->with('success', $message.' Registration Fee ditandai lunas (transfer manual), Formulir & Dokumen siswa sudah terbuka.');
+        }
+
+        $link = $registrar->paymentLink($applications->first());
+
+        if ($link['amount'] <= 0) {
+            return back()->with('error', $message.' Registration Fee jurusannya belum diatur, jadi siswa belum bisa bayar. Atur dulu di halaman Degree & Course University Profile.');
+        }
+
+        $amount = 'Rp '.number_format($link['amount'], 0, ',', '.');
+        $waNumber = preg_replace('/^0/', '62', preg_replace('/\D/', '', (string) $validated['whatsapp']));
+        $waText = 'Halo '.$name.', pendaftaran kamu ke '.$campuses.' sudah kami buat. '
+            .'Silakan bayar Registration Fee sebesar '.$amount.($link['count'] > 1 ? ' untuk '.$link['count'].' kampus (DP 50% per kampus)' : '')
+            .' lewat link berikut: '.$link['url'];
+
         return back()
-            ->with('success', trim($student->first_name.' '.$student->last_name).' berhasil didaftarkan ke InaStudy. Formulir & dokumen bisa dibantu isi lewat tombol Progress InaStudy.');
+            ->with('success', $message.' Registration Fee yang dibayar sekarang '.$amount.'. Kirim link bayarnya ke siswa lewat tombol WhatsApp di bawah.')
+            ->with('inastudy_wa', $waNumber ? 'https://wa.me/'.$waNumber.'?text='.rawurlencode($waText) : null);
     }
 
     /** Filter Progress: '-' = belum pernah diisi (kosong). */
