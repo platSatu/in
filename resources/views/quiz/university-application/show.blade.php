@@ -54,7 +54,8 @@
     {{-- Apply beberapa kampus (18 November 2026): daftar bernomor semua kampus yang di-apply siswa ini --
          jurusan, status Registration Fee & dokumen wajib yang masih kurang per kampus. Kampus yang sedang
          dibuka ditandai; klik nama kampus lain untuk pindah. Hanya muncul kalau lebih dari 1 kampus. --}}
-    @if ($studentApplications->count() > 1)
+    @php $multiCampus = $studentApplications->count() > 1; @endphp
+    @if ($multiCampus)
         <div class="widget-content widget-content-area br-8 mb-3" style="padding:18px 22px;">
             <div class="mb-3">
                 <div class="fw-bold" style="font-size:15px;">
@@ -84,6 +85,17 @@
                                 @if ($campusApp->isCancelled())
                                     <span class="badge badge-secondary">Dibatalkan</span>
                                 @endif
+                                {{-- Ubah Kampus / Jurusan per kampus (18 November 2026): kampus yang sedang dibuka langsung buka
+                                     popup-nya; kampus lain dibuka dulu halamannya lalu popup otomatis muncul (?change=1). --}}
+                                @if ($canEdit && ! $campusApp->isCancelled())
+                                    @if ($item['change_blocked'])
+                                        <span class="text-muted small ms-auto" title="{{ $item['change_blocked'] }}"><i class="bi bi-lock"></i> Kampus/jurusan terkunci</span>
+                                    @elseif ($item['current'])
+                                        <button type="button" class="btn btn-outline-primary btn-sm ms-auto" data-bs-toggle="modal" data-bs-target="#changeCourseModal">Ubah kampus / jurusan</button>
+                                    @else
+                                        <a href="{{ route('quiz.university-application.show', $campusApp->id) }}?change=1" class="btn btn-outline-primary btn-sm ms-auto">Ubah kampus / jurusan</a>
+                                    @endif
+                                @endif
                             </div>
 
                             <div class="mt-1" style="font-size:13.5px;">
@@ -95,12 +107,34 @@
                                 <div>
                                     <span class="text-muted">Registration Fee:</span>
                                     <span @class(['badge', 'badge-success' => $item['fee'] === 'Lunas', 'badge-warning' => $item['fee'] === 'DP 50%', 'badge-secondary' => $item['fee'] === 'Belum bayar'])>{{ $item['fee'] }}</span>
+                                    @if ($item['remaining'] > 0)
+                                        <span class="ms-1">sisa <strong>Rp {{ number_format($item['remaining'], 0, ',', '.') }}</strong></span>
+                                    @endif
                                 </div>
                                 <div>
                                     <span class="text-muted">Dokumen:</span>
                                     {{ str_replace('/', ' dari ', $item['documents']) }} sudah diupload
                                 </div>
                             </div>
+
+                            {{-- Sisa Registration Fee setelah DP 50% (18 November 2026): tagih & kirim link bayar lewat WhatsApp
+                                 gateway, atau kirim ulang kalau tagihannya sudah aktif. Sama dengan "Tagih Pelunasan" di card Payment. --}}
+                            @if ($canEdit && $item['remaining'] > 0 && ! $campusApp->isCancelled() && ! $campusApp->isAwaitingUpgradePayment())
+                                <form method="POST" action="{{ route('quiz.university-application.fees.update', $campusApp->id) }}"
+                                    class="d-flex flex-wrap align-items-center gap-2 mt-2 p-2 rounded" style="background:#fff8e6; font-size:13px;">
+                                    @csrf
+                                    @if ($item['due'])
+                                        <span>Tagihan pelunasan <strong>Rp {{ number_format($item['due'], 0, ',', '.') }}</strong> sudah aktif, menunggu dibayar siswa.</span>
+                                        <button type="submit" name="balance" value="remind" class="btn btn-success btn-sm ms-auto"
+                                            onclick="return confirm('Kirim ulang link pelunasan ke WhatsApp siswa?')"><i class="bi bi-whatsapp"></i> Kirim ulang via WhatsApp</button>
+                                    @else
+                                        <span>Sisa Registration Fee <strong>Rp {{ number_format($item['remaining'], 0, ',', '.') }}</strong> belum ditagih.</span>
+                                        <input type="hidden" name="notify_wa" value="1">
+                                        <button type="submit" name="balance" value="send" class="btn btn-success btn-sm ms-auto"
+                                            onclick="return confirm('Tagih sisa Rp {{ number_format($item['remaining'], 0, ',', '.') }} dan kirim link bayarnya ke WhatsApp siswa?')"><i class="bi bi-whatsapp"></i> Tagih &amp; kirim via WhatsApp</button>
+                                    @endif
+                                </form>
+                            @endif
 
                             <div class="mt-2" style="font-size:13.5px;">
                                 @if ($item['missing']->isEmpty())
@@ -154,11 +188,14 @@
                     @endif
                     {{-- Ubah Kampus/Jurusan & Batalkan (22 Oktober 2026), aturan di ApplicationAdminService. --}}
                     @if ($canEdit && ! $application->isCancelled())
-                        @if ($changeBlockedReason)
-                            <span class="text-muted small">{{ $changeBlockedReason }}</span>
-                        @else
-                            <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changeCourseModal">Ubah Kampus / Jurusan</button>
-                        @endif
+                        {{-- Lebih dari 1 kampus: tombol Ubah ada di tiap kampus pada daftar di atas. --}}
+                        @unless ($multiCampus)
+                            @if ($changeBlockedReason)
+                                <span class="text-muted small">{{ $changeBlockedReason }}</span>
+                            @else
+                                <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#changeCourseModal">Ubah Kampus / Jurusan</button>
+                            @endif
+                        @endunless
                         @if ($canCancel)
                             <button type="button" class="btn btn-outline-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelModal">Batalkan Aplikasi</button>
                         @endif
@@ -191,6 +228,9 @@
                             </form>
                         </div>
                     </div>
+                    @if (request()->boolean('change'))
+                        <script>document.addEventListener('DOMContentLoaded', function () { bootstrap.Modal.getOrCreateInstance(document.getElementById('changeCourseModal')).show(); });</script>
+                    @endif
                     @if ($errors->hasAny(['university_id', 'degree', 'degree_intake_id', 'intake_year', 'whatsapp']))
                         <script>document.addEventListener('DOMContentLoaded', function () { bootstrap.Modal.getOrCreateInstance(document.getElementById('changeCourseModal')).show(); });</script>
                     @endif
@@ -242,6 +282,8 @@
                     </div>
                     <div class="col-md-6">
                         <table class="table table-borderless mb-0" style="font-size:14px;">
+                            {{-- Lebih dari 1 kampus: kampus & jurusan sudah tampil di daftar bernomor di atas. --}}
+                            @unless ($multiCampus)
                             <tr>
                                 <td class="text-muted" style="width:180px;">University</td>
                                 <td class="fw-bold">{{ optional($application->university)->name ?? '-' }}</td>
@@ -268,8 +310,9 @@
                                 <td class="text-muted">Degree / Intake / Duration</td>
                                 <td>{{ collect([$application->degree, $application->intake . ' ' . $application->intake_year, $application->duration])->filter()->implode(' - ') }}</td>
                             </tr>
+                            @endunless
                             <tr>
-                                <td class="text-muted">Status</td>
+                                <td class="text-muted" style="width:180px;">Status</td>
                                 <td><span class="badge badge-info text-capitalize">{{ str_replace('_', ' ', $application->status) }}</span></td>
                             </tr>
                             <tr>

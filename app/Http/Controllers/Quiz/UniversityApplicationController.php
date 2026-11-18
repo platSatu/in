@@ -196,7 +196,7 @@ class UniversityApplicationController extends Controller
         $degreeOrder = UniversityProfileDegree::DEGREES;
 
         // Semua kampus yang di-apply siswa ini (18 November 2026): pindah antar kampus, status bayar & dokumen.
-        $studentApplications = $this->studentApplicationsSummary($application);
+        $studentApplications = $this->studentApplicationsSummary($application, $admin);
 
         // Tombol "Tambah Kampus" (18 November 2026): popup yang sama dengan Add to InaStudy di menu Student,
         // jadi butuh akses kelola Student (route student.student.add-to-inastudy).
@@ -236,7 +236,7 @@ class UniversityApplicationController extends Controller
      * Registration Fee & dokumen yang masih kurang, memakai aturan yang sama dengan halaman dokumen
      * (UniversityApplication::documentTypes()). Aplikasi Cancelled tidak ikut, kecuali yang sedang dibuka.
      */
-    private function studentApplicationsSummary(UniversityApplication $application)
+    private function studentApplicationsSummary(UniversityApplication $application, ApplicationAdminService $admin)
     {
         $visibleStudentIds = DataScope::visibleStudentIds(request()->user());
 
@@ -248,7 +248,7 @@ class UniversityApplicationController extends Controller
             ->withProgressFlags()
             ->oldest('submitted_at')
             ->get()
-            ->map(function (UniversityApplication $item) use ($application) {
+            ->map(function (UniversityApplication $item) use ($application, $admin) {
                 $types = $item->documentTypes();
                 $uploaded = $item->documents()->pluck('document_type_id')->unique();
 
@@ -258,6 +258,10 @@ class UniversityApplicationController extends Controller
                     'fee' => ! $item->fee_paid ? 'Belum bayar' : ($item->registrationFeeRemaining() > 0 ? 'DP 50%' : 'Lunas'),
                     'documents' => $types->filter(fn ($type) => $uploaded->contains($type->id))->count().'/'.$types->count(),
                     'missing' => $types->filter(fn ($type) => $type->is_required && ! $uploaded->contains($type->id))->pluck('label')->values(),
+                    // Sisa Registration Fee setelah DP & tagihan pelunasan yang sedang aktif (18 November 2026).
+                    'remaining' => $item->fee_paid ? $item->registrationFeeRemaining() : 0,
+                    'due' => (int) $item->registration_fee_due,
+                    'change_blocked' => $admin->changeBlockedReason($item),
                 ];
             });
     }
@@ -319,6 +323,32 @@ class UniversityApplicationController extends Controller
             ->route('quiz.university-application.show', $id)
             ->with('success', $success)
             ->with('warning', $result['fee_warning']);
+    }
+
+    /**
+     * WhatsApp (gateway) ke siswa: link bayar sisa Registration Fee setelah DP 50% (18 November 2026).
+     *
+     * @return array{0: bool, 1: string} [terkirim?, pesan untuk admin]
+     */
+    private function sendBalanceNotice(UniversityApplication $application, int $amount): array
+    {
+        $application->loadMissing(['student', 'university']);
+        $phone = $application->whatsapp ?: ($application->student->handphone ?? null);
+
+        if (empty($phone)) {
+            return [false, 'Nomor WhatsApp siswa kosong, kirim link pembayarannya manual.'];
+        }
+
+        $name = trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) ?: 'Calon Mahasiswa';
+
+        $result = (new WhatsappMessenger())->send($phone, "Halo {$name},\n\n"
+            . 'Terima kasih sudah membayar DP Registration Fee untuk *' . optional($application->university)->name . ' - ' . $application->major_label . "* ({$application->application_no}).\n"
+            . 'Sisa Registration Fee sebesar *Rp ' . number_format($amount, 0, ',', '.') . "* sudah bisa dilunasi lewat link berikut (login dengan akun kamu):\n"
+            . route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE]));
+
+        return $result === false
+            ? [false, 'WhatsApp gagal terkirim (cek pengaturan WhatsApp Gateway). Kirim link pembayarannya manual.']
+            : [true, 'Link pembayaran terkirim ke WhatsApp '.$phone.'.'];
     }
 
     /** WhatsApp ke siswa: link halaman bayar kekurangan Registration Fee (wajib login sebagai siswa pemilik aplikasi). */
@@ -533,6 +563,19 @@ class UniversityApplicationController extends Controller
                 ->with('success', 'Registration Fee Rp '.number_format($payment->amount, 0, ',', '.').' ditandai lunas. Formulir & Upload Dokumen student sudah terbuka.');
         }
 
+        // Kirim ulang link tagihan pelunasan yang sudah aktif lewat WhatsApp gateway (18 November 2026).
+        if ($request->input('balance') === 'remind') {
+            abort_if($application->isAwaitingUpgradePayment() || $application->isCancelled(), 422);
+
+            if (! $application->registration_fee_due) {
+                return back()->withErrors(['balance' => 'Belum ada tagihan pelunasan yang aktif untuk aplikasi ini.']);
+            }
+
+            [$sent, $note] = $this->sendBalanceNotice($application, (int) $application->registration_fee_due);
+
+            return back()->with($sent ? 'success' : 'warning', $note);
+        }
+
         // Tagihan pelunasan DP 50% (12 November 2026): admin yang memutuskan dikirim atau dibatalkan.
         if ($request->filled('balance')) {
             abort_if($application->isAwaitingUpgradePayment() || $application->isCancelled(), 422);
@@ -544,6 +587,13 @@ class UniversityApplicationController extends Controller
             }
 
             $application->update(['registration_fee_due' => $send ? $remaining : null]);
+
+            // Tombol "Tagih & kirim via WhatsApp" di daftar kampus (18 November 2026): langsung kirim link bayarnya.
+            if ($send && $request->boolean('notify_wa')) {
+                [$sent, $note] = $this->sendBalanceNotice($application, $remaining);
+
+                return back()->with($sent ? 'success' : 'warning', 'Tagihan pelunasan Rp '.number_format($remaining, 0, ',', '.').' sudah aktif. '.$note);
+            }
 
             return redirect()
                 ->route('quiz.university-application.show', $id)
