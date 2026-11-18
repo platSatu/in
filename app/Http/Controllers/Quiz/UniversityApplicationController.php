@@ -58,6 +58,8 @@ class UniversityApplicationController extends Controller
         $universityId = $request->query('university_id');
         $intakeYear = $request->query('intake_year');
         $status = $request->query('status');
+        // Filter "Masih ada sisa" (18 November 2026): sudah bayar DP tapi Registration Fee belum lunas.
+        $balance = $request->query('balance');
 
         // Query manual (bukan AdminCrud::paginate()) karena butuh filter ke
         // beberapa kolom sekaligus (university_id, intake_year, status) +
@@ -71,7 +73,11 @@ class UniversityApplicationController extends Controller
         $query = UniversityApplication::with(['student', 'university', 'universityProfile'])
             ->withDocumentProgress()
             // Kolom Progress (12 November 2026): bedakan aplikasi serius dari yang coba-coba sebelum batal massal.
-            ->withProgressFlags();
+            ->withProgressFlags()
+            // Total Registration Fee yang sudah lunas, untuk menghitung sisa setelah DP 50% (18 November 2026).
+            ->withSum(['payments as fee_paid_amount' => fn ($payment) => $payment
+                ->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+                ->where('status', ApplicationPayment::STATUS_PAID)], 'amount');
 
         // FIX (15 September 2026): batasi ke aplikasi milik student yang jadi
         // cakupan user ini (lihat docblock class & DataScope::visibleStudentIds()).
@@ -91,6 +97,10 @@ class UniversityApplicationController extends Controller
 
         if (!empty($status)) {
             $query->where('status', $status);
+        }
+
+        if ($balance === 'outstanding') {
+            $this->scopeOutstandingBalance($query);
         }
 
         if (!empty($search)) {
@@ -117,6 +127,10 @@ class UniversityApplicationController extends Controller
             ->groupBy('student_id')
             ->pluck('total', 'student_id');
 
+        // Jumlah aplikasi yang masih ada sisa Registration Fee (pengingat di atas tabel).
+        $outstandingCount = $this->scopeOutstandingBalance(UniversityApplication::query()
+            ->when($visibleStudentIds !== null, fn ($q) => $q->whereIn('student_id', $visibleStudentIds)))->count();
+
         $universities = University::orderBy('name')->get();
 
         $intakeYears = UniversityApplication::whereNotNull('intake_year')
@@ -139,6 +153,8 @@ class UniversityApplicationController extends Controller
         return view('quiz.university-application.index', compact(
             'canEdit',
             'campusCounts',
+            'balance',
+            'outstandingCount',
             'data',
             'universities',
             'intakeYears',
@@ -229,6 +245,22 @@ class UniversityApplicationController extends Controller
             'registerDegreeOrder',
             'existingCampuses'
         ));
+    }
+
+    /**
+     * Aplikasi aktif yang sudah bayar Registration Fee tapi belum lunas (mis. DP 50% apply beberapa kampus):
+     * total pembayaran lunas lebih kecil dari registration_fee_amount. Sama dengan registrationFeeRemaining() > 0.
+     */
+    private function scopeOutstandingBalance($query)
+    {
+        return $query->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+            ->whereNotNull('registration_fee_amount')
+            ->whereHas('payments', fn ($payment) => $payment->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+                ->where('status', ApplicationPayment::STATUS_PAID))
+            ->whereRaw('registration_fee_amount > (select coalesce(sum(amount), 0) from application_payments where application_payments.application_id = university_applications.id and purpose = ? and status = ?)', [
+                ApplicationPayment::PURPOSE_REGISTRATION_FEE,
+                ApplicationPayment::STATUS_PAID,
+            ]);
     }
 
     /**

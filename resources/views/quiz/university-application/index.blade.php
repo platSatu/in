@@ -10,6 +10,13 @@
         </div>
     @endif
 
+    @if (session('warning'))
+        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+            {{ session('warning') }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        </div>
+    @endif
+
     @if ($errors->any())
         <div class="alert alert-warning alert-dismissible fade show" role="alert">
             <ul class="mb-0 ps-3">@foreach ($errors->all() as $error) <li>{{ $error }}</li> @endforeach</ul>
@@ -23,11 +30,11 @@
 
                 <div class="mb-4">
                     <form method="GET" action="{{ route('quiz.university-application.index') }}" class="row g-2">
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <input type="text" name="search" class="form-control"
                                 placeholder="Search application no / student name / email / phone..." value="{{ $search }}">
                         </div>
-                        <div class="col-md-3">
+                        <div class="col-md-2">
                             <select name="university_id" class="form-select">
                                 <option value="">All Universities</option>
                                 @foreach ($universities as $university)
@@ -57,11 +64,28 @@
                                 @endforeach
                             </select>
                         </div>
+                        <div class="col-md-2">
+                            {{-- 18 November 2026: aplikasi yang baru dibayar DP dan masih ada sisa Registration Fee. --}}
+                            <select name="balance" class="form-select">
+                                <option value="">Semua Pembayaran</option>
+                                <option value="outstanding" {{ $balance === 'outstanding' ? 'selected' : '' }}>Masih ada sisa (DP)</option>
+                            </select>
+                        </div>
                         <div class="col-md-1 d-grid">
                             <button type="submit" class="btn btn-outline-primary">Filter</button>
                         </div>
                     </form>
                 </div>
+
+                {{-- Pengingat sisa Registration Fee (18 November 2026). --}}
+                @if ($outstandingCount > 0 && $balance !== 'outstanding')
+                    <div class="alert alert-light-warning d-flex flex-wrap align-items-center gap-2 mb-3" style="background:#fff8e6; border:1px solid #f5d6b8;">
+                        <span><strong>{{ $outstandingCount }} aplikasi</strong> baru dibayar DP dan masih ada sisa Registration Fee.</span>
+                        <a href="{{ route('quiz.university-application.index', ['balance' => 'outstanding']) }}" class="btn btn-sm btn-warning ms-auto">Lihat &amp; tagih</a>
+                    </div>
+                @elseif ($balance === 'outstanding')
+                    <div class="small text-muted mb-3">Menampilkan aplikasi yang sudah bayar DP tapi belum lunas. Tagih sisanya lewat tombol WhatsApp di kolom Progress.</div>
+                @endif
 
                 {{-- Batal massal (22 Oktober 2026): yang sudah ada pembayaran otomatis dilewati. --}}
                 @if ($canEdit)
@@ -119,7 +143,26 @@
                                         <span class="badge badge-info text-capitalize">{{ str_replace('_', ' ', $item->status) }}</span>
                                     </td>
                                     <td class="text-nowrap" style="font-size:12px;">
-                                        @if ($item->fee_paid)
+                                        @php $feeRemaining = $item->fee_paid && $item->registration_fee_amount ? max(0, (int) $item->registration_fee_amount - (int) $item->fee_paid_amount) : 0; @endphp
+                                        @if ($item->fee_paid && $feeRemaining > 0)
+                                            {{-- DP 50% (18 November 2026): sisa & tombol tagih via WhatsApp, sama dengan di halaman detail. --}}
+                                            <span class="badge badge-warning">DP</span>
+                                            <div class="mt-1">Sisa <strong>Rp {{ number_format($feeRemaining, 0, ',', '.') }}</strong></div>
+                                            @if ($canEdit && $item->status !== \App\Models\UniversityApplication::STATUS_CANCELLED && ! $item->isAwaitingUpgradePayment())
+                                                <form method="POST" action="{{ route('quiz.university-application.fees.update', $item->id) }}" class="mt-1">
+                                                    @csrf
+                                                    @if ($item->registration_fee_due)
+                                                        <div class="text-muted">Tagihan aktif</div>
+                                                        <button type="submit" name="balance" value="remind" class="btn btn-success btn-sm py-0 px-2 mt-1" style="font-size:11px;"
+                                                            onclick="return confirm('Kirim ulang link pelunasan ke WhatsApp siswa?')"><i class="bi bi-whatsapp"></i> Kirim ulang</button>
+                                                    @else
+                                                        <input type="hidden" name="notify_wa" value="1">
+                                                        <button type="submit" name="balance" value="send" class="btn btn-success btn-sm py-0 px-2" style="font-size:11px;"
+                                                            onclick="return confirm('Tagih sisa Rp {{ number_format($feeRemaining, 0, ',', '.') }} dan kirim link bayarnya ke WhatsApp siswa?')"><i class="bi bi-whatsapp"></i> Tagih via WA</button>
+                                                    @endif
+                                                </form>
+                                            @endif
+                                        @elseif ($item->fee_paid)
                                             <span class="badge badge-success">Sudah bayar</span>
                                         @else
                                             <span class="badge bg-light text-dark border">Belum bayar</span>
@@ -152,7 +195,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="{{ $canEdit ? 12 : 11 }}" class="text-center">Belum ada aplikasi kuliah masuk.</td>
+                                    <td colspan="{{ $canEdit ? 12 : 11 }}" class="text-center">{{ $balance === 'outstanding' ? 'Tidak ada aplikasi yang masih punya sisa Registration Fee.' : 'Belum ada aplikasi kuliah masuk.' }}</td>
                                 </tr>
                             @endforelse
                         </tbody>
