@@ -11,6 +11,12 @@
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">
             {{ session('success') }}
+            @if (session('inastudy_wa'))
+                {{-- Tambah Kampus (18 November 2026): link bayar Registration Fee untuk dikirim ke siswa. --}}
+                <div class="mt-2">
+                    <a href="{{ session('inastudy_wa') }}" target="_blank" rel="noopener" class="btn btn-success btn-sm">Kirim link bayar via WhatsApp</a>
+                </div>
+            @endif
             <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
         </div>
     @endif
@@ -41,6 +47,48 @@
         </div>
     @endif
 
+    @if ($canAddCampus)
+        @include('partials.inastudy-add-campus-modal')
+    @endif
+
+    {{-- Apply beberapa kampus (18 November 2026): semua kampus yang di-apply siswa ini, klik untuk pindah.
+         Kampus yang sedang dibuka ditandai. Hanya muncul kalau siswa apply lebih dari 1 kampus. --}}
+    @if ($studentApplications->count() > 1)
+        <div class="widget-content widget-content-area br-8 mb-3" style="padding:16px 20px;">
+            <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+                <span class="fw-bold">{{ trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) }} apply {{ $studentApplications->count() }} kampus</span>
+                <span class="text-muted small">Klik kampus untuk membuka aplikasinya. Dokumen yang sama dipakai di semua kampus, tetap direview per kampus.</span>
+            </div>
+            <div class="row g-2">
+                @foreach ($studentApplications as $item)
+                    @php $campusApp = $item['application']; @endphp
+                    <div class="col-md-6 col-xl-4">
+                        <a href="{{ route('quiz.university-application.show', $campusApp->id) }}"
+                           class="d-block h-100 rounded p-3 text-decoration-none text-body"
+                           style="border: {{ $item['current'] ? '2px solid #4361ee' : '1px solid #e0e6ed' }}; background: {{ $item['current'] ? '#f4f6ff' : '#fff' }};">
+                            <div class="d-flex justify-content-between align-items-start gap-2">
+                                <div class="fw-bold" style="font-size:14px;">{{ optional($campusApp->university)->name ?? 'University (sudah dihapus)' }}</div>
+                                @if ($item['current'])
+                                    <span class="badge badge-info">Sedang dibuka</span>
+                                @elseif ($campusApp->isCancelled())
+                                    <span class="badge badge-secondary">Dibatalkan</span>
+                                @endif
+                            </div>
+                            <div class="text-muted small">{{ $campusApp->major_label }} &middot; Intake {{ $campusApp->intake_year }} &middot; {{ $campusApp->application_no }}</div>
+                            <div class="d-flex flex-wrap gap-2 mt-2 small">
+                                <span @class(['badge', 'badge-success' => $item['fee'] === 'Lunas', 'badge-warning' => $item['fee'] === 'DP 50%', 'badge-secondary' => $item['fee'] === 'Belum bayar'])>{{ $item['fee'] }}</span>
+                                <span class="text-muted">Dokumen {{ $item['documents'] }}</span>
+                            </div>
+                            <div class="small mt-1 {{ $item['missing']->isEmpty() ? 'text-success' : 'text-muted' }}">
+                                {{ $item['missing']->isEmpty() ? 'Dokumen wajib lengkap' : 'Kurang: '.$item['missing']->implode(', ') }}
+                            </div>
+                        </a>
+                    </div>
+                @endforeach
+            </div>
+        </div>
+    @endif
+
     {{-- 16 Oktober 2026: dua tab -- Detail Aplikasi (isi lama, tidak diubah) & Application Form (A4 siap print). --}}
     <ul class="nav nav-tabs mb-3" role="tablist">
         <li class="nav-item" role="presentation">
@@ -62,6 +110,16 @@
 
                 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
                     <h5 class="fw-bold mb-0 me-auto">{{ $application->application_no }}</h5>
+                    @if ($canAddCampus)
+                        {{-- Tambah kampus untuk siswa ini (18 November 2026), popup partials.inastudy-add-campus-modal. --}}
+                        <button type="button" class="btn btn-primary btn-sm"
+                            data-bs-toggle="modal" data-bs-target="#addInaStudyModal"
+                            data-add-url="{{ route('student.student.add-to-inastudy', $application->student->id) }}"
+                            data-student-name="{{ trim(($application->student->first_name ?? '').' '.($application->student->last_name ?? '')) }}"
+                            data-student-whatsapp="{{ $application->whatsapp ?: $application->student->handphone }}"
+                            data-has-account="{{ $application->student->user_id ? 1 : 0 }}"
+                            data-existing="{{ json_encode($existingCampuses) }}">+ Tambah Kampus</button>
+                    @endif
                     {{-- Ubah Kampus/Jurusan & Batalkan (22 Oktober 2026), aturan di ApplicationAdminService. --}}
                     @if ($canEdit && ! $application->isCancelled())
                         @if ($changeBlockedReason)
@@ -226,35 +284,6 @@
                     </div>
                 </div>
 
-                {{-- Apply beberapa kampus (18 November 2026): kampus lain siswa ini, status bayar & dokumen yang masih kurang. --}}
-                @if ($otherApplications->isNotEmpty())
-                    <div class="border rounded p-3 mb-4" style="background:#f8fafd;">
-                        <div class="fw-bold mb-2" style="font-size:14px;">Kampus lain siswa ini</div>
-                        <div class="table-responsive">
-                            <table class="table table-sm mb-0" style="font-size:13px;">
-                                <thead>
-                                    <tr><th>Kampus</th><th>Registration Fee</th><th>Dokumen</th><th>Masih kurang</th></tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($otherApplications as $other)
-                                        <tr>
-                                            <td>
-                                                <a href="{{ route('quiz.university-application.show', $other['application']->id) }}" class="fw-semibold">{{ optional($other['application']->university)->name ?? '-' }}</a>
-                                                <div class="text-muted small">{{ $other['application']->major_label }} &middot; {{ $other['application']->intake_year }}</div>
-                                            </td>
-                                            <td>
-                                                <span @class(['badge', 'badge-success' => $other['fee'] === 'Lunas', 'badge-warning' => $other['fee'] === 'DP', 'badge-secondary' => $other['fee'] === 'Belum bayar'])>{{ $other['fee'] }}</span>
-                                            </td>
-                                            <td>{{ $other['documents'] }}</td>
-                                            <td class="text-muted">{{ $other['missing']->isEmpty() ? 'Lengkap' : $other['missing']->implode(', ') }}</td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="text-muted small mt-2">Dokumen yang sama dari kampus lain otomatis ikut dipakai di sini (status Pending), tetap direview per kampus.</div>
-                    </div>
-                @endif
 
                 <hr>
 

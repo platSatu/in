@@ -110,6 +110,13 @@ class UniversityApplicationController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        // Apply beberapa kampus (18 November 2026): jumlah kampus aktif per student di halaman ini (penanda "2 kampus").
+        $campusCounts = UniversityApplication::whereIn('student_id', $data->pluck('student_id')->unique())
+            ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+            ->selectRaw('student_id, count(*) as total')
+            ->groupBy('student_id')
+            ->pluck('total', 'student_id');
+
         $universities = University::orderBy('name')->get();
 
         $intakeYears = UniversityApplication::whereNotNull('intake_year')
@@ -131,6 +138,7 @@ class UniversityApplicationController extends Controller
 
         return view('quiz.university-application.index', compact(
             'canEdit',
+            'campusCounts',
             'data',
             'universities',
             'intakeYears',
@@ -187,8 +195,22 @@ class UniversityApplicationController extends Controller
         $courseUniversities = $canEdit && ! $changeBlockedReason ? $registrar->options() : collect();
         $degreeOrder = UniversityProfileDegree::DEGREES;
 
-        // Ringkasan kampus lain siswa ini (18 November 2026): bayar & kelengkapan dokumen per kampus.
-        $otherApplications = $this->otherApplicationsSummary($application);
+        // Semua kampus yang di-apply siswa ini (18 November 2026): pindah antar kampus, status bayar & dokumen.
+        $studentApplications = $this->studentApplicationsSummary($application);
+
+        // Tombol "Tambah Kampus" (18 November 2026): popup yang sama dengan Add to InaStudy di menu Student,
+        // jadi butuh akses kelola Student (route student.student.add-to-inastudy).
+        $canAddCampus = $application->student && $request->user()->canAccessPermission('student.student', 'edit');
+        $registerUniversities = $canAddCampus ? $registrar->options() : collect();
+        $registerDegreeOrder = UniversityProfileDegree::DEGREES;
+        $existingCampuses = $studentApplications
+            ->reject(fn ($item) => $item['application']->isCancelled())
+            ->map(fn ($item) => [
+                'course_id' => $item['application']->degree_intake_id,
+                'intake_year' => $item['application']->intake_year,
+                'label' => (optional($item['application']->university)->name ?? '-').' - '.$item['application']->major_label,
+                'paid' => (bool) $item['application']->fee_paid,
+            ])->values();
 
         return view('quiz.university-application.show', compact(
             'application',
@@ -201,33 +223,41 @@ class UniversityApplicationController extends Controller
             'changeBlockedReason',
             'courseUniversities',
             'degreeOrder',
-            'otherApplications'
+            'studentApplications',
+            'canAddCampus',
+            'registerUniversities',
+            'registerDegreeOrder',
+            'existingCampuses'
         ));
     }
 
     /**
-     * Kampus lain (aktif) milik siswa yang sama: status bayar Registration Fee & dokumen yang masih kurang,
-     * memakai aturan yang sama dengan halaman dokumen (UniversityApplication::documentTypes()).
+     * Semua kampus aktif milik siswa yang sama (termasuk aplikasi yang sedang dibuka): status bayar
+     * Registration Fee & dokumen yang masih kurang, memakai aturan yang sama dengan halaman dokumen
+     * (UniversityApplication::documentTypes()). Aplikasi Cancelled tidak ikut, kecuali yang sedang dibuka.
      */
-    private function otherApplicationsSummary(UniversityApplication $application)
+    private function studentApplicationsSummary(UniversityApplication $application)
     {
+        $visibleStudentIds = DataScope::visibleStudentIds(request()->user());
+
         return UniversityApplication::with('university')
             ->where('student_id', $application->student_id)
-            ->whereKeyNot($application->getKey())
-            ->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+            ->where(fn ($query) => $query->where('status', '!=', UniversityApplication::STATUS_CANCELLED)
+                ->orWhereKey($application->getKey()))
+            ->when($visibleStudentIds !== null, fn ($query) => $query->whereIn('student_id', $visibleStudentIds))
             ->withProgressFlags()
-            ->latest('submitted_at')
+            ->oldest('submitted_at')
             ->get()
-            ->map(function (UniversityApplication $other) {
-                $types = $other->documentTypes();
-                $uploaded = $other->documents()->pluck('document_type_id')->unique();
-                $missing = $types->filter(fn ($type) => $type->is_required && ! $uploaded->contains($type->id));
+            ->map(function (UniversityApplication $item) use ($application) {
+                $types = $item->documentTypes();
+                $uploaded = $item->documents()->pluck('document_type_id')->unique();
 
                 return [
-                    'application' => $other,
-                    'fee' => ! $other->fee_paid ? 'Belum bayar' : ($other->registrationFeeRemaining() > 0 ? 'DP' : 'Lunas'),
+                    'application' => $item,
+                    'current' => $item->is($application),
+                    'fee' => ! $item->fee_paid ? 'Belum bayar' : ($item->registrationFeeRemaining() > 0 ? 'DP 50%' : 'Lunas'),
                     'documents' => $types->filter(fn ($type) => $uploaded->contains($type->id))->count().'/'.$types->count(),
-                    'missing' => $missing->pluck('label')->values(),
+                    'missing' => $types->filter(fn ($type) => $type->is_required && ! $uploaded->contains($type->id))->pluck('label')->values(),
                 ];
             });
     }
