@@ -478,6 +478,7 @@ class UniversityApplicationController extends Controller
 
         if ($documentType->allows_multiple) {
             (new MultipleDocumentUploader())->add($application, $documentType, $validated['document'], trim($validated['title']), $request->user()->id, 'document');
+            $this->notifyStudentOfInaDocument($application, $documentType, $documentType->label.': '.trim($validated['title']));
 
             return redirect()
                 ->route('quiz.university-application.show', $id)
@@ -530,6 +531,8 @@ class UniversityApplicationController extends Controller
             ]
         );
         });
+
+        $this->notifyStudentOfInaDocument($application, $documentType, $documentType->label);
 
         // Sama dengan upload oleh siswa (ApplicationDocumentController): dokumen yang sama langsung dipakai juga
         // di kampus lain siswa ini yang memintanya (status Pending, tetap direview per kampus).
@@ -866,6 +869,31 @@ class UniversityApplicationController extends Controller
         $this->assertVisibleApplication($request->user(), $application);
 
         return ApplicationFiles::response($application->formDetail?->photo_path);
+    }
+
+    /**
+     * Notifikasi Card 4 (20 November 2026): hanya untuk dokumen dari INA (Documents from InaStudy).
+     * Dikirim setelah halaman selesai merespons (pola sama dengan upload student), jadi upload admin
+     * tidak melambat dan kegagalan kirim tidak menggagalkan upload.
+     */
+    private function notifyStudentOfInaDocument(UniversityApplication $application, DocumentType $documentType, string $label): void
+    {
+        if (! $documentType->isAdminProvided()) {
+            return;
+        }
+
+        $applicationId = $application->id;
+
+        app()->terminating(function () use ($applicationId, $label) {
+            try {
+                $fresh = UniversityApplication::with(['student', 'university'])->find($applicationId);
+                if ($fresh) {
+                    app(\App\Services\InaStudy\DocumentNotifier::class)->inaDocumentUploaded($fresh, $label);
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
     }
 
     /**

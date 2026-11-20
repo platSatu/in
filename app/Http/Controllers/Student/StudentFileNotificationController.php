@@ -55,6 +55,8 @@ class StudentFileNotificationController extends Controller
             'complete_notify_student' => ['boolean'],
             'complete_notify_admin' => ['boolean'],
             'upload_confirm_student' => ['boolean'],
+            'ina_document_notify_whatsapp' => ['boolean'],
+            'ina_document_notify_email' => ['boolean'],
         ], [
             'admin_whatsapp_numbers.required' => 'Isi minimal 1 nomor WhatsApp admin, atau matikan saklarnya.',
             'admin_whatsapp_numbers.*.regex' => 'Nomor WhatsApp admin tidak valid. Contoh: 081234567890.',
@@ -86,6 +88,8 @@ class StudentFileNotificationController extends Controller
             'complete_notify_student' => $request->boolean('complete_notify_student'),
             'complete_notify_admin' => $request->boolean('complete_notify_admin'),
             'upload_confirm_student' => $request->boolean('upload_confirm_student'),
+            'ina_document_notify_whatsapp' => $request->boolean('ina_document_notify_whatsapp'),
+            'ina_document_notify_email' => $request->boolean('ina_document_notify_email'),
             'updated_by' => $request->user()->id,
         ]);
 

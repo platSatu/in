@@ -227,6 +227,41 @@
             </div>
         </div>
 
+        {{-- ================= Card 4: dokumen dari INA (20 November 2026) ================= --}}
+        <div class="card mb-4">
+            <div class="card-body p-4">
+                <h5 class="mb-1"><i class="bi bi-file-earmark-arrow-down"></i> Info ke Student saat Admin Upload Dokumen dari INA</h5>
+                <p class="text-muted small mb-4">
+                    Student langsung diberi tahu setiap kali admin mengunggah dokumen di bagian <b>Documents from InaStudy</b>
+                    (mis. Admission Letter, Visa Application JW202/JW201, Visa X1/X2, Any Documents).
+                </p>
+
+                <div class="border rounded p-3 mb-3">
+                    <div class="form-check form-switch">
+                        <input type="hidden" name="ina_document_notify_whatsapp" value="0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="ina_document_notify_whatsapp" name="ina_document_notify_whatsapp" value="1" @checked($on('ina_document_notify_whatsapp'))>
+                        <label class="form-check-label fw-bold" for="ina_document_notify_whatsapp">Kirim lewat WhatsApp student</label>
+                    </div>
+                </div>
+
+                <div class="border rounded p-3">
+                    <div class="form-check form-switch">
+                        <input type="hidden" name="ina_document_notify_email" value="0">
+                        <input class="form-check-input" type="checkbox" role="switch" id="ina_document_notify_email" name="ina_document_notify_email" value="1" @checked($on('ina_document_notify_email'))>
+                        <label class="form-check-label fw-bold" for="ina_document_notify_email">Kirim lewat Email student</label>
+                    </div>
+                </div>
+
+                <div class="bg-light rounded p-3 mt-3 small">
+                    <div class="fw-bold mb-1">Contoh pesan:</div>
+                    Hai Kak Budi 👋<br>
+                    Ada dokumen baru dari Tim INA Study untuk pendaftaran Kakak di Peking University: <b>Admission Letter</b><br>
+                    Silakan dilihat &amp; diunduh di sini: <span class="text-primary">[link aplikasi student]</span><br>
+                    Kalau ada pertanyaan, balas pesan ini ya, kami siap bantu!
+                </div>
+            </div>
+        </div>
+
         </fieldset>
 
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">

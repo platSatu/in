@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  *  - reminder_*     : pengingat ke student yang dokumennya belum lengkap (Card 2)
  *  - complete_*     : pesan saat semua dokumen wajib sudah lengkap (Card 3)
  *  - upload_confirm_student : konfirmasi ke student setiap kali upload (Card 3)
+ *  - ina_document_notify_*  : info ke student saat admin upload dokumen dari INA (Card 4)
  */
 class DocumentNotificationSetting extends Model
 {
@@ -42,6 +43,9 @@ class DocumentNotificationSetting extends Model
         'complete_notify_student',
         'complete_notify_admin',
         'upload_confirm_student',
+        // Card 4 (20 November 2026): info ke student saat admin upload dokumen dari INA.
+        'ina_document_notify_whatsapp',
+        'ina_document_notify_email',
         'updated_by',
     ];
 
@@ -58,6 +62,8 @@ class DocumentNotificationSetting extends Model
         'complete_notify_student' => 'boolean',
         'complete_notify_admin' => 'boolean',
         'upload_confirm_student' => 'boolean',
+        'ina_document_notify_whatsapp' => 'boolean',
+        'ina_document_notify_email' => 'boolean',
     ];
 
     public static function current(): self

@@ -190,6 +190,47 @@ class DocumentNotifier
         }
     }
 
+    /**
+     * Card 4 (20 November 2026): info ke student saat admin mengunggah dokumen dari INA
+     * (bagian "Documents from InaStudy", mis. Admission Letter, Visa). Kanal WhatsApp & email
+     * diatur sendiri-sendiri di tab Notifikasi. Dicatat dengan tipe "ina_document".
+     */
+    public function inaDocumentUploaded(UniversityApplication $application, string $document): void
+    {
+        $setting = DocumentNotificationSetting::current();
+
+        if (! $setting->ina_document_notify_whatsapp && ! $setting->ina_document_notify_email) {
+            return;
+        }
+
+        $application->loadMissing(['student', 'university']);
+        $name = $this->firstName($application);
+        $place = $application->university?->name ?? 'kampus pilihan Kakak';
+        $url = route('student-portal.applications.show', $application->id);
+
+        if ($setting->ina_document_notify_whatsapp && ($phone = $this->studentPhone($application))) {
+            $this->sendWhatsapp($phone, "Hai Kak {$name} 👋\n\n"
+                ."Ada dokumen baru dari Tim INA Study untuk pendaftaran Kakak di {$place}:\n*{$document}*\n\n"
+                ."Silakan dilihat & diunduh di sini:\n{$url}\n\n"
+                .'Kalau ada pertanyaan, balas pesan ini ya, kami siap bantu!', 'ina_document', $application->id);
+        }
+
+        if ($setting->ina_document_notify_email && ($email = $application->student?->email)) {
+            $this->sendEmail($email, new DocumentNotificationMail(
+                "Dokumen baru dari INA Study: {$document}",
+                [
+                    "Hai Kak {$name} 👋",
+                    "Ada dokumen baru dari Tim INA Study untuk pendaftaran Kakak di {$place}:",
+                    '• '.$document,
+                    'Silakan dilihat & diunduh lewat tombol di bawah.',
+                    'Kalau ada pertanyaan, balas email ini ya, kami siap bantu!',
+                ],
+                $url,
+                'Lihat Dokumen',
+            ), 'ina_document', $application->id);
+        }
+    }
+
     /** Sudah pernah terkirim (minimal 1 kanal berhasil) untuk aplikasi & tipe ini? */
     public function alreadySent(string $applicationId, string $type): bool
     {
