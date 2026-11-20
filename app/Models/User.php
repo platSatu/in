@@ -94,6 +94,22 @@ class User extends Authenticatable implements MustVerifyEmail
             ->exists();
     }
 
+    /**
+     * Kwitansi pembayaran Aplikasi Kuliah (20 November 2026): role Sales tidak boleh melihat/mengelola,
+     * role lain boleh. User yang juga superadmin tetap boleh. Role Sales dikenali dari slug/nama "sales".
+     */
+    public function canAccessPaymentReceipt(): bool
+    {
+        if ($this->hasRole('superadmin')) {
+            return true;
+        }
+
+        return ! $this->roles()
+            ->where('roles.status', Role::STATUS_ACTIVE)
+            ->where(fn ($query) => $query->whereRaw('LOWER(slug) = ?', ['sales'])->orWhereRaw('LOWER(name) = ?', ['sales']))
+            ->exists();
+    }
+
     public function divisions(): BelongsToMany
     {
         return $this->belongsToMany(

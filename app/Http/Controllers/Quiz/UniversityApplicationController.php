@@ -210,6 +210,8 @@ class UniversityApplicationController extends Controller
         $changeBlockedReason = $canEdit ? $admin->changeBlockedReason($application) : null;
         $courseUniversities = $canEdit && ! $changeBlockedReason ? $registrar->options() : collect();
         $degreeOrder = UniversityProfileDegree::DEGREES;
+        // Kwitansi pembayaran disembunyikan dari role Sales (20 November 2026).
+        $canSeeReceipt = $request->user()->canAccessPaymentReceipt();
 
         // Semua kampus yang di-apply siswa ini (18 November 2026): pindah antar kampus, status bayar & dokumen.
         $studentApplications = $this->studentApplicationsSummary($application, $admin);
@@ -239,6 +241,7 @@ class UniversityApplicationController extends Controller
             'changeBlockedReason',
             'courseUniversities',
             'degreeOrder',
+            'canSeeReceipt',
             'studentApplications',
             'canAddCampus',
             'registerUniversities',
@@ -666,6 +669,7 @@ class UniversityApplicationController extends Controller
     {
         $application = UniversityApplication::findOrFail($id);
         $this->assertVisibleApplication($request->user(), $application);
+        abort_unless($request->user()->canAccessPaymentReceipt(), 403);
 
         $request->validate([
             'payment_receipt' => 'nullable|file|max:5120|mimes:jpg,jpeg,png,pdf',
@@ -706,6 +710,7 @@ class UniversityApplicationController extends Controller
     {
         $application = UniversityApplication::with('student')->findOrFail($id);
         $this->assertVisibleApplication($request->user(), $application);
+        abort_unless($request->user()->canAccessPaymentReceipt(), 403);
 
         return $this->downloadFile(
             $application->payment_receipt_path,

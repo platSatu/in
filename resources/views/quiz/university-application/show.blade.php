@@ -524,7 +524,8 @@
                     @endif
                 </div>
 
-                {{-- Kwitansi pembayaran (20 November 2026): upload bukti bayar jpg/png/pdf, opsional. --}}
+                {{-- Kwitansi pembayaran (20 November 2026): upload bukti bayar jpg/png/pdf, opsional. Tidak tampil untuk role Sales. --}}
+                @if ($canSeeReceipt)
                 <div class="row g-3 mb-3">
                     <div class="col-md-6">
                         <label class="form-label" style="font-size:13px;">Kwitansi Pembayaran <span class="text-muted">(opsional)</span></label>
@@ -559,6 +560,7 @@
                         @endif
                     </div>
                 </div>
+                @endif
 
                 <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="row g-3 mb-4">
                     @csrf
