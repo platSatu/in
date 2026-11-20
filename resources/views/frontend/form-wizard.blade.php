@@ -258,6 +258,41 @@
             color: #333a4d;
         }
 
+        /* Navigasi nomor soal (20 November 2026) -- hanya terpakai kalau Form::question_nav_enabled aktif.
+           Card dilebarkan HANYA saat step soal tampil (class ditambah lewat showStep()). */
+        /* overflow: clip (bukan hidden) supaya panel nomor tetap menempel (sticky) saat halaman di-scroll. */
+        .wizard-card.quiz-nav-wide { max-width: 1040px; overflow: clip; }
+        .quiz-nav-layout { display: flex; gap: 24px; align-items: flex-start; }
+        .quiz-nav-main { flex: 1 1 auto; min-width: 0; }
+        .quiz-nav-panel {
+            flex: 0 0 230px; position: sticky; top: 16px;
+            background: #f8f9fc; border: 1px solid #e3e8f2; border-radius: 14px; padding: 14px;
+            max-height: calc(100vh - 32px); overflow-y: auto;
+        }
+        .quiz-nav-title { font-weight: 700; font-size: 14px; color: #333a4d; margin-bottom: 4px; }
+        .quiz-nav-summary { font-size: 12px; color: #6c757d; margin-bottom: 10px; }
+        .quiz-nav-section-label { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .03em;
+            color: #6c757d; margin: 10px 0 6px; }
+        .quiz-nav-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+        .quiz-nav-btn {
+            height: 34px; border-radius: 8px; border: 1px solid #d5dbe7; background: #fff; color: #333a4d;
+            font-weight: 700; font-size: 13px; padding: 0; cursor: pointer; transition: all .15s;
+        }
+        .quiz-nav-btn:hover { border-color: var(--brand); color: var(--brand); }
+        .quiz-nav-btn.is-answered { background: var(--brand); border-color: var(--brand); color: #fff; }
+        .quiz-nav-btn.is-current { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--brand); }
+        .quiz-nav-btn.is-error { background: #fdecec; border-color: #dc3545; color: #dc3545; }
+        .quiz-nav-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: #6c757d; margin-top: 12px; }
+        .quiz-nav-legend span { display: inline-flex; align-items: center; gap: 5px; }
+        .quiz-nav-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid #d5dbe7; background: #fff; }
+        .quiz-nav-legend i.done { background: var(--brand); border-color: var(--brand); }
+        .question-card.quiz-nav-flash { box-shadow: 0 0 0 3px var(--brand); transition: box-shadow .3s; }
+        @media (max-width: 991px) {
+            .quiz-nav-layout { flex-direction: column-reverse; }
+            .quiz-nav-panel { position: static; width: 100%; flex-basis: auto; max-height: none; }
+            .quiz-nav-grid { grid-template-columns: repeat(auto-fill, minmax(38px, 1fr)); }
+        }
+
         .question-number {
             background: var(--brand);
             color: white;
@@ -948,6 +983,14 @@
                         </div>
                     @endif
 
+                    {{-- Navigasi nomor soal (opsional per Form, default off): kalau aktif, isi step ini dibungkus
+                         2 kolom -- kiri pertanyaan (markup lama, tidak diubah), kanan panel nomor yang diisi JS. --}}
+                    @php $questionNavEnabled = $selectedForm && $selectedForm->question_nav_enabled && $placementTestQuestions->count() > 0; @endphp
+                    @if($questionNavEnabled)
+                        <div class="quiz-nav-layout">
+                        <div class="quiz-nav-main">
+                    @endif
+
                     @if($selectedForm && $placementTestQuestions->count() > 0)
                         @if($placementTestGroups->isNotEmpty())
                             {{--
@@ -997,6 +1040,20 @@
                             Next <i class="bi bi-arrow-right"></i>
                         </button>
                     </div>
+
+                    @if($questionNavEnabled)
+                        </div>{{-- /.quiz-nav-main --}}
+                        <aside class="quiz-nav-panel" id="quizNavPanel" aria-label="Navigasi nomor soal">
+                            <div class="quiz-nav-title"><i class="bi bi-grid-3x3-gap"></i> Nomor Soal</div>
+                            <div class="quiz-nav-summary" id="quizNavSummary"></div>
+                            <div id="quizNavList"></div>
+                            <div class="quiz-nav-legend">
+                                <span><i class="done"></i> Sudah dijawab</span>
+                                <span><i></i> Belum</span>
+                            </div>
+                        </aside>
+                        </div>{{-- /.quiz-nav-layout --}}
+                    @endif
 
                 </div>
 
@@ -1201,6 +1258,12 @@
             return;
         }
 
+        // Navigasi nomor soal memungkinkan peserta melompati section, jadi sebelum lanjut ke Review
+        // semua section dicek ulang (soal wajib yang terlewat di section lain tetap tertangkap).
+        if (questionNavEnabled && sectionGroups.length > 1 && !validateAllSectionsForNav()) {
+            return;
+        }
+
         nextStep();
     }
 
@@ -1211,6 +1274,123 @@
         }
 
         prevStep();
+    }
+
+    // === NAVIGASI NOMOR SOAL (opsional, 20 November 2026) =========================
+    // Hanya aktif kalau Form::question_nav_enabled = true. Panel kanan dibangun dari kartu
+    // pertanyaan UTAMA (data-depth="0") yang sudah ada di #step-questions -- markup soal,
+    // penyimpanan jawaban, timer & submit tidak diubah sama sekali. Pertanyaan bercabang
+    // (nested) tidak diberi nomor sendiri karena selalu tampil di bawah soal induknya.
+    const questionNavEnabled = {{ !empty($questionNavEnabled) ? 'true' : 'false' }};
+    let questionNavItems = [];
+
+    function buildQuestionNav() {
+        const list = document.getElementById('quizNavList');
+        if (!questionNavEnabled || !list) return;
+
+        const groups = sectionGroups.length ? sectionGroups : [document.getElementById('step-questions')];
+        list.innerHTML = '';
+        questionNavItems = [];
+
+        groups.forEach(function (groupEl, groupIndex) {
+            const cards = Array.from(groupEl.querySelectorAll('.question-card[data-depth="0"]'));
+            if (!cards.length) return;
+
+            if (sectionGroups.length > 1) {
+                const header = groupEl.querySelector('.quiz-section-header h5');
+                const label = document.createElement('div');
+                label.className = 'quiz-nav-section-label';
+                label.textContent = header ? header.textContent.trim() : ('Section ' + (groupIndex + 1));
+                list.appendChild(label);
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'quiz-nav-grid';
+            cards.forEach(function (card, i) {
+                const numberEl = card.querySelector('.question-number');
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'quiz-nav-btn';
+                btn.textContent = numberEl ? numberEl.textContent.trim() : String(i + 1);
+                btn.title = 'Menuju soal ' + btn.textContent;
+                btn.addEventListener('click', function () { goToQuestion(card, groupIndex); });
+                grid.appendChild(btn);
+                questionNavItems.push({ card: card, button: btn, groupIndex: groupIndex });
+            });
+            list.appendChild(grid);
+        });
+
+        refreshQuestionNav();
+    }
+
+    function refreshQuestionNav() {
+        if (!questionNavEnabled || !questionNavItems.length) return;
+        let answered = 0;
+        questionNavItems.forEach(function (item) {
+            const done = isQuestionAnswered(item.card);
+            if (done) answered++;
+            item.button.classList.toggle('is-answered', done);
+            item.button.classList.toggle('is-error', !done && item.card.classList.contains('has-error'));
+        });
+        const summary = document.getElementById('quizNavSummary');
+        if (summary) summary.textContent = answered + ' dari ' + questionNavItems.length + ' soal sudah dijawab';
+    }
+
+    function setCurrentQuestionNav(card) {
+        questionNavItems.forEach(function (item) {
+            item.button.classList.toggle('is-current', item.card === card);
+        });
+    }
+
+    function goToQuestion(card, groupIndex) {
+        if (sectionGroups.length > 1 && groupIndex !== currentSectionGroupIndex) {
+            showSectionGroup(groupIndex);
+        }
+        setCurrentQuestionNav(card);
+        // Ditunda sedikit supaya scroll ke soal tidak tertimpa scroll ke atas dari showSectionGroup().
+        setTimeout(function () {
+            card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            card.classList.add('quiz-nav-flash');
+            setTimeout(function () { card.classList.remove('quiz-nav-flash'); }, 1200);
+        }, 60);
+    }
+
+    // Cek section satu per satu; berhenti & tampilkan section pertama yang masih ada soal wajib kosong.
+    function validateAllSectionsForNav() {
+        const lastIndex = currentSectionGroupIndex;
+        for (let i = 0; i < sectionGroups.length; i++) {
+            if (i === lastIndex) continue; // section aktif sudah divalidasi questionsStepNext()
+            sectionGroups.forEach(function (el, j) { el.classList.toggle('d-none', j !== i); });
+            currentSectionGroupIndex = i;
+            refreshNestedQuestionVisibility();
+            if (!validateQuestionsStep('step-questions')) {
+                updateSectionProgressLabel();
+                refreshQuestionNav();
+                return false;
+            }
+        }
+        sectionGroups.forEach(function (el, j) { el.classList.toggle('d-none', j !== lastIndex); });
+        currentSectionGroupIndex = lastIndex;
+        refreshNestedQuestionVisibility();
+        updateSectionProgressLabel();
+        return true;
+    }
+
+    if (questionNavEnabled) {
+        const questionsStepEl = document.getElementById('step-questions');
+        if (questionsStepEl) {
+            ['change', 'input'].forEach(function (evt) {
+                questionsStepEl.addEventListener(evt, function () { refreshQuestionNav(); });
+            });
+            questionsStepEl.addEventListener('focusin', function (e) {
+                const card = e.target.closest('.question-card[data-depth="0"]');
+                if (card) setCurrentQuestionNav(card);
+            });
+        }
+        document.addEventListener('DOMContentLoaded', buildQuestionNav);
+        if (document.readyState !== 'loading') buildQuestionNav();
+        // Jawaban yang dipulihkan dari progress tersimpan diisi tanpa event, jadi warna nomor disegarkan lagi.
+        window.addEventListener('load', function () { setTimeout(refreshQuestionNav, 300); });
     }
 
     let paymentInitiated = false;
@@ -1270,6 +1450,13 @@
             if (infoBackBtn) {
                 infoBackBtn.classList.toggle('d-none', index === 0);
             }
+        }
+
+        // Navigasi nomor soal: card dilebarkan hanya saat step soal tampil (form lain tidak terpengaruh).
+        if (questionNavEnabled) {
+            const wizardCardEl = document.querySelector('.wizard-card');
+            if (wizardCardEl) wizardCardEl.classList.toggle('quiz-nav-wide', stepId === 'step-questions');
+            if (stepId === 'step-questions') refreshQuestionNav();
         }
 
         if (stepId === 'step-payment' && !paymentInitiated) {

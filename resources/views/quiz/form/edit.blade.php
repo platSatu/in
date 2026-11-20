@@ -304,6 +304,23 @@
                         </div>
                     </div>
 
+                    {{-- Navigasi nomor soal (20 November 2026): opsional, default off = tampilan quiz seperti biasa. --}}
+                    <div class="row mb-4">
+                        <div class="col-sm-12">
+                            <label class="mb-2 d-block">Navigasi Nomor Soal</label>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch" id="question_nav_enabled"
+                                    name="question_nav_enabled" value="1" {{ old('question_nav_enabled', $data->question_nav_enabled) ? 'checked' : '' }}>
+                                <label class="form-check-label" for="question_nav_enabled">
+                                    Tampilkan panel nomor soal di samping pertanyaan
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Kalau aktif, halaman soal dibagi 2: kiri pertanyaan, kanan nomor soal. Peserta bisa klik nomor untuk langsung menuju soal itu (termasuk soal di Section lain), dan nomor yang sudah dijawab berubah warna. Kalau tidak aktif, tampilan tetap seperti sekarang.
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="row mb-4">
                         <div class="col-sm-4">
                             <label class="mb-2 d-block">Timer Placement Test</label>

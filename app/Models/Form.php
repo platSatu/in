@@ -51,6 +51,8 @@ class Form extends Model
         'timer_duration_minutes',
         'timer_auto_save',
         'timer_auto_restart',
+        // Navigasi nomor soal di halaman quiz peserta (20 November 2026), default off.
+        'question_nav_enabled',
     ];
 
     protected $casts = [
@@ -68,6 +70,7 @@ class Form extends Model
         'timer_duration_minutes' => 'integer',
         'timer_auto_save' => 'boolean',
         'timer_auto_restart' => 'boolean',
+        'question_nav_enabled' => 'boolean',
         'section_fail_threshold' => 'integer',
         'section_pass_threshold' => 'integer',
     ];

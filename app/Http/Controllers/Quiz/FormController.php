@@ -493,6 +493,7 @@ class FormController extends Controller
             'timer_duration_minutes' => 'nullable|required_if:timer_enabled,1|integer|min:1|max:600',
             'timer_auto_save' => 'nullable|boolean',
             'timer_auto_restart' => 'nullable|boolean',
+            'question_nav_enabled' => 'nullable|boolean',
         ]);
 
         $validated['pre_test_notice'] = $this->sanitizeNoticeHtml($validated['pre_test_notice'] ?? null);
@@ -526,6 +527,8 @@ class FormController extends Controller
         $validated = $this->applySectionThresholdFields($validated);
 
         $validated = $this->applyTimerFields($request, $validated);
+        // Navigasi nomor soal (20 November 2026): checkbox tidak terkirim = off.
+        $validated['question_nav_enabled'] = $request->boolean('question_nav_enabled');
 
         $userId = Auth::id();
         if ($userId === null) {
@@ -672,6 +675,7 @@ class FormController extends Controller
             'timer_duration_minutes' => 'nullable|required_if:timer_enabled,1|integer|min:1|max:600',
             'timer_auto_save' => 'nullable|boolean',
             'timer_auto_restart' => 'nullable|boolean',
+            'question_nav_enabled' => 'nullable|boolean',
         ]);
 
         $validated['pre_test_notice'] = $this->sanitizeNoticeHtml($validated['pre_test_notice'] ?? null);
@@ -703,6 +707,8 @@ class FormController extends Controller
         $validated = $this->applySectionThresholdFields($validated);
 
         $validated = $this->applyTimerFields($request, $validated);
+        // Navigasi nomor soal (20 November 2026): checkbox tidak terkirim = off.
+        $validated['question_nav_enabled'] = $request->boolean('question_nav_enabled');
 
         $validated['status'] = $validated['status'] ?? $existing->status;
 
@@ -993,6 +999,7 @@ class FormController extends Controller
                 'timer_duration_minutes',
                 'timer_auto_save',
                 'timer_auto_restart',
+                'question_nav_enabled',
             ]);
 
             $newFormData['user_id'] = (string) $userId;
