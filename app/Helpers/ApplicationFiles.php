@@ -19,6 +19,8 @@ class ApplicationFiles
 {
     public const DOCUMENTS = 'applications/documents';
     public const FORM_PHOTOS = 'applications/form-photos';
+    // Kwitansi pembayaran yang diupload admin di card Payment (20 November 2026).
+    public const PAYMENT_RECEIPTS = 'applications/payment-receipts';
 
     private const INLINE_EXTENSIONS = ['pdf', 'jpg', 'jpeg', 'png', 'webp', 'gif'];
 
@@ -39,8 +41,8 @@ class ApplicationFiles
     /** Path absolut file, atau null kalau path tidak sah / file tidak ada. */
     public static function path(?string $relativePath): ?string
     {
-        // Hanya nama file di dua folder ini; menolak "..", subfolder, atau path lain.
-        if (! $relativePath || ! preg_match('#^applications/(documents|form-photos)/[A-Za-z0-9._-]+$#', $relativePath)) {
+        // Hanya nama file di folder-folder ini; menolak "..", subfolder, atau path lain.
+        if (! $relativePath || ! preg_match('#^applications/(documents|form-photos|payment-receipts)/[A-Za-z0-9._-]+$#', $relativePath)) {
             return null;
         }
 

@@ -524,6 +524,42 @@
                     @endif
                 </div>
 
+                {{-- Kwitansi pembayaran (20 November 2026): upload bukti bayar jpg/png/pdf, opsional. --}}
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label" style="font-size:13px;">Kwitansi Pembayaran <span class="text-muted">(opsional)</span></label>
+                        @if ($application->payment_receipt_path)
+                            <div class="border rounded p-2 mb-2 d-flex flex-wrap align-items-center gap-2" style="font-size:13px;">
+                                <i class="bi bi-file-earmark-check text-success"></i>
+                                <span class="text-truncate" style="max-width:260px;">{{ $application->payment_receipt_name ?: 'Kwitansi' }}</span>
+                                <a href="{{ route('quiz.university-application.payment-receipt', $application->id) }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">Lihat</a>
+                                <a href="{{ route('quiz.university-application.payment-receipt', [$application->id, 'download' => 1]) }}" class="btn btn-outline-secondary btn-sm">Download</a>
+                                @if ($canEdit)
+                                    <form method="POST" action="{{ route('quiz.university-application.payment-receipt.update', $application->id) }}" class="d-inline">
+                                        @csrf
+                                        <input type="hidden" name="remove_payment_receipt" value="1">
+                                        <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('Hapus kwitansi pembayaran ini?')">Hapus</button>
+                                    </form>
+                                @endif
+                            </div>
+                        @elseif (! $canEdit)
+                            <input type="text" class="form-control" disabled value="Belum ada kwitansi">
+                        @endif
+
+                        @if ($canEdit)
+                            <form method="POST" action="{{ route('quiz.university-application.payment-receipt.update', $application->id) }}" enctype="multipart/form-data" class="d-flex gap-2">
+                                @csrf
+                                <input type="file" name="payment_receipt" accept=".jpg,.jpeg,.png,.pdf" class="form-control @error('payment_receipt') is-invalid @enderror" required>
+                                <button type="submit" class="btn btn-primary btn-sm text-nowrap">{{ $application->payment_receipt_path ? 'Ganti' : 'Upload' }}</button>
+                            </form>
+                            @error('payment_receipt')
+                                <div class="text-danger mt-1" style="font-size:12px;">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text" style="font-size:12px;">Format JPG, PNG, atau PDF, maksimal 5 MB.</div>
+                        @endif
+                    </div>
+                </div>
+
                 <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="row g-3 mb-4">
                     @csrf
                     <div class="col-md-6">

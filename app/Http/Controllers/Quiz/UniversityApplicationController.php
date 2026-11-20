@@ -659,6 +659,64 @@ class UniversityApplicationController extends Controller
     }
 
     /**
+     * Upload / ganti / hapus kwitansi pembayaran (jpg, png, pdf; opsional) di card Payment (20 November 2026).
+     * File disimpan privat (ApplicationFiles::PAYMENT_RECEIPTS), dibuka lewat route payment-receipt.
+     */
+    public function updatePaymentReceipt(Request $request, string $id): RedirectResponse
+    {
+        $application = UniversityApplication::findOrFail($id);
+        $this->assertVisibleApplication($request->user(), $application);
+
+        $request->validate([
+            'payment_receipt' => 'nullable|file|max:5120|mimes:jpg,jpeg,png,pdf',
+            'remove_payment_receipt' => 'nullable|boolean',
+        ], [
+            'payment_receipt.mimes' => 'Kwitansi harus berformat JPG, PNG, atau PDF.',
+            'payment_receipt.max' => 'Ukuran kwitansi maksimal 5 MB.',
+        ]);
+
+        if ($request->hasFile('payment_receipt')) {
+            $file = $request->file('payment_receipt');
+            $originalName = $file->getClientOriginalName();
+            $path = ApplicationFiles::store($file, ApplicationFiles::PAYMENT_RECEIPTS);
+            $oldPath = $application->payment_receipt_path;
+
+            $application->update([
+                'payment_receipt_path' => $path,
+                'payment_receipt_name' => Str::limit($originalName, 250, ''),
+            ]);
+            ApplicationFiles::delete($oldPath);
+
+            return back()->with('success', 'Kwitansi pembayaran berhasil diupload.');
+        }
+
+        if ($request->boolean('remove_payment_receipt') && $application->payment_receipt_path) {
+            $oldPath = $application->payment_receipt_path;
+            $application->update(['payment_receipt_path' => null, 'payment_receipt_name' => null]);
+            ApplicationFiles::delete($oldPath);
+
+            return back()->with('success', 'Kwitansi pembayaran dihapus.');
+        }
+
+        return back()->with('warning', 'Tidak ada file kwitansi yang dipilih.');
+    }
+
+    /** Lihat kwitansi pembayaran (PDF/gambar dibuka di browser; ?download=1 untuk unduh). */
+    public function paymentReceipt(Request $request, string $id)
+    {
+        $application = UniversityApplication::with('student')->findOrFail($id);
+        $this->assertVisibleApplication($request->user(), $application);
+
+        return $this->downloadFile(
+            $application->payment_receipt_path,
+            $application->student,
+            'kwitansi-'.$application->application_no,
+            $application->payment_receipt_name,
+            ! $request->boolean('download')
+        );
+    }
+
+    /**
      * Admin isi/ubah Application No (manual) & data paspor student aplikasi
      * ini (13 Oktober 2026). Disimpan ke data Student (Student::savePassport),
      * jadi langsung ikut tampil di tab Progress Student. Boleh dikosongkan.

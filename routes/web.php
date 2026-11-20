@@ -782,6 +782,7 @@ Route::middleware(['auth', 'permission:quiz.university-application'])->prefix('d
     Route::get('/{id}/documents/{documentId}/download', [UniversityApplicationController::class, 'downloadDocument'])->name('quiz.university-application.documents.download');
     Route::get('/{id}/documents/history/{historyId}/download', [UniversityApplicationController::class, 'downloadDocumentHistory'])->name('quiz.university-application.documents.history.download');
     Route::get('/{id}/form-photo', [UniversityApplicationController::class, 'formPhoto'])->name('quiz.university-application.form-photo');
+    Route::get('/{id}/payment-receipt', [UniversityApplicationController::class, 'paymentReceipt'])->name('quiz.university-application.payment-receipt');
 });
 
 // Ability 'edit' -- superadmin approve/reject dokumen & upload dokumen atas
@@ -798,6 +799,7 @@ Route::middleware(['auth', 'permission:quiz.university-application,edit'])->pref
     // pernah bisa membayar (ApplicationPaymentController::init() menolak
     // nominal kosong/0).
     Route::post('/{id}/fees', [UniversityApplicationController::class, 'updateFees'])->name('quiz.university-application.fees.update');
+    Route::post('/{id}/payment-receipt', [UniversityApplicationController::class, 'updatePaymentReceipt'])->name('quiz.university-application.payment-receipt.update');
     // Application No (manual) & data paspor student, 13 Oktober 2026.
     Route::post('/{id}/passport', [UniversityApplicationController::class, 'updatePassport'])->name('quiz.university-application.passport.update');
     // FASE 4 -- admin update manual admission_status (UNDER REVIEW diset

@@ -74,6 +74,9 @@ class UniversityApplication extends Model
         'registration_fee_due',
         'registration_fee_paid_at',
         'deposit_fee_china_amount',
+        // Kwitansi pembayaran (jpg/png/pdf, opsional) diupload admin di card Payment (20 November 2026).
+        'payment_receipt_path',
+        'payment_receipt_name',
         'status',
         'cancel_reason',
         // FIX (10 September 2026): lihat catatan ADMISSION_STATUS_* di atas.
