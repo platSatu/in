@@ -42,6 +42,7 @@ class CourseClassController extends Controller
             'name' => ['required', 'string', 'max:255', Rule::unique('course_class', 'name')],
             'description' => ['nullable', 'string', 'max:2000'],
             'teacher_fee' => ['required', 'numeric', 'min:0', 'max:999999999'],
+            'honor_mode' => ['required', Rule::in(array_keys(CourseClass::HONOR_MODES))],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
 
@@ -70,6 +71,7 @@ class CourseClassController extends Controller
             'name' => ['required', 'string', 'max:255', Rule::unique('course_class', 'name')->ignore($id)],
             'description' => ['nullable', 'string', 'max:2000'],
             'teacher_fee' => ['required', 'numeric', 'min:0', 'max:999999999'],
+            'honor_mode' => ['required', Rule::in(array_keys(CourseClass::HONOR_MODES))],
             'status' => ['required', Rule::in(['active', 'inactive'])],
         ]);
 

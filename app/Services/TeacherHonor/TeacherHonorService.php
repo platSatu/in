@@ -3,6 +3,7 @@
 namespace App\Services\TeacherHonor;
 
 use App\Models\ClassSession;
+use App\Models\CourseClass;
 use App\Models\CompanyBranch;
 use App\Models\TeacherHonor;
 use App\Models\TeacherHonorPeriod;
@@ -99,13 +100,21 @@ class TeacherHonorService
                     ];
                 }
 
+                // Honor per kelas: Per Kelas = fee (cara lama), Per Jam = fee x total credit (1 credit = 1 jam).
+                foreach ($classes as &$class) {
+                    $class['honor'] = $class['honor_mode'] === CourseClass::HONOR_PER_HOUR
+                        ? round($class['fee'] * $class['credit_total'], 2)
+                        : $class['fee'];
+                }
+                unset($class);
+
                 $classes = collect($classes)->sortBy(fn (array $class) => $class['class_name'].'|'.$class['owner'])->values()->all();
 
                 return [
                     'teacher_user_id' => $teacherId,
                     'teacher_name' => $teacherSessions->first()->teacher?->name ?? '-',
                     'class_count' => count($classes),
-                    'honor_amount' => (float) array_sum(array_column($classes, 'fee')),
+                    'honor_amount' => (float) array_sum(array_column($classes, 'honor')),
                     'classes' => $classes,
                     'honor' => null,
                 ];
@@ -386,6 +395,7 @@ class TeacherHonorService
             'package' => $package?->name ?? '-',
             'class_name' => $package?->courseClass?->name ?? '-',
             'fee' => (float) ($package?->courseClass?->teacher_fee ?? 0),
+            'honor_mode' => $package?->courseClass?->honor_mode ?? CourseClass::HONOR_PER_CLASS,
         ];
     }
 

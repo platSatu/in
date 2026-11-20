@@ -42,8 +42,19 @@
                 @enderror
             </div>
 
+            {{-- Cara hitung honor (20 November 2026): Per Kelas = cara lama, Per Jam = fee x jam (1 credit = 1 jam). --}}
             <div class="mb-3">
-                <label class="form-label">Fee Pengajar (Rp)</label>
+                <label class="form-label">Cara Hitung Honor</label>
+                <select name="honor_mode" class="form-select @error('honor_mode') is-invalid @enderror">
+                    @foreach (\App\Models\CourseClass::HONOR_MODES as $mode => $label)
+                        <option value="{{ $mode }}" @selected(old('honor_mode', \App\Models\CourseClass::HONOR_PER_CLASS) === $mode)>{{ $label }}</option>
+                    @endforeach
+                </select>
+                <div class="form-text">Per Kelas: fee di bawah dibayar sekali per kelas per periode. Per Jam: fee di bawah dikali total jam mengajar (1 credit disetujui = 1 jam).</div>
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label">Fee Pengajar (Rp per kelas / per jam)</label>
 
                 <div class="input-group">
                     <span class="input-group-text">Rp</span>

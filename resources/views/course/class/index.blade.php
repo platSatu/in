@@ -78,7 +78,7 @@
                                 </td>
 
                                 <td class="text-nowrap">
-                                    Rp {{ number_format((float) $item->teacher_fee, 0, ',', '.') }}
+                                    Rp {{ number_format((float) $item->teacher_fee, 0, ',', '.') }}{{ $item->honor_mode === \App\Models\CourseClass::HONOR_PER_HOUR ? ' / jam' : ' / kelas' }}
                                 </td>
 
                                 <td>
