@@ -347,6 +347,9 @@ class FormController extends Controller
 
                 $messenger->send($submission->student->handphone, $message, $form->user_id);
 
+                // Forward hasil yang sama ke nomor tim (kalau diisi di form ini).
+                $messenger->forwardResult($form, $message, $submission->student);
+
                 $waSent = true;
             }
         }
@@ -494,6 +497,7 @@ class FormController extends Controller
             'timer_auto_save' => 'nullable|boolean',
             'timer_auto_restart' => 'nullable|boolean',
             'question_nav_enabled' => 'nullable|boolean',
+            'whatsapp_forward_numbers' => 'nullable|string|max:1000',
         ]);
 
         $validated['pre_test_notice'] = $this->sanitizeNoticeHtml($validated['pre_test_notice'] ?? null);
@@ -529,6 +533,7 @@ class FormController extends Controller
         $validated = $this->applyTimerFields($request, $validated);
         // Navigasi nomor soal (20 November 2026): checkbox tidak terkirim = off.
         $validated['question_nav_enabled'] = $request->boolean('question_nav_enabled');
+        $validated['whatsapp_forward_numbers'] = $this->normalizeForwardNumbers($validated['whatsapp_forward_numbers'] ?? null);
 
         $userId = Auth::id();
         if ($userId === null) {
@@ -676,6 +681,7 @@ class FormController extends Controller
             'timer_auto_save' => 'nullable|boolean',
             'timer_auto_restart' => 'nullable|boolean',
             'question_nav_enabled' => 'nullable|boolean',
+            'whatsapp_forward_numbers' => 'nullable|string|max:1000',
         ]);
 
         $validated['pre_test_notice'] = $this->sanitizeNoticeHtml($validated['pre_test_notice'] ?? null);
@@ -709,6 +715,7 @@ class FormController extends Controller
         $validated = $this->applyTimerFields($request, $validated);
         // Navigasi nomor soal (20 November 2026): checkbox tidak terkirim = off.
         $validated['question_nav_enabled'] = $request->boolean('question_nav_enabled');
+        $validated['whatsapp_forward_numbers'] = $this->normalizeForwardNumbers($validated['whatsapp_forward_numbers'] ?? null);
 
         $validated['status'] = $validated['status'] ?? $existing->status;
 
@@ -814,6 +821,23 @@ class FormController extends Controller
         }
 
         return $collect;
+    }
+
+    /**
+     * Forward hasil WA (20 November 2026): rapikan daftar nomor jadi "62xxx, 62xxx".
+     * Nomor yang formatnya salah ditolak dengan pesan error, bukan dibuang diam-diam.
+     */
+    private function normalizeForwardNumbers(?string $raw): ?string
+    {
+        $parsed = Form::parseWhatsappNumbers((string) $raw);
+
+        if ($parsed['invalid']) {
+            throw \Illuminate\Validation\ValidationException::withMessages([
+                'whatsapp_forward_numbers' => 'Nomor WhatsApp tidak valid: '.implode(', ', $parsed['invalid']).'. Gunakan format 08xx, 62xx atau +62xx.',
+            ]);
+        }
+
+        return $parsed['valid'] ? implode(', ', $parsed['valid']) : null;
     }
 
     private function applyTimerFields(Request $request, array $validated): array
@@ -1000,6 +1024,7 @@ class FormController extends Controller
                 'timer_auto_save',
                 'timer_auto_restart',
                 'question_nav_enabled',
+                'whatsapp_forward_numbers',
             ]);
 
             $newFormData['user_id'] = (string) $userId;

@@ -137,6 +137,43 @@ class WhatsappMessenger
      *
      * @return array|false
      */
+    /**
+     * Forward hasil WA ke nomor tim yang diisi di Form (whatsapp_forward_numbers, 20 November 2026).
+     * Isinya pesan yang sama dengan yang diterima siswa, ditambah data peserta di atasnya.
+     * Gagal kirim ke satu nomor tidak menghentikan nomor lain maupun proses submit.
+     *
+     * @return int jumlah nomor yang dicoba dikirimi
+     */
+    public function forwardResult(Form $form, string $message, $student = null): int
+    {
+        $numbers = $form->whatsappForwardNumbers();
+        if (! $numbers) {
+            return 0;
+        }
+
+        $name = $student ? trim(($student->first_name ?? '').' '.($student->last_name ?? '')) : '';
+        $header = "*[FORWARD] {$form->name}*\n"
+            .'Peserta: '.($name !== '' ? $name : '-')."\n"
+            .'No WA: '.($student->handphone ?? '-')."\n"
+            .'Email: '.($student->email ?? '-')."\n"
+            ."--------------------\n";
+
+        $sent = 0;
+        foreach ($numbers as $number) {
+            try {
+                $this->send($number, $header.$message, $form->user_id);
+                $sent++;
+            } catch (\Throwable $e) {
+                Log::error('[WA-FORWARD] Gagal forward ke 1 nomor (nomor lain tetap lanjut)', [
+                    'form_id' => $form->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        return $sent;
+    }
+
     public function send(string $phone, string $message, ?string $userId = null)
     {
         try {

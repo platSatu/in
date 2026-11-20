@@ -1113,6 +1113,9 @@ class FrontendController extends Controller
                 $this->sendWhatsapp($student->handphone, $message, $form->user_id);
                 Log::info('[FORM-WIZARD] sendWhatsapp selesai tanpa exception');
 
+                // Forward pesan yang sama ke nomor tim (kalau diisi di form ini, 20 November 2026).
+                (new \App\Services\Whatsapp\WhatsappMessenger())->forwardResult($form, $message, $student);
+
                 // Tandai kapan hasil (auto ATAU section_threshold) ini terkirim via WA
                 // (dipakai konsisten dengan FormController::saveResult() untuk mode
                 // manual, supaya semua mode sama-sama punya jejak waktu pengiriman).

@@ -53,6 +53,8 @@ class Form extends Model
         'timer_auto_restart',
         // Navigasi nomor soal di halaman quiz peserta (20 November 2026), default off.
         'question_nav_enabled',
+        // Forward hasil WA ke nomor lain (20 November 2026), dipisah koma. Kosong = tidak ada forward.
+        'whatsapp_forward_numbers',
     ];
 
     protected $casts = [
@@ -206,5 +208,50 @@ class Form extends Model
             ->where(function ($q) use ($now) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', $now);
             });
+    }
+
+    /**
+     * Nomor WA tujuan forward hasil (20 November 2026), sudah dinormalisasi ke format 62xxx.
+     * Kosong = tidak ada forward, perilaku lama tidak berubah.
+     *
+     * @return array<int, string>
+     */
+    public function whatsappForwardNumbers(): array
+    {
+        return self::parseWhatsappNumbers((string) $this->whatsapp_forward_numbers)['valid'];
+    }
+
+    /**
+     * Pecah input nomor (dipisah koma, titik koma atau baris baru; spasi/strip di dalam nomor diabaikan) lalu normalisasi
+     * 08xx / +62xx / 62xx menjadi 62xx. Dipakai juga oleh FormController untuk validasi.
+     *
+     * @return array{valid: array<int, string>, invalid: array<int, string>}
+     */
+    public static function parseWhatsappNumbers(string $raw): array
+    {
+        $valid = [];
+        $invalid = [];
+
+        foreach (preg_split('/[,;\r\n]+/', $raw, -1, PREG_SPLIT_NO_EMPTY) as $item) {
+            $digits = preg_replace('/\D/', '', $item);
+            $item = trim($item);
+            if ($item === '') {
+                continue;
+            }
+            if (str_starts_with($digits, '0')) {
+                $digits = '62'.substr($digits, 1);
+            } elseif (str_starts_with($digits, '8')) {
+                $digits = '62'.$digits;
+            }
+
+            if (strlen($digits) < 9 || strlen($digits) > 15) {
+                $invalid[] = $item;
+                continue;
+            }
+
+            $valid[$digits] = $digits;
+        }
+
+        return ['valid' => array_values($valid), 'invalid' => $invalid];
     }
 }

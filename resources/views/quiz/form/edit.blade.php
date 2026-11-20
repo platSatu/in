@@ -187,6 +187,16 @@
                             @error('whatsapp_template_id')
                                 <div class="invalid-feedback">{{ $message }}</div>
                             @enderror
+
+                            {{-- Forward hasil (20 November 2026): pesan yang diterima peserta ikut dikirim ke nomor-nomor ini. --}}
+                            <label for="whatsapp_forward_numbers" class="mb-2 mt-3">Forward Hasil ke Nomor WA <span class="text-muted">(opsional)</span></label>
+                            <textarea class="form-control @error('whatsapp_forward_numbers') is-invalid @enderror" rows="2"
+                                id="whatsapp_forward_numbers" name="whatsapp_forward_numbers"
+                                placeholder="Contoh: 081234567890, 6281298765432">{{ old('whatsapp_forward_numbers', $data->whatsapp_forward_numbers) }}</textarea>
+                            @error('whatsapp_forward_numbers')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                            <div class="form-text">Setiap peserta menerima hasil via WhatsApp, pesan yang sama (ditambah nama, No WA &amp; email peserta) ikut dikirim ke nomor ini. Pisahkan beberapa nomor dengan koma. Kosongkan kalau tidak perlu forward.</div>
                         </div>
                     </div>
 
