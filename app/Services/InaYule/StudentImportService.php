@@ -17,7 +17,9 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
+use Carbon\Carbon;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -39,7 +41,8 @@ class StudentImportService
 {
     public const MAX_ROWS = 2000;
 
-    public const COLUMNS = ['nama_murid', 'email', 'no_hp', 'pengajar', 'paket', 'sisa_credit', 'sisa_saldo'];
+    // join_by_date (20 November 2026): tanggal murid bergabung di sistem lama, syarat voucher murid lama.
+    public const COLUMNS = ['nama_murid', 'email', 'no_hp', 'pengajar', 'paket', 'sisa_credit', 'sisa_saldo', 'join_by_date'];
 
     private const SALDO_METHOD = 'import';
 
@@ -89,6 +92,7 @@ class StudentImportService
         $students = [];
 
         foreach ($rows as $line => $row) {
+            $row += ['join_by_date' => '']; // pratinjau yang dibuat sebelum kolom ini ada
             $errors = [];
             $notes = [];
             $email = mb_strtolower($row['email']);
@@ -132,6 +136,11 @@ class StudentImportService
                 }
             }
 
+            $joinDate = $this->joinDate($row['join_by_date']);
+            if ($row['join_by_date'] !== '' && $joinDate === null) {
+                $errors[] = 'join_by_date tidak dikenali. Pakai format 2024-03-15 atau 15/03/2024 (tidak boleh tanggal ke depan).';
+            }
+
             $saldo = $this->number($row['sisa_saldo'], true);
             if ($row['sisa_saldo'] !== '' && ($saldo === null || $saldo < 0)) {
                 $errors[] = 'Sisa saldo harus angka 0 atau lebih (tanpa titik/Rp).';
@@ -149,8 +158,9 @@ class StudentImportService
             }
 
             if (! $errors) {
-                $students[$email] ??= ['email' => $email, 'name' => $row['nama_murid'], 'phone' => $phone, 'teacher_id' => null, 'packages' => [], 'saldo' => 0.0, 'lines' => []];
+                $students[$email] ??= ['email' => $email, 'name' => $row['nama_murid'], 'phone' => $phone, 'teacher_id' => null, 'packages' => [], 'saldo' => 0.0, 'join_by_date' => null, 'lines' => []];
                 $students[$email]['phone'] ??= $phone;
+                $students[$email]['join_by_date'] ??= $joinDate;
                 $students[$email]['teacher_id'] ??= $teacherId;
                 $students[$email]['saldo'] += (float) $saldo;
                 if ($packageId) {
@@ -159,7 +169,7 @@ class StudentImportService
                 $students[$email]['lines'][] = $line;
             }
 
-            $result[$line] = $row + ['errors' => $errors, 'notes' => $notes, 'email_key' => $email];
+            $result[$line] = $row + ['errors' => $errors, 'notes' => $notes, 'email_key' => $email, 'join_date_label' => $joinDate ? Carbon::parse($joinDate)->translatedFormat('d M Y') : null];
         }
 
         // Cek terhadap data yang sudah ada (InaStudy/InaYule): akun, murid, import sebelumnya.
@@ -193,7 +203,7 @@ class StudentImportService
      */
     public function import(array $students, ?string $branchId, string $adminId): array
     {
-        $summary = ['created' => 0, 'linked' => 0, 'packages' => 0, 'saldo' => 0, 'failed' => []];
+        $summary = ['created' => 0, 'linked' => 0, 'packages' => 0, 'saldo' => 0, 'join' => 0, 'failed' => []];
         $studentRoleId = Role::firstOrCreate(['slug' => 'student'], ['name' => 'Student', 'status' => Role::STATUS_ACTIVE])->id;
 
         foreach ($students as $email => $plan) {
@@ -235,6 +245,14 @@ class StudentImportService
                     }
                     if ($plan['teacher_id']) {
                         $student->teacher_user_id = $plan['teacher_id'];
+                    }
+                    // join_by_date (20 November 2026): diisi hanya kalau masih kosong (data lama tidak ditimpa). Murid lama
+                    // yang baru tercatat tanggal join-nya otomatis boleh memakai voucher; switch yang sudah diubah admin
+                    // tidak disentuh lagi saat import ulang.
+                    if (($plan['join_by_date'] ?? null) && ! $student->join_by_date) {
+                        $student->join_by_date = $plan['join_by_date'];
+                        $student->voucher_eligible = true;
+                        $summary['join']++;
                     }
                     $student->save();
 
@@ -288,10 +306,11 @@ class StudentImportService
     {
         $book = new Spreadsheet();
         $sheet = $book->getActiveSheet()->setTitle('Import Murid');
-        $sheet->fromArray([self::COLUMNS, ['Budi Santoso', 'budi@contoh.com', '081234567890', '', '', 6, 150000]]);
+        $sheet->fromArray([self::COLUMNS, ['Budi Santoso', 'budi@contoh.com', '081234567890', '', '', 6, 150000, '2024-03-15']]);
         $sheet->getStyle('C:C')->getNumberFormat()->setFormatCode('@');
-        $sheet->getStyle('A1:G1')->getFont()->setBold(true);
-        foreach (['A' => 24, 'B' => 28, 'C' => 16, 'D' => 20, 'E' => 38, 'F' => 12, 'G' => 14] as $col => $width) {
+        $sheet->getStyle('H:H')->getNumberFormat()->setFormatCode('@');
+        $sheet->getStyle('A1:H1')->getFont()->setBold(true);
+        foreach (['A' => 24, 'B' => 28, 'C' => 16, 'D' => 20, 'E' => 38, 'F' => 12, 'G' => 14, 'H' => 14] as $col => $width) {
             $sheet->getColumnDimension($col)->setWidth($width);
         }
 
@@ -316,6 +335,7 @@ class StudentImportService
             ['paket', 'Wajib bila ada sisa credit. Salin dari sheet Daftar Paket. 2 paket = 2 baris dengan email sama.'],
             ['sisa_credit', 'Sisa credit paket itu, angka (boleh desimal, mis. 1.5).'],
             ['sisa_saldo', 'Opsional. Sisa saldo dalam Rupiah, angka saja. Isi SEKALI per murid.'],
+            ['join_by_date', 'Opsional. Tanggal murid bergabung, format 2024-03-15 atau 15/03/2024. Murid yang punya tanggal ini otomatis boleh memakai Voucher Paket (switch "Bisa pakai voucher" ON). Murid tanpa paket juga boleh diisi baris ini saja.'],
             ['', 'Hapus baris contoh sebelum upload. Sebelum disimpan, sistem menampilkan pratinjau & baris yang bermasalah.'],
         ]);
         $help->getColumnDimension('A')->setWidth(14);
@@ -380,6 +400,35 @@ class StudentImportService
         }
 
         return $out;
+    }
+
+    /** join_by_date dari Excel: tanggal Excel (angka) atau teks 2024-03-15 / 15/03/2024 / 15-03-2024 -> "Y-m-d". */
+    private function joinDate(string $value): ?string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return null;
+        }
+
+        try {
+            if (is_numeric($value) && (float) $value > 1000 && (float) $value < 100000) {
+                $date = Carbon::instance(ExcelDate::excelToDateTimeObject((float) $value));
+            } else {
+                $date = null;
+                foreach (['Y-m-d', 'd/m/Y', 'd-m-Y', 'Y/m/d', 'd.m.Y'] as $format) {
+                    $parsed = \DateTime::createFromFormat('!'.$format, $value);
+                    $warnings = \DateTime::getLastErrors();
+                    if ($parsed && (! $warnings || ($warnings['warning_count'] === 0 && $warnings['error_count'] === 0))) {
+                        $date = Carbon::instance($parsed);
+                        break;
+                    }
+                }
+            }
+        } catch (Throwable) {
+            $date = null;
+        }
+
+        return $date && $date->year >= 1990 && ! $date->isFuture() ? $date->format('Y-m-d') : null;
     }
 
     /** 0812.., 62812.., +62 812.., 812.. -> 0812..; selain nomor HP Indonesia -> null. */

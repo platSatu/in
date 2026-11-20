@@ -56,7 +56,7 @@
             <div class="widget-content widget-content-area br-8">
 
                 <form method="GET" action="{{ route('course.student.index') }}" class="row g-2 mb-4">
-                    <div class="col-md-5">
+                    <div class="col-md-3">
                         <input type="text" name="search" class="form-control" maxlength="100"
                             placeholder="Cari nama, email, atau HP murid..." value="{{ $filters['search'] }}">
                     </div>
@@ -73,6 +73,13 @@
                             <option value="">-- Semua Credit --</option>
                             <option value="low" @selected(($filters['credit'] ?? null) === 'low')>Hampir habis (≤ {{ $lowCredit }})</option>
                             <option value="empty" @selected(($filters['credit'] ?? null) === 'empty')>Habis</option>
+                        </select>
+                    </div>
+                    <div class="col-md-2">
+                        <select name="voucher" class="form-select">
+                            <option value="">-- Semua Voucher --</option>
+                            <option value="on" @selected(($filters['voucher'] ?? null) === 'on')>Bisa pakai voucher</option>
+                            <option value="off" @selected(($filters['voucher'] ?? null) === 'off')>Tidak bisa</option>
                         </select>
                     </div>
                     <div class="col-md-2 d-flex gap-2">
@@ -94,6 +101,8 @@
                                 <th class="text-end">Sisa Credit</th>
                                 <th class="text-end">Sisa Saldo</th>
                                 <th>Aktivitas Terakhir</th>
+                                <th>Join</th>
+                                <th>Bisa Pakai Voucher</th>
                                 <th class="text-end">Aksi</th>
                             </tr>
                         </thead>
@@ -120,11 +129,25 @@
                                     </td>
                                     <td class="text-end text-nowrap">Rp {{ number_format($student->deposit_balance, 0, ',', '.') }}</td>
                                     <td class="text-nowrap small">{{ $student->last_activity ? \Illuminate\Support\Carbon::parse($student->last_activity)->translatedFormat('d M Y, H:i') : '-' }}</td>
+                                    <td class="text-nowrap small">{{ $student->join_by_date?->translatedFormat('d M Y') ?? '-' }}</td>
+                                    <td>
+                                        {{-- Switch voucher (20 November 2026): langsung tersimpan saat diklik. --}}
+                                        <form method="POST" action="{{ route('course.student.voucher', $student->id) }}" class="m-0">
+                                            @csrf
+                                            @method('PUT')
+                                            <input type="hidden" name="voucher_eligible" value="0">
+                                            <div class="form-check form-switch mb-0">
+                                                <input class="form-check-input" type="checkbox" role="switch" name="voucher_eligible" value="1"
+                                                    title="Bisa pakai voucher paket" @checked($student->voucher_eligible) @disabled(! $canEdit)
+                                                    onchange="this.form.submit()">
+                                            </div>
+                                        </form>
+                                    </td>
                                     <td class="text-end"><a href="{{ route('course.student.show', $student->id) }}" class="btn btn-sm btn-outline-primary">Detail</a></td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="8" class="text-center text-muted py-4">
+                                    <td colspan="10" class="text-center text-muted py-4">
                                         {{ array_filter($filters) ? 'Tidak ada murid yang cocok dengan filter.' : 'Belum ada murid yang punya paket InaYule.' }}
                                     </td>
                                 </tr>
@@ -151,7 +174,8 @@
                 </div>
                 <div class="modal-body">
                     <p class="small text-muted">
-                        Kolom: <b>nama_murid</b>, <b>email</b>, no_hp, pengajar, paket, sisa_credit, sisa_saldo.
+                        Kolom: <b>nama_murid</b>, <b>email</b>, no_hp, pengajar, paket, sisa_credit, sisa_saldo, join_by_date.
+                        Murid yang punya <b>join_by_date</b> otomatis bisa memakai Voucher Paket.
                         Nama paket & pengajar salin dari sheet di <a href="{{ route('course.student.import.template') }}">contoh Excel</a>.
                         Setelah upload, Anda melihat pratinjau dulu; data baru disimpan setelah dikonfirmasi.
                     </p>

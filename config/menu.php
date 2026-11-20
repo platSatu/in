@@ -108,6 +108,8 @@ return [
     // 13 November 2026: murid InaYule (punya paket) + sisa credit/saldo, pengajar tetap & riwayatnya.
     // Lihat App\Http\Controllers\Course\CourseStudentController.
     ['key' => 'course.student', 'label' => 'Student InaYule', 'route' => 'course.student.index', 'group' => 'Course', 'icon' => 'list'],
+    // 20 November 2026: voucher diskon beli paket credit InaYule. Lihat App\Http\Controllers\Course\CourseVoucherController.
+    ['key' => 'course.voucher', 'label' => 'Voucher Paket', 'route' => 'course.voucher.index', 'group' => 'Course', 'icon' => 'list'],
     // FASE 2 bagian 2 & Fase 3 (16 September 2026) -- sisi admin/manager
     // dari alur "Pengajuan Pemakaian Credit" & "Honor Pengajar". Sempat
     // dijadikan grup terpisah 'Kredit & Honor', tapi atas permintaan owner

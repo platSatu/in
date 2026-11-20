@@ -85,6 +85,7 @@ use App\Http\Controllers\Course\CoursePackageController;
 use App\Http\Controllers\Course\CourseReportController;
 use App\Http\Controllers\Course\CourseStudentController;
 use App\Http\Controllers\Course\CourseTypeController;
+use App\Http\Controllers\Course\CourseVoucherController;
 use App\Http\Controllers\Payment\FormPaymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -1186,12 +1187,26 @@ Route::middleware(['auth', 'permission:course.report'])->prefix('dashboard/super
 });
 
 // Student InaYule (13 November 2026): daftar & detail murid yang punya paket; edit = ganti pengajar tetap.
+// Course > Voucher Paket (20 November 2026): voucher diskon beli paket credit InaYule. Lihat CourseVoucherController.
+Route::middleware(['auth', 'permission:course.voucher'])->prefix('dashboard/superadmin/course/voucher')->group(function () {
+    Route::get('/', [CourseVoucherController::class, 'index'])->name('course.voucher.index');
+});
+Route::middleware(['auth', 'permission:course.voucher,edit'])->prefix('dashboard/superadmin/course/voucher')->group(function () {
+    Route::get('/create', [CourseVoucherController::class, 'create'])->name('course.voucher.create');
+    Route::post('/', [CourseVoucherController::class, 'store'])->name('course.voucher.store');
+    Route::get('/{id}/edit', [CourseVoucherController::class, 'edit'])->whereUuid('id')->name('course.voucher.edit');
+    Route::put('/{id}', [CourseVoucherController::class, 'update'])->whereUuid('id')->name('course.voucher.update');
+    Route::delete('/{id}', [CourseVoucherController::class, 'destroy'])->whereUuid('id')->name('course.voucher.destroy');
+});
+
 Route::middleware(['auth', 'permission:course.student'])->prefix('dashboard/superadmin/course/student')->group(function () {
     Route::get('/', [CourseStudentController::class, 'index'])->name('course.student.index');
     Route::get('/{id}', [CourseStudentController::class, 'show'])->whereUuid('id')->name('course.student.show');
 });
 Route::middleware(['auth', 'permission:course.student,edit'])->prefix('dashboard/superadmin/course/student')->group(function () {
     Route::put('/{id}/teacher', [CourseStudentController::class, 'updateTeacher'])->whereUuid('id')->name('course.student.teacher');
+    // Switch "Bisa pakai voucher" per murid (20 November 2026).
+    Route::put('/{id}/voucher', [CourseStudentController::class, 'updateVoucherEligible'])->whereUuid('id')->name('course.student.voucher');
     // Import murid dari sistem lama: contoh Excel -> pratinjau -> simpan.
     Route::get('/import/contoh', [CourseStudentController::class, 'importTemplate'])->name('course.student.import.template');
     Route::post('/import', [CourseStudentController::class, 'importPreview'])->middleware('throttle:10,1')->name('course.student.import.preview');

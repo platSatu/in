@@ -22,9 +22,35 @@
                 <div class="alert alert-danger">{{ session('error') }}</div>
             @endif
 
+            {{-- Voucher Paket (20 November 2026): pratinjau harga lewat GET, kuota baru dipakai saat Bayar Sekarang. --}}
+            <form method="GET" action="{{ route('inayule.checkout.show', $package->id) }}" class="mb-3">
+                <label class="form-label small text-muted mb-1">Punya kode voucher?</label>
+                <div class="input-group">
+                    <input type="text" name="voucher" maxlength="50" class="form-control text-uppercase" placeholder="Masukkan kode voucher"
+                        value="{{ $voucherCode }}" autocomplete="off">
+                    <button class="btn btn-outline-primary">Pakai</button>
+                    @if ($voucherCode !== '')
+                        <a href="{{ route('inayule.checkout.show', $package->id) }}" class="btn btn-outline-secondary" title="Hapus voucher">&times;</a>
+                    @endif
+                </div>
+                @if ($voucherResult)
+                    <div @class(['small mt-1', 'text-success' => $voucherResult['ok'], 'text-danger' => ! $voucherResult['ok']])>{{ $voucherResult['message'] }}</div>
+                @endif
+            </form>
+
             <div class="mb-4">
+                @if ($voucherResult && $voucherResult['ok'])
+                    <div class="d-flex justify-content-between py-1 text-muted">
+                        <span>Harga Package</span>
+                        <span class="text-decoration-line-through">Rp {{ number_format($originalPrice, 0, ',', '.') }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between py-1 text-success">
+                        <span>Diskon Voucher {{ $voucherResult['voucher']->code }}</span>
+                        <span>- Rp {{ number_format($voucherResult['discount'], 0, ',', '.') }}</span>
+                    </div>
+                @endif
                 <div class="d-flex justify-content-between py-1">
-                    <span>Harga Package</span>
+                    <span>{{ $voucherResult && $voucherResult['ok'] ? 'Harga Setelah Diskon' : 'Harga Package' }}</span>
                     <span class="fw-bold">Rp {{ number_format($price, 0, ',', '.') }}</span>
                 </div>
                 <div class="d-flex justify-content-between py-1 text-muted">
@@ -56,8 +82,11 @@
                 </p>
             @endif
 
-            <form method="POST" action="{{ route('inayule.checkout.store', $package->id) }}">
+            <form method="POST" action="{{ route('inayule.checkout.store', $package->id) }}" onsubmit="this.querySelector('[type=submit]').disabled = true;">
                 @csrf
+                @if ($voucherResult && $voucherResult['ok'])
+                    <input type="hidden" name="voucher_code" value="{{ $voucherResult['voucher']->code }}">
+                @endif
                 <div class="d-flex gap-2">
                     <button type="submit" class="btn btn-primary" @disabled($gatewayMissing)>Bayar Sekarang</button>
                     <a href="{{ route('inayule.index') }}#beli" class="btn btn-outline-secondary">Batal</a>

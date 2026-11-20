@@ -43,6 +43,7 @@ class CourseStudentController extends Controller
             'search' => ['nullable', 'string', 'max:100'],
             'teacher' => ['nullable', 'uuid'],
             'credit' => ['nullable', Rule::in(['low', 'empty'])],
+            'voucher' => ['nullable', Rule::in(['on', 'off'])],
         ]);
         $search = trim((string) ($filters['search'] ?? ''));
 
@@ -58,6 +59,8 @@ class CourseStudentController extends Controller
             ->when(($filters['credit'] ?? null) === 'empty', fn (Builder $q) => $q->where($this->latestCreditBalance(), '<=', 0))
             ->when(($filters['credit'] ?? null) === 'low', fn (Builder $q) => $q->where($this->latestCreditBalance(), '>', 0)
                 ->where($this->latestCreditBalance(), '<=', self::LOW_CREDIT))
+            ->when(($filters['voucher'] ?? null) === 'on', fn (Builder $q) => $q->where('voucher_eligible', true))
+            ->when(($filters['voucher'] ?? null) === 'off', fn (Builder $q) => $q->where('voucher_eligible', false))
             ->orderByDesc('last_activity')
             ->paginate(20)
             ->withQueryString();
@@ -137,6 +140,19 @@ class CourseStudentController extends Controller
         return back()->with('success', 'Pengajar tetap diperbarui.');
     }
 
+    /** Switch "Bisa pakai voucher" per murid (Voucher Paket, 20 November 2026). */
+    public function updateVoucherEligible(Request $request, string $id): RedirectResponse
+    {
+        $student = $this->students($request)->findOrFail($id);
+        $student->forceFill(['voucher_eligible' => $request->boolean('voucher_eligible')])->save();
+
+        $name = trim($student->first_name.' '.$student->last_name);
+
+        return back()->with('success', $student->voucher_eligible
+            ? "{$name} sekarang bisa memakai voucher paket."
+            : "{$name} tidak bisa memakai voucher paket (khusus voucher murid yang diizinkan).");
+    }
+
     /** Contoh Excel import (berisi daftar paket & pengajar dari sistem). */
     public function importTemplate(StudentImportService $import): StreamedResponse
     {
@@ -185,7 +201,7 @@ class CourseStudentController extends Controller
         $students = $import->plan($pending['rows'])['students'];
         $result = $import->import($students, $pending['branch_id'], $request->user()->id);
 
-        $message = "Import selesai: {$result['created']} akun baru, {$result['linked']} murid lama, {$result['packages']} paket, {$result['saldo']} saldo awal.";
+        $message = "Import selesai: {$result['created']} akun baru, {$result['linked']} murid lama, {$result['packages']} paket, {$result['saldo']} saldo awal, {$result['join']} tanggal join (voucher aktif).";
 
         return redirect()->route('course.student.index')
             ->with('success', $message)
@@ -201,10 +217,14 @@ class CourseStudentController extends Controller
             ->get(['id', 'name']);
     }
 
-    /** Murid yang pernah punya paket InaYule, dibatasi cabang yang boleh dilihat user. */
+    /**
+     * Murid yang pernah punya paket InaYule, dibatasi cabang yang boleh dilihat user. Sejak 20 November 2026 juga
+     * murid lama dari Excel yang punya join_by_date walau belum punya paket, supaya switch voucher-nya bisa diatur.
+     */
     private function students(Request $request): Builder
     {
-        return Student::whereIn('students.id', CoursePackagePurchase::select('student_id'))
+        return Student::where(fn (Builder $q) => $q->whereIn('students.id', CoursePackagePurchase::select('student_id'))
+                ->orWhereNotNull('students.join_by_date'))
             ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request, 'students.branch_id'));
     }
 

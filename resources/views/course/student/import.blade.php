@@ -32,7 +32,7 @@
         <div class="table-responsive">
             <table class="table align-middle">
                 <thead>
-                    <tr><th>Baris</th><th>Nama / Email</th><th>Pengajar</th><th>Paket</th><th class="text-end">Sisa Credit</th><th class="text-end">Sisa Saldo</th><th>Hasil Pengecekan</th></tr>
+                    <tr><th>Baris</th><th>Nama / Email</th><th>Pengajar</th><th>Paket</th><th class="text-end">Sisa Credit</th><th class="text-end">Sisa Saldo</th><th>Join</th><th>Hasil Pengecekan</th></tr>
                 </thead>
                 <tbody>
                     @foreach ($rows as $line => $row)
@@ -46,6 +46,7 @@
                             <td>{{ $row['paket'] ?: '-' }}</td>
                             <td class="text-end">{{ $row['sisa_credit'] !== '' ? $row['sisa_credit'] : '-' }}</td>
                             <td class="text-end">{{ $row['sisa_saldo'] !== '' ? $row['sisa_saldo'] : '-' }}</td>
+                            <td class="text-nowrap small">{{ $row['join_date_label'] ?? ($row['join_by_date'] !== '' ? $row['join_by_date'] : '-') }}</td>
                             <td class="small">
                                 @foreach ($row['errors'] as $error)<div class="text-danger">✕ {{ $error }}</div>@endforeach
                                 @if (! $row['errors'])

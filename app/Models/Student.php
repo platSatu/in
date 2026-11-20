@@ -34,6 +34,14 @@ class Student extends Model
         'status',
         'progress_student',
         'teacher_user_id',
+        // Voucher Paket InaYule (20 November 2026): tanggal join dari data lama (import Excel) & switch "Bisa pakai voucher".
+        'join_by_date',
+        'voucher_eligible',
+    ];
+
+    protected $casts = [
+        'join_by_date' => 'date',
+        'voucher_eligible' => 'boolean',
     ];
 
     /*

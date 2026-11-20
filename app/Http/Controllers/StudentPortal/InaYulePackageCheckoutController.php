@@ -13,6 +13,8 @@ use App\Models\Student;
 use App\Models\Transaction;
 use App\Services\CoursePackagePayment\CoursePackagePaymentGatewayFactory;
 use App\Services\CoursePackagePayment\CoursePackagePurchaseNotifier;
+use App\Models\CourseVoucherRedemption;
+use App\Services\CourseVoucher\CourseVoucherService;
 use App\Services\StudentIdentityResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -78,6 +80,21 @@ class InaYulePackageCheckoutController extends Controller
             return redirect()->route('inayule.index')->with('status', 'Package ini gratis (trial) -- klaim lewat tombol "Klaim Gratis", bukan lewat checkout.');
         }
 
+        // Voucher Paket (20 November 2026): ?voucher=KODE hanya untuk pratinjau harga, belum memakai kuota.
+        // Kuota baru dipakai di store() (dicek ulang di dalam lock).
+        $originalPrice = $price;
+        $voucherCode = trim((string) $request->query('voucher', ''));
+        $voucherResult = null;
+        if ($voucherCode !== '') {
+            $student = (new StudentIdentityResolver())->resolveForUser($user);
+            $voucherResult = $student
+                ? (new CourseVoucherService())->preview($voucherCode, (string) $user->id, $student, $package, $price)
+                : ['ok' => false, 'message' => StudentIdentityResolver::CONFLICT_MESSAGE];
+            if ($voucherResult['ok']) {
+                $price = $voucherResult['final'];
+            }
+        }
+
         $depositBalance = Deposit::currentBalanceFor((string) $user->id);
         $depositPortion = min($depositBalance, $price);
         $gatewayPortion = max($price - $depositPortion, 0.0);
@@ -89,6 +106,9 @@ class InaYulePackageCheckoutController extends Controller
         return view('student-portal.inayule.checkout', [
             'package' => $package,
             'price' => $price,
+            'originalPrice' => $originalPrice,
+            'voucherCode' => $voucherCode,
+            'voucherResult' => $voucherResult,
             'depositBalance' => $depositBalance,
             'depositPortion' => $depositPortion,
             'gatewayPortion' => $gatewayPortion,
@@ -123,6 +143,20 @@ class InaYulePackageCheckoutController extends Controller
             return redirect()->route('inayule.index')->with('status', 'Package ini gratis (trial) -- klaim lewat tombol "Klaim Gratis", bukan lewat checkout.');
         }
 
+        // Voucher Paket (20 November 2026): kode dicek ulang & kuotanya dipegang di dalam lock (lihat
+        // CourseVoucherService::reserve()), lalu harga yang diproses di bawah adalah harga setelah diskon.
+        $redemption = null;
+        $voucherCode = trim((string) $request->input('voucher_code', ''));
+        if ($voucherCode !== '') {
+            $voucher = (new CourseVoucherService())->reserve($voucherCode, (string) $user->id, $student, $package, $price);
+            if (! $voucher['ok']) {
+                return redirect()->route('inayule.checkout.show', ['packageId' => $package->id, 'voucher' => $voucherCode])
+                    ->with('error', $voucher['message']);
+            }
+            $redemption = $voucher['redemption'];
+            $price = $voucher['final'];
+        }
+
         // Preview (belum di-lock) -- cuma untuk MEMILIH jalur mana yang
         // dipakai. Kebenaran akhirnya tetap di-cek ULANG di dalam lock pada
         // completeWithDepositOnly(), atau di webhook untuk jalur gateway.
@@ -131,6 +165,12 @@ class InaYulePackageCheckoutController extends Controller
 
         if ($gatewayPortionPreview <= 0.0) {
             $outcome = $this->completeWithDepositOnly($user, $student, $package, $price);
+
+            if ($outcome['ok'] && $redemption) {
+                (new CourseVoucherService())->attach($redemption, $outcome['payment']->id);
+            } elseif ($redemption) {
+                (new CourseVoucherService())->release($redemption);
+            }
 
             if ($outcome['ok']) {
                 (new CoursePackagePurchaseNotifier())->notify($outcome['payment']);
@@ -142,11 +182,11 @@ class InaYulePackageCheckoutController extends Controller
             // paling aman minta user coba lagi (submit ulang akan otomatis
             // dihitung ulang, bisa jadi jatuh ke jalur gateway kalau saldo
             // ternyata sudah berkurang).
-            return redirect()->route('inayule.checkout.show', ['packageId' => $package->id])
+            return redirect()->route('inayule.checkout.show', ['packageId' => $package->id, 'voucher' => $voucherCode ?: null])
                 ->with('error', 'Saldo Anda baru saja berubah, silakan coba lagi.');
         }
 
-        return $this->initiateGatewayCheckout($user, $student, $package, $price, $depositBalancePreview);
+        return $this->initiateGatewayCheckout($user, $student, $package, $price, $depositBalancePreview, $redemption);
     }
 
     /**
@@ -261,11 +301,15 @@ class InaYulePackageCheckoutController extends Controller
      * Jalur gateway (murni gateway ATAU campuran) -- lihat docblock class di
      * atas (poin 2). TIDAK menyentuh Deposit sama sekali di sini.
      */
-    private function initiateGatewayCheckout(mixed $user, Student $student, CoursePackage $package, float $price, float $depositBalance): RedirectResponse
+    private function initiateGatewayCheckout(mixed $user, Student $student, CoursePackage $package, float $price, float $depositBalance, ?CourseVoucherRedemption $redemption = null): RedirectResponse
     {
         $activeGateway = PaymentGateway::forInayule();
 
         if (!$activeGateway) {
+            if ($redemption) {
+                (new CourseVoucherService())->release($redemption);
+            }
+
             return redirect()->route('inayule.checkout.show', ['packageId' => $package->id])
                 ->with('error', 'Payment gateway belum diaktifkan oleh admin. Silakan hubungi penyelenggara.');
         }
@@ -290,6 +334,11 @@ class InaYulePackageCheckoutController extends Controller
             'status' => CoursePackagePayment::STATUS_PENDING,
             'expires_at' => now()->addMinutes($activeGateway->expiry_minutes ?? 60),
         ]);
+
+        // Voucher ikut pembayaran ini: kalau pembayaran gagal/kedaluwarsa, kuotanya otomatis kembali.
+        if ($redemption) {
+            (new CourseVoucherService())->attach($redemption, $payment->id);
+        }
 
         try {
             $driver = CoursePackagePaymentGatewayFactory::make($activeGateway);
