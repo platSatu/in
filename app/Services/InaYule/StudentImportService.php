@@ -107,6 +107,9 @@ class StudentImportService
             $phone = $this->phone($row['no_hp']);
             if ($row['no_hp'] !== '' && $phone === null) {
                 $notes[] = 'No. HP tidak dikenali, dikosongkan.';
+            } elseif ($phone !== null && $this->phoneUsedByOther($phone, $email)) {
+                // 23 November 2026: beri tahu admin di pratinjau, bukan diam-diam dikosongkan.
+                $notes[] = 'No. HP '.$phone.' sudah dipakai akun/murid lain, dikosongkan (bisa diisi manual nanti).';
             }
 
             $teacherId = null;
@@ -219,7 +222,9 @@ class StudentImportService
                         $user = User::create([
                             'name' => $plan['name'],
                             'email' => $email,
-                            'handphone' => $plan['phone'] && ! User::where('handphone', $plan['phone'])->exists() ? $plan['phone'] : null,
+                            // Kolom users.handphone NOT NULL di database (23 November 2026): HP yang tidak bisa dipakai
+                            // disimpan sebagai teks kosong, bukan null, supaya import tidak gagal "handphone cannot be null".
+                            'handphone' => $plan['phone'] && ! User::where('handphone', $plan['phone'])->exists() ? $plan['phone'] : '',
                             'password' => Hash::make(Str::random(40)),
                             'status' => User::STATUS_INACTIVE,
                         ]);
@@ -234,13 +239,14 @@ class StudentImportService
                         $parts = preg_split('/\s+/', trim($plan['name']), 2);
                         $student = Student::create([
                             'user_id' => $user->id, 'first_name' => $parts[0], 'last_name' => $parts[1] ?? '',
-                            'email' => $email, 'handphone' => $this->freePhone($plan['phone']), 'status' => 'active',
+                            'email' => $email, 'handphone' => $this->freePhone($plan['phone']) ?? '', 'status' => 'active',
                             'images' => null, 'branch_id' => $branchId,
                         ]);
                     } else {
                         $student->user_id = $student->user_id ?: $user->id;
                         if (blank($student->handphone)) {
-                            $student->handphone = $this->freePhone($plan['phone'], $student->id);
+                            // students.handphone juga NOT NULL: tetap teks kosong kalau HP tidak bisa dipakai.
+                            $student->handphone = $this->freePhone($plan['phone'], $student->id) ?? '';
                         }
                     }
                     if ($plan['teacher_id']) {
@@ -437,6 +443,13 @@ class StudentImportService
         $digits = preg_replace('/^(62|0)/', '', preg_replace('/\D/', '', $value));
 
         return preg_match('/^8\d{7,12}$/', $digits) ? '0'.$digits : null;
+    }
+
+    /** HP ini sudah dipakai akun atau murid dengan email lain (hanya untuk catatan di pratinjau). */
+    private function phoneUsedByOther(string $phone, string $email): bool
+    {
+        return User::where('handphone', $phone)->whereRaw('LOWER(email) <> ?', [$email])->exists()
+            || Student::where('handphone', $phone)->where(fn ($q) => $q->whereNull('email')->orWhereRaw('LOWER(email) <> ?', [$email]))->exists();
     }
 
     /** HP dipakai murid lain -> dikosongkan (kolom HP murid unik), supaya import tidak gagal. */
