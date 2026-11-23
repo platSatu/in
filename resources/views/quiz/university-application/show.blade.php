@@ -109,7 +109,7 @@
                             <div class="d-flex flex-wrap gap-3 mt-2" style="font-size:13.5px;">
                                 <div>
                                     <span class="text-muted">Registration Fee:</span>
-                                    <span @class(['badge', 'badge-success' => $item['fee'] === 'Lunas', 'badge-warning' => $item['fee'] === 'DP 50%', 'badge-secondary' => $item['fee'] === 'Belum bayar'])>{{ $item['fee'] }}</span>
+                                    <span @class(['badge', 'badge-success' => $item['fee'] === 'Lunas', 'badge-warning' => in_array($item['fee'], ['DP 50%', 'Kurang bayar (upgrade)'], true), 'badge-secondary' => $item['fee'] === 'Belum bayar'])>{{ $item['fee'] }}</span>
                                 </div>
                                 <div>
                                     <span class="text-muted">Dokumen:</span>
@@ -154,12 +154,13 @@
 
                             {{-- Sisa Registration Fee setelah DP 50% (18 November 2026): tagih & kirim link bayar lewat WhatsApp
                                  gateway, atau kirim ulang kalau tagihannya sudah aktif. Sama dengan "Tagih Pelunasan" di card Payment. --}}
-                            @if ($canEdit && $item['remaining'] > 0 && ! $campusApp->isCancelled() && ! $campusApp->isAwaitingUpgradePayment())
+                            {{-- Kekurangan setelah upgrade jurusan ikut tampil (23 November 2026): tagihannya sudah aktif, admin bisa salin/kirim link. --}}
+                            @if ($canEdit && $item['remaining'] > 0 && ! $campusApp->isCancelled() && ($item['due'] || ! $campusApp->isAwaitingUpgradePayment()))
                                 <form method="POST" action="{{ route('quiz.university-application.fees.update', $campusApp->id) }}"
                                     class="d-flex flex-wrap align-items-center gap-2 mt-2 p-2 rounded" style="background:#fff8e6; font-size:13px;">
                                     @csrf
                                     @if ($item['due'])
-                                        <span>Tagihan pelunasan <strong>Rp {{ number_format($item['due'], 0, ',', '.') }}</strong> sudah aktif, menunggu dibayar siswa.</span>
+                                        <span>{{ $campusApp->isAwaitingUpgradePayment() ? 'Kekurangan (upgrade jurusan)' : 'Tagihan pelunasan' }} <strong>Rp {{ number_format($item['due'], 0, ',', '.') }}</strong> sudah aktif, menunggu dibayar siswa.</span>
                                         {{-- Link pelunasan siap kirim (siswa login dulu untuk membuka). --}}
                                         <div class="input-group input-group-sm w-100 order-last mt-1">
                                             <input type="text" class="form-control" value="{{ $item['pay_url'] }}" readonly onclick="this.select()">
@@ -463,7 +464,8 @@
                         $feePaid = $payments->contains(fn ($payment) => $payment->isPaid() && $payment->purpose === 'registration_fee');
                         $remaining = $feePaid ? $application->registrationFeeRemaining() : 0;
                     @endphp
-                    @if ($canEdit && $feePaid && ! $application->isAwaitingUpgradePayment() && ! $application->isCancelled() && ($remaining > 0 || $application->registration_fee_due))
+                    {{-- Juga untuk kekurangan setelah upgrade jurusan (23 November 2026): kirim link via WhatsApp, tanpa tombol Batalkan. --}}
+                    @if ($canEdit && $feePaid && ! $application->isCancelled() && ($application->registration_fee_due || (! $application->isAwaitingUpgradePayment() && $remaining > 0)))
                         <div class="col-md-6">
                             <label class="form-label" style="font-size:13px;">Pelunasan Registration Fee</label>
                             <form method="POST" action="{{ route('quiz.university-application.fees.update', $application->id) }}" class="border rounded p-2">
@@ -473,13 +475,16 @@
                                         $waNumber = preg_replace('/^0/', '62', preg_replace('/\D/', '', (string) $application->whatsapp));
                                         $waText = 'Halo, tagihan pelunasan Registration Fee '.($application->university->name ?? '').' sebesar Rp '.number_format($application->registration_fee_due, 0, ',', '.').' sudah bisa dibayar di sini: '.route('student-portal.applications.payment.show', [$application->id, 'registration_fee']);
                                     @endphp
-                                    <div style="font-size:13px;">Tagihan <strong>Rp {{ number_format($application->registration_fee_due, 0, ',', '.') }}</strong> aktif, menunggu dibayar student.</div>
+                                    <div style="font-size:13px;">{{ $application->isAwaitingUpgradePayment() ? 'Kekurangan (upgrade jurusan)' : 'Tagihan' }} <strong>Rp {{ number_format($application->registration_fee_due, 0, ',', '.') }}</strong> aktif, menunggu dibayar student.</div>
                                     <div class="d-flex flex-wrap gap-2 mt-2">
                                         @if ($waNumber)
                                             <a href="https://wa.me/{{ $waNumber }}?text={{ rawurlencode($waText) }}" target="_blank" rel="noopener" class="btn btn-success btn-sm">Kirim via WhatsApp</a>
                                         @endif
-                                        <button type="submit" name="balance" value="cancel" class="btn btn-outline-secondary btn-sm"
-                                            onclick="return confirm('Batalkan tagihan pelunasan ini?')">Batalkan Tagihan</button>
+                                        {{-- Kekurangan upgrade tidak bisa dibatalkan di sini (ditolak juga di controller). --}}
+                                        @unless ($application->isAwaitingUpgradePayment())
+                                            <button type="submit" name="balance" value="cancel" class="btn btn-outline-secondary btn-sm"
+                                                onclick="return confirm('Batalkan tagihan pelunasan ini?')">Batalkan Tagihan</button>
+                                        @endunless
                                     </div>
                                 @else
                                     <div style="font-size:13px;">Sudah dibayar sebagian (DP). Sisa <strong>Rp {{ number_format($remaining, 0, ',', '.') }}</strong>.</div>

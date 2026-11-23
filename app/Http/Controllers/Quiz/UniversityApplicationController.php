@@ -293,7 +293,8 @@ class UniversityApplicationController extends Controller
                 return [
                     'application' => $item,
                     'current' => $item->is($application),
-                    'fee' => ! $item->fee_paid ? 'Belum bayar' : ($item->registrationFeeRemaining() > 0 ? 'DP 50%' : 'Lunas'),
+                    // Kurang bayar karena upgrade jurusan dibedakan dari DP 50% apply beberapa kampus (23 November 2026).
+                    'fee' => ! $item->fee_paid ? 'Belum bayar' : ($item->registrationFeeRemaining() > 0 ? ($item->isAwaitingUpgradePayment() ? 'Kurang bayar (upgrade)' : 'DP 50%') : 'Lunas'),
                     'documents' => $types->filter(fn ($type) => $uploaded->contains($type->id))->count().'/'.$types->count(),
                     'missing' => $types->filter(fn ($type) => $type->is_required && ! $uploaded->contains($type->id))->pluck('label')->values(),
                     // Sisa Registration Fee setelah DP & tagihan pelunasan yang sedang aktif (18 November 2026).
@@ -387,8 +388,12 @@ class UniversityApplicationController extends Controller
 
         $name = trim(($application->student->first_name ?? '') . ' ' . ($application->student->last_name ?? '')) ?: 'Calon Mahasiswa';
 
+        $intro = $application->isAwaitingUpgradePayment()
+            ? 'Aplikasi kamu untuk *' . optional($application->university)->name . ' - ' . $application->major_label . "* ({$application->application_no}) masih ada kekurangan Registration Fee setelah perubahan jurusan.\n"
+            : 'Terima kasih sudah membayar DP Registration Fee untuk *' . optional($application->university)->name . ' - ' . $application->major_label . "* ({$application->application_no}).\n";
+
         $result = (new WhatsappMessenger())->send($phone, "Halo {$name},\n\n"
-            . 'Terima kasih sudah membayar DP Registration Fee untuk *' . optional($application->university)->name . ' - ' . $application->major_label . "* ({$application->application_no}).\n"
+            . $intro
             . 'Sisa Registration Fee sebesar *Rp ' . number_format($amount, 0, ',', '.') . "* sudah bisa dilunasi lewat link berikut (login dengan akun kamu):\n"
             . route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE]));
 
@@ -411,7 +416,7 @@ class UniversityApplicationController extends Controller
 
         (new WhatsappMessenger())->send($phone, "Halo {$name},\n\n"
             . "Aplikasi *{$application->application_no}* sudah dipindahkan ke *" . optional($application->university)->name . ' - ' . $application->major_label . "*.\n"
-            . 'Terdapat kekurangan Registration Fee sebesar *Rp ' . number_format($due, 0, ',', '.') . "*. Formulir & dokumen akan terbuka kembali setelah pembayaran ini lunas.\n\n"
+            . 'Terdapat kekurangan Registration Fee sebesar *Rp ' . number_format($due, 0, ',', '.') . "*. Formulir & dokumen tetap bisa kamu lengkapi; kekurangan ini dilunasi saat hasil dari kampus keluar.\n\n"
             . "Bayar lewat link berikut:\n"
             . route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE]));
 
@@ -613,8 +618,9 @@ class UniversityApplicationController extends Controller
         }
 
         // Kirim ulang link tagihan pelunasan yang sudah aktif lewat WhatsApp gateway (18 November 2026).
+        // Juga untuk kekurangan setelah upgrade jurusan (23 November 2026): tagihannya sudah aktif sejak jurusan diubah.
         if ($request->input('balance') === 'remind') {
-            abort_if($application->isAwaitingUpgradePayment() || $application->isCancelled(), 422);
+            abort_if($application->isCancelled(), 422);
 
             if (! $application->registration_fee_due) {
                 return back()->withErrors(['balance' => 'Belum ada tagihan pelunasan yang aktif untuk aplikasi ini.']);
