@@ -61,6 +61,12 @@
                                     @if($myApplication->fee_paid)
                                         <a href="{{ route('student-portal.applications.form.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-warning">Form</a>
                                         <a href="{{ route('student-portal.applications.documents.edit', $myApplication->id) }}" class="btn btn-sm btn-outline-success">Documents</a>
+                                        {{-- Sisa pelunasan DP 50% / kekurangan upgrade jurusan yang sudah ditagih (23 November 2026):
+                                             Formulir & Dokumen tetap terbuka, tombol bayarnya juga tampil di sini. --}}
+                                        @if($myApplication->registration_fee_due)
+                                            <a href="{{ route('student-portal.applications.payment.show', [$myApplication->id, 'registration_fee']) }}" class="btn btn-sm btn-danger"
+                                                title="Rp {{ number_format($myApplication->registration_fee_due, 0, ',', '.') }}">Pay Balance</a>
+                                        @endif
                                     @else
                                         {{-- Belum bayar (mis. keluar dari halaman bayar): lanjutkan pembayaran dulu, Formulir & Dokumen terbuka setelahnya. --}}
                                         <a href="{{ route('student-portal.applications.payment.show', [$myApplication->id, 'registration_fee']) }}" class="btn btn-sm btn-danger">Pay Registration Fee</a>
