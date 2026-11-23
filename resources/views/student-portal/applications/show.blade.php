@@ -169,12 +169,13 @@
         @endif
 
         @if($application->isAwaitingUpgradePayment())
-            {{-- Upgrade jurusan (10 November 2026): Formulir & Dokumen terkunci sampai kekurangan lunas. --}}
+            {{-- Upgrade jurusan (10 November 2026). Sejak 23 November 2026 Formulir & Dokumen tetap terbuka;
+                 kekurangan dilunasi saat hasil kampus keluar. --}}
             <div class="card-box">
                 <h6 class="fw-bold mb-2">Menunggu Pelunasan</h6>
                 <p class="mb-3">Aplikasi Anda dipindahkan ke <strong>{{ optional($application->university)->name }} - {{ $application->major_label }}</strong>.
                     Masih ada kekurangan Registration Fee <strong>Rp {{ number_format($application->registration_fee_due, 0, ',', '.') }}</strong>.
-                    Formulir & dokumen terbuka kembali setelah pembayaran ini lunas.</p>
+                    Formulir & dokumen tetap bisa Anda lengkapi; kekurangan ini dilunasi saat hasil dari kampus keluar.</p>
                 <a href="{{ route('student-portal.applications.payment.show', [$application->id, \App\Models\ApplicationPayment::PURPOSE_REGISTRATION_FEE]) }}" class="btn btn-danger btn-sm">Bayar Kekurangan</a>
             </div>
         @elseif($application->admission_status)

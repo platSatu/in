@@ -211,17 +211,16 @@ class ApplicationFormController extends Controller
             ->where('status', ApplicationPayment::STATUS_PAID)
             ->exists();
 
-        // Upgrade jurusan (10 November 2026): kekurangan Registration Fee harus lunas dulu.
-        // Tagihan pelunasan DP 50% (apply lebih dari 1 kampus) TIDAK mengunci Formulir (23 November 2026):
-        // sama dengan ApplicationDocumentController, student tetap bisa isi Formulir & upload dokumen
-        // sambil melunasi sisa 50%-nya.
-        if ($isPaid && ! $application->isAwaitingUpgradePayment()) {
+        // Cukup sudah pernah bayar Registration Fee (23 November 2026): sisa pelunasan DP 50% (apply >1 kampus)
+        // maupun kekurangan setelah upgrade jurusan TIDAK mengunci Formulir -- dilunasi saat hasil kampus keluar.
+        // Sama dengan ApplicationDocumentController.
+        if ($isPaid) {
             return null;
         }
 
         return redirect()
             ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
-            ->with('status', 'Selesaikan pembayaran '.($application->isAwaitingUpgradePayment() ? 'kekurangan ' : '').'Registration Fee terlebih dahulu untuk membuka Formulir & Upload Documents.');
+            ->with('status', 'Selesaikan pembayaran Registration Fee terlebih dahulu untuk membuka Formulir & Upload Documents.');
     }
 
     private function ownedApplicationOrFail(Request $request, string $applicationId): UniversityApplication

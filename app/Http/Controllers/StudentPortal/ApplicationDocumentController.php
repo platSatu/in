@@ -327,15 +327,15 @@ class ApplicationDocumentController extends Controller
             ->where('status', ApplicationPayment::STATUS_PAID)
             ->exists();
 
-        // Upgrade jurusan (10 November 2026): kekurangan Registration Fee harus lunas dulu.
-        // Tagihan pelunasan DP 50% (12 November 2026) tidak mengunci dokumen.
-        if ($isPaid && ! $application->isAwaitingUpgradePayment()) {
+        // Cukup sudah pernah bayar Registration Fee (23 November 2026): sisa pelunasan DP 50% (apply >1 kampus)
+        // maupun kekurangan setelah upgrade jurusan TIDAK mengunci dokumen -- dilunasi saat hasil kampus keluar.
+        if ($isPaid) {
             return null;
         }
 
         return redirect()
             ->route('student-portal.applications.payment.show', [$application->id, ApplicationPayment::PURPOSE_REGISTRATION_FEE])
-            ->with('status', 'Selesaikan pembayaran '.($application->isAwaitingUpgradePayment() ? 'kekurangan ' : '').'Registration Fee terlebih dahulu untuk membuka Study Plan & Upload Documents.');
+            ->with('status', 'Selesaikan pembayaran Registration Fee terlebih dahulu untuk membuka Study Plan & Upload Documents.');
     }
 
     /**
