@@ -110,12 +110,37 @@ class TeacherHonorController extends Controller
         $fullRecap = $this->honorService->recap($period);
         // Filter pengajar (25 November 2026). Ringkasan di atas mengikuti filter.
         $teacherFilter = $request->query('teacher');
-        $recap = $teacherFilter ? $fullRecap->where('teacher_user_id', $teacherFilter)->values() : $fullRecap;
+        $search = trim((string) $request->query('q', ''));
+        $sort = in_array($request->query('sort'), ['honor', 'hours'], true) ? $request->query('sort') : 'name';
+
+        $recap = $fullRecap
+            ->when($teacherFilter, fn ($rows) => $rows->where('teacher_user_id', $teacherFilter))
+            ->when($search !== '', fn ($rows) => $rows->filter(fn ($row) => str_contains(mb_strtolower($row['teacher_name']), mb_strtolower($search))))
+            ->sortBy(fn ($row) => match ($sort) {
+                'honor' => -$row['honor_amount'],
+                'hours' => -$row['teaching_hours'],
+                default => mb_strtolower($row['teacher_name']),
+            })
+            ->values();
         $closeBlockedReason = $period->isOpen() ? $this->honorService->closeBlockedReason($period) : null;
+
+        // Banyak pengajar: tabel ringkas dibagi per halaman (20 pengajar), ringkasan atas tetap menghitung semuanya.
+        $perPage = 20;
+        $page = max(1, (int) $request->query('page', 1));
+        $rows = new \Illuminate\Pagination\LengthAwarePaginator(
+            $recap->forPage($page, $perPage)->values(),
+            $recap->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
 
         return view('teacher-honor.show', [
             'period' => $period,
             'recap' => $recap,
+            'rows' => $rows,
+            'search' => $search,
+            'sort' => $sort,
             'closeBlockedReason' => $closeBlockedReason,
             'teacherFilter' => $teacherFilter,
             'teacherOptions' => $fullRecap->map(fn ($row) => ['id' => $row['teacher_user_id'], 'name' => $row['teacher_name']])->sortBy('name')->values(),
@@ -134,6 +159,9 @@ class TeacherHonorController extends Controller
         $recap = $this->honorService->recap($period);
         if ($teacher = $request->query('teacher')) {
             $recap = $recap->where('teacher_user_id', $teacher)->values();
+        }
+        if (($search = trim((string) $request->query('q', ''))) !== '') {
+            $recap = $recap->filter(fn ($row) => str_contains(mb_strtolower($row['teacher_name']), mb_strtolower($search)))->values();
         }
 
         $book = new Spreadsheet();

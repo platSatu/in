@@ -119,12 +119,20 @@
         </div>
         <div class="flex-grow-1" style="min-width: 200px">
             <label class="form-label small text-muted mb-1">Cari pengajar</label>
-            <input type="search" class="form-control" placeholder="Ketik nama pengajar..." id="honorSearch" autocomplete="off">
+            <input type="search" name="q" class="form-control" placeholder="Ketik nama pengajar lalu Enter..." value="{{ $search }}" autocomplete="off">
+        </div>
+        <div>
+            <label class="form-label small text-muted mb-1">Urutkan</label>
+            <select name="sort" class="form-select" onchange="this.form.submit()">
+                <option value="name" @selected($sort === 'name')>Nama (A-Z)</option>
+                <option value="honor" @selected($sort === 'honor')>Honor terbesar</option>
+                <option value="hours" @selected($sort === 'hours')>Jam terbanyak</option>
+            </select>
         </div>
         {{-- Label kosong + flex-grow supaya tinggi tombol sama persis dengan kolom di sebelahnya. --}}
         <div class="d-flex flex-column">
             <label class="form-label small mb-1 invisible" aria-hidden="true">Export</label>
-            <a href="{{ route('teacher-honor.export', ['id' => $period->id, 'teacher' => $teacherFilter]) }}"
+            <a href="{{ route('teacher-honor.export', ['id' => $period->id, 'teacher' => $teacherFilter, 'q' => $search ?: null]) }}"
                 class="btn btn-success flex-grow-1 d-flex align-items-center justify-content-center px-4">
                 Export Excel
             </a>
@@ -135,7 +143,11 @@
         Banyak pengajar & murid: ringkasan 1 baris per pengajar dulu, rincian kelas & murid baru dibuka
         saat diklik ("Rincian"), supaya halaman tidak memanjang. Kalau hanya 1 pengajar, rincian langsung terbuka.
     --}}
-    @if ($recap->isEmpty())
+    @if ($recap->isEmpty() && ($search !== '' || $teacherFilter))
+        <div class="widget-content widget-content-area br-8 text-center text-muted py-5">
+            Tidak ada pengajar yang cocok dengan pencarian/filter ini.
+        </div>
+    @elseif ($recap->isEmpty())
         <div class="widget-content widget-content-area br-8 text-center text-muted py-5">
             Belum ada kelas di periode ini. Honor akan muncul otomatis begitu ada sesi yang disetujui di cabang ini.
         </div>
@@ -154,10 +166,11 @@
                         </tr>
                     </thead>
                     <tbody>
-                        @foreach ($recap as $index => $row)
+                        @foreach ($rows as $index => $row)
                             @php
                                 $status = $row['honor'] ? ($honorStatus[$row['honor']->status] ?? [$row['honor']->status, 'badge-secondary']) : ['Sedang berjalan', 'badge-light-info'];
                                 $openByDefault = $recap->count() === 1;
+                                $detailId = 'honorDetail'.$rows->currentPage().'-'.$index;
                             @endphp
                             <tr class="honor-row" data-name="{{ \Illuminate\Support\Str::lower($row['teacher_name']) }}">
                                 <td class="fw-bold">{{ $row['teacher_name'] }}</td>
@@ -179,7 +192,7 @@
                                             </form>
                                         @endif
                                         <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" data-bs-toggle="collapse"
-                                            data-bs-target="#honorDetail{{ $index }}" aria-expanded="{{ $openByDefault ? 'true' : 'false' }}">
+                                            data-bs-target="#{{ $detailId }}" aria-expanded="{{ $openByDefault ? 'true' : 'false' }}">
                                             Rincian
                                         </button>
                                     </div>
@@ -187,8 +200,9 @@
                             </tr>
                             <tr class="honor-detail" data-name="{{ \Illuminate\Support\Str::lower($row['teacher_name']) }}">
                                 <td colspan="6" class="p-0 border-0">
-                                    <div class="collapse {{ $openByDefault ? 'show' : '' }}" id="honorDetail{{ $index }}">
-                                        <div class="p-3 bg-light rounded-3 my-2">
+                                    <div class="collapse {{ $openByDefault ? 'show' : '' }}" id="{{ $detailId }}">
+                                        {{-- Murid banyak: rincian dibatasi tingginya & bisa digulir di dalam kotak. --}}
+                                        <div class="p-3 bg-light rounded-3 my-2" style="max-height: 460px; overflow-y: auto;">
                                             @include('teacher-honor._classes', ['classes' => $row['classes']])
                                         </div>
                                     </div>
@@ -198,25 +212,11 @@
                     </tbody>
                 </table>
             </div>
-            <p class="text-muted small text-center py-3 mb-0" id="honorSearchEmpty" hidden>Tidak ada pengajar dengan nama itu.</p>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
+                <small class="text-muted">Menampilkan {{ $rows->firstItem() }}&ndash;{{ $rows->lastItem() }} dari {{ $rows->total() }} pengajar</small>
+                {{ $rows->links('pagination::bootstrap-5') }}
+            </div>
         </div>
-
-        <script>
-            (function () {
-                var input = document.getElementById('honorSearch');
-                var empty = document.getElementById('honorSearchEmpty');
-                input.addEventListener('input', function () {
-                    var q = input.value.trim().toLowerCase(), shown = 0;
-                    document.querySelectorAll('.honor-row').forEach(function (row) {
-                        var match = !q || row.dataset.name.indexOf(q) !== -1;
-                        row.hidden = !match;
-                        row.nextElementSibling.hidden = !match;
-                        if (match) { shown++; }
-                    });
-                    empty.hidden = shown > 0;
-                });
-            })();
-        </script>
     @endif
 </div>
 @endsection
