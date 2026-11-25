@@ -197,6 +197,27 @@
                         </div>
                     @enderror
                 </div>
+
+                <div class="col-md-4 mb-3">
+                    <label class="form-label">Kuota Siswa per Kelas <span class="text-danger">*</span></label>
+
+                    <input
+                        type="number"
+                        name="class_quota"
+                        min="1"
+                        max="100"
+                        class="form-control @error('class_quota') is-invalid @enderror"
+                        value="{{ old('class_quota', $data->class_quota ?? 1) }}"
+                        required>
+
+                    <div class="form-text">Berapa siswa boleh belajar bersama di jam yang sama. Contoh: Private 2, Group 15.</div>
+
+                    @error('class_quota')
+                        <div class="invalid-feedback">
+                            {{ $message }}
+                        </div>
+                    @enderror
+                </div>
             </div>
 
             <div class="mb-3">

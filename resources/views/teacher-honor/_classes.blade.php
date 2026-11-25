@@ -1,6 +1,7 @@
 {{--
     Daftar kelas 1 pengajar dalam 1 periode (1 kelas = 1 credit/paket).
-    Sejak 20 November 2026 kelas bisa dihitung Per Jam (fee x credit); rekap lama tanpa 'honor' tetap pakai 'fee'.
+    Sejak 20 November 2026 kelas bisa dihitung Per Jam (fee x jam mengajar); rekap lama tanpa 'honor' tetap pakai 'fee'.
+    Sejak 25 November 2026 ada 'hours' = jam mengajar (kelas ramai-ramai dihitung sekali, dibagi rata per siswa).
     Dipakai halaman detail Honor Pengajar & Jadwal pengajar.
     $classes: array hasil TeacherHonorService::recap()['classes'].
 --}}
@@ -12,6 +13,7 @@
                 <th>Jenis</th>
                 <th>Pertemuan</th>
                 <th>Credit Terpakai</th>
+                <th>Jam Mengajar</th>
                 <th class="text-end">Fee</th>
             </tr>
         </thead>
@@ -29,6 +31,9 @@
                                         {{ \Carbon\Carbon::parse($session['at'])->translatedFormat('d M Y, H:i') }}
                                         &middot; {{ $session['student'] }}
                                         &middot; {{ rtrim(rtrim(number_format((float) $session['credit'], 2, ',', '.'), '0'), ',') }} credit
+                                        @if (($session['classmates'] ?? 1) > 1)
+                                            &middot; kelas bersama {{ $session['classmates'] }} siswa
+                                        @endif
                                     </li>
                                 @endforeach
                             </ul>
@@ -37,10 +42,11 @@
                     <td>{{ $class['class_name'] }}</td>
                     <td>{{ count($class['sessions']) }}x</td>
                     <td>{{ rtrim(rtrim(number_format((float) $class['credit_total'], 2, ',', '.'), '0'), ',') }}</td>
+                    <td class="text-nowrap">{{ \App\Models\ClassSession::hoursLabel((float) ($class['hours'] ?? $class['credit_total'])) }}</td>
                     <td class="text-end text-nowrap">
                         Rp {{ number_format((float) ($class['honor'] ?? $class['fee']), 0, ',', '.') }}
                         @if (($class['honor_mode'] ?? null) === \App\Models\CourseClass::HONOR_PER_HOUR)
-                            <div class="small text-muted">Rp {{ number_format((float) $class['fee'], 0, ',', '.') }}/jam &times; {{ rtrim(rtrim(number_format((float) $class['credit_total'], 2, ',', '.'), '0'), ',') }} jam</div>
+                            <div class="small text-muted">Rp {{ number_format((float) $class['fee'], 0, ',', '.') }}/jam &times; {{ \App\Models\ClassSession::hoursLabel((float) ($class['hours'] ?? $class['credit_total'])) }}</div>
                         @endif
                     </td>
                 </tr>

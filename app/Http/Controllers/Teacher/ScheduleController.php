@@ -40,11 +40,11 @@ class ScheduleController extends Controller
             : $from->copy()->addDays(29)->endOfDay();
 
         $sessions = ClassSession::where('teacher_user_id', $teacher->id)
-            ->whereBetween('requested_at', [$from, $to])
+            ->heldBetween($from, $to)
             ->with(['student', 'coursePackage.courseClass', 'branch'])
-            ->orderBy('requested_at')
+            ->orderByClassTime()
             ->get()
-            ->groupBy(fn (ClassSession $session) => optional($session->requested_at)->format('Y-m-d'));
+            ->groupBy(fn (ClassSession $session) => optional($session->classStartsAt())->format('Y-m-d'));
 
         // Honor saya: periode yang sedang berjalan (dihitung langsung) +
         // beberapa periode terakhir yang sudah ditutup.

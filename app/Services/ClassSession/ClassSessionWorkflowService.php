@@ -9,10 +9,12 @@ use App\Models\CoursePackagePurchase;
 use App\Models\CourseCredit;
 use App\Models\CompanyBranch;
 use App\Models\Student;
+use App\Models\TeacherAvailability;
 use App\Models\TeacherHonorPeriod;
 use App\Models\User;
 use App\Services\CourseCredit\CourseCreditDebitService;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -58,16 +60,28 @@ class ClassSessionWorkflowService
     ) {
     }
 
+    /** Jam mulai kelas baru dibuat per kelipatan ini, supaya siswa mudah bertemu di jam yang sama. */
+    public const START_STEP_MINUTES = 60;
+
+    /** Siswa bisa memilih jadwal sampai sekian hari ke depan. */
+    public const BOOKING_DAYS_AHEAD = 30;
+
     /**
-     * Siswa mengajukan pemakaian credit untuk 1 jam kelas (atau 1,5 jam,
-     * sesuai kesepakatan) dengan pengajar tertentu. BELUM memotong credit
-     * sama sekali -- baru status 'menunggu_guru'.
+     * Siswa mengajukan pemakaian credit untuk kelas di jam yang ia pilih.
+     * BELUM memotong credit sama sekali -- baru status 'menunggu_guru'.
+     *
+     * Jam kelas ($classStartAt) wajib ada di pilihan scheduleOptions():
+     * gabung ke kelas yang kuotanya masih ada, atau buka jam baru di dalam
+     * jam buka pengajar. Dicek ulang di sini (bukan hanya di tampilan) dan
+     * pengajar dikunci, supaya dua siswa yang submit bersamaan tidak bisa
+     * melebihi kuota.
      */
     public function requestUsage(
         Student $student,
         User $teacher,
         CoursePackage $package,
         float $creditAmountRequested,
+        Carbon $classStartAt,
         ?CompanyBranch $branch = null,
         ?string $notes = null
     ): ClassSession {
@@ -77,28 +91,210 @@ class ClassSessionWorkflowService
 
         $this->assertNoPendingTradeIn($student, $package->id);
 
-        // Credit terpisah per paket: sisa paket ini dikurangi pengajuan lain yang belum selesai.
-        $purchases = CoursePackagePurchase::where('student_id', $student->id)->where('course_package_id', $package->id)->get();
-        $reserved = (float) ClassSession::where('student_id', $student->id)
-            ->where('course_package_id', $package->id)
-            ->whereIn('status', [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN])
-            ->sum('credit_amount_requested');
-        $available = array_sum($this->debitService->remainingByPurchase($purchases)) - $reserved;
+        return DB::transaction(function () use ($student, $teacher, $package, $creditAmountRequested, $classStartAt, $branch, $notes) {
+            User::whereKey($teacher->id)->lockForUpdate()->first();
 
-        if ($available + 0.000001 < $creditAmountRequested) {
-            throw new InvalidArgumentException('Sisa credit paket "'.$package->name.'" tidak cukup (tersedia '.max(0, $available).' credit, termasuk yang sedang diajukan).');
+            // Credit terpisah per paket: sisa paket ini dikurangi pengajuan lain yang belum selesai.
+            $purchases = CoursePackagePurchase::where('student_id', $student->id)->where('course_package_id', $package->id)->get();
+            $reserved = (float) ClassSession::where('student_id', $student->id)
+                ->where('course_package_id', $package->id)
+                ->whereIn('status', [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN])
+                ->sum('credit_amount_requested');
+            $available = array_sum($this->debitService->remainingByPurchase($purchases)) - $reserved;
+
+            if ($available + 0.000001 < $creditAmountRequested) {
+                throw new InvalidArgumentException('Sisa credit paket "'.$package->name.'" tidak cukup (tersedia '.max(0, $available).' credit, termasuk yang sedang diajukan).');
+            }
+
+            $this->assertTimeIsOffered($student, $teacher, $package, $classStartAt, $creditAmountRequested);
+
+            return ClassSession::create([
+                'student_id' => $student->id,
+                'teacher_user_id' => $teacher->id,
+                'course_package_id' => $package->id,
+                'branch_id' => $branch?->id,
+                'credit_amount_requested' => $creditAmountRequested,
+                'status' => ClassSession::STATUS_WAITING_TEACHER,
+                'notes' => $notes,
+                'requested_at' => now(),
+                'class_start_at' => $classStartAt,
+                'class_end_at' => $this->classEnd($classStartAt, $creditAmountRequested),
+            ]);
+        });
+    }
+
+    /**
+     * Admin memindahkan jadwal 1 siswa (mis. siswa ke-7 sakit) ke jam lain.
+     * Siswa lain di kelas lamanya tidak ikut pindah. Lama kelas & credit
+     * tetap. Admin boleh memilih jam di luar jam buka pengajar, tapi tetap
+     * tidak boleh bentrok dengan kelas lain pengajar itu atau melebihi kuota.
+     */
+    public function reschedule(ClassSession $session, Carbon $newStartAt, User $admin): ClassSession
+    {
+        return DB::transaction(function () use ($session, $newStartAt, $admin) {
+            $session = ClassSession::whereKey($session->id)->lockForUpdate()->firstOrFail();
+            $this->assertStatus($session, [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN]);
+
+            $teacher = User::whereKey($session->teacher_user_id)->lockForUpdate()->firstOrFail();
+            $credit = (float) $session->credit_amount_requested;
+            $oldLabel = optional($session->classStartsAt())->translatedFormat('d M Y H:i');
+
+            $this->assertTimeIsOffered($session->student, $teacher, $session->coursePackage, $newStartAt, $credit, $session);
+
+            $session->update([
+                'class_start_at' => $newStartAt,
+                'class_end_at' => $this->classEnd($newStartAt, $credit),
+                'notes' => trim(($session->notes ? $session->notes."\n" : '').'Jadwal dipindah admin '.$admin->name.' dari '.$oldLabel.' ke '.$newStartAt->translatedFormat('d M Y H:i').'.'),
+            ]);
+
+            return $session->fresh();
+        });
+    }
+
+    /**
+     * Pilihan jam kelas untuk 1 tanggal -- dipakai form Ajukan Kredit DAN
+     * pengecekan saat submit, supaya aturannya hanya ada di satu tempat.
+     *
+     *  - join: kelas yang sudah dibuka siswa lain (pengajar, paket & lama
+     *          kelas sama) dan kuotanya belum penuh.
+     *  - new:  jam mulai baru di dalam jam buka pengajar yang tidak bentrok
+     *          dengan kelas lain pengajar itu maupun kelas siswa sendiri.
+     *
+     * Saat admin memindah jadwal: $moving = pengajuan yang dipindah (tidak
+     * dihitung bentrok dengan dirinya sendiri) dan $adminChosenStart = jam
+     * pilihan admin, yang boleh di luar jam buka pengajar.
+     *
+     * @return array{join: array<int, array{start: string, label: string, filled: int, quota: int}>, new: array<int, array{start: string, label: string}>}
+     */
+    public function scheduleOptions(
+        Student $student,
+        User $teacher,
+        CoursePackage $package,
+        Carbon $date,
+        float $credit,
+        ?ClassSession $moving = null,
+        ?Carbon $adminChosenStart = null
+    ): array {
+        $options = ['join' => [], 'new' => []];
+        $date = $date->copy()->startOfDay();
+        $minutes = (int) round($credit * 60);
+
+        if ($minutes <= 0 || ! isset(TeacherAvailability::DAYS[$date->dayOfWeekIso]) || $date->lt(today())) {
+            return $options;
         }
 
-        return ClassSession::create([
-            'student_id' => $student->id,
-            'teacher_user_id' => $teacher->id,
-            'course_package_id' => $package->id,
-            'branch_id' => $branch?->id,
-            'credit_amount_requested' => $creditAmountRequested,
-            'status' => ClassSession::STATUS_WAITING_TEACHER,
-            'notes' => $notes,
-            'requested_at' => now(),
-        ]);
+        // Semua kelas pengajar ini di tanggal itu (semua paket & cabang), dikelompokkan per kelas.
+        $teacherClasses = $this->activeSessionsOn($date)
+            ->where('teacher_user_id', $teacher->id)
+            ->get()
+            ->reject(fn (ClassSession $session) => $session->id === $moving?->id)
+            ->groupBy(fn (ClassSession $session) => $session->classKey());
+
+        $studentSessions = $this->activeSessionsOn($date)
+            ->where('student_id', $student->id)
+            ->get()
+            ->reject(fn (ClassSession $session) => $session->id === $moving?->id);
+
+        $studentIsFree = fn (Carbon $start, Carbon $end) => $studentSessions
+            ->doesntContain(fn (ClassSession $session) => $this->overlaps($start, $end, $session->class_start_at, $session->class_end_at));
+
+        // 1. Gabung ke kelas yang sudah ada.
+        foreach ($teacherClasses as $students) {
+            $first = $students->first();
+            $start = $first->class_start_at;
+            $end = $first->class_end_at;
+
+            $samePackageAndLength = $first->course_package_id === $package->id
+                && (int) round($start->diffInMinutes($end)) === $minutes;
+
+            if ($samePackageAndLength && $start->isFuture() && $students->count() < $package->seatsPerClass() && $studentIsFree($start, $end)) {
+                $options['join'][] = [
+                    'start' => $start->format('Y-m-d H:i'),
+                    'label' => $start->format('H:i').' - '.$end->format('H:i'),
+                    'filled' => $students->count(),
+                    'quota' => $package->seatsPerClass(),
+                ];
+            }
+        }
+
+        // 2. Buka jam baru.
+        $openingHours = $adminChosenStart
+            ? [[$adminChosenStart->copy(), $adminChosenStart->copy()->addMinutes($minutes)]]
+            : $this->openingHours($teacher, $date, $student->branch_id);
+
+        $teacherIsFree = fn (Carbon $start, Carbon $end) => $teacherClasses
+            ->doesntContain(fn (Collection $students) => $this->overlaps($start, $end, $students->first()->class_start_at, $students->first()->class_end_at));
+
+        foreach ($openingHours as [$open, $close]) {
+            for ($start = $open->copy(); $start->copy()->addMinutes($minutes)->lte($close); $start->addMinutes(self::START_STEP_MINUTES)) {
+                $end = $start->copy()->addMinutes($minutes);
+
+                if ($start->isFuture() && $teacherIsFree($start, $end) && $studentIsFree($start, $end)) {
+                    $options['new'][] = ['start' => $start->format('Y-m-d H:i'), 'label' => $start->format('H:i').' - '.$end->format('H:i')];
+                }
+            }
+        }
+
+        usort($options['join'], fn ($a, $b) => strcmp($a['start'], $b['start']));
+
+        return $options;
+    }
+
+    /**
+     * Jam buka pengajar di hari itu untuk cabang siswa (siswa tanpa cabang:
+     * semua cabang pengajar).
+     *
+     * @return array<int, array{0: Carbon, 1: Carbon}>
+     */
+    private function openingHours(User $teacher, Carbon $date, ?string $branchId): array
+    {
+        return TeacherAvailability::where('teacher_user_id', $teacher->id)
+            ->where('day_of_week', $date->dayOfWeekIso)
+            ->when($branchId, fn ($query) => $query->where('branch_id', $branchId))
+            ->orderBy('start_time')
+            ->get()
+            ->map(fn (TeacherAvailability $row) => [
+                $date->copy()->setTimeFromTimeString($row->start_time),
+                $date->copy()->setTimeFromTimeString($row->end_time),
+            ])
+            ->all();
+    }
+
+    private function assertTimeIsOffered(
+        Student $student,
+        User $teacher,
+        CoursePackage $package,
+        Carbon $classStartAt,
+        float $credit,
+        ?ClassSession $moving = null
+    ): void {
+        $options = $this->scheduleOptions($student, $teacher, $package, $classStartAt, $credit, $moving, $moving ? $classStartAt : null);
+        $chosen = $classStartAt->format('Y-m-d H:i');
+
+        if (collect($options['join'])->pluck('start')->contains($chosen) || collect($options['new'])->pluck('start')->contains($chosen)) {
+            return;
+        }
+
+        throw new InvalidArgumentException('Jam '.$classStartAt->translatedFormat('l, d M Y H:i').' sudah tidak tersedia (kuota penuh, bentrok dengan kelas lain, atau di luar jam buka pengajar). Silakan pilih jam lain.');
+    }
+
+    /** Pengajuan yang masih memegang kursi kelas pada tanggal itu. */
+    private function activeSessionsOn(Carbon $date)
+    {
+        return ClassSession::whereIn('status', ClassSession::ACTIVE_STATUSES)
+            ->whereNotNull('class_start_at')
+            ->whereBetween('class_start_at', [$date->copy()->startOfDay(), $date->copy()->endOfDay()]);
+    }
+
+    private function overlaps(Carbon $start, Carbon $end, ?Carbon $otherStart, ?Carbon $otherEnd): bool
+    {
+        return $otherStart && $otherEnd && $start->lt($otherEnd) && $end->gt($otherStart);
+    }
+
+    /** 1 credit = 1 jam, 1.5 credit = 1 jam 30 menit. */
+    private function classEnd(Carbon $start, float $credit): Carbon
+    {
+        return $start->copy()->addMinutes((int) round($credit * 60));
     }
 
     /**
@@ -253,7 +449,7 @@ class ClassSessionWorkflowService
                 throw new InvalidClassSessionStateException('Sesi ini tidak punya catatan potongan credit, jadi tidak bisa di-refund.');
             }
 
-            $this->assertPeriodOpen($session->branch_id, $session->requested_at);
+            $this->assertPeriodOpen($session->branch_id, $session->classStartsAt());
 
             $refund = $this->debitService->refund(
                 $session->courseCredit()->firstOrFail(),

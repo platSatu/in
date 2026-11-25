@@ -14,6 +14,10 @@
     <div class="row layout-top-spacing">
         <div class="col-xl-12 col-lg-12 col-sm-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                    <p class="text-muted mb-0">Jadwal terbentuk dari pengajuan siswa, sesuai jam buka pengajar.</p>
+                    <a href="{{ route('schedule.availability.index') }}" class="btn btn-primary btn-sm">Ketersediaan Pengajar</a>
+                </div>
                 <div class="mb-4">
                     <form method="GET" action="{{ route('schedule.index') }}" class="row g-2">
                         <div class="col-md-3">
@@ -57,7 +61,7 @@
                             <tbody>
                                 @foreach ($dateSessions as $session)
                                     <tr>
-                                        <td>{{ optional($session->requested_at)->format('H:i') }}</td>
+                                        <td class="text-nowrap">{{ $session->classHoursLabel() }}</td>
                                         <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
                                         <td>{{ optional($session->teacher)->name ?? '-' }}</td>
                                         <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>

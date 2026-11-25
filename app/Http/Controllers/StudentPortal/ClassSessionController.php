@@ -8,12 +8,15 @@ use App\Models\CoursePackage;
 use App\Models\CoursePackagePurchase;
 use App\Models\Role;
 use App\Models\Student;
+use App\Models\TeacherAvailability;
 use App\Models\User;
 use App\Services\ClassSession\ClassSessionWorkflowService;
 use App\Services\ClassSession\InvalidClassSessionStateException;
 use App\Services\CourseCredit\CourseCreditDebitService;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\View\View;
 use InvalidArgumentException;
 
@@ -42,7 +45,7 @@ class ClassSessionController extends Controller
 
         $sessions = ClassSession::where('student_id', $student->id)
             ->with(['teacher', 'coursePackage.courseClass'])
-            ->orderByDesc('requested_at')
+            ->orderByClassTime('desc')
             ->paginate(15);
 
         return view('student-portal.inayule.class-sessions.index', compact('sessions'));
@@ -56,9 +59,14 @@ class ClassSessionController extends Controller
             return redirect()->route('inayule.index')->with('status', 'Data student untuk akun ini tidak ditemukan.');
         }
 
+        // Hanya pengajar yang sudah punya jam buka di cabang siswa ini.
         $teachers = User::whereHas('roles', function ($query) {
             $query->where('slug', 'teacher')->where('roles.status', Role::STATUS_ACTIVE);
-        })->orderBy('name')->get();
+        })
+            ->whereIn('id', TeacherAvailability::select('teacher_user_id')
+                ->when($student->branch_id, fn ($query) => $query->where('branch_id', $student->branch_id)))
+            ->orderBy('name')
+            ->get();
 
         // Package yang ditampilkan HANYA dari riwayat pembelian student ini
         // sendiri (lihat docblock ClassSession -- course_package_id di sini
@@ -78,7 +86,57 @@ class ClassSessionController extends Controller
         $remainingByPackage = $purchases->groupBy('course_package_id')
             ->map(fn ($rows) => $rows->sum(fn ($purchase) => $remainingByPurchase[$purchase->id] ?? 0.0));
 
-        return view('student-portal.inayule.class-sessions.create', compact('teachers', 'packages', 'remainingByPackage'));
+        return view('student-portal.inayule.class-sessions.create', [
+            'teachers' => $teachers,
+            'packages' => $packages,
+            'remainingByPackage' => $remainingByPackage,
+            'usualTeacherId' => $student->teacher_user_id, // pengajar tetap siswa, dipilih duluan
+            'firstDate' => today(),
+            'lastDate' => today()->addDays(ClassSessionWorkflowService::BOOKING_DAYS_AHEAD),
+        ]);
+    }
+
+    /**
+     * Pilihan jam untuk form Ajukan Kredit (dipanggil lewat JavaScript
+     * setiap siswa mengganti pengajar / paket / credit / tanggal).
+     */
+    public function scheduleOptions(Request $request): JsonResponse
+    {
+        $student = Student::where('user_id', $request->user()->id)->firstOrFail();
+
+        $validated = $request->validate([
+            'teacher_user_id' => ['required', 'string'],
+            'course_package_id' => ['required', 'string'],
+            'credit_amount' => ['required', 'numeric', 'in:1,1.5,2'],
+            'date' => ['required', 'date_format:Y-m-d'],
+        ]);
+
+        $teacher = User::find($validated['teacher_user_id']);
+        $package = CoursePackage::find($validated['course_package_id']);
+
+        if (! $teacher || ! $package || ! $this->studentOwnsPackage($student, $package)) {
+            return response()->json(['join' => [], 'new' => []]);
+        }
+
+        return response()->json($this->workflowService->scheduleOptions(
+            $student,
+            $teacher,
+            $package,
+            Carbon::createFromFormat('Y-m-d', $validated['date'])->startOfDay(),
+            (float) $validated['credit_amount']
+        ));
+    }
+
+    /**
+     * Kelas dikunci per paket: siswa hanya bisa memakai paket yang ia beli.
+     * Mau ikut kelas paket lain? Upgrade dulu lewat fitur Upgrade yang sudah ada.
+     */
+    private function studentOwnsPackage(Student $student, CoursePackage $package): bool
+    {
+        return CoursePackagePurchase::where('student_id', $student->id)
+            ->where('course_package_id', $package->id)
+            ->where('status', CoursePackagePurchase::STATUS_COMPLETED)
+            ->exists();
     }
 
     public function store(Request $request): RedirectResponse
@@ -96,7 +154,11 @@ class ClassSessionController extends Controller
             // 1 jam). Pilihan 2 credit ditambahkan 12 Oktober 2026 --
             // sebelumnya belajar 2 jam harus diajukan 2 kali 1 credit.
             'credit_amount' => ['required', 'numeric', 'in:1,1.5,2'],
+            // Jam kelas yang dipilih siswa (25 November 2026), mis. "2026-12-02 19:00".
+            'class_start_at' => ['required', 'date_format:Y-m-d H:i'],
             'notes' => ['nullable', 'string', 'max:500'],
+        ], [
+            'class_start_at.required' => 'Pilih jam kelas terlebih dahulu.',
         ]);
 
         $teacher = User::find($validated['teacher_user_id']);
@@ -107,12 +169,17 @@ class ClassSessionController extends Controller
 
         $package = CoursePackage::findOrFail($validated['course_package_id']);
 
+        if (! $this->studentOwnsPackage($student, $package)) {
+            return back()->withInput()->with('error', 'Paket ini belum Anda miliki. Untuk ikut kelas paket lain, silakan upgrade paket Anda terlebih dahulu.');
+        }
+
         try {
             $this->workflowService->requestUsage(
                 $student,
                 $teacher,
                 $package,
                 (float) $validated['credit_amount'],
+                Carbon::createFromFormat('Y-m-d H:i', $validated['class_start_at']),
                 $student->companyBranch,
                 $validated['notes'] ?? null
             );

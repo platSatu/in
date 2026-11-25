@@ -86,8 +86,8 @@
         </div>
         <div class="col-md-4 layout-spacing">
             <div class="widget-content widget-content-area br-8">
-                <p class="text-muted mb-1">Total Kelas</p>
-                <h5 class="mb-0">{{ $recap->sum('class_count') }} kelas</h5>
+                <p class="text-muted mb-1">Total Kelas &amp; Jam Mengajar</p>
+                <h5 class="mb-0">{{ $recap->sum('class_count') }} kelas &middot; {{ \App\Models\ClassSession::hoursLabel((float) $recap->sum('teaching_hours')) }}</h5>
             </div>
         </div>
         <div class="col-md-4 layout-spacing">
@@ -103,7 +103,7 @@
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
                 <div>
                     <h6 class="mb-1">{{ $row['teacher_name'] }}</h6>
-                    <p class="text-muted mb-0">{{ $row['class_count'] }} kelas &middot; <strong>Rp {{ number_format((float) $row['honor_amount'], 0, ',', '.') }}</strong></p>
+                    <p class="text-muted mb-0">{{ $row['class_count'] }} kelas &middot; {{ \App\Models\ClassSession::hoursLabel((float) $row['teaching_hours']) }} mengajar &middot; <strong>Rp {{ number_format((float) $row['honor_amount'], 0, ',', '.') }}</strong></p>
                 </div>
 
                 @if ($row['honor'])

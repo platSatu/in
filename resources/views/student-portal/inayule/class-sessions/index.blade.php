@@ -39,7 +39,7 @@
                     <table class="table dt-table-hover" style="width:100%">
                         <thead>
                             <tr>
-                                <th>Diajukan</th>
+                                <th>Jadwal Kelas</th>
                                 <th>Pengajar</th>
                                 <th>Package</th>
                                 <th>Credit Diajukan</th>
@@ -51,7 +51,7 @@
                         <tbody>
                             @forelse ($sessions as $session)
                                 <tr>
-                                    <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
+                                    <td class="text-nowrap">{{ optional($session->classStartsAt())->translatedFormat('D, d/m/Y') }}<br><small class="text-muted">{{ $session->classHoursLabel() }}</small></td>
                                     <td>{{ optional($session->teacher)->name ?? '-' }}</td>
                                     <td>{{ optional($session->coursePackage)->name ?? '-' }}
                                         @if (optional(optional($session->coursePackage)->courseClass)->name)

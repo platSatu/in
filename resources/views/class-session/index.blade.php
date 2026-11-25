@@ -91,7 +91,7 @@
                     <table class="table dt-table-hover" style="width:100%">
                         <thead>
                             <tr>
-                                <th>Diajukan</th>
+                                <th>Jadwal Kelas</th>
                                 <th>Siswa</th>
                                 <th>Pengajar</th>
                                 <th>Package</th>
@@ -102,7 +102,7 @@
                         <tbody>
                             @forelse ($pending as $session)
                                 <tr>
-                                    <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
+                                    <td class="text-nowrap">{{ optional($session->classStartsAt())->translatedFormat('D, d/m/Y') }}<br><small class="text-muted">{{ $session->classHoursLabel() }}</small></td>
                                     <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
                                     <td>{{ optional($session->teacher)->name ?? '-' }}</td>
                                     <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
@@ -110,6 +110,7 @@
                                     <td class="text-center">
                                         <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
                                             <button type="button" class="btn btn-sm btn-outline-success text-nowrap" data-bs-toggle="modal" data-bs-target="#approveModal-{{ $session->id }}">Approve</button>
+                                            <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#rescheduleModal-{{ $session->id }}">Pindah Jadwal</button>
                                             <button type="button" class="btn btn-sm btn-outline-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $session->id }}">Tolak</button>
                                         </div>
 
@@ -139,6 +140,7 @@
                                         </div>
 
                                         @include('class-session._reject-modal')
+                                        @include('class-session._reschedule-modal')
                                     </td>
                                 </tr>
                             @empty
@@ -163,7 +165,7 @@
                         <table class="table dt-table-hover" style="width:100%">
                             <thead>
                                 <tr>
-                                    <th>Diajukan</th>
+                                    <th>Jadwal Kelas</th>
                                     <th>Siswa</th>
                                     <th>Pengajar</th>
                                     <th>Package</th>
@@ -174,14 +176,18 @@
                             <tbody>
                                 @foreach ($waitingTeacher as $session)
                                     <tr>
-                                        <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
+                                        <td class="text-nowrap">{{ optional($session->classStartsAt())->translatedFormat('D, d/m/Y') }}<br><small class="text-muted">{{ $session->classHoursLabel() }}</small></td>
                                         <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
                                         <td>{{ optional($session->teacher)->name ?? '-' }}</td>
                                         <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>
                                         <td>{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>
                                         <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-outline-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $session->id }}">Tolak</button>
+                                            <div class="d-flex flex-nowrap justify-content-center align-items-center gap-2">
+                                                <button type="button" class="btn btn-sm btn-outline-primary text-nowrap" data-bs-toggle="modal" data-bs-target="#rescheduleModal-{{ $session->id }}">Pindah Jadwal</button>
+                                                <button type="button" class="btn btn-sm btn-outline-danger text-nowrap" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ $session->id }}">Tolak</button>
+                                            </div>
                                             @include('class-session._reject-modal')
+                                            @include('class-session._reschedule-modal')
                                         </td>
                                     </tr>
                                 @endforeach
@@ -201,7 +207,7 @@
                     <table class="table dt-table-hover" style="width:100%">
                         <thead>
                             <tr>
-                                <th>Diajukan</th>
+                                <th>Jadwal Kelas</th>
                                 <th>Siswa</th>
                                 <th>Pengajar</th>
                                 <th>Package</th>
@@ -213,7 +219,7 @@
                         <tbody>
                             @forelse ($history as $session)
                                 <tr>
-                                    <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
+                                    <td class="text-nowrap">{{ optional($session->classStartsAt())->translatedFormat('D, d/m/Y') }}<br><small class="text-muted">{{ $session->classHoursLabel() }}</small></td>
                                     <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
                                     <td>{{ optional($session->teacher)->name ?? '-' }}</td>
                                     <td>{{ optional($session->coursePackage)->name ?? '-' }}</td>

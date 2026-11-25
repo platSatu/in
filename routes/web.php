@@ -64,6 +64,7 @@ use App\Http\Controllers\StudentPortal\InaYulePackageController;
 use App\Http\Controllers\StudentPortal\InaYulePackageUpgradeController;
 use App\Http\Controllers\ClassSession\ClassSessionAdminController;
 use App\Http\Controllers\Schedule\ScheduleAdminController;
+use App\Http\Controllers\Schedule\TeacherAvailabilityController;
 use App\Http\Controllers\Teacher\ClassSessionApprovalController;
 use App\Http\Controllers\Teacher\ScheduleController as TeacherScheduleController;
 use App\Http\Controllers\TeacherHonor\TeacherHonorController;
@@ -317,6 +318,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // lengkapnya (siswa ajukan -> guru approve -> admin approve final).
     Route::get('/inayule/class-sessions', [ClassSessionController::class, 'index'])->name('inayule.class-sessions.index');
     Route::get('/inayule/class-sessions/create', [ClassSessionController::class, 'create'])->name('inayule.class-sessions.create');
+    Route::get('/inayule/class-sessions/schedule-options', [ClassSessionController::class, 'scheduleOptions'])->name('inayule.class-sessions.schedule-options');
     Route::post('/inayule/class-sessions', [ClassSessionController::class, 'store'])->name('inayule.class-sessions.store');
     // Siswa membatalkan pengajuan yang belum disetujui pengajar (14 Oktober 2026).
     Route::post('/inayule/class-sessions/{id}/cancel', [ClassSessionController::class, 'cancel'])->name('inayule.class-sessions.cancel');
@@ -345,6 +347,7 @@ Route::middleware(['auth', 'permission:class-session'])->prefix('dashboard/class
 Route::middleware(['auth', 'permission:class-session,edit'])->prefix('dashboard/class-session')->group(function () {
     Route::post('/{id}/approve', [ClassSessionAdminController::class, 'approve'])->name('class-session.approve');
     Route::post('/{id}/reject', [ClassSessionAdminController::class, 'reject'])->name('class-session.reject');
+    Route::post('/{id}/reschedule', [ClassSessionAdminController::class, 'reschedule'])->name('class-session.reschedule');
     // Refund credit sesi & potong credit manual (30 September 2026).
     Route::post('/{id}/refund', [ClassSessionAdminController::class, 'refund'])->name('class-session.refund');
     Route::post('/charge', [ClassSessionAdminController::class, 'charge'])->name('class-session.charge');
@@ -370,6 +373,16 @@ Route::middleware(['auth', 'permission:teacher-honor,edit'])->prefix('dashboard/
 // untuk keputusan scope lengkapnya & modul 'schedule' di config/menu.php.
 Route::middleware(['auth', 'permission:schedule'])->prefix('dashboard/schedule')->group(function () {
     Route::get('/', [ScheduleAdminController::class, 'index'])->name('schedule.index');
+});
+
+// Jadwal > Ketersediaan Pengajar (25 November 2026): jam buka pengajar per cabang,
+// dipakai siswa saat memilih jadwal kelas. Lihat TeacherAvailabilityController.
+Route::middleware(['auth', 'permission:schedule'])->prefix('dashboard/schedule/availability')->group(function () {
+    Route::get('/', [TeacherAvailabilityController::class, 'index'])->name('schedule.availability.index');
+});
+Route::middleware(['auth', 'permission:schedule,edit'])->prefix('dashboard/schedule/availability')->group(function () {
+    Route::get('/edit', [TeacherAvailabilityController::class, 'edit'])->name('schedule.availability.edit');
+    Route::put('/', [TeacherAvailabilityController::class, 'update'])->name('schedule.availability.update');
 });
 
 Route::middleware(['auth'])->prefix('dashboard/profile-bussines')->group(function () {

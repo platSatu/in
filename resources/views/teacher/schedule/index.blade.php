@@ -27,7 +27,7 @@
                 <div class="text-end">
                     <div class="text-muted small">Honor sementara</div>
                     <h5 class="mb-0">Rp {{ number_format((float) $item['row']['honor_amount'], 0, ',', '.') }}</h5>
-                    <div class="small">{{ $item['row']['class_count'] }} kelas</div>
+                    <div class="small">{{ $item['row']['class_count'] }} kelas &middot; {{ \App\Models\ClassSession::hoursLabel((float) $item['row']['teaching_hours']) }} mengajar</div>
                 </div>
             </div>
             @include('teacher-honor._classes', ['classes' => $item['row']['classes']])
@@ -43,6 +43,7 @@
                         <tr>
                             <th>Periode</th>
                             <th>Kelas</th>
+                            <th>Jam Mengajar</th>
                             <th>Honor</th>
                             <th>Status</th>
                         </tr>
@@ -59,6 +60,7 @@
                             <tr>
                                 <td>{{ optional($honor->period)->name ?? '-' }} &middot; {{ optional(optional($honor->period)->branch)->name }}</td>
                                 <td>{{ $honor->class_count }} kelas</td>
+                                <td class="text-nowrap">{{ \App\Models\ClassSession::hoursLabel($honor->teachingHours()) }}</td>
                                 <td class="text-nowrap">Rp {{ number_format((float) $honor->honor_amount, 0, ',', '.') }}</td>
                                 <td><span class="badge {{ $honorStatus[1] }}">{{ $honorStatus[0] }}</span></td>
                             </tr>
@@ -105,7 +107,7 @@
                             <tbody>
                                 @foreach ($dateSessions as $session)
                                     <tr>
-                                        <td>{{ optional($session->requested_at)->format('H:i') }}</td>
+                                        <td class="text-nowrap">{{ $session->classHoursLabel() }}</td>
                                         <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
                                         <td>{{ optional($session->coursePackage)->name ?? '-' }}
                                         @if (optional(optional($session->coursePackage)->courseClass)->name)

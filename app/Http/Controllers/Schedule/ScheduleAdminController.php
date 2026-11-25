@@ -43,12 +43,12 @@ class ScheduleAdminController extends Controller
             $query->where('slug', 'teacher')->where('roles.status', Role::STATUS_ACTIVE);
         })->orderBy('name')->get();
 
-        $sessions = ClassSession::whereBetween('requested_at', [$from, $to])
+        $sessions = ClassSession::heldBetween($from, $to)
             ->when($teacherId, fn ($query) => $query->where('teacher_user_id', $teacherId))
             ->with(['student', 'teacher', 'coursePackage', 'branch'])
-            ->orderBy('requested_at')
+            ->orderByClassTime()
             ->get()
-            ->groupBy(fn (ClassSession $session) => optional($session->requested_at)->format('Y-m-d'));
+            ->groupBy(fn (ClassSession $session) => optional($session->classStartsAt())->format('Y-m-d'));
 
         return view('schedule.index', [
             'sessions' => $sessions,

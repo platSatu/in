@@ -455,16 +455,16 @@
                 <div class="tab-pane fade" id="inayule-schedule" role="tabpanel"
                     aria-labelledby="inayule-schedule-tab">
                     <div class="mb-3 d-none d-md-block">
-                        <a href="{{ route('inayule.class-sessions.create') }}" class="btn btn-primary btn-sm">+ Ajukan Pemakaian Credit</a>
+                        <a href="{{ route('inayule.class-sessions.create') }}" class="btn btn-primary btn-sm">+ Ajukan Jadwal Kelas</a>
                     </div>
                     {{-- HP: tombol bulat mengambang (ikut tersembunyi saat tab lain aktif). --}}
-                    <a href="{{ route('inayule.class-sessions.create') }}" class="iy-fab" aria-label="Ajukan Pemakaian Credit" title="Ajukan Pemakaian Credit">+</a>
+                    <a href="{{ route('inayule.class-sessions.create') }}" class="iy-fab" aria-label="Ajukan Jadwal Kelas" title="Ajukan Jadwal Kelas">+</a>
 
                     <div class="table-responsive">
                         <table class="table align-middle mb-0 iy-table">
                             <thead>
                                 <tr>
-                                    <th>Diajukan</th>
+                                    <th>Jadwal Kelas</th>
                                     <th>Package</th>
                                     <th>Pengajar</th>
                                     <th>Credit</th>
@@ -474,8 +474,11 @@
                             <tbody>
                                 @forelse ($scheduleSessions as $session)
                                     <tr>
-                                        {{-- Waktu siswa mengajukan (requested_at), bukan jam/lama kelas. --}}
-                                        <td class="text-nowrap" data-label="Diajukan">{{ $session->requested_at?->translatedFormat('d M Y, H:i') ?? '-' }}</td>
+                                        {{-- Jam kelas yang dipilih siswa; pengajuan lama memakai waktu pengajuan. --}}
+                                        <td class="text-nowrap" data-label="Jadwal Kelas">
+                                            {{ $session->classStartsAt()?->translatedFormat('D, d M Y') ?? '-' }}<br>
+                                            <small class="text-muted">{{ $session->classHoursLabel() }}</small>
+                                        </td>
                                         <td class="iy-td-main">@include('student-portal.inayule._package-info', ['package' => $session->coursePackage])</td>
                                         <td data-label="Pengajar">{{ optional($session->teacher)->name ?? '-' }}</td>
                                         <td data-label="Credit">{{ number_format((float) $session->credit_amount_requested, 2, ',', '.') }}</td>

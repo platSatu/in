@@ -23,7 +23,15 @@ use Illuminate\Support\Facades\DB;
  * itu dihitung SATU kelas -- berapa kali pun dipakai, berapa pun isinya.
  * Asal credit dibaca dari course_credit_allocations (dicatat
  * CourseCreditDebitService saat admin menyetujui sesi), jadi tidak ada
- * input tambahan. Waktu sesi = requested_at, sama dengan menu Jadwal.
+ * input tambahan. Waktu sesi = jam kelas (class_start_at; data lama:
+ * requested_at), sama dengan menu Jadwal.
+ *
+ * Jam mengajar (25 November 2026): dihitung PER KELAS, bukan per siswa.
+ * 7 siswa di kelas yang sama (pengajar, paket, jam mulai sama) selama 1 jam
+ * = pengajar mengajar 1 jam, walaupun tiap siswa terpotong 1 credit.
+ * Jam kelas = credit final terbesar di kelas itu (1 credit = 1 jam), jadi
+ * koreksi credit oleh admin ikut terhitung. Jam ini dibagi rata ke siswa di
+ * kelas itu supaya total jam per paket tetap pas; honor Per Jam = fee x jam.
  *
  * Periode terbuka: rekap dihitung langsung (fee mengikuti Course Class
  * terkini). Periode ditutup: rekap dikunci ke TeacherHonor.classes.
@@ -49,7 +57,7 @@ class TeacherHonorService
     /**
      * Rekap per pengajar untuk satu periode.
      *
-     * @return Collection<int, array{teacher_user_id: string, teacher_name: string, class_count: int, honor_amount: float, classes: array}>
+     * @return Collection<int, array{teacher_user_id: string, teacher_name: string, class_count: int, teaching_hours: float, honor_amount: float, classes: array}>
      */
     public function recap(TeacherHonorPeriod $period, ?string $teacherUserId = null): Collection
     {
@@ -62,6 +70,7 @@ class TeacherHonorService
                     'teacher_user_id' => $honor->teacher_user_id,
                     'teacher_name' => $honor->teacher?->name ?? '-',
                     'class_count' => $honor->class_count,
+                    'teaching_hours' => $honor->teachingHours(),
                     'honor_amount' => (float) $honor->honor_amount,
                     'classes' => $honor->classes,
                     'honor' => $honor,
@@ -81,29 +90,39 @@ class TeacherHonorService
                 'courseCredit.allocations.purchase.student',
                 'courseCredit.allocations.purchase.coursePackage.courseClass',
             ])
-            ->orderBy('requested_at')
+            ->orderByClassTime()
             ->get();
 
         return $sessions
             ->groupBy('teacher_user_id')
             ->map(function (Collection $teacherSessions, string $teacherId) {
+                // Jam tiap kelas yang diajar: siswa yang belajar bareng dihitung sekali.
+                $meetings = $teacherSessions->groupBy(fn (ClassSession $session) => $session->classKey());
+                $meetingHours = $meetings->map(fn (Collection $students) => (float) $students->max('credit_amount_final'));
+
                 $classes = [];
 
                 foreach ($teacherSessions as $session) {
                     [$key, $source] = $this->creditSource($session);
-                    $classes[$key] ??= $source + ['credit_total' => 0.0, 'sessions' => []];
+                    $meetingKey = $session->classKey();
+                    $hoursShare = $meetingHours[$meetingKey] / $meetings[$meetingKey]->count();
+
+                    $classes[$key] ??= $source + ['credit_total' => 0.0, 'hours' => 0.0, 'sessions' => []];
                     $classes[$key]['credit_total'] += (float) $session->credit_amount_final;
+                    $classes[$key]['hours'] += $hoursShare;
                     $classes[$key]['sessions'][] = [
-                        'at' => optional($session->requested_at)->format('Y-m-d H:i'),
+                        'at' => optional($session->classStartsAt())->format('Y-m-d H:i'),
                         'student' => $this->studentName($session->student),
                         'credit' => (float) $session->credit_amount_final,
+                        'classmates' => $meetings[$meetingKey]->count(),
                     ];
                 }
 
-                // Honor per kelas: Per Kelas = fee (cara lama), Per Jam = fee x total credit (1 credit = 1 jam).
+                // Honor per kelas: Per Kelas = fee (cara lama), Per Jam = fee x jam mengajar.
                 foreach ($classes as &$class) {
+                    $class['hours'] = round($class['hours'], 2);
                     $class['honor'] = $class['honor_mode'] === CourseClass::HONOR_PER_HOUR
-                        ? round($class['fee'] * $class['credit_total'], 2)
+                        ? round($class['fee'] * $class['hours'], 2)
                         : $class['fee'];
                 }
                 unset($class);
@@ -114,6 +133,7 @@ class TeacherHonorService
                     'teacher_user_id' => $teacherId,
                     'teacher_name' => $teacherSessions->first()->teacher?->name ?? '-',
                     'class_count' => count($classes),
+                    'teaching_hours' => round($meetingHours->sum(), 2),
                     'honor_amount' => (float) array_sum(array_column($classes, 'honor')),
                     'classes' => $classes,
                     'honor' => null,
@@ -352,11 +372,11 @@ class TeacherHonorService
         return $honor->fresh();
     }
 
-    /** Sesi kelas di cabang & rentang tanggal periode (berdasarkan waktu pengajuan). */
+    /** Sesi kelas di cabang & rentang tanggal periode (berdasarkan jam kelas). */
     private function sessionsIn(TeacherHonorPeriod $period): Builder
     {
         return ClassSession::where('branch_id', $period->branch_id)
-            ->whereBetween('requested_at', [$period->start_date->copy()->startOfDay(), $period->end_date->copy()->endOfDay()]);
+            ->heldBetween($period->start_date->copy()->startOfDay(), $period->end_date->copy()->endOfDay());
     }
 
     /**

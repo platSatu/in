@@ -41,13 +41,13 @@ class ClassSessionApprovalController extends Controller
         $pending = ClassSession::where('teacher_user_id', $teacher->id)
             ->where('status', ClassSession::STATUS_WAITING_TEACHER)
             ->with(['student', 'coursePackage.courseClass'])
-            ->orderBy('requested_at')
+            ->orderByClassTime()
             ->get();
 
         $history = ClassSession::where('teacher_user_id', $teacher->id)
             ->whereIn('status', [ClassSession::STATUS_WAITING_ADMIN, ClassSession::STATUS_APPROVED, ClassSession::STATUS_REJECTED_BY_ADMIN, ClassSession::STATUS_REJECTED_BY_TEACHER])
             ->with(['student', 'coursePackage.courseClass'])
-            ->orderByDesc('requested_at')
+            ->orderByClassTime('desc')
             ->paginate(15);
 
         return view('teacher.class-sessions.index', compact('pending', 'history'));

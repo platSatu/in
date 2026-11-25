@@ -32,6 +32,7 @@ class CoursePackage extends Model
         'price',
         'promo_price',
         'credits',
+        'class_quota',
         'description',
         'status',
     ];
@@ -41,7 +42,19 @@ class CoursePackage extends Model
         'price' => 'decimal:2',
         'promo_price' => 'decimal:2',
         'credits' => 'decimal:2',
+        'class_quota' => 'integer',
     ];
+
+    /**
+     * Kuota siswa dalam 1 kelas (25 November 2026). Diisi admin di form
+     * Course Package, mis. Private 2 orang, Group 15 orang. Siswa yang
+     * memilih jam yang sama, pengajar yang sama, dan paket yang sama
+     * belajar di kelas yang sama sampai kuota ini penuh.
+     */
+    public function seatsPerClass(): int
+    {
+        return max(1, (int) $this->class_quota);
+    }
 
     /**
      * FIX (16 September 2026, permintaan user): package "lagi promo" kalau

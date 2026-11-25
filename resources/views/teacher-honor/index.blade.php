@@ -95,6 +95,7 @@
                                 <th>Periode</th>
                                 <th>Cabang</th>
                                 <th>Tanggal</th>
+                                <th>Total Jam Mengajar</th>
                                 <th>Total Honor</th>
                                 <th>Status</th>
                                 <th class="no-content text-center">Aksi</th>
@@ -106,6 +107,7 @@
                                     <td class="fw-bold">{{ $period->name }}</td>
                                     <td>{{ optional($period->branch)->name ?? '-' }}</td>
                                     <td class="text-nowrap">{{ $period->start_date->translatedFormat('d F Y') }} - {{ $period->end_date->translatedFormat('d F Y') }}</td>
+                                    <td class="text-nowrap">{{ \App\Models\ClassSession::hoursLabel($teachingHours[$period->id] ?? 0) }}</td>
                                     <td class="text-nowrap">Rp {{ number_format((float) ($period->isOpen() ? ($openTotals[$period->id] ?? 0) : $period->honors_sum_honor_amount), 0, ',', '.') }}</td>
                                     <td>
                                         @if ($period->isOpen())
@@ -120,7 +122,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="text-center text-muted py-4">Belum ada periode. Yuk buat periode pertama lewat form di atas!</td>
+                                    <td colspan="7" class="text-center text-muted py-4">Belum ada periode. Yuk buat periode pertama lewat form di atas!</td>
                                 </tr>
                             @endforelse
                         </tbody>

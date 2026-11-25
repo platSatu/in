@@ -62,4 +62,16 @@ class TeacherHonor extends Model
     {
         return $this->belongsTo(User::class, 'approved_by_user_id');
     }
+
+    /**
+     * Total jam mengajar di periode ini (siswa yang belajar bareng dihitung sekali).
+     * Rekap yang dikunci sebelum 25 November 2026 belum punya 'hours', jadi pakai total credit.
+     */
+    public function teachingHours(): float
+    {
+        return round(array_sum(array_map(
+            fn ($class) => (float) ($class['hours'] ?? $class['credit_total'] ?? 0),
+            $this->classes ?? []
+        )), 2);
+    }
 }

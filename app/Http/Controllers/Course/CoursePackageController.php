@@ -168,6 +168,7 @@ class CoursePackageController extends Controller
             'duration_unit' => $original->duration_unit,
             'price' => $original->price,
             'promo_price' => $original->promo_price,
+            'class_quota' => $original->class_quota,
             'credits' => $this->calculateCredits((int) $original->duration_value, $original->duration_unit),
             'description' => $original->description,
             'status' => $original->status,
@@ -199,6 +200,8 @@ class CoursePackageController extends Controller
             // jual (lihat CoursePackage::hasActivePromo()/effectivePrice()).
             // 'lt:price' otomatis menolak kalau promo_price >= price.
             'promo_price' => ['nullable', 'numeric', 'min:0', 'lt:price', 'max:999999999.99'],
+            // Berapa siswa boleh belajar bersama dalam 1 kelas (lihat CoursePackage::seatsPerClass()).
+            'class_quota' => ['required', 'integer', 'min:1', 'max:100'],
             // 'credits' SENGAJA tidak divalidasi/diambil dari input di sini --
             // selalu dihitung ulang lewat calculateCredits() di store()/update(),
             // lihat docblock CREDITS_PER_DURATION_UNIT di atas.

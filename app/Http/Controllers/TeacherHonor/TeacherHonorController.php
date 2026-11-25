@@ -46,18 +46,21 @@ class TeacherHonorController extends Controller
 
         // Periode terbuka dihitung langsung supaya angka di daftar sama
         // dengan halaman detailnya.
+        // Total jam mengajar semua pengajar per periode (25 November 2026).
+        $recaps = $periods->getCollection()->mapWithKeys(fn (TeacherHonorPeriod $period) => [
+            $period->id => $this->honorService->recap($period),
+        ]);
         $openTotals = $periods->getCollection()
             ->filter->isOpen()
-            ->mapWithKeys(fn (TeacherHonorPeriod $period) => [
-                $period->id => $this->honorService->recap($period)->sum('honor_amount'),
-            ]);
+            ->mapWithKeys(fn (TeacherHonorPeriod $period) => [$period->id => $recaps[$period->id]->sum('honor_amount')]);
+        $teachingHours = $recaps->map(fn ($recap) => (float) $recap->sum('teaching_hours'));
 
         $branches = $this->scopeToVisibleBranches(CompanyBranch::query(), $request, 'id')->orderBy('name')->get(['id', 'name']);
         $nextDates = $this->honorService->nextPeriodDates();
         // Cabang yang belum punya periode: siklus 26 -> 25 yang sedang berjalan.
         $defaultDates = $this->honorService->cycleFor(Carbon::today());
 
-        return view('teacher-honor.index', compact('periods', 'openTotals', 'branches', 'branchId', 'nextDates', 'defaultDates'));
+        return view('teacher-honor.index', compact('periods', 'openTotals', 'teachingHours', 'branches', 'branchId', 'nextDates', 'defaultDates'));
     }
 
     public function store(Request $request): RedirectResponse

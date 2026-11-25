@@ -50,7 +50,7 @@ class ClassSessionAdminController extends Controller
         $pending = ClassSession::where('status', ClassSession::STATUS_WAITING_ADMIN)
             ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
             ->with(['student', 'teacher', 'coursePackage'])
-            ->orderBy('requested_at')
+            ->orderByClassTime()
             ->get();
 
         // Belum disetujui pengajar -- admin hanya bisa menolak (mis. pengajar
@@ -58,13 +58,13 @@ class ClassSessionAdminController extends Controller
         $waitingTeacher = ClassSession::where('status', ClassSession::STATUS_WAITING_TEACHER)
             ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
             ->with(['student', 'teacher', 'coursePackage'])
-            ->orderBy('requested_at')
+            ->orderByClassTime()
             ->get();
 
         $history = ClassSession::whereIn('status', [ClassSession::STATUS_APPROVED, ClassSession::STATUS_REJECTED_BY_ADMIN, ClassSession::STATUS_REFUNDED])
             ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
             ->with(['student', 'teacher', 'coursePackage', 'refundedBy'])
-            ->orderByDesc('requested_at')
+            ->orderByClassTime('desc')
             ->paginate(20);
 
         return view('class-session.index', [
@@ -250,6 +250,31 @@ class ClassSessionAdminController extends Controller
         }
 
         return back()->with('success', 'Pengajuan ditolak.');
+    }
+
+    /**
+     * Pindah jadwal 1 siswa ke jam lain (mis. sakit / ada urusan mendadak).
+     * Aturannya di ClassSessionWorkflowService::reschedule().
+     */
+    public function reschedule(Request $request, string $id): RedirectResponse
+    {
+        $validated = $request->validate([
+            'class_start_at' => ['required', 'date', 'after:now'],
+        ], [
+            'class_start_at.after' => 'Jadwal baru harus di waktu yang akan datang.',
+        ]);
+
+        try {
+            $this->workflowService->reschedule(
+                $this->visibleSession($request, $id),
+                Carbon::parse($validated['class_start_at'])->seconds(0),
+                $request->user()
+            );
+        } catch (InvalidClassSessionStateException|InvalidArgumentException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Jadwal berhasil dipindah. Siswa lain di kelas lamanya tidak ikut pindah.');
     }
 
     /** Sesi di cabang yang boleh dilihat admin ini; cabang lain = 404. */

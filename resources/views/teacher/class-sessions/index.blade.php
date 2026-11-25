@@ -32,7 +32,7 @@
                     <table class="table dt-table-hover" style="width:100%">
                         <thead>
                             <tr>
-                                <th>Diajukan</th>
+                                <th>Jadwal Kelas</th>
                                 <th>Siswa</th>
                                 <th>Package</th>
                                 <th>Credit Diajukan</th>
@@ -43,7 +43,7 @@
                         <tbody>
                             @forelse ($pending as $session)
                                 <tr>
-                                    <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
+                                    <td class="text-nowrap">{{ optional($session->classStartsAt())->translatedFormat('D, d/m/Y') }}<br><small class="text-muted">{{ $session->classHoursLabel() }}</small></td>
                                     <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
                                     <td>{{ optional($session->coursePackage)->name ?? '-' }}
                                         @if (optional(optional($session->coursePackage)->courseClass)->name)
@@ -104,7 +104,7 @@
                     <table class="table dt-table-hover" style="width:100%">
                         <thead>
                             <tr>
-                                <th>Diajukan</th>
+                                <th>Jadwal Kelas</th>
                                 <th>Siswa</th>
                                 <th>Package</th>
                                 <th>Credit Final</th>
@@ -114,7 +114,7 @@
                         <tbody>
                             @forelse ($history as $session)
                                 <tr>
-                                    <td>{{ optional($session->requested_at)->format('d/m/Y H:i') }}</td>
+                                    <td class="text-nowrap">{{ optional($session->classStartsAt())->translatedFormat('D, d/m/Y') }}<br><small class="text-muted">{{ $session->classHoursLabel() }}</small></td>
                                     <td>{{ $session->student ? trim($session->student->first_name . ' ' . $session->student->last_name) : '-' }}</td>
                                     <td>{{ optional($session->coursePackage)->name ?? '-' }}
                                         @if (optional(optional($session->coursePackage)->courseClass)->name)

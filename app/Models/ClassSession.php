@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -40,6 +41,77 @@ class ClassSession extends Model
     // Tidak ada transaksi: credit belum pernah terpotong & tidak dihitung honor.
     public const STATUS_CANCELLED_BY_STUDENT = 'dibatalkan';
 
+    /** Pengajuan yang masih "memegang" kursi di kelas (belum ditolak/dibatalkan/direfund). */
+    public const ACTIVE_STATUSES = [
+        self::STATUS_WAITING_TEACHER,
+        self::STATUS_WAITING_ADMIN,
+        self::STATUS_APPROVED,
+    ];
+
+    /**
+     * Kapan kelas berlangsung. Pengajuan sebelum fitur Pilih Jadwal
+     * (25 November 2026) belum punya class_start_at, jadi memakai waktu pengajuan.
+     */
+    public function classStartsAt(): ?\Illuminate\Support\Carbon
+    {
+        return $this->class_start_at ?? $this->requested_at;
+    }
+
+    /** Rentang jam kelas untuk ditampilkan, mis. "19:00 - 20:30". */
+    public function classHoursLabel(): string
+    {
+        if (! $this->class_start_at) {
+            return optional($this->requested_at)->format('H:i') ?? '-';
+        }
+
+        return $this->class_start_at->format('H:i').' - '.optional($this->class_end_at)->format('H:i');
+    }
+
+    /**
+     * Siswa yang memilih pengajar, paket, dan jam mulai yang sama belajar di
+     * KELAS YANG SAMA. Kunci ini dipakai untuk menghitung kuota terisi dan
+     * jam mengajar (7 siswa di kelas 1 jam = pengajar tetap 1 jam).
+     */
+    public function classKey(): string
+    {
+        if (! $this->class_start_at) {
+            return 'session:'.$this->id; // data lama: 1 pengajuan = 1 kelas
+        }
+
+        return $this->teacher_user_id.'|'.$this->course_package_id.'|'.$this->class_start_at->format('Y-m-d H:i');
+    }
+
+    /** Lama kelas dalam jam (1.5 = 1 jam 30 menit). */
+    public function classHours(): float
+    {
+        if ($this->class_start_at && $this->class_end_at) {
+            return round(abs($this->class_start_at->diffInMinutes($this->class_end_at)) / 60, 2);
+        }
+
+        return (float) ($this->credit_amount_final ?? $this->credit_amount_requested);
+    }
+
+    /** Jam dalam kalimat: 1.5 -> "1 jam 30 menit", 12 -> "12 jam". */
+    public static function hoursLabel(float $hours): string
+    {
+        $minutes = (int) round($hours * 60);
+        $label = intdiv($minutes, 60).' jam';
+
+        return $minutes % 60 ? $label.' '.($minutes % 60).' menit' : $label;
+    }
+
+    /** Kelas yang berlangsung di rentang waktu ini (dipakai menu Jadwal & Honor Pengajar). */
+    public function scopeHeldBetween(Builder $query, \DateTimeInterface $from, \DateTimeInterface $to): Builder
+    {
+        return $query->whereRaw('COALESCE(class_start_at, requested_at) BETWEEN ? AND ?', [$from, $to]);
+    }
+
+    /** Urutkan berdasarkan jam kelas. */
+    public function scopeOrderByClassTime(Builder $query, string $direction = 'asc'): Builder
+    {
+        return $query->orderByRaw('COALESCE(class_start_at, requested_at) '.($direction === 'desc' ? 'desc' : 'asc'));
+    }
+
     /** Siswa hanya boleh membatalkan selama pengajar belum menyetujui. */
     public function canBeCancelledByStudent(): bool
     {
@@ -57,6 +129,8 @@ class ClassSession extends Model
         'notes',
         'course_credit_id',
         'requested_at',
+        'class_start_at',
+        'class_end_at',
         'teacher_approved_at',
         'admin_approved_at',
         'admin_user_id',
@@ -71,6 +145,8 @@ class ClassSession extends Model
         'credit_amount_requested' => 'decimal:2',
         'credit_amount_final' => 'decimal:2',
         'requested_at' => 'datetime',
+        'class_start_at' => 'datetime',
+        'class_end_at' => 'datetime',
         'teacher_approved_at' => 'datetime',
         'admin_approved_at' => 'datetime',
         'is_admin_entry' => 'boolean',
