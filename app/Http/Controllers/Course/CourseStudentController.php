@@ -297,9 +297,8 @@ class CourseStudentController extends Controller
     private function students(Request $request): Builder
     {
         return Student::where(fn (Builder $q) => $q->whereIn('students.id', CoursePackagePurchase::select('student_id'))
-                ->orWhereNotNull('students.join_by_date')
-                // Ditambahkan admin lewat "Tambah Student" / Import Excel (25 November 2026).
-                ->orWhereNotNull('students.inayule_registered_at'))
+                // Murid lama dari Excel & murid yang ditambah lewat "Tambah Student" (tanggal join = hari ditambahkan).
+                ->orWhereNotNull('students.join_by_date'))
             ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request, 'students.branch_id'));
     }
 

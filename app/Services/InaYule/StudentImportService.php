@@ -260,8 +260,6 @@ class StudentImportService
                         $student->voucher_eligible = true;
                         $summary['join']++;
                     }
-                    // Tanda murid INA YULE (25 November 2026): langsung tampil di Student INA YULE walau belum punya paket.
-                    $student->inayule_registered_at ??= now();
                     $student->save();
 
                     // Baris ledger 1 murid diberi jeda 1 detik supaya urutan "baris terakhir = saldo terkini" tetap pasti.
@@ -330,7 +328,15 @@ class StudentImportService
             return ['student' => null, 'error' => preg_replace('/^[^:]+:\s*/', '', $summary['failed'][0]), 'existing' => false];
         }
 
-        return ['student' => $this->existing($email, [])['student'], 'error' => null, 'existing' => (bool) ($before['user'] || $before['student'])];
+        $student = $this->existing($email, [])['student'];
+
+        // Tanggal join = hari murid ditambahkan, supaya langsung tampil di Student INA YULE (memakai kolom yang sudah ada).
+        // Tanggal join lama tidak ditimpa, dan switch voucher tidak diubah (voucher tetap diatur admin).
+        if ($student && ! $student->join_by_date) {
+            $student->forceFill(['join_by_date' => today()])->save();
+        }
+
+        return ['student' => $student, 'error' => null, 'existing' => (bool) ($before['user'] || $before['student'])];
     }
 
     /** Contoh Excel: sheet isian + daftar paket & pengajar dari sistem supaya nama yang ditulis pasti cocok. */
