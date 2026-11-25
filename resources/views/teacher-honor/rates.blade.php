@@ -28,7 +28,22 @@
     @endif
 
     <div class="row layout-top-spacing">
-        <div class="col-xl-8 layout-spacing">
+        <div class="col-12 layout-spacing">
+            {{-- Penjelasan singkat di atas tabel (sebelumnya kolom kanan, membuat tabel terlalu sempit). --}}
+            <div class="alert alert-light border d-flex flex-wrap gap-3 align-items-start mb-3">
+                <div class="flex-grow-1" style="min-width: 260px">
+                    <strong class="d-block mb-1">Cara sistem memilih tarif</strong>
+                    <span class="small text-muted">Kalau beberapa aturan cocok, yang paling spesifik dipakai:
+                        <strong>nama pengajar</strong> &rarr; <strong>Course Class</strong> &rarr; <strong>cabang</strong> &rarr; tidak ada yang cocok: <strong>fee umum Course Class</strong>.
+                        Tarif khusus <strong>menggantikan</strong> fee Course Class, tidak ditambahkan.</span>
+                </div>
+                <div class="small text-muted" style="min-width: 260px">
+                    <strong class="d-block mb-1 text-body">Contoh</strong>
+                    Pengajar A &middot; Semua cabang &middot; Semua kelas &middot; Per Jam &middot; 10.000<br>
+                    = Pengajar A selalu dibayar Rp 10.000/jam, pengajar lain ikut Course Class.
+                </div>
+            </div>
+
             <div class="widget-content widget-content-area br-8">
                 <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                     <h6 class="mb-0">Aturan Tarif</h6>
@@ -43,11 +58,11 @@
                         <table class="table align-middle">
                             <thead>
                                 <tr>
-                                    <th>Pengajar</th>
-                                    <th>Cabang</th>
-                                    <th>Course Class</th>
-                                    <th>Cara Hitung</th>
-                                    <th style="min-width: 150px">Fee (Rp)</th>
+                                    <th style="min-width: 200px">Pengajar</th>
+                                    <th style="min-width: 180px">Cabang</th>
+                                    <th style="min-width: 180px">Course Class</th>
+                                    <th style="min-width: 150px">Cara Hitung</th>
+                                    <th style="min-width: 160px">Fee (Rp)</th>
                                     <th></th>
                                 </tr>
                             </thead>
@@ -73,25 +88,6 @@
             </div>
         </div>
 
-        <div class="col-xl-4 layout-spacing">
-            <div class="widget-content widget-content-area br-8">
-                <h6 class="mb-2">Cara sistem memilih tarif</h6>
-                <p class="small text-muted">Kalau ada beberapa aturan yang cocok, yang <strong>paling spesifik</strong> dipakai:</p>
-                <ol class="small ps-3 mb-3">
-                    <li>Aturan yang menyebut <strong>nama pengajar</strong></li>
-                    <li>lalu yang menyebut <strong>Course Class</strong></li>
-                    <li>lalu yang menyebut <strong>cabang</strong></li>
-                    <li>tidak ada yang cocok: <strong>fee umum Course Class</strong></li>
-                </ol>
-                <p class="small text-muted mb-2">Contoh:</p>
-                <ul class="small ps-3 mb-0">
-                    <li>Semua pengajar &middot; MOI &middot; Private &middot; Per Kelas &middot; 1.000.000</li>
-                    <li>Semua pengajar &middot; Pluit &middot; Private &middot; Per Kelas &middot; 2.000.000</li>
-                    <li>Pengajar A &middot; Semua cabang &middot; Semua kelas &middot; Per Jam &middot; 10.000</li>
-                </ul>
-                <p class="small text-muted mt-2 mb-0">Pengajar A selalu dibayar Rp 10.000/jam. Pengajar lain yang mengajar Private di Pluit dibayar Rp 2.000.000 per kelas.</p>
-            </div>
-        </div>
     </div>
 </div>
 
