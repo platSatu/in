@@ -269,6 +269,25 @@
                         <div class="media-body">
                             <h5>{{ auth()->user()?->name ?? '-' }}</h5>
                             <p>{{ auth()->user()?->roles?->pluck('name')?->implode(', ') ?: '-' }}</p>
+                            {{-- Kode referal akun ini (25 November 2026) + tombol salin. --}}
+                            @auth
+                                <div class="d-flex align-items-center gap-1 mt-1" title="Kode referal Anda">
+                                    <small class="text-muted" style="font-size: .7rem;">Kode referal:</small>
+                                    <code class="fw-semibold" style="font-size: .78rem; letter-spacing: .05em;">{{ auth()->user()->referralCode() }}</code>
+                                    <button type="button" class="btn btn-link p-0 lh-1 header-referral-copy" data-code="{{ auth()->user()->referralCode() }}"
+                                        title="Salin kode referal" aria-label="Salin kode referal"
+                                        onclick="event.stopPropagation(); var b = this, c = b.dataset.code;
+                                            (navigator.clipboard ? navigator.clipboard.writeText(c) : Promise.reject()).catch(function () {
+                                                var i = document.createElement('input'); i.value = c; document.body.appendChild(i); i.select(); document.execCommand('copy'); i.remove();
+                                            }).finally(function () { b.title = 'Tersalin!'; b.classList.add('text-success'); setTimeout(function () { b.title = 'Salin kode referal'; b.classList.remove('text-success'); }, 1500); });">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                            stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
+                                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                                        </svg>
+                                    </button>
+                                </div>
+                            @endauth
                         </div>
                     </div>
 
