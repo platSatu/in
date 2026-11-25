@@ -15,6 +15,9 @@ use App\Services\CoursePackagePayment\CoursePackagePaymentGatewayFactory;
 use App\Services\CoursePackagePayment\CoursePackagePurchaseNotifier;
 use App\Models\CourseVoucherRedemption;
 use App\Services\CourseVoucher\CourseVoucherService;
+use App\Models\ReferralRedemption;
+use App\Models\ReferralSetting;
+use App\Services\Referral\ReferralService;
 use App\Services\StudentIdentityResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -95,6 +98,21 @@ class InaYulePackageCheckoutController extends Controller
             }
         }
 
+        // Kode Referal (25 November 2026): kolomnya hanya tampil untuk murid baru selama program aktif.
+        // ?referral=KODE hanya pratinjau; dicek ulang & dipegang di dalam lock saat Bayar Sekarang.
+        $priceBeforeReferral = $price;
+        $referralCode = trim((string) $request->query('referral', ''));
+        $referralResult = null;
+        $referralStudent = (new StudentIdentityResolver())->resolveForUser($user);
+        $referralAvailable = ReferralSetting::current()->is_active && $referralStudent
+            && (new ReferralService())->isNewStudent($user, $referralStudent);
+        if ($referralAvailable && $referralCode !== '') {
+            $referralResult = (new ReferralService())->preview($referralCode, $user, $referralStudent, $price);
+            if ($referralResult['ok']) {
+                $price = $referralResult['final'];
+            }
+        }
+
         $depositBalance = Deposit::currentBalanceFor((string) $user->id);
         $depositPortion = min($depositBalance, $price);
         $gatewayPortion = max($price - $depositPortion, 0.0);
@@ -109,6 +127,10 @@ class InaYulePackageCheckoutController extends Controller
             'originalPrice' => $originalPrice,
             'voucherCode' => $voucherCode,
             'voucherResult' => $voucherResult,
+            'referralAvailable' => $referralAvailable,
+            'referralCode' => $referralCode,
+            'referralResult' => $referralResult,
+            'priceBeforeReferral' => $priceBeforeReferral,
             'depositBalance' => $depositBalance,
             'depositPortion' => $depositPortion,
             'gatewayPortion' => $gatewayPortion,
@@ -157,6 +179,24 @@ class InaYulePackageCheckoutController extends Controller
             $price = $voucher['final'];
         }
 
+        // Kode Referal (25 November 2026): diskon dihitung dari harga setelah voucher, dicek ulang di dalam lock.
+        // Browser hanya mengirim teks kodenya; semua angka dihitung di server.
+        $referral = null;
+        $referralCode = trim((string) $request->input('referral_code', ''));
+        if ($referralCode !== '') {
+            $referralCheck = (new ReferralService())->reserve($referralCode, $user, $student, $package, $price);
+            if (! $referralCheck['ok']) {
+                if ($redemption) {
+                    (new CourseVoucherService())->release($redemption);
+                }
+
+                return redirect()->route('inayule.checkout.show', ['packageId' => $package->id, 'voucher' => $voucherCode ?: null, 'referral' => $referralCode])
+                    ->with('error', $referralCheck['message']);
+            }
+            $referral = $referralCheck['redemption'];
+            $price = $referralCheck['final'];
+        }
+
         // Preview (belum di-lock) -- cuma untuk MEMILIH jalur mana yang
         // dipakai. Kebenaran akhirnya tetap di-cek ULANG di dalam lock pada
         // completeWithDepositOnly(), atau di webhook untuk jalur gateway.
@@ -172,6 +212,13 @@ class InaYulePackageCheckoutController extends Controller
                 (new CourseVoucherService())->release($redemption);
             }
 
+            if ($outcome['ok'] && $referral) {
+                (new ReferralService())->attach($referral, $outcome['payment']->id);
+                (new ReferralService())->payCommission($outcome['payment']);
+            } elseif ($referral) {
+                (new ReferralService())->release($referral);
+            }
+
             if ($outcome['ok']) {
                 (new CoursePackagePurchaseNotifier())->notify($outcome['payment']);
 
@@ -182,11 +229,11 @@ class InaYulePackageCheckoutController extends Controller
             // paling aman minta user coba lagi (submit ulang akan otomatis
             // dihitung ulang, bisa jadi jatuh ke jalur gateway kalau saldo
             // ternyata sudah berkurang).
-            return redirect()->route('inayule.checkout.show', ['packageId' => $package->id, 'voucher' => $voucherCode ?: null])
+            return redirect()->route('inayule.checkout.show', ['packageId' => $package->id, 'voucher' => $voucherCode ?: null, 'referral' => $referralCode ?: null])
                 ->with('error', 'Saldo Anda baru saja berubah, silakan coba lagi.');
         }
 
-        return $this->initiateGatewayCheckout($user, $student, $package, $price, $depositBalancePreview, $redemption);
+        return $this->initiateGatewayCheckout($user, $student, $package, $price, $depositBalancePreview, $redemption, $referral);
     }
 
     /**
@@ -301,13 +348,16 @@ class InaYulePackageCheckoutController extends Controller
      * Jalur gateway (murni gateway ATAU campuran) -- lihat docblock class di
      * atas (poin 2). TIDAK menyentuh Deposit sama sekali di sini.
      */
-    private function initiateGatewayCheckout(mixed $user, Student $student, CoursePackage $package, float $price, float $depositBalance, ?CourseVoucherRedemption $redemption = null): RedirectResponse
+    private function initiateGatewayCheckout(mixed $user, Student $student, CoursePackage $package, float $price, float $depositBalance, ?CourseVoucherRedemption $redemption = null, ?ReferralRedemption $referral = null): RedirectResponse
     {
         $activeGateway = PaymentGateway::forInayule();
 
         if (!$activeGateway) {
             if ($redemption) {
                 (new CourseVoucherService())->release($redemption);
+            }
+            if ($referral) {
+                (new ReferralService())->release($referral);
             }
 
             return redirect()->route('inayule.checkout.show', ['packageId' => $package->id])
@@ -338,6 +388,10 @@ class InaYulePackageCheckoutController extends Controller
         // Voucher ikut pembayaran ini: kalau pembayaran gagal/kedaluwarsa, kuotanya otomatis kembali.
         if ($redemption) {
             (new CourseVoucherService())->attach($redemption, $payment->id);
+        }
+        // Referal ikut pembayaran ini: komisi baru dibayar setelah webhook lunas (lihat InaYulePackageWebhookController).
+        if ($referral) {
+            (new ReferralService())->attach($referral, $payment->id);
         }
 
         try {

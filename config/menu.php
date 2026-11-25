@@ -110,6 +110,8 @@ return [
     ['key' => 'course.student', 'label' => 'Student InaYule', 'route' => 'course.student.index', 'group' => 'Course', 'icon' => 'list'],
     // 20 November 2026: voucher diskon beli paket credit InaYule. Lihat App\Http\Controllers\Course\CourseVoucherController.
     ['key' => 'course.voucher', 'label' => 'Voucher Paket', 'route' => 'course.voucher.index', 'group' => 'Course', 'icon' => 'list'],
+    // Kode Referal (25 November 2026): pengaturan diskon pembeli baru & komisi saldo pemberi kode + laporan.
+    ['key' => 'course.referral', 'label' => 'Kode Referal', 'route' => 'course.referral.index', 'group' => 'Course', 'icon' => 'list'],
     // FASE 2 bagian 2 & Fase 3 (16 September 2026) -- sisi admin/manager
     // dari alur "Pengajuan Pemakaian Credit" & "Honor Pengajar". Sempat
     // dijadikan grup terpisah 'Kredit & Honor', tapi atas permintaan owner

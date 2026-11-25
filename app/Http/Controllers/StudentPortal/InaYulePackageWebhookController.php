@@ -12,6 +12,7 @@ use App\Models\Student;
 use App\Models\Transaction;
 use App\Services\CoursePackagePayment\CoursePackagePaymentGatewayFactory;
 use App\Services\CoursePackagePayment\CoursePackagePurchaseNotifier;
+use App\Services\Referral\ReferralService;
 use App\Services\CoursePackagePayment\PackageUpgradeCalculator;
 use App\Services\CoursePackagePayment\UpgradeConfirmationFailedException;
 use App\Services\Payment\PaymentSignatureMismatchException;
@@ -157,6 +158,8 @@ class InaYulePackageWebhookController extends Controller
             $freshPayment = CoursePackagePayment::find($outcome['payment_id']);
 
             if ($freshPayment) {
+                // Kode Referal (25 November 2026): komisi pemberi kode masuk Saldo setelah lunas (sekali saja).
+                (new ReferralService())->payCommission($freshPayment);
                 (new CoursePackagePurchaseNotifier())->notify($freshPayment);
             }
         }

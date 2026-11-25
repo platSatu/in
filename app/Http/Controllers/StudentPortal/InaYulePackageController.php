@@ -209,6 +209,14 @@ class InaYulePackageController extends Controller
             'scheduleSessions' => $scheduleSessions,
             'depositBalance' => $depositBalance,
             'depositLedger' => $depositLedger,
+            // Kode Referal (25 November 2026): kartu "Bagikan kode" hanya tampil selama program aktif.
+            'referral' => ($referralSetting = \App\Models\ReferralSetting::current())->is_active ? [
+                'code' => $request->user()->referralCode(),
+                'buyer_percent' => (float) $referralSetting->buyer_discount_percent,
+                'referrer_percent' => (float) $referralSetting->referrer_commission_percent,
+                'friends' => \App\Models\ReferralRedemption::where('referrer_user_id', $request->user()->id)->whereNotNull('commission_paid_at')->count(),
+                'earned' => (float) \App\Models\ReferralRedemption::where('referrer_user_id', $request->user()->id)->sum('commission_amount'),
+            ] : null,
             // Tab "Riwayat Credit": semua mutasi credit siswa ini (hanya baca).
             'creditLedger' => $student
                 ? CourseCredit::ledgerFor($student->id)->paginate(15, ['*'], 'credit_page')->withQueryString()

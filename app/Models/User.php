@@ -44,6 +44,7 @@ class User extends Authenticatable implements MustVerifyEmail
        // 'saldo',
        'image',
        'sales_code',
+       'referral_code',
     ];
 
     protected static function booted(): void
@@ -186,5 +187,29 @@ class User extends Authenticatable implements MustVerifyEmail
         }
 
         return $this->student?->branch_id;
+    }
+
+    /**
+     * Kode referal akun ini (25 November 2026). Dibuat sekali saat pertama dibutuhkan, lalu tetap sama.
+     * Unik dijaga indeks UNIQUE users.referral_code + pengecekan di newReferralCode().
+     */
+    public function referralCode(): string
+    {
+        if (! $this->referral_code) {
+            $this->forceFill(['referral_code' => static::newReferralCode((string) $this->name)])->save();
+        }
+
+        return $this->referral_code;
+    }
+
+    /** Kode baru yang belum dipakai akun lain, mis. "BUDI-K7Q2M" (tanpa huruf/angka yang mirip: 0 O 1 I L). */
+    public static function newReferralCode(string $name): string
+    {
+        do {
+            $prefix = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', $name), 0, 4)) ?: 'INA';
+            $code = strtr($prefix.'-'.strtoupper(\Illuminate\Support\Str::random(5)), ['0' => 'X', 'O' => 'Y', '1' => 'Z', 'I' => 'W', 'L' => 'K']);
+        } while (static::where('referral_code', $code)->exists());
+
+        return $code;
     }
 }

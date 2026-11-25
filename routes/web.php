@@ -87,6 +87,7 @@ use App\Http\Controllers\Course\CourseReportController;
 use App\Http\Controllers\Course\CourseStudentController;
 use App\Http\Controllers\Course\CourseTypeController;
 use App\Http\Controllers\Course\CourseVoucherController;
+use App\Http\Controllers\Course\CourseReferralController;
 use App\Http\Controllers\Payment\FormPaymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -1207,6 +1208,14 @@ Route::middleware(['auth', 'permission:course.report'])->prefix('dashboard/super
 });
 
 // Student InaYule (13 November 2026): daftar & detail murid yang punya paket; edit = ganti pengajar tetap.
+// Course > Kode Referal (25 November 2026). Lihat CourseReferralController & ReferralService.
+Route::middleware(['auth', 'permission:course.referral'])->prefix('dashboard/superadmin/course/referral')->group(function () {
+    Route::get('/', [CourseReferralController::class, 'index'])->name('course.referral.index');
+});
+Route::middleware(['auth', 'permission:course.referral,edit'])->prefix('dashboard/superadmin/course/referral')->group(function () {
+    Route::put('/settings', [CourseReferralController::class, 'updateSettings'])->name('course.referral.settings');
+});
+
 // Course > Voucher Paket (20 November 2026): voucher diskon beli paket credit InaYule. Lihat CourseVoucherController.
 Route::middleware(['auth', 'permission:course.voucher'])->prefix('dashboard/superadmin/course/voucher')->group(function () {
     Route::get('/', [CourseVoucherController::class, 'index'])->name('course.voucher.index');

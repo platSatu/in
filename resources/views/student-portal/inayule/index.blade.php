@@ -191,6 +191,45 @@
                     .inayule-page #inayule-credit table > tbody > tr > td[colspan]::before { content: none; }
                 }
             </style>
+            {{-- Kode Referal (25 November 2026): murid cukup membagikan kodenya. --}}
+            @if ($referral)
+                @php
+                    $pct = fn ($value) => rtrim(rtrim(number_format($value, 2, ',', '.'), '0'), ',');
+                @endphp
+                <div class="iy-referral mb-3">
+                    <div class="iy-referral-text">
+                        <strong>Ajak teman belajar Mandarin</strong>
+                        <span>Teman baru hemat {{ $pct($referral['buyer_percent']) }}% di pembelian pertamanya, kamu dapat saldo {{ $pct($referral['referrer_percent']) }}% dari tiap teman. Saldo dipakai untuk beli paket berikutnya (tidak bisa dicairkan).</span>
+                        @if ($referral['friends'] > 0)
+                            <small>{{ $referral['friends'] }} teman sudah bergabung &middot; saldo terkumpul Rp {{ number_format($referral['earned'], 0, ',', '.') }}</small>
+                        @endif
+                    </div>
+                    <div class="iy-referral-code">
+                        <code id="iyReferralCode">{{ $referral['code'] }}</code>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="iyReferralCopy">Salin</button>
+                        <a class="btn btn-sm btn-success" target="_blank" rel="noopener"
+                            href="https://wa.me/?text={{ rawurlencode('Yuk belajar Mandarin di INA YULE! Pakai kode referal saya '.$referral['code'].' saat beli paket pertama, kamu hemat '.$pct($referral['buyer_percent']).'%. '.route('frontend.inayule.classes')) }}">Bagikan</a>
+                    </div>
+                </div>
+                <style>
+                    .inayule-page .iy-referral { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--ina-red-soft); border: 1px dashed rgba(215, 25, 32, .35); }
+                    .inayule-page .iy-referral-text { display: flex; flex-direction: column; gap: 2px; max-width: 560px; }
+                    .inayule-page .iy-referral-text strong { color: var(--ina-red); }
+                    .inayule-page .iy-referral-text span, .inayule-page .iy-referral-text small { font-size: 13px; color: #515365; }
+                    .inayule-page .iy-referral-code { display: flex; align-items: center; gap: 8px; }
+                    .inayule-page .iy-referral-code code { font-size: 16px; font-weight: 700; letter-spacing: .08em; color: var(--ina-ink); background: #fff; padding: 6px 12px; border-radius: 10px; border: 1px solid #f1c4c6; }
+                </style>
+                <script>
+                    document.getElementById('iyReferralCopy').addEventListener('click', function () {
+                        var button = this, code = document.getElementById('iyReferralCode').textContent.trim();
+                        (navigator.clipboard ? navigator.clipboard.writeText(code) : Promise.reject()).catch(function () {
+                            var input = document.createElement('input'); input.value = code; document.body.appendChild(input);
+                            input.select(); document.execCommand('copy'); input.remove();
+                        }).finally(function () { button.textContent = 'Tersalin!'; setTimeout(function () { button.textContent = 'Salin'; }, 1500); });
+                    });
+                </script>
+            @endif
+
             {{-- Pesan hasil aksi (batal pengajuan, upgrade/convert, dll.). --}}
             @foreach (['success' => 'alert-success', 'error' => 'alert-danger', 'status' => 'alert-info'] as $flashKey => $flashClass)
                 @if (session($flashKey))
