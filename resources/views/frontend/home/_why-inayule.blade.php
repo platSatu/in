@@ -15,7 +15,6 @@
     $journey = [
         ['person-plus', 'Registrasi', 'Buat akun dalam hitungan menit'],
         ['collection', 'Pilih paket kelas', 'Sesuai program, kelas, dan level'],
-        ['receipt', 'Konfirmasi pembayaran', 'Credit langsung masuk ke akunmu'],
         ['clipboard-check', 'Tes placement', 'Supaya kelasnya pas dengan levelmu'],
         ['calendar-check', 'Pilih jadwal kelas', 'Cocokkan dengan jam buka pengajar'],
         ['mortarboard', 'Mulai belajar', 'Bertemu pengajar dan teman sekelas'],
@@ -39,15 +38,16 @@
     </ul>
 </div>
 
-<div class="yule-journey">
+{{-- data-yule-journey: home.js menjalankan animasi (muncul bergantian, lalu sorotan berjalan dari langkah 1 ke 5). --}}
+<div class="yule-journey" data-yule-journey>
     <div class="why-yule__head">
         <span class="eyebrow">Langkah demi langkah</span>
         <h2 class="section-title">Alur belajar Mandarin di <em>INA YULE</em></h2>
     </div>
 
-    <ol class="yule-journey__steps">
+    <ol class="yule-journey__steps" style="--steps: {{ count($journey) }}">
         @foreach ($journey as $i => [$icon, $title, $text])
-            <li class="yule-step">
+            <li class="yule-step" style="--i: {{ $i }}">
                 <span class="yule-step__icon" aria-hidden="true">
                     <i class="bi bi-{{ $icon }}"></i>
                     <b>{{ $i + 1 }}</b>

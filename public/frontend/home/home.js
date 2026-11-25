@@ -233,3 +233,57 @@
         }
     }, 2600);
 })();
+
+// Alur belajar INA YULE (25 November 2026): langkah muncul bergantian saat terlihat,
+// lalu sorotan berjalan dari langkah pertama ke terakhir dan garis merah ikut terisi.
+// Berhenti saat section tidak terlihat; tanpa JS / mode kurangi animasi, semua langkah tetap tampil.
+(function () {
+    var journey = document.querySelector('[data-yule-journey]');
+    if (!journey || !('IntersectionObserver' in window)) return;
+
+    var list = journey.querySelector('.yule-journey__steps');
+    var steps = Array.prototype.slice.call(journey.querySelectorAll('.yule-step'));
+    var calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    var current = -1, timer = null, paused = false;
+
+    function show(index) {
+        current = index;
+        steps.forEach(function (step, i) {
+            step.classList.toggle('is-active', i === index);
+            step.classList.toggle('is-done', i < index);
+        });
+        list.style.setProperty('--progress', steps.length > 1 ? index / (steps.length - 1) : 1);
+    }
+
+    function next() {
+        if (paused) return;
+        show(current + 1 >= steps.length ? 0 : current + 1);
+    }
+
+    function start() {
+        if (timer || calm) return;
+        timer = setInterval(next, 1800);
+    }
+
+    function stop() { clearInterval(timer); timer = null; }
+
+    // Kursor diarahkan ke satu langkah: sorotan berhenti di langkah itu.
+    steps.forEach(function (step, i) {
+        step.addEventListener('mouseenter', function () { paused = true; show(i); });
+        step.addEventListener('mouseleave', function () { paused = false; });
+    });
+
+    if (!calm) journey.classList.add('is-waiting');
+
+    new IntersectionObserver(function (entries) {
+        entries.forEach(function (entry) {
+            if (entry.isIntersecting) {
+                journey.classList.remove('is-waiting');
+                if (current < 0) setTimeout(function () { show(0); start(); }, calm ? 0 : 700);
+                else start();
+            } else {
+                stop();
+            }
+        });
+    }, { threshold: 0.35 }).observe(journey);
+})();

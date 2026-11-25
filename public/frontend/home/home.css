@@ -500,36 +500,64 @@ a { color: inherit; }
 .why-card h3 { font-family: var(--serif); font-weight: 600; font-size: 1.25rem; line-height: 1.3; margin: 1.1rem 0 .5rem; }
 .why-card p { margin: 0; font-size: .9rem; line-height: 1.65; color: var(--muted); }
 
-.yule-journey { margin-top: clamp(3.5rem, 8vw, 6rem); padding: clamp(2rem, 4vw, 3rem) clamp(1.25rem, 3vw, 2.5rem); border-radius: 28px; background:
-    radial-gradient(circle at 0% 0%, rgba(200, 16, 46, .07), transparent 45%),
-    radial-gradient(circle at 100% 100%, rgba(214, 181, 106, .18), transparent 45%), var(--cream); }
-.yule-journey__steps { list-style: none; position: relative; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 1rem; margin: 0; padding: 0; }
-/* Garis putus-putus yang menyambung ikon langkah 1 sampai 6. */
-.yule-journey__steps::before { content: ""; position: absolute; top: 36px; left: calc(100% / 12); right: calc(100% / 12); border-top: 2px dashed rgba(200, 16, 46, .3); }
-.yule-step { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .35rem; }
-.yule-step__icon { position: relative; display: grid; place-items: center; width: 72px; height: 72px; margin-bottom: .6rem; border-radius: 50%; background: #fff; color: var(--red); font-size: 1.6rem; box-shadow: 0 0 0 6px var(--cream), 0 16px 30px -18px rgba(200, 16, 46, .55); transition: transform .25s, background-color .25s, color .25s; }
-.yule-step__icon b { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--red); color: #fff; font-size: .75rem; font-weight: 600; box-shadow: 0 0 0 3px var(--cream); }
-.yule-step:hover .yule-step__icon { transform: translateY(-4px); background: var(--red); color: #fff; }
-.yule-step:last-child .yule-step__icon { background: var(--red); color: #fff; }
-.yule-step:last-child .yule-step__icon b { background: var(--ink); }
-.yule-step strong { font-size: .95rem; font-weight: 600; }
+.yule-journey { position: relative; overflow: hidden; margin-top: clamp(3.5rem, 8vw, 6rem); padding: clamp(2rem, 4vw, 3rem) clamp(1.25rem, 3vw, 2.5rem) clamp(2.25rem, 4vw, 3.25rem); border-radius: 28px; background:
+    radial-gradient(circle at 0% 0%, rgba(200, 16, 46, .09), transparent 45%),
+    radial-gradient(circle at 100% 100%, rgba(214, 181, 106, .2), transparent 45%), var(--cream); }
+.yule-journey .section-title em { white-space: nowrap; }
+
+/* Jalur: garis putus-putus yang mengalir + garis merah yang terisi mengikuti langkah yang sedang disorot. */
+.yule-journey__steps { --progress: 0; list-style: none; position: relative; display: grid; grid-template-columns: repeat(var(--steps, 5), minmax(0, 1fr)); gap: 1rem; margin: 0; padding: 0; }
+.yule-journey__steps::before, .yule-journey__steps::after { content: ""; position: absolute; top: 37px; left: calc(100% / (var(--steps, 5) * 2)); height: 3px; border-radius: 3px; }
+.yule-journey__steps::before { right: calc(100% / (var(--steps, 5) * 2)); background: repeating-linear-gradient(90deg, rgba(200, 16, 46, .32) 0 8px, transparent 8px 16px); background-size: 16px 3px; animation: yule-flow 1s linear infinite; }
+.yule-journey__steps::after { right: calc(100% / (var(--steps, 5) * 2)); background: linear-gradient(90deg, rgba(200, 16, 46, .55), var(--red)); box-shadow: 0 0 12px rgba(200, 16, 46, .45); transform: scaleX(var(--progress)); transform-origin: left center; transition: transform .9s cubic-bezier(.65, 0, .35, 1); }
+
+.yule-step { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: .35rem; z-index: 1; }
+/* Ikon berlatar merah tipis (bukan putih polos), dengan cincin krem supaya terpisah dari garis. */
+.yule-step__icon { position: relative; display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: .6rem; border-radius: 50%;
+    background: linear-gradient(145deg, #FDE8EB, #F9D3D9); color: var(--red); font-size: 1.65rem;
+    box-shadow: 0 0 0 6px var(--cream), inset 0 0 0 1px rgba(200, 16, 46, .14), 0 16px 30px -18px rgba(200, 16, 46, .55);
+    transition: transform .45s cubic-bezier(.34, 1.56, .64, 1), background .45s, color .45s, box-shadow .45s; }
+.yule-step__icon::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border: 2px solid var(--red); opacity: 0; pointer-events: none; }
+.yule-step__icon b { position: absolute; top: -4px; right: -4px; display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--red); color: #fff; font-size: .75rem; font-weight: 600; box-shadow: 0 0 0 3px var(--cream); transition: background-color .45s; }
+.yule-step strong { font-size: .95rem; font-weight: 600; transition: color .45s; }
 .yule-step small { font-size: .8rem; line-height: 1.45; color: var(--muted); max-width: 12rem; }
+
+/* Langkah yang sedang disorot (berpindah otomatis, atau saat kursor diarahkan). */
+.yule-step.is-active .yule-step__icon, .yule-step:hover .yule-step__icon { transform: translateY(-6px) scale(1.06); background: linear-gradient(145deg, #E4032B, var(--red) 55%, var(--red-dark)); color: #fff;
+    box-shadow: 0 0 0 6px var(--cream), 0 22px 36px -16px rgba(200, 16, 46, .75); }
+.yule-step.is-active .yule-step__icon::after { animation: yule-ring 1.6s ease-out infinite; }
+.yule-step.is-active .yule-step__icon b, .yule-step:hover .yule-step__icon b { background: var(--ink); }
+.yule-step.is-active strong { color: var(--red); }
+.yule-step.is-done .yule-step__icon { background: linear-gradient(145deg, #FBD5DB, #F5BCC6); }
+
+/* Muncul bergantian saat section terlihat (diaktifkan home.js; tanpa JS langsung tampil). */
+.yule-journey.is-waiting .yule-step { opacity: 0; transform: translateY(18px); }
+.yule-journey.is-waiting .yule-journey__steps::before { opacity: 0; }
+.yule-step, .yule-journey__steps::before { transition: opacity .6s ease, transform .6s cubic-bezier(.22, 1, .36, 1); transition-delay: calc(var(--i, 0) * .12s); }
+
+@keyframes yule-flow { to { background-position: 16px 0; } }
+@keyframes yule-flow-y { to { background-position: 0 16px; } }
+@keyframes yule-ring { 0% { opacity: .55; transform: scale(1); } 100% { opacity: 0; transform: scale(1.35); } }
 
 @media (max-width: 991.98px) {
     .why-yule__grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .yule-journey__steps { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 2rem; }
-    .yule-journey__steps::before { display: none; }
+    .yule-journey__steps::before, .yule-journey__steps::after { display: none; }
 }
 @media (max-width: 575.98px) {
     .why-yule__grid { grid-template-columns: 1fr; }
-    /* HP: alur jadi garis waktu vertikal. */
+    /* HP: alur jadi garis waktu vertikal; garis mengalir & terisi dari atas ke bawah. */
     .yule-journey__steps { grid-template-columns: 1fr; row-gap: 0; }
-    .yule-journey__steps::before { display: block; top: 28px; bottom: 28px; left: 27px; right: auto; border-top: 0; border-left: 2px dashed rgba(200, 16, 46, .3); }
-    .yule-step { display: grid; grid-template-columns: 56px 1fr; grid-template-rows: auto auto; column-gap: 1rem; text-align: left; align-items: center; padding: .6rem 0; }
-    .yule-step__icon { grid-row: span 2; width: 56px; height: 56px; margin: 0; font-size: 1.3rem; }
+    .yule-journey__steps::before, .yule-journey__steps::after { display: block; top: 34px; left: 28px; width: 3px; height: auto; }
+    .yule-journey__steps::before { bottom: 34px; right: auto; background: repeating-linear-gradient(180deg, rgba(200, 16, 46, .32) 0 8px, transparent 8px 16px); background-size: 3px 16px; animation-name: yule-flow-y; }
+    .yule-journey__steps::after { bottom: 34px; right: auto; background: linear-gradient(180deg, rgba(200, 16, 46, .55), var(--red)); transform: scaleY(var(--progress)); transform-origin: center top; }
+    .yule-step { display: grid; grid-template-columns: 58px 1fr; grid-template-rows: auto auto; column-gap: 1rem; text-align: left; align-items: center; padding: .7rem 0; }
+    .yule-step__icon { grid-row: span 2; width: 58px; height: 58px; margin: 0; font-size: 1.3rem; }
+    .yule-step.is-active .yule-step__icon, .yule-step:hover .yule-step__icon { transform: scale(1.06); }
     .yule-step strong { align-self: end; }
     .yule-step small { align-self: start; max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-    .why-card, .why-card__icon, .yule-step__icon { transition: none; }
+    .why-card, .why-card__icon, .yule-step__icon, .yule-step, .yule-journey__steps::after { transition: none; }
+    .yule-journey__steps::before, .yule-step.is-active .yule-step__icon::after { animation: none; }
 }
