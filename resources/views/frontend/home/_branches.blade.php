@@ -11,23 +11,24 @@
             @php
                 $packages = $branch->coursePackages;
                 $online = $branch->isOnline();
-                $priceFrom = $packages->map(fn ($package) => $package->effectivePrice())->filter(fn ($price) => $price > 0)->min();
                 $classNames = $packages->map(fn ($package) => $package->courseClass?->name)->filter()->unique()->sort()->values();
                 $typeNames = $packages->map(fn ($package) => $package->type?->name)->filter()->unique()->sort()->values();
             @endphp
             <a href="{{ route('frontend.inayule.branch', $branch->slug()) }}" class="branch-card {{ $online ? 'branch-card--online' : '' }}"
                 data-hanzi="{{ $online ? '家' : '学' }}">
                 <span class="branch-card__badge">
-                    <i class="bi bi-{{ $online ? 'laptop' : 'geo-alt-fill' }}" aria-hidden="true"></i>
+                    <i class="bi bi-{{ $online ? 'laptop' : 'people-fill' }}" aria-hidden="true"></i>
                     {{ $online ? 'Belajar dari rumah' : 'Kelas tatap muka' }}
                 </span>
 
                 <h3 class="branch-card__name">{{ $branch->name }}</h3>
                 <p class="branch-card__place">
                     @if ($online)
-                        Bertemu pengajar lewat video call, dari mana saja kamu berada.
+                        <i class="bi bi-camera-video" aria-hidden="true"></i>Bertemu pengajar lewat video call, dari mana saja kamu berada.
+                    @elseif ($branch->address)
+                        <i class="bi bi-geo-alt-fill" aria-hidden="true"></i>{{ \Illuminate\Support\Str::limit($branch->address, 90) }}
                     @else
-                        {{ \Illuminate\Support\Str::limit($branch->address ?: 'Belajar langsung bersama pengajar di kelas.', 90) }}
+                        Belajar langsung bersama pengajar di kelas.
                     @endif
                 </p>
 
@@ -42,9 +43,7 @@
                 <span class="branch-card__foot">
                     <span>
                         <strong>{{ $packages->count() }} kelas</strong>
-                        @if ($priceFrom)
-                            <small>mulai Rp {{ number_format($priceFrom, 0, ',', '.') }}</small>
-                        @endif
+                        <small>Lihat kelas &amp; jadwal</small>
                     </span>
                     <span class="branch-card__go" aria-hidden="true"><i class="bi bi-arrow-right"></i></span>
                 </span>

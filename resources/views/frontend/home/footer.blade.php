@@ -1,10 +1,6 @@
 <footer class="site-footer">
     <div class="container site-footer__inner">
-        <p class="site-footer__copy">
-            <span>Copyright &copy; {{ date('Y') }} INA Group</span>
-            {{-- Kredit pembuat website (25 November 2026). --}}
-            <span class="site-footer__credit">Dirancang &amp; dikembangkan dengan <i class="bi bi-heart-fill" aria-label="cinta"></i>&nbsp;oleh tim INA Group</span>
-        </p>
+        <span>Copyright &copy; {{ date('Y') }} INA Group</span>
         <nav class="socials" aria-label="Media sosial INA Group">
             <a href="https://www.instagram.com/inastudy/" class="social social--instagram" target="_blank" rel="noopener" aria-label="Instagram"><i class="bi bi-instagram"></i></a>
             <a href="https://www.tiktok.com/@inastudy" class="social social--tiktok" target="_blank" rel="noopener" aria-label="TikTok"><i class="bi bi-tiktok"></i></a>

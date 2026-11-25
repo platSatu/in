@@ -213,7 +213,31 @@ a { color: inherit; }
 .page-section--catalog .class-filter { position: sticky; top: calc(var(--header-h) + .75rem); z-index: 5; padding: .75rem; border-radius: 18px; background: rgba(255, 255, 255, .94); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); box-shadow: 0 16px 36px -24px rgba(31, 41, 55, .4); }
 .page-section--catalog .class-count { margin-top: 0; }
 
-.inayule { background: #fff; padding-top: calc(var(--header-h) + 1rem); padding-bottom: 2rem; }
+.inayule { position: relative; isolation: isolate; overflow: hidden; background: var(--cream); padding-top: calc(var(--header-h) + 1rem); padding-bottom: 2rem; }
+/* 25 November 2026: latar merah tipis + kisi halus, senada dengan hero "Study in China". */
+.inayule::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background:
+    radial-gradient(45% 35% at 92% 8%, rgba(200, 16, 46, .13), transparent 70%),
+    radial-gradient(40% 30% at 4% 45%, rgba(200, 16, 46, .08), transparent 70%),
+    radial-gradient(45% 30% at 85% 75%, rgba(200, 16, 46, .1), transparent 70%),
+    radial-gradient(40% 30% at 15% 98%, rgba(214, 181, 106, .25), transparent 70%); }
+.inayule::after { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+    background-image: linear-gradient(rgba(31, 41, 55, .05) 1px, transparent 1px), linear-gradient(90deg, rgba(31, 41, 55, .05) 1px, transparent 1px);
+    background-size: 64px 64px;
+    -webkit-mask-image: linear-gradient(180deg, transparent, #000 15%, #000 85%, transparent); mask-image: linear-gradient(180deg, transparent, #000 15%, #000 85%, transparent); }
+/* Kartu di atas latar krem dibuat putih transparan supaya tetap menonjol. */
+.inayule .branch-card:not(.branch-card--online), .inayule .why-card { background: rgba(255, 255, 255, .72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.inayule .why-card:hover, .inayule .branch-card:not(.branch-card--online):hover { background: #fff; }
+.inayule .why-card__icon { background: rgba(200, 16, 46, .07); box-shadow: none; }
+.inayule .yule-journey { background:
+    radial-gradient(circle at 0% 0%, rgba(200, 16, 46, .1), transparent 45%),
+    radial-gradient(circle at 100% 100%, rgba(214, 181, 106, .2), transparent 45%), rgba(255, 255, 255, .7);
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); box-shadow: inset 0 0 0 1px var(--line); }
+.inayule .yule-step__icon { box-shadow: 0 0 0 6px #fff, inset 0 0 0 1px rgba(200, 16, 46, .14), 0 16px 30px -18px rgba(200, 16, 46, .55); }
+.inayule .yule-step.is-active .yule-step__icon, .inayule .yule-step:hover .yule-step__icon { box-shadow: 0 0 0 6px #fff, 0 22px 36px -16px rgba(200, 16, 46, .75); }
+.inayule .yule-step__icon b { box-shadow: 0 0 0 3px #fff; }
+/* Ikon peta di alamat cabang. */
+.branch-card__place i { color: var(--red); margin-right: .3rem; }
+.branch-card--online .branch-card__place i { color: #fff; }
 .inayule .section-lead { max-width: 46em; }
 .page-section { padding: calc(var(--header-h) + 2.5rem) 0 4rem; min-height: 70vh; }
 .class-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: clamp(1rem, 1.6vw, 1.5rem); }
