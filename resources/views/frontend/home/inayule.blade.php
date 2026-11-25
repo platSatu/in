@@ -24,5 +24,8 @@
 
         {{-- 25 November 2026: langkah pertama = pilih lokasi; katalog kelas ada di halaman tiap cabang. --}}
         @include('frontend.home._branches', ['branches' => $branches])
+
+        {{-- Alasan & alur belajar di INA YULE (25 November 2026). --}}
+        @include('frontend.home._why-inayule')
     </div>
 </section>
