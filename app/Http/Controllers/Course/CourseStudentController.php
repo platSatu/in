@@ -7,9 +7,15 @@ use App\Http\Controllers\Controller;
 use App\Models\ClassSession;
 use App\Models\CompanyBranch;
 use App\Models\CourseCredit;
+use App\Models\CourseCreditAllocation;
+use App\Models\CoursePackagePayment;
 use App\Models\CoursePackagePurchase;
+use App\Models\CourseVoucherRedemption;
 use App\Models\Deposit;
+use App\Models\DepositPayment;
+use App\Models\ReferralRedemption;
 use App\Models\Student;
+use App\Models\Transaction;
 use App\Models\User;
 use App\Services\CourseCredit\CourseCreditDebitService;
 use App\Services\InaYule\StudentImportService;
@@ -17,6 +23,8 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -184,6 +192,66 @@ class CourseStudentController extends Controller
         return back()->with('success', $active
             ? "Akun {$name} sekarang aktif dan bisa login."
             : "Akun {$name} dinonaktifkan. Murid tidak bisa login sampai diaktifkan lagi.");
+    }
+
+    /**
+     * Hapus murid dari INA YULE (25 November 2026). Data murid & akun login TETAP ada (murid masih di menu Students
+     * dan masih bisa login), tapi SEMUA data INA YULE-nya dihapus permanen:
+     *  - paket (pembelian), riwayat credit & alokasinya, semua jadwal/riwayat kelas,
+     *  - pembayaran paket, pemakaian voucher & kode referal sebagai pembeli,
+     *  - saldo: mutasi saldo, topup saldo & transaksi akun ini (saldo kembali Rp 0).
+     * Tanggal join & pengajar tetap dikosongkan supaya murid hilang dari daftar Student INA YULE.
+     * Admin wajib mengetik HAPUS; semuanya dalam 1 transaksi (gagal sebagian = tidak ada yang terhapus).
+     */
+    public function destroy(Request $request, string $id): RedirectResponse
+    {
+        $student = $this->students($request)->findOrFail($id);
+        $name = trim($student->first_name.' '.$student->last_name) ?: $student->email;
+
+        $request->validate(
+            ['confirm' => ['required', 'in:HAPUS']],
+            ['confirm.required' => 'Ketik HAPUS untuk mengonfirmasi.', 'confirm.in' => 'Ketik HAPUS (huruf besar) untuk mengonfirmasi.'],
+        );
+
+        try {
+            $deleted = DB::transaction(function () use ($student) {
+                DB::table('students')->where('id', $student->id)->lockForUpdate()->first();
+
+                $purchaseIds = CoursePackagePurchase::where('student_id', $student->id)->pluck('id');
+                $creditIds = CourseCredit::where('student_id', $student->id)->pluck('id');
+                $paymentIds = CoursePackagePayment::where('student_id', $student->id)->pluck('id');
+                $userId = $student->user_id;
+
+                // Urutan: data yang menunjuk ke data lain dihapus lebih dulu.
+                $counts = [
+                    'kelas' => ClassSession::where('student_id', $student->id)->delete(),
+                    'alokasi' => CourseCreditAllocation::whereIn('course_credit_id', $creditIds)->orWhereIn('course_package_purchase_id', $purchaseIds)->delete(),
+                    'voucher' => CourseVoucherRedemption::where('student_id', $student->id)->orWhereIn('course_package_payment_id', $paymentIds)->delete(),
+                    'referal' => ReferralRedemption::where('buyer_student_id', $student->id)
+                        ->when($userId, fn ($q) => $q->orWhere('buyer_user_id', $userId))->delete(),
+                    'pembayaran' => CoursePackagePayment::whereIn('id', $paymentIds)->delete(),
+                    'credit' => CourseCredit::whereIn('id', $creditIds)->delete(),
+                    'paket' => CoursePackagePurchase::whereIn('id', $purchaseIds)->delete(),
+                    'saldo' => $userId ? Deposit::where('user_id', $userId)->delete() : 0,
+                    'topup' => $userId ? DepositPayment::where('user_id', $userId)->delete() : 0,
+                    'transaksi' => $userId ? Transaction::where('user_id', $userId)->delete() : 0,
+                ];
+
+                $student->forceFill(['join_by_date' => null, 'teacher_user_id' => null])->save();
+
+                return $counts;
+            });
+        } catch (Throwable $e) {
+            Log::error('[INAYULE] Hapus murid gagal', ['student_id' => $student->id, 'message' => $e->getMessage()]);
+
+            return back()->with('error', "Data INA YULE {$name} gagal dihapus, tidak ada data yang berubah. Coba lagi atau hubungi developer.");
+        }
+
+        Log::warning('[INAYULE] Murid dihapus dari INA YULE', ['student_id' => $student->id, 'by' => $request->user()->id, 'deleted' => $deleted]);
+
+        return redirect()->route('course.student.index')->with('success',
+            "Data INA YULE {$name} sudah dihapus: {$deleted['paket']} paket, {$deleted['kelas']} kelas, {$deleted['credit']} riwayat credit, "
+            ."{$deleted['pembayaran']} pembayaran, {$deleted['saldo']} mutasi saldo. Akun murid tetap ada di menu Students.");
     }
 
     /** Form Tambah Student INA YULE (25 November 2026). */

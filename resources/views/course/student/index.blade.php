@@ -163,7 +163,14 @@
                                             </div>
                                         </form>
                                     </td>
-                                    <td class="text-end"><a href="{{ route('course.student.show', $student->id) }}" class="btn btn-sm btn-outline-primary">Detail</a></td>
+                                    <td class="text-end text-nowrap">
+                                        <a href="{{ route('course.student.show', $student->id) }}" class="btn btn-sm btn-outline-primary">Detail</a>
+                                        @if ($canEdit)
+                                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#inayule-delete"
+                                                data-action="{{ route('course.student.destroy', $student->id) }}"
+                                                data-name="{{ trim($student->first_name . ' ' . $student->last_name) ?: $student->email }}">Hapus</button>
+                                        @endif
+                                    </td>
                                 </tr>
                             @empty
                                 <tr>
@@ -217,5 +224,50 @@
             </form>
         </div>
     </div>
+
+    {{-- Hapus murid dari INA YULE (25 November 2026): 1 modal untuk semua baris, nama & alamat diisi dari tombol Hapus. --}}
+    <div class="modal fade" id="inayule-delete" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <form method="POST" action="" class="modal-content">
+                @csrf
+                @method('DELETE')
+                <div class="modal-header">
+                    <h5 class="modal-title text-danger">Hapus <span data-delete-name></span> dari INA YULE?</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Tutup"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="mb-2">Data berikut akan <strong>dihapus permanen</strong> dan <strong>tidak bisa dikembalikan</strong>:</p>
+                    <ul class="small mb-3">
+                        <li>Semua paket, sisa credit, dan riwayat credit</li>
+                        <li>Semua jadwal dan riwayat kelas (honor pengajar di periode yang belum ditutup ikut berkurang)</li>
+                        <li>Riwayat pembayaran paket, pemakaian voucher, dan kode referal</li>
+                        <li>Saldo, riwayat isi saldo, dan transaksi akun ini (saldo jadi Rp 0)</li>
+                    </ul>
+                    <div class="alert alert-light border small mb-3">Akun murid <strong>tidak</strong> dihapus: murid tetap ada di menu Students dan masih bisa login. Kalau perlu, matikan dulu switch <strong>Akun Aktif</strong>.</div>
+                    <label class="form-label small mb-1">Ketik <strong>HAPUS</strong> untuk melanjutkan</label>
+                    <input type="text" name="confirm" class="form-control" autocomplete="off" placeholder="HAPUS" data-delete-confirm>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-light" data-bs-dismiss="modal">Batal</button>
+                    <button class="btn btn-danger" disabled data-delete-submit onclick="this.disabled = true; this.form.submit();">Hapus Permanen</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+        (function () {
+            var modal = document.getElementById('inayule-delete');
+            var input = modal.querySelector('[data-delete-confirm]');
+            var submit = modal.querySelector('[data-delete-submit]');
+            modal.addEventListener('show.bs.modal', function (event) {
+                var button = event.relatedTarget;
+                modal.querySelector('form').action = button.getAttribute('data-action');
+                modal.querySelector('[data-delete-name]').textContent = button.getAttribute('data-name');
+                input.value = '';
+                submit.disabled = true;
+            });
+            input.addEventListener('input', function () { submit.disabled = input.value.trim() !== 'HAPUS'; });
+        })();
+    </script>
 @endif
 @endsection
