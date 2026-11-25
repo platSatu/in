@@ -135,7 +135,7 @@
                                     <td>
                                         {{-- Switch akun (25 November 2026): ON = bisa login, OFF = dinonaktifkan. Langsung tersimpan. --}}
                                         @if ($student->user)
-                                            @php $accountActive = $student->user->isActive(); @endphp
+                                            @php($accountActive = $student->user->isActive())
                                             <form method="POST" action="{{ route('course.student.account', $student->id) }}" class="m-0">
                                                 @csrf
                                                 @method('PUT')
