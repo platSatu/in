@@ -271,10 +271,10 @@
                             <p>{{ auth()->user()?->roles?->pluck('name')?->implode(', ') ?: '-' }}</p>
                             {{-- Kode referal akun ini (25 November 2026) + tombol salin. --}}
                             @auth
-                                <div class="d-flex align-items-center gap-1 mt-1" title="Kode referal Anda">
-                                    <small class="text-muted" style="font-size: .7rem;">Kode referal:</small>
-                                    <code class="fw-semibold" style="font-size: .78rem; letter-spacing: .05em;">{{ auth()->user()->referralCode() }}</code>
-                                    <button type="button" class="btn btn-link p-0 lh-1 header-referral-copy" data-code="{{ auth()->user()->referralCode() }}"
+                                <small class="text-muted d-block mt-1" style="font-size: .7rem;">Kode referal</small>
+                                <div class="d-flex align-items-center gap-2 flex-nowrap" title="Kode referal Anda">
+                                    <code class="fw-semibold text-nowrap" style="font-size: .8rem; letter-spacing: .05em; white-space: nowrap;">{{ auth()->user()->referralCode() }}</code>
+                                    <button type="button" class="btn btn-link p-0 lh-1 flex-shrink-0 header-referral-copy" data-code="{{ auth()->user()->referralCode() }}"
                                         title="Salin kode referal" aria-label="Salin kode referal"
                                         onclick="event.stopPropagation(); var b = this, c = b.dataset.code;
                                             (navigator.clipboard ? navigator.clipboard.writeText(c) : Promise.reject()).catch(function () {
