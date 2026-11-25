@@ -363,6 +363,7 @@ Route::middleware(['auth', 'permission:class-session,edit'])->prefix('dashboard/
 Route::middleware(['auth', 'permission:teacher-honor'])->prefix('dashboard/teacher-honor')->group(function () {
     Route::get('/', [TeacherHonorController::class, 'index'])->name('teacher-honor.index');
     Route::get('/period/{id}', [TeacherHonorController::class, 'show'])->name('teacher-honor.show');
+    Route::get('/period/{id}/export', [TeacherHonorController::class, 'export'])->name('teacher-honor.export');
     // Rekap gabungan semua cabang & Tarif Pengajar (25 November 2026).
     Route::get('/combined', [TeacherHonorController::class, 'combined'])->name('teacher-honor.combined');
     Route::get('/rates', [TeacherHonorController::class, 'rates'])->name('teacher-honor.rates');

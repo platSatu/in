@@ -128,6 +128,7 @@ class InaYulePackageCheckoutController extends Controller
             'voucherCode' => $voucherCode,
             'voucherResult' => $voucherResult,
             'referralAvailable' => $referralAvailable,
+            'referralProgramActive' => ReferralSetting::current()->is_active,
             'referralCode' => $referralCode,
             'referralResult' => $referralResult,
             'priceBeforeReferral' => $priceBeforeReferral,

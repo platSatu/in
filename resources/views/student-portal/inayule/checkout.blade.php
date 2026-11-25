@@ -63,6 +63,9 @@
                         <div class="small text-muted mt-1">Khusus pembelian pertama. Bisa digabung dengan voucher.</div>
                     @endif
                 </form>
+            @elseif ($referralProgramActive)
+                {{-- Murid lama: kolom kode referal tidak tampil, beri tahu alasannya supaya tidak bingung. --}}
+                <p class="small text-muted mb-3">Kode referal hanya bisa dipakai di pembelian pertama murid baru INA YULE.</p>
             @endif
 
             <div class="mb-4">

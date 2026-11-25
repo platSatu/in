@@ -18,6 +18,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\View\View;
 
 /**
@@ -104,10 +107,88 @@ class TeacherHonorController extends Controller
     public function show(Request $request, string $id): View
     {
         $period = $this->visiblePeriod($request, $id)->load('branch');
-        $recap = $this->honorService->recap($period);
+        $fullRecap = $this->honorService->recap($period);
+        // Filter pengajar (25 November 2026). Ringkasan di atas mengikuti filter.
+        $teacherFilter = $request->query('teacher');
+        $recap = $teacherFilter ? $fullRecap->where('teacher_user_id', $teacherFilter)->values() : $fullRecap;
         $closeBlockedReason = $period->isOpen() ? $this->honorService->closeBlockedReason($period) : null;
 
-        return view('teacher-honor.show', compact('period', 'recap', 'closeBlockedReason'));
+        return view('teacher-honor.show', [
+            'period' => $period,
+            'recap' => $recap,
+            'closeBlockedReason' => $closeBlockedReason,
+            'teacherFilter' => $teacherFilter,
+            'teacherOptions' => $fullRecap->map(fn ($row) => ['id' => $row['teacher_user_id'], 'name' => $row['teacher_name']])->sortBy('name')->values(),
+            // Filter cabang = pindah ke periode bulan yang sama di cabang lain.
+            'branchPeriods' => $this->sameMonthPeriods($request, $period),
+        ]);
+    }
+
+    /**
+     * Export Excel detail honor 1 periode (25 November 2026): 1 baris per kelas (paket siswa) dengan
+     * pengajar, jam mengajar, tarif yang dipakai, dan honor. Mengikuti filter pengajar di layar.
+     */
+    public function export(Request $request, string $id): StreamedResponse
+    {
+        $period = $this->visiblePeriod($request, $id)->load('branch');
+        $recap = $this->honorService->recap($period);
+        if ($teacher = $request->query('teacher')) {
+            $recap = $recap->where('teacher_user_id', $teacher)->values();
+        }
+
+        $book = new Spreadsheet();
+        $sheet = $book->getActiveSheet()->setTitle('Honor');
+        $sheet->fromArray([['Honor Pengajar '.$period->name.' - '.($period->branch?->name ?? '-')], [$period->start_date->format('d/m/Y').' s/d '.$period->end_date->format('d/m/Y')], []]);
+        $sheet->fromArray(['Pengajar', 'Murid', 'Paket', 'Jenis Kelas', 'Pertemuan', 'Credit Terpakai', 'Jam Mengajar', 'Cara Hitung', 'Tarif Dipakai', 'Fee', 'Honor'], null, 'A4');
+
+        $line = 5;
+        foreach ($recap as $row) {
+            foreach ($row['classes'] as $class) {
+                $sheet->fromArray([
+                    $row['teacher_name'],
+                    $class['owner'] ?? '-',
+                    $class['package'] ?? '-',
+                    $class['class_name'] ?? '-',
+                    count($class['sessions'] ?? []),
+                    (float) ($class['credit_total'] ?? 0),
+                    (float) ($class['hours'] ?? $class['credit_total'] ?? 0),
+                    ($class['honor_mode'] ?? null) === CourseClass::HONOR_PER_HOUR ? 'Per Jam' : 'Per Kelas',
+                    $class['rate_label'] ?? 'Fee umum Course Class',
+                    (float) ($class['fee'] ?? 0),
+                    (float) ($class['honor'] ?? $class['fee'] ?? 0),
+                ], null, 'A'.$line++);
+            }
+            $sheet->fromArray(['Total '.$row['teacher_name'], null, null, null, null, null, (float) $row['teaching_hours'], null, null, null, (float) $row['honor_amount']], null, 'A'.$line);
+            $sheet->getStyle('A'.$line.':K'.$line)->getFont()->setBold(true);
+            $line += 2;
+        }
+
+        $sheet->fromArray(['TOTAL SEMUA', null, null, null, null, null, (float) $recap->sum('teaching_hours'), null, null, null, (float) $recap->sum('honor_amount')], null, 'A'.$line);
+        $sheet->getStyle('A'.$line.':K'.$line)->getFont()->setBold(true);
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(13);
+        $sheet->getStyle('A4:K4')->getFont()->setBold(true);
+        $sheet->getStyle('J5:K'.$line)->getNumberFormat()->setFormatCode('#,##0');
+        foreach (range('A', 'K') as $column) {
+            $sheet->getColumnDimension($column)->setAutoSize(true);
+        }
+
+        $file = 'honor-'.\Illuminate\Support\Str::slug($period->name.'-'.($period->branch?->name ?? 'cabang')).'.xlsx';
+
+        return response()->streamDownload(fn () => (new Xlsx($book))->save('php://output'), $file, [
+            'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        ]);
+    }
+
+    /** Periode bulan yang sama (tanggal tutup sama) di cabang lain yang boleh dilihat admin ini. */
+    private function sameMonthPeriods(Request $request, TeacherHonorPeriod $period)
+    {
+        return TeacherHonorPeriod::query()
+            ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
+            ->whereDate('end_date', $period->end_date)
+            ->with('branch:id,name')
+            ->get()
+            ->sortBy(fn ($item) => $item->branch?->name)
+            ->values();
     }
 
     public function close(Request $request, string $id): RedirectResponse

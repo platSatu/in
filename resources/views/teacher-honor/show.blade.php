@@ -98,39 +98,120 @@
         </div>
     </div>
 
-    @forelse ($recap as $row)
-        <div class="widget-content widget-content-area br-8 mb-3">
-            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
-                <div>
-                    <h6 class="mb-1">{{ $row['teacher_name'] }}</h6>
-                    <p class="text-muted mb-0">{{ $row['class_count'] }} kelas &middot; {{ \App\Models\ClassSession::hoursLabel((float) $row['teaching_hours']) }} mengajar &middot; <strong>Rp {{ number_format((float) $row['honor_amount'], 0, ',', '.') }}</strong></p>
-                </div>
-
-                @if ($row['honor'])
-                    @php $status = $honorStatus[$row['honor']->status] ?? [$row['honor']->status, 'badge-secondary']; @endphp
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge {{ $status[1] }}">{{ $status[0] }}</span>
-                        @if ($canEdit && $row['honor']->status === 'pending')
-                            <form method="POST" action="{{ route('teacher-honor.approve-payout', $row['honor']->id) }}">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">Setujui</button>
-                            </form>
-                        @elseif ($canEdit && $row['honor']->status === 'approved_for_payout')
-                            <form method="POST" action="{{ route('teacher-honor.mark-paid', $row['honor']->id) }}">
-                                @csrf
-                                <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Tandai Dibayar</button>
-                            </form>
-                        @endif
-                    </div>
-                @endif
-            </div>
-
-            @include('teacher-honor._classes', ['classes' => $row['classes']])
+    {{-- Filter cabang & pengajar + Export Excel (25 November 2026). --}}
+    <form method="GET" class="widget-content widget-content-area br-8 mb-3 d-flex flex-wrap align-items-end gap-2">
+        <div>
+            <label class="form-label small text-muted mb-1">Cabang</label>
+            <select class="form-select" onchange="if (this.value) window.location = this.value">
+                @foreach ($branchPeriods as $item)
+                    <option value="{{ route('teacher-honor.show', $item->id) }}" @selected($item->id === $period->id)>{{ $item->branch?->name ?? '-' }}</option>
+                @endforeach
+            </select>
         </div>
-    @empty
+        <div>
+            <label class="form-label small text-muted mb-1">Pengajar</label>
+            <select name="teacher" class="form-select" onchange="this.form.submit()">
+                <option value="">Semua pengajar</option>
+                @foreach ($teacherOptions as $teacher)
+                    <option value="{{ $teacher['id'] }}" @selected($teacherFilter === $teacher['id'])>{{ $teacher['name'] }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="flex-grow-1" style="min-width: 200px">
+            <label class="form-label small text-muted mb-1">Cari pengajar</label>
+            <input type="search" class="form-control" placeholder="Ketik nama pengajar..." id="honorSearch" autocomplete="off">
+        </div>
+        <a href="{{ route('teacher-honor.export', ['id' => $period->id, 'teacher' => $teacherFilter]) }}" class="btn btn-success">
+            Export Excel
+        </a>
+    </form>
+
+    {{--
+        Banyak pengajar & murid: ringkasan 1 baris per pengajar dulu, rincian kelas & murid baru dibuka
+        saat diklik ("Rincian"), supaya halaman tidak memanjang. Kalau hanya 1 pengajar, rincian langsung terbuka.
+    --}}
+    @if ($recap->isEmpty())
         <div class="widget-content widget-content-area br-8 text-center text-muted py-5">
             Belum ada kelas di periode ini. Honor akan muncul otomatis begitu ada sesi yang disetujui di cabang ini.
         </div>
-    @endforelse
+    @else
+        <div class="widget-content widget-content-area br-8">
+            <div class="table-responsive">
+                <table class="table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Pengajar</th>
+                            <th class="text-center">Kelas</th>
+                            <th>Jam Mengajar</th>
+                            <th class="text-end">Honor</th>
+                            <th>Status</th>
+                            <th class="text-end">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($recap as $index => $row)
+                            @php
+                                $status = $row['honor'] ? ($honorStatus[$row['honor']->status] ?? [$row['honor']->status, 'badge-secondary']) : ['Sedang berjalan', 'badge-light-info'];
+                                $openByDefault = $recap->count() === 1;
+                            @endphp
+                            <tr class="honor-row" data-name="{{ \Illuminate\Support\Str::lower($row['teacher_name']) }}">
+                                <td class="fw-bold">{{ $row['teacher_name'] }}</td>
+                                <td class="text-center">{{ $row['class_count'] }}</td>
+                                <td class="text-nowrap">{{ \App\Models\ClassSession::hoursLabel((float) $row['teaching_hours']) }}</td>
+                                <td class="text-end text-nowrap fw-bold">Rp {{ number_format((float) $row['honor_amount'], 0, ',', '.') }}</td>
+                                <td><span class="badge {{ $status[1] }}">{{ $status[0] }}</span></td>
+                                <td class="text-end">
+                                    <div class="d-flex justify-content-end align-items-center gap-2">
+                                        @if ($canEdit && $row['honor'] && $row['honor']->status === 'pending')
+                                            <form method="POST" action="{{ route('teacher-honor.approve-payout', $row['honor']->id) }}" class="m-0">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-success text-nowrap">Setujui</button>
+                                            </form>
+                                        @elseif ($canEdit && $row['honor'] && $row['honor']->status === 'approved_for_payout')
+                                            <form method="POST" action="{{ route('teacher-honor.mark-paid', $row['honor']->id) }}" class="m-0">
+                                                @csrf
+                                                <button type="submit" class="btn btn-sm btn-outline-primary text-nowrap">Tandai Dibayar</button>
+                                            </form>
+                                        @endif
+                                        <button type="button" class="btn btn-sm btn-outline-secondary text-nowrap" data-bs-toggle="collapse"
+                                            data-bs-target="#honorDetail{{ $index }}" aria-expanded="{{ $openByDefault ? 'true' : 'false' }}">
+                                            Rincian
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                            <tr class="honor-detail" data-name="{{ \Illuminate\Support\Str::lower($row['teacher_name']) }}">
+                                <td colspan="6" class="p-0 border-0">
+                                    <div class="collapse {{ $openByDefault ? 'show' : '' }}" id="honorDetail{{ $index }}">
+                                        <div class="p-3 bg-light rounded-3 my-2">
+                                            @include('teacher-honor._classes', ['classes' => $row['classes']])
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted small text-center py-3 mb-0" id="honorSearchEmpty" hidden>Tidak ada pengajar dengan nama itu.</p>
+        </div>
+
+        <script>
+            (function () {
+                var input = document.getElementById('honorSearch');
+                var empty = document.getElementById('honorSearchEmpty');
+                input.addEventListener('input', function () {
+                    var q = input.value.trim().toLowerCase(), shown = 0;
+                    document.querySelectorAll('.honor-row').forEach(function (row) {
+                        var match = !q || row.dataset.name.indexOf(q) !== -1;
+                        row.hidden = !match;
+                        row.nextElementSibling.hidden = !match;
+                        if (match) { shown++; }
+                    });
+                    empty.hidden = shown > 0;
+                });
+            })();
+        </script>
+    @endif
 </div>
 @endsection
