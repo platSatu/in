@@ -15,9 +15,9 @@
 
         <div class="section-head">
             <div>
-                <span class="eyebrow">InaYule &middot; Kursus Mandarin</span>
+                <span class="eyebrow">INA YULE &middot; Kursus Mandarin</span>
                 <h2 class="section-title">Learning <em>Chinese</em></h2>
-                <p class="section-lead">Mulai dari tempat yang paling nyaman untukmu. Pilih lokasi belajar, lalu temukan kelas sesuai level dan waktumu bersama pengajar InaYule.</p>
+                <p class="section-lead">Mulai dari tempat yang paling nyaman untukmu. Pilih lokasi belajar, lalu temukan kelas sesuai level dan waktumu bersama pengajar INA YULE.</p>
             </div>
             <a href="{{ route('frontend.inayule.classes') }}" class="link-arrow">Lihat semua kelas</a>
         </div>

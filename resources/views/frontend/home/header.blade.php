@@ -10,8 +10,8 @@
 
         <nav class="site-nav" id="siteNav" aria-label="Menu utama">
             <a href="{{ route('home') }}#inastudy">Home</a>
-            <a href="{{ route('home') }}#inayule">InaYule</a>
-            <a href="{{ route('home') }}#inatrip">InaTrip</a>
+            <a href="{{ route('home') }}#inayule">INA YULE</a>
+            <a href="{{ route('home') }}#inatrip">INA TRIP</a>
             <a href="{{ route('frontend.university.catalog') }}">Partner University</a>
             <a href="{{ route('home') }}#lokasi">Location</a>
             @auth

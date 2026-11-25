@@ -12,8 +12,8 @@
     $whatsapp = $phone ? 'https://wa.me/'.(str_starts_with($phone, '0') ? '62'.substr($phone, 1) : $phone) : null;
 @endphp
 
-@section('title', 'Kursus Mandarin InaYule '.$branch->name.' | INASTUDY')
-@section('description', 'Kelas Mandarin InaYule di '.$branch->name.': pilih program, jenis kelas, dan level yang pas, lalu atur jadwal bersama pengajar.')
+@section('title', 'Kursus Mandarin INA YULE '.$branch->name.' | INASTUDY')
+@section('description', 'Kelas Mandarin INA YULE di '.$branch->name.': pilih program, jenis kelas, dan level yang pas, lalu atur jadwal bersama pengajar.')
 
 @section('content')
     <section class="page-section page-section--catalog page-section--branch">
@@ -22,7 +22,7 @@
 
             <div class="branch-hero">
                 <div class="branch-hero__text">
-                    <span class="eyebrow">InaYule &middot; {{ $online ? 'Kelas Online' : 'Kelas Tatap Muka' }}</span>
+                    <span class="eyebrow">INA YULE &middot; {{ $online ? 'Kelas Online' : 'Kelas Tatap Muka' }}</span>
                     <h1 class="section-title">
                         @if ($online)
                             Belajar Mandarin <em>dari rumah</em>
@@ -61,11 +61,10 @@
                 @endif
             </div>
 
-            {{-- Tiga langkah, supaya pengunjung tahu apa yang terjadi setelah membeli. --}}
+            {{-- Dua langkah, supaya pengunjung tahu apa yang terjadi setelah memilih kelas. --}}
             <ol class="start-steps">
                 <li><span>1</span><div><strong>Pilih kelas</strong><small>Sesuai program, suasana kelas, dan levelmu.</small></div></li>
-                <li><span>2</span><div><strong>Beli paket</strong><small>1 credit = 1 jam belajar.</small></div></li>
-                <li><span>3</span><div><strong>Pilih jadwal</strong><small>Cocokkan waktumu dengan jam buka pengajar.</small></div></li>
+                <li><span>2</span><div><strong>Pilih jadwal</strong><small>Cocokkan waktumu dengan jam buka pengajar.</small></div></li>
             </ol>
 
             @include('frontend.home._packages', ['packages' => $packages, 'pills' => true])

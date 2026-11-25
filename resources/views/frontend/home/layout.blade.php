@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'INASTUDY | CHINA EDUCATION CONSULTANT')</title>
-    <meta name="description" content="@yield('description', 'China Education Consultant. InaStudy mendampingi kuliah ke China: pilih universitas, beasiswa, dokumen, visa, kursus Mandarin InaYule, dan perjalanan InaTrip.')">
+    <meta name="description" content="@yield('description', 'China Education Consultant. InaStudy mendampingi kuliah ke China: pilih universitas, beasiswa, dokumen, visa, kursus Mandarin INA YULE, dan perjalanan INA TRIP.')">
     <link rel="icon" type="image/png" href="{{ asset('frontend/img/Logo-icon.png') }}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
