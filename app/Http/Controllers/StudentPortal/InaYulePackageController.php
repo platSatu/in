@@ -212,8 +212,7 @@ class InaYulePackageController extends Controller
             // Kode Referal (25 November 2026): kartu "Bagikan kode" hanya tampil selama program aktif.
             'referral' => ($referralSetting = \App\Models\ReferralSetting::current())->is_active ? [
                 'code' => $request->user()->referralCode(),
-                'buyer_percent' => (float) $referralSetting->buyer_discount_percent,
-                'referrer_percent' => (float) $referralSetting->referrer_commission_percent,
+                'bonus' => (float) $referralSetting->referrer_bonus_amount,
                 'friends' => \App\Models\ReferralRedemption::where('referrer_user_id', $request->user()->id)->whereNotNull('commission_paid_at')->count(),
                 'earned' => (float) \App\Models\ReferralRedemption::where('referrer_user_id', $request->user()->id)->sum('commission_amount'),
             ] : null,

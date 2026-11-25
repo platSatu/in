@@ -8,13 +8,12 @@
 
 @php
     $rupiah = fn ($value) => 'Rp '.number_format((float) $value, 0, ',', '.');
-    $pct = fn ($value) => rtrim(rtrim(number_format((float) $value, 2, ',', '.'), '0'), ',');
 @endphp
 
 <div class="middle-content container-xxl p-0">
     <div class="layout-top-spacing mb-3">
         <h5 class="mb-1">Kode Referal</h5>
-        <p class="text-muted mb-0">Setiap akun punya kode referal sendiri. Murid baru yang memakai kode teman mendapat diskon di pembelian pertamanya, dan pemberi kode mendapat komisi berupa saldo.</p>
+        <p class="text-muted mb-0">Setiap akun punya kode referal sendiri. Kalau murid baru memakai kode teman saat membeli paket pertamanya, teman yang mengajak mendapat bonus saldo.</p>
     </div>
 
     @foreach (['success' => 'success', 'error' => 'danger'] as $flash => $type)
@@ -50,27 +49,27 @@
                     </div>
 
                     <div class="row g-3 mb-3">
-                        <div class="col-md-4 col-lg-3">
-                            <label class="form-label">Diskon pembeli baru (%)</label>
-                            <input type="number" name="buyer_discount_percent" class="form-control" min="0" max="90" step="0.5"
-                                value="{{ old('buyer_discount_percent', $pct($setting->buyer_discount_percent)) }}" @disabled(! $canEdit) required>
-                        </div>
-                        <div class="col-md-4 col-lg-3">
-                            <label class="form-label">Komisi pemberi kode (%)</label>
-                            <input type="number" name="referrer_commission_percent" class="form-control" min="0" max="90" step="0.5"
-                                value="{{ old('referrer_commission_percent', $pct($setting->referrer_commission_percent)) }}" @disabled(! $canEdit) required>
+                        <div class="col-md-5 col-lg-4">
+                            <label class="form-label">Bonus untuk pemberi kode</label>
+                            <div class="input-group">
+                                <span class="input-group-text">Rp</span>
+                                <input type="number" name="referrer_bonus_amount" class="form-control" min="0" step="1000"
+                                    value="{{ old('referrer_bonus_amount', (int) $setting->referrer_bonus_amount) }}" placeholder="mis. 50000" @disabled(! $canEdit) required>
+                            </div>
+                            <div class="form-text">Ditulis tanpa titik, mis. 50000 untuk Rp 50.000.</div>
                         </div>
                     </div>
 
                     <div class="alert alert-light border small">
-                        <strong class="d-block mb-1">Contoh dengan 10% + 10%</strong>
-                        Paket Rp 1.000.000: murid baru membayar <strong>Rp 900.000</strong>. Setelah lunas, pemberi kode mendapat
-                        saldo <strong>Rp 90.000</strong> (10% dari yang dibayar).
+                        <strong class="d-block mb-1">Cara kerjanya</strong>
+                        Misal bonus Rp 50.000: Budi membagikan kodenya ke Ani. Ani memasukkan kode Budi saat membeli paket pertamanya
+                        dan membayar <strong>harga normal</strong>. Setelah pembayaran Ani lunas, Budi mendapat saldo <strong>Rp 50.000</strong>.
                         <ul class="mb-0 mt-2 ps-3">
+                            <li>Murid baru <strong>tidak mendapat diskon</strong> dari kode referal. Kalau ingin memberi potongan, buat <strong>Voucher</strong> seperti biasa (tetap bisa dipakai bersamaan).</li>
                             <li>Hanya untuk <strong>pembelian pertama murid baru</strong>, sekali per murid.</li>
-                            <li>Kode pemberi bisa dipakai banyak murid baru; komisi didapat <strong>1x dari tiap murid</strong>.</li>
-                            <li>Bisa digabung voucher: diskon referal dihitung dari harga setelah voucher.</li>
-                            <li>Saldo komisi <strong>hanya untuk membeli paket</strong>, tidak bisa dicairkan.</li>
+                            <li>Kode pemberi bisa dipakai banyak murid baru; bonus didapat <strong>1x dari tiap murid</strong>.</li>
+                            <li>Bonus tidak pernah melebihi yang dibayar murid baru, dan tidak ada bonus kalau murid baru membayar Rp 0.</li>
+                            <li>Saldo bonus <strong>hanya untuk membeli paket</strong>, tidak bisa dicairkan.</li>
                         </ul>
                     </div>
 
@@ -83,21 +82,15 @@
 
         <div class="col-12 layout-spacing">
             <div class="row g-3 mb-3">
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <div class="widget-content widget-content-area br-8">
                         <p class="text-muted small mb-1">Murid baru dari referal</p>
                         <h5 class="mb-0">{{ $summary['buyers'] }} orang</h5>
                     </div>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-6">
                     <div class="widget-content widget-content-area br-8">
-                        <p class="text-muted small mb-1">Total diskon pembeli</p>
-                        <h5 class="mb-0">{{ $rupiah($summary['discount']) }}</h5>
-                    </div>
-                </div>
-                <div class="col-md-4">
-                    <div class="widget-content widget-content-area br-8">
-                        <p class="text-muted small mb-1">Total komisi saldo</p>
+                        <p class="text-muted small mb-1">Total bonus saldo</p>
                         <h5 class="mb-0">{{ $rupiah($summary['commission']) }}</h5>
                     </div>
                 </div>
@@ -114,7 +107,7 @@
                                 <th>Murid Baru</th>
                                 <th>Paket</th>
                                 <th class="text-end">Dibayar</th>
-                                <th class="text-end">Komisi</th>
+                                <th class="text-end">Bonus</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
@@ -133,7 +126,9 @@
                                     <td class="small">{{ $row->coursePackage?->name ?? '-' }}</td>
                                     <td class="text-end text-nowrap">
                                         {{ $rupiah($row->price_after) }}
-                                        <div class="small text-success">hemat {{ $rupiah($row->discount_amount) }}</div>
+                                        @if ((float) $row->discount_amount > 0)
+                                            <div class="small text-success">hemat {{ $rupiah($row->discount_amount) }}</div>
+                                        @endif
                                     </td>
                                     <td class="text-end text-nowrap">{{ $row->commission_paid_at ? $rupiah($row->commission_amount) : '-' }}</td>
                                     <td><span class="badge {{ $row->commission_paid_at ? 'badge-success' : 'badge-secondary' }}">{{ $row->statusLabel() }}</span></td>

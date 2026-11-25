@@ -193,13 +193,10 @@
             </style>
             {{-- Kode Referal (25 November 2026): murid cukup membagikan kodenya. --}}
             @if ($referral)
-                @php
-                    $pct = fn ($value) => rtrim(rtrim(number_format($value, 2, ',', '.'), '0'), ',');
-                @endphp
                 <div class="iy-referral mb-3">
                     <div class="iy-referral-text">
                         <strong>Ajak teman belajar Mandarin</strong>
-                        <span>Teman baru hemat {{ $pct($referral['buyer_percent']) }}% di pembelian pertamanya, kamu dapat saldo {{ $pct($referral['referrer_percent']) }}% dari tiap teman. Saldo dipakai untuk beli paket berikutnya (tidak bisa dicairkan).</span>
+                        <span>Bagikan kodemu ke teman yang baru mau belajar. Setelah teman membayar paket pertamanya, kamu dapat saldo Rp {{ number_format($referral['bonus'], 0, ',', '.') }} dari tiap teman. Saldo dipakai untuk beli paket berikutnya (tidak bisa dicairkan).</span>
                         @if ($referral['friends'] > 0)
                             <small>{{ $referral['friends'] }} teman sudah bergabung &middot; saldo terkumpul Rp {{ number_format($referral['earned'], 0, ',', '.') }}</small>
                         @endif
@@ -208,7 +205,7 @@
                         <code id="iyReferralCode">{{ $referral['code'] }}</code>
                         <button type="button" class="btn btn-sm btn-outline-primary" id="iyReferralCopy">Salin</button>
                         <a class="btn btn-sm btn-success" target="_blank" rel="noopener"
-                            href="https://wa.me/?text={{ rawurlencode('Yuk belajar Mandarin di INA YULE! Pakai kode referal saya '.$referral['code'].' saat beli paket pertama, kamu hemat '.$pct($referral['buyer_percent']).'%. '.route('frontend.inayule.classes')) }}">Bagikan</a>
+                            href="https://wa.me/?text={{ rawurlencode('Yuk belajar Mandarin di INA YULE! Pakai kode referal saya '.$referral['code'].' saat beli paket pertama. '.route('frontend.inayule.classes')) }}">Bagikan</a>
                     </div>
                 </div>
                 <style>

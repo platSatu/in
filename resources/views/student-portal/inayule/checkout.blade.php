@@ -42,7 +42,7 @@
             </form>
 
             {{-- Kode Referal (25 November 2026): hanya untuk pembelian pertama murid baru. Pratinjau lewat GET;
-                 diskon dihitung & dicek ulang di server saat Bayar Sekarang. --}}
+                 tidak mengubah harga, hanya mencatat siapa yang mengajak (dicek ulang di server saat Bayar Sekarang). --}}
             @if ($referralAvailable)
                 <form method="GET" action="{{ route('inayule.checkout.show', $package->id) }}" class="mb-3">
                     @if ($voucherCode !== '')
@@ -60,7 +60,7 @@
                     @if ($referralResult)
                         <div @class(['small mt-1', 'text-success' => $referralResult['ok'], 'text-danger' => ! $referralResult['ok']])>{{ $referralResult['message'] }}</div>
                     @else
-                        <div class="small text-muted mt-1">Khusus pembelian pertama. Bisa digabung dengan voucher.</div>
+                        <div class="small text-muted mt-1">Khusus pembelian pertama. Teman yang mengajak Anda akan mendapat bonus.</div>
                     @endif
                 </form>
             @elseif ($referralProgramActive)
@@ -80,19 +80,13 @@
                     </div>
                 @endif
                 @if ($referralResult && $referralResult['ok'])
-                    @unless ($voucherResult && $voucherResult['ok'])
-                        <div class="d-flex justify-content-between py-1 text-muted">
-                            <span>Harga Package</span>
-                            <span class="text-decoration-line-through">Rp {{ number_format($originalPrice, 0, ',', '.') }}</span>
-                        </div>
-                    @endunless
-                    <div class="d-flex justify-content-between py-1 text-success">
-                        <span>Diskon Referal {{ $referralResult['referrer']->referral_code }}</span>
-                        <span>- Rp {{ number_format($referralResult['discount'], 0, ',', '.') }}</span>
+                    <div class="d-flex justify-content-between py-1 text-muted">
+                        <span>Kode Referal</span>
+                        <span>{{ $referralResult['referrer']->referral_code }}</span>
                     </div>
                 @endif
                 <div class="d-flex justify-content-between py-1">
-                    <span>{{ ($voucherResult && $voucherResult['ok']) || ($referralResult && $referralResult['ok']) ? 'Harga Setelah Diskon' : 'Harga Package' }}</span>
+                    <span>{{ $voucherResult && $voucherResult['ok'] ? 'Harga Setelah Diskon' : 'Harga Package' }}</span>
                     <span class="fw-bold">Rp {{ number_format($price, 0, ',', '.') }}</span>
                 </div>
                 <div class="d-flex justify-content-between py-1 text-muted">
@@ -129,7 +123,7 @@
                 @if ($voucherResult && $voucherResult['ok'])
                     <input type="hidden" name="voucher_code" value="{{ $voucherResult['voucher']->code }}">
                 @endif
-                {{-- Hanya kodenya yang dikirim; diskon & syaratnya dihitung ulang di server. --}}
+                {{-- Hanya kodenya yang dikirim; syaratnya dicek ulang di server. --}}
                 @if ($referralResult && $referralResult['ok'])
                     <input type="hidden" name="referral_code" value="{{ $referralResult['referrer']->referral_code }}">
                 @endif

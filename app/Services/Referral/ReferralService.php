@@ -18,8 +18,9 @@ use Throwable;
 
 /**
  * Kode Referal INA YULE (25 November 2026). Murid B membagikan kodenya, murid baru A memakainya saat checkout:
- *  - A dapat diskon X% di pembelian pertamanya (setelah potongan voucher, kalau ada).
- *  - B dapat komisi Y% dari yang BENAR-BENAR dibayar A, masuk ke Saldo setelah pembayaran A lunas.
+ *  - Harga A tidak berubah (diskon untuk murid baru cukup lewat Voucher).
+ *  - B dapat bonus saldo sejumlah rupiah yang diisi admin, setelah pembayaran A lunas.
+ *    Bonus tidak pernah lebih besar dari yang benar-benar dibayar A, dan tidak ada bonus kalau A membayar Rp 0.
  *    Saldo hanya bisa dipakai membeli paket, tidak bisa dicairkan.
  *
  * Penjagaan (semua di server, angka dari browser tidak pernah dipakai):
@@ -60,10 +61,11 @@ class ReferralService
                 'buyer_student_id' => $student->id,
                 'course_package_id' => $package->id,
                 'price_before' => $price,
-                'buyer_discount_percent' => $result['setting']->buyer_discount_percent,
-                'discount_amount' => $result['discount'],
-                'price_after' => $result['final'],
-                'referrer_commission_percent' => $result['setting']->referrer_commission_percent,
+                'buyer_discount_percent' => 0,
+                'discount_amount' => 0,
+                'price_after' => $price,
+                'referrer_commission_percent' => 0,
+                'referrer_bonus_amount' => $result['setting']->referrer_bonus_amount,
             ]);
 
             return $result;
@@ -97,9 +99,12 @@ class ReferralService
                     return;
                 }
 
-                // Dari yang benar-benar dibayar pembeli (saldo + gateway), dibulatkan ke bawah per rupiah.
-                $paid = (float) $payment->price_total;
-                $commission = floor($paid * (float) $redemption->referrer_commission_percent / 100);
+                // Bonus rupiah tetap (nilai saat kode dipakai), tapi tidak melebihi yang benar-benar dibayar pembeli.
+                // Pemakaian lama (sebelum bonus rupiah) tetap memakai persen yang tercatat.
+                $paid = max((float) $payment->price_total, 0);
+                $commission = $redemption->referrer_bonus_amount !== null
+                    ? floor(min((float) $redemption->referrer_bonus_amount, $paid))
+                    : floor($paid * (float) $redemption->referrer_commission_percent / 100);
 
                 if ($commission <= 0) {
                     $redemption->update(['commission_amount' => 0, 'commission_paid_at' => now()]);
@@ -117,7 +122,7 @@ class ReferralService
                     'debit' => 0,
                     'kredit' => $commission,
                     'balance' => $before + $commission,
-                    'description' => "Komisi referal: {$buyerName} membeli {$packageName} (hanya untuk beli paket, tidak bisa dicairkan)",
+                    'description' => "Bonus referal: {$buyerName} membeli {$packageName} (hanya untuk beli paket, tidak bisa dicairkan)",
                     'payment_status' => 'success',
                     'payment_method' => self::SALDO_METHOD,
                     'payment_date' => now(),
@@ -130,7 +135,7 @@ class ReferralService
                     'amount' => $commission,
                     'balance_before' => $before,
                     'balance_after' => $before + $commission,
-                    'description' => 'Komisi referal dari '.$buyerName,
+                    'description' => 'Bonus referal dari '.$buyerName,
                     'reference_type' => 'referral_redemption',
                     'reference_id' => $redemption->id,
                     'status' => 'success',
@@ -187,16 +192,15 @@ class ReferralService
             return $fail('Kode referal hanya untuk pembelian pertama murid baru INA YULE.');
         }
 
-        $discount = floor($price * (float) $setting->buyer_discount_percent / 100);
-        if ($discount <= 0 || $discount >= $price) {
-            return $fail('Kode referal tidak bisa dipakai untuk harga ini.');
+        if ($price <= 0) {
+            return $fail('Kode referal hanya bisa dipakai untuk pembelian berbayar.');
         }
 
         return [
             'ok' => true,
-            'message' => 'Kode referal '.$referrer->referral_code.' dipakai: hemat Rp '.number_format($discount, 0, ',', '.').'.',
-            'discount' => $discount,
-            'final' => $price - $discount,
+            'message' => 'Kode referal '.$referrer->referral_code.' tercatat. Terima kasih sudah diajak '.$referrer->name.'!',
+            'discount' => 0.0,
+            'final' => $price,
             'referrer' => $referrer,
             'setting' => $setting,
         ];

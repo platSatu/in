@@ -33,6 +33,7 @@ class ReferralRedemption extends Model
         'discount_amount',
         'price_after',
         'referrer_commission_percent',
+        'referrer_bonus_amount',
         'commission_amount',
         'commission_deposit_id',
         'commission_paid_at',
@@ -44,6 +45,7 @@ class ReferralRedemption extends Model
         'discount_amount' => 'decimal:2',
         'price_after' => 'decimal:2',
         'referrer_commission_percent' => 'decimal:2',
+        'referrer_bonus_amount' => 'decimal:2',
         'commission_amount' => 'decimal:2',
         'commission_paid_at' => 'datetime',
     ];
@@ -65,7 +67,7 @@ class ReferralRedemption extends Model
         $payment = $this->payment;
 
         return match (true) {
-            $this->commission_paid_at !== null => 'Lunas, komisi masuk',
+            $this->commission_paid_at !== null => 'Lunas, bonus masuk',
             $payment?->status === CoursePackagePayment::STATUS_PAID => 'Lunas',
             $payment?->status === CoursePackagePayment::STATUS_PENDING && (! $payment->expires_at || $payment->expires_at->isFuture()) => 'Menunggu bayar',
             $payment === null && $this->created_at?->gt(now()->subMinutes(CourseVoucherRedemption::UNATTACHED_GRACE_MINUTES)) => 'Diproses',

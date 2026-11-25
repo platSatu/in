@@ -180,7 +180,7 @@ class InaYulePackageCheckoutController extends Controller
             $price = $voucher['final'];
         }
 
-        // Kode Referal (25 November 2026): diskon dihitung dari harga setelah voucher, dicek ulang di dalam lock.
+        // Kode Referal (25 November 2026): harga tidak berubah, kode hanya dicatat (dicek ulang di dalam lock).
         // Browser hanya mengirim teks kodenya; semua angka dihitung di server.
         $referral = null;
         $referralCode = trim((string) $request->input('referral_code', ''));

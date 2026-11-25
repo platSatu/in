@@ -10,7 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 /**
- * Course > Kode Referal (25 November 2026): admin mengatur besaran diskon pembeli baru & komisi pemberi kode,
+ * Course > Kode Referal (25 November 2026): admin mengisi 1 angka, bonus saldo (Rp) untuk pemberi kode,
  * lalu melihat siapa mengajak siapa. Aturan pemakaiannya ada di App\Services\Referral\ReferralService.
  */
 class CourseReferralController extends Controller
@@ -27,7 +27,6 @@ class CourseReferralController extends Controller
                 ->paginate(20),
             'summary' => [
                 'buyers' => (clone $paid)->count(),
-                'discount' => (float) (clone $paid)->sum('discount_amount'),
                 'commission' => (float) (clone $paid)->sum('commission_amount'),
             ],
         ]);
@@ -37,17 +36,16 @@ class CourseReferralController extends Controller
     {
         $data = $request->validate([
             'is_active' => ['nullable', 'boolean'],
-            'buyer_discount_percent' => ['required', 'numeric', 'min:0', 'max:90'],
-            'referrer_commission_percent' => ['required', 'numeric', 'min:0', 'max:90'],
+            'referrer_bonus_amount' => ['required', 'integer', 'min:0', 'max:100000000'],
         ], [
-            'buyer_discount_percent.max' => 'Diskon pembeli maksimal 90%.',
-            'referrer_commission_percent.max' => 'Komisi pemberi kode maksimal 90%.',
+            'referrer_bonus_amount.required' => 'Isi besaran bonus untuk pemberi kode.',
+            'referrer_bonus_amount.integer' => 'Bonus diisi angka rupiah tanpa titik atau koma, mis. 50000.',
+            'referrer_bonus_amount.min' => 'Bonus tidak boleh minus.',
         ]);
 
         ReferralSetting::current()->update([
             'is_active' => $request->boolean('is_active'),
-            'buyer_discount_percent' => $data['buyer_discount_percent'],
-            'referrer_commission_percent' => $data['referrer_commission_percent'],
+            'referrer_bonus_amount' => $data['referrer_bonus_amount'],
             'updated_by' => $request->user()->id,
         ]);
 
