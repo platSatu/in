@@ -74,6 +74,8 @@ class CompanyBranchController extends Controller
             'handphone' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
             'status' => 'nullable|in:active,inactive',
+            // Link quiz Placement Test cabang ini, ditempel admin dari menu Quiz (25 November 2026).
+            'placement_test_url' => 'nullable|url|max:500',
         ]);
 
         $userId = Auth::id();
@@ -125,6 +127,8 @@ class CompanyBranchController extends Controller
             'handphone' => 'nullable|string|max:50',
             'email' => 'nullable|email|max:255',
             'status' => 'nullable|in:active,inactive',
+            // Link quiz Placement Test cabang ini, ditempel admin dari menu Quiz (25 November 2026).
+            'placement_test_url' => 'nullable|url|max:500',
         ]);
 
         if ($request->hasFile('logo')) {

@@ -7,6 +7,7 @@ use App\Models\CourseClass;
 use App\Models\CompanyBranch;
 use App\Models\TeacherHonor;
 use App\Models\TeacherHonorPeriod;
+use App\Models\TeacherRate;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -54,6 +55,9 @@ class TeacherHonorService
     /** Tanggal tutup periode setiap bulan; periode berikutnya mulai besoknya (26). */
     public const CUTOFF_DAY = 25;
 
+    /** Aturan Tarif Pengajar, dimuat sekali per rekap (lihat TeacherRate::bestFor()). */
+    private ?Collection $rates = null;
+
     /**
      * Rekap per pengajar untuk satu periode.
      *
@@ -92,6 +96,8 @@ class TeacherHonorService
             ])
             ->orderByClassTime()
             ->get();
+
+        $this->rates = TeacherRate::with(['teacher:id,name', 'branch:id,name', 'courseClass:id,name'])->get();
 
         return $sessions
             ->groupBy('teacher_user_id')
@@ -141,6 +147,35 @@ class TeacherHonorService
             })
             ->sortBy('teacher_name')
             ->values();
+    }
+
+    /**
+     * Rekap gabungan semua cabang (25 November 2026): honor & jam tiap pengajar
+     * per cabang, lalu dijumlahkan. Contoh: MOI Rp 1.000.000 + Pluit Rp 2.000.000
+     * = total Rp 3.000.000. $periods = periode-periode cabang di bulan yang sama.
+     *
+     * @param  Collection<int, TeacherHonorPeriod>  $periods
+     * @return Collection<int, array{teacher_user_id: string, teacher_name: string, branches: array<string, array{honor: float, hours: float, classes: int}>, total_honor: float, total_hours: float}>
+     */
+    public function combinedRecap(Collection $periods, ?string $teacherUserId = null): Collection
+    {
+        $rows = [];
+
+        foreach ($periods as $period) {
+            foreach ($this->recap($period, $teacherUserId) as $row) {
+                $teacher = $row['teacher_user_id'];
+                $rows[$teacher] ??= ['teacher_user_id' => $teacher, 'teacher_name' => $row['teacher_name'], 'branches' => [], 'total_honor' => 0.0, 'total_hours' => 0.0];
+                $rows[$teacher]['branches'][$period->branch_id] = [
+                    'honor' => (float) $row['honor_amount'],
+                    'hours' => (float) $row['teaching_hours'],
+                    'classes' => (int) $row['class_count'],
+                ];
+                $rows[$teacher]['total_honor'] += (float) $row['honor_amount'];
+                $rows[$teacher]['total_hours'] += (float) $row['teaching_hours'];
+            }
+        }
+
+        return collect($rows)->sortBy('teacher_name')->values();
     }
 
     /**
@@ -398,24 +433,34 @@ class TeacherHonorService
         if ($allocation) {
             return ['purchase:'.$allocation->purchase->id, $this->source(
                 $this->studentName($allocation->purchase->student),
-                $allocation->purchase->coursePackage
+                $allocation->purchase->coursePackage,
+                $session
             )];
         }
 
         return ['package:'.$session->student_id.':'.$session->course_package_id, $this->source(
             $this->studentName($session->student),
-            $session->coursePackage
+            $session->coursePackage,
+            $session
         )];
     }
 
-    private function source(string $owner, $package): array
+    /**
+     * Fee kelas ini: aturan Tarif Pengajar yang paling spesifik untuk pengajar,
+     * cabang sesi, dan course class-nya; kalau tidak ada, fee umum Course Class.
+     */
+    private function source(string $owner, $package, ClassSession $session): array
     {
+        $courseClass = $package?->courseClass;
+        $rate = TeacherRate::bestFor($this->rates ?? collect(), $session->teacher_user_id, $session->branch_id, $courseClass?->id);
+
         return [
             'owner' => $owner,
             'package' => $package?->name ?? '-',
-            'class_name' => $package?->courseClass?->name ?? '-',
-            'fee' => (float) ($package?->courseClass?->teacher_fee ?? 0),
-            'honor_mode' => $package?->courseClass?->honor_mode ?? CourseClass::HONOR_PER_CLASS,
+            'class_name' => $courseClass?->name ?? '-',
+            'fee' => (float) ($rate ? $rate->fee : ($courseClass?->teacher_fee ?? 0)),
+            'honor_mode' => $rate ? $rate->honor_mode : ($courseClass?->honor_mode ?? CourseClass::HONOR_PER_CLASS),
+            'rate_label' => $rate ? $rate->label() : 'Fee umum Course Class',
         ];
     }
 

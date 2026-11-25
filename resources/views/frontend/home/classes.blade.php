@@ -1,7 +1,7 @@
 @extends('frontend.home.layout')
 
 @section('title', 'Kelas Mandarin InaYule | INASTUDY | CHINA EDUCATION CONSULTANT')
-@section('description', 'Daftar kelas kursus Mandarin InaYule: level, durasi, jumlah sesi, dan harga.')
+@section('description', 'Kursus Mandarin InaYule di Mall of Indonesia, Pluit, dan Online. Pilih lokasi, lalu temukan kelas sesuai level dan waktumu.')
 
 @section('content')
     <section class="page-section page-section--catalog">
@@ -9,13 +9,13 @@
             <div class="section-head">
                 <div>
                     <span class="eyebrow">InaYule &middot; Kursus Mandarin</span>
-                    <h1 class="section-title">Semua kelas <em>InaYule</em></h1>
-                    <p class="section-lead">Pilih kelas yang pas, lalu login untuk membeli dan mengatur jadwal belajarmu.</p>
+                    <h1 class="section-title">Mau belajar <em>di mana?</em></h1>
+                    <p class="section-lead">Setiap lokasi punya kelas, harga, dan Placement Test sendiri. Pilih yang paling dekat atau paling nyaman untukmu.</p>
                 </div>
                 <a href="{{ route('home') }}#inayule" class="link-arrow link-arrow--back">Kembali ke beranda</a>
             </div>
 
-            @include('frontend.home._packages', ['packages' => $packages])
+            @include('frontend.home._branches', ['branches' => $branches])
         </div>
     </section>
 @endsection

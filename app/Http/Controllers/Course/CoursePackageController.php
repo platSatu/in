@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Course;
 
 use App\Helpers\AdminCrud;
 use App\Http\Controllers\Controller;
+use App\Models\CompanyBranch;
 use App\Models\CourseClass;
 use App\Models\CourseLevel;
 use App\Models\CoursePackage;
@@ -11,6 +12,7 @@ use App\Models\CourseType;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 
 /**
@@ -65,15 +67,22 @@ class CoursePackageController extends Controller
     public function index(Request $request)
     {
         $search = $request->query('search');
+        // Filter cabang (25 November 2026): 'none' = paket yang belum punya cabang.
+        $branchFilter = $request->query('branch');
 
-        $data = CoursePackage::query()
-            ->with(['type', 'courseClass', 'level'])
-            ->when($search, fn (Builder $q) => $q->where('name', 'like', "%{$search}%"))
+        $data = $this->filtered($search, $branchFilter)
+            ->with(['type', 'courseClass', 'level', 'branch'])
             ->latest()
-            ->paginate(10)
+            ->paginate(25)
             ->withQueryString();
 
-        return view('course.package.index', compact('data', 'search'));
+        return view('course.package.index', [
+            'data' => $data,
+            'search' => $search,
+            'branchFilter' => $branchFilter,
+            'branches' => $this->branchOptions(),
+            'withoutBranch' => CoursePackage::whereNull('branch_id')->count(),
+        ]);
     }
 
     public function create()
@@ -83,6 +92,7 @@ class CoursePackageController extends Controller
             'classes' => $this->activeOptions(CourseClass::class),
             'levels' => $this->activeOptions(CourseLevel::class),
             'durationUnits' => self::DURATION_UNITS,
+            'branches' => $this->branchOptions(),
         ]);
     }
 
@@ -111,6 +121,7 @@ class CoursePackageController extends Controller
             'classes' => $this->activeOptions(CourseClass::class, $data->course_class_id),
             'levels' => $this->activeOptions(CourseLevel::class, $data->course_level_id),
             'durationUnits' => self::DURATION_UNITS,
+            'branches' => $this->branchOptions(),
         ]);
     }
 
@@ -169,6 +180,7 @@ class CoursePackageController extends Controller
             'price' => $original->price,
             'promo_price' => $original->promo_price,
             'class_quota' => $original->class_quota,
+            'branch_id' => $original->branch_id,
             'credits' => $this->calculateCredits((int) $original->duration_value, $original->duration_unit),
             'description' => $original->description,
             'status' => $original->status,
@@ -180,6 +192,80 @@ class CoursePackageController extends Controller
         return redirect()
             ->route('course.package.index')
             ->with('success', 'Course Package berhasil di-copy.');
+    }
+
+    /**
+     * Pilih Semua -> Copy / Pindahkan ke cabang (25 November 2026).
+     *
+     *  - Copy:      paket yang dicentang digandakan ke cabang tujuan, nama tetap
+     *               sama (cabangnya sudah membedakan). Untuk start awal: isi 1
+     *               cabang dulu, lalu copy semuanya ke cabang lain.
+     *  - Pindahkan: paket yang dicentang diganti cabangnya, mis. paket lama
+     *               yang belum punya cabang.
+     */
+    public function bulk(Request $request)
+    {
+        $validated = $request->validate([
+            // all_filtered = "pilih semua paket di filter ini" (bukan hanya yang tampil di halaman ini).
+            'all_filtered' => ['nullable', 'boolean'],
+            'search' => ['nullable', 'string'],
+            'branch' => ['nullable', 'string'],
+            'ids' => ['required_without:all_filtered', 'array'],
+            'ids.*' => ['uuid'],
+            'action' => ['required', Rule::in(['copy', 'move'])],
+            'target_branch_id' => ['required', 'uuid', Rule::exists('company_branch', 'id')],
+        ], [
+            'ids.required' => 'Centang dulu paket yang mau diproses.',
+            'target_branch_id.required' => 'Pilih cabang tujuan.',
+        ]);
+
+        $branch = CompanyBranch::findOrFail($validated['target_branch_id']);
+        $packages = $request->boolean('all_filtered')
+            ? $this->filtered($validated['search'] ?? null, $validated['branch'] ?? null)->get()
+            : CoursePackage::whereIn('id', $validated['ids'])->get();
+
+        if ($packages->isEmpty()) {
+            return back()->with('error', 'Tidak ada paket yang diproses.');
+        }
+        $userId = Auth::id();
+
+        DB::transaction(function () use ($packages, $validated, $branch, $userId) {
+            foreach ($packages as $package) {
+                if ($validated['action'] === 'move') {
+                    $package->update(['branch_id' => $branch->id]);
+                    continue;
+                }
+
+                $copy = $package->replicate(['credits']);
+                $copy->branch_id = $branch->id;
+                $copy->credits = $this->calculateCredits((int) $package->duration_value, $package->duration_unit);
+                $copy->user_id = $userId !== null ? (string) $userId : null;
+                $copy->save();
+            }
+        });
+
+        $verb = $validated['action'] === 'copy' ? 'di-copy ke' : 'dipindahkan ke';
+
+        return redirect()
+            ->route('course.package.index', ['branch' => $branch->id])
+            ->with('success', $packages->count().' paket berhasil '.$verb.' cabang '.$branch->name.'. Silakan cek harga & paket yang tidak dijual di cabang ini.');
+    }
+
+    /** Pencarian & filter cabang yang sama untuk daftar dan aksi Pilih Semua. */
+    private function filtered(?string $search, ?string $branchFilter): Builder
+    {
+        return CoursePackage::query()
+            ->when($search, fn (Builder $q) => $q->where('name', 'like', "%{$search}%"))
+            ->when($branchFilter === 'none', fn (Builder $q) => $q->whereNull('branch_id'))
+            ->when($branchFilter && $branchFilter !== 'none', fn (Builder $q) => $q->where('branch_id', $branchFilter));
+    }
+
+    /** Cabang aktif untuk pilihan di form & filter. */
+    private function branchOptions()
+    {
+        return CompanyBranch::where(fn ($q) => $q->whereNull('status')->orWhere('status', '!=', 'inactive'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
     }
 
     /**
@@ -202,6 +288,8 @@ class CoursePackageController extends Controller
             'promo_price' => ['nullable', 'numeric', 'min:0', 'lt:price', 'max:999999999.99'],
             // Berapa siswa boleh belajar bersama dalam 1 kelas (lihat CoursePackage::seatsPerClass()).
             'class_quota' => ['required', 'integer', 'min:1', 'max:100'],
+            // Cabang tempat paket ini dijual (25 November 2026). Kosong = belum tampil di website.
+            'branch_id' => ['nullable', 'uuid', Rule::exists('company_branch', 'id')],
             // 'credits' SENGAJA tidak divalidasi/diambil dari input di sini --
             // selalu dihitung ulang lewat calculateCredits() di store()/update(),
             // lihat docblock CREDITS_PER_DURATION_UNIT di atas.

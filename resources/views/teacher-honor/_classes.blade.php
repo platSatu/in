@@ -45,6 +45,9 @@
                     <td class="text-nowrap">{{ \App\Models\ClassSession::hoursLabel((float) ($class['hours'] ?? $class['credit_total'])) }}</td>
                     <td class="text-end text-nowrap">
                         Rp {{ number_format((float) ($class['honor'] ?? $class['fee']), 0, ',', '.') }}
+                        @if (! empty($class['rate_label']))
+                            <div class="small text-muted">{{ $class['rate_label'] }}</div>
+                        @endif
                         @if (($class['honor_mode'] ?? null) === \App\Models\CourseClass::HONOR_PER_HOUR)
                             <div class="small text-muted">Rp {{ number_format((float) $class['fee'], 0, ',', '.') }}/jam &times; {{ \App\Models\ClassSession::hoursLabel((float) ($class['hours'] ?? $class['credit_total'])) }}</div>
                         @endif

@@ -64,11 +64,46 @@
             if (empty) empty.hidden = shown > 0;
             if (count) count.textContent = matched;
             if (grid) grid.scrollLeft = 0; // HP: kembali ke kartu pertama setelah filter berubah
+            dimEmptyChoices(type);
+            syncUrl(type, kelas);
+        }
+
+        // Halaman cabang (25 November 2026): pilihan "Belajar dengan" yang tidak punya kelas
+        // untuk program terpilih dibuat redup, supaya pengunjung tidak menemui hasil kosong.
+        function dimEmptyChoices(type) {
+            form.querySelectorAll('.pill-chips input[name="class"]').forEach(function (input) {
+                var available = !input.value || cards.some(function (card) {
+                    return card.dataset['class'] === input.value && (!type || card.dataset.type === type);
+                });
+                input.closest('label').classList.toggle('is-empty', !available);
+            });
+        }
+
+        // Pilihan Program & kelas ikut tersimpan di alamat halaman, jadi link-nya bisa dibagikan apa adanya.
+        function syncUrl(type, kelas) {
+            if (!form.hasAttribute('data-sync-url') || !window.history.replaceState) return;
+            var url = new URL(window.location.href);
+            type ? url.searchParams.set('program', type) : url.searchParams.delete('program');
+            kelas ? url.searchParams.set('kelas', kelas) : url.searchParams.delete('kelas');
+            window.history.replaceState(null, '', url);
+        }
+
+        function restoreFromUrl() {
+            if (!form.hasAttribute('data-sync-url')) return;
+            var params = new URLSearchParams(window.location.search);
+            [['type', params.get('program')], ['class', params.get('kelas')]].forEach(function (pair) {
+                if (!pair[1]) return;
+                Array.prototype.forEach.call(form.querySelectorAll('input[name="' + pair[0] + '"]'), function (input) {
+                    if (input.value === pair[1]) input.checked = true;
+                });
+            });
         }
 
         form.addEventListener('input', apply);
         form.addEventListener('change', apply);
         form.addEventListener('reset', function () { setTimeout(apply, 0); });
+        restoreFromUrl();
+        apply();
     });
 })();
 

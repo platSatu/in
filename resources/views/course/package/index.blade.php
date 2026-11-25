@@ -29,9 +29,26 @@
         <div class="col-xl-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
 
+                @if ($withoutBranch > 0)
+                    {{-- Paket tanpa cabang tidak tampil di website (25 November 2026). --}}
+                    <div class="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <span><strong>{{ $withoutBranch }} paket belum punya cabang</strong> dan belum tampil di website. Tampilkan, centang Pilih Semua, lalu Pindahkan ke cabang.</span>
+                        <a href="{{ route('course.package.index', ['branch' => 'none']) }}" class="btn btn-sm btn-warning">Tampilkan paket ini</a>
+                    </div>
+                @endif
+
                 <div class="mb-4">
                     <form method="GET" action="{{ route('course.package.index') }}" class="row g-2">
-                        <div class="col-md-10">
+                        <div class="col-md-3">
+                            <select name="branch" class="form-select" onchange="this.form.submit()">
+                                <option value="">Semua Cabang</option>
+                                <option value="none" @selected($branchFilter === 'none')>Belum ada cabang</option>
+                                @foreach ($branches as $branch)
+                                    <option value="{{ $branch->id }}" @selected($branchFilter === $branch->id)>{{ $branch->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-7">
                             <input
                                 type="text"
                                 name="search"
@@ -48,12 +65,45 @@
                     </form>
                 </div>
 
+                {{-- Pilih Semua -> Copy / Pindahkan ke cabang. Checkbox baris memakai form="bulkForm"
+                     karena tombol Copy/Delete per baris sudah punya form sendiri. --}}
+                <form method="POST" action="{{ route('course.package.bulk') }}" id="bulkForm"
+                    class="border rounded-3 p-3 mb-3 bg-light" hidden>
+                    @csrf
+                    <input type="hidden" name="all_filtered" value="0" id="bulkAllFiltered">
+                    <input type="hidden" name="search" value="{{ $search }}">
+                    <input type="hidden" name="branch" value="{{ $branchFilter }}">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <strong id="bulkCount">0 paket dipilih</strong>
+                        @if ($data->total() > $data->count())
+                            <button type="button" class="btn btn-link btn-sm p-0" id="bulkSelectFiltered">
+                                Pilih juga semua {{ $data->total() }} paket di filter ini
+                            </button>
+                        @endif
+                        <span class="ms-md-auto"></span>
+                        <select name="action" class="form-select form-select-sm w-auto" required>
+                            <option value="copy">Copy ke cabang</option>
+                            <option value="move">Pindahkan ke cabang</option>
+                        </select>
+                        <select name="target_branch_id" class="form-select form-select-sm w-auto" required>
+                            <option value="">-- Pilih cabang --</option>
+                            @foreach ($branches as $branch)
+                                <option value="{{ $branch->id }}">{{ $branch->name }}</option>
+                            @endforeach
+                        </select>
+                        <button type="submit" class="btn btn-primary btn-sm">Proses</button>
+                    </div>
+                    <small class="text-muted d-block mt-2">Copy = paket digandakan ke cabang tujuan (nama tetap sama). Pindahkan = cabang paket diganti.</small>
+                </form>
+
                 <div class="table-responsive">
                     <table class="table dt-table-hover">
                         <thead>
                             <tr>
+                                <th style="width:36px"><input type="checkbox" class="form-check-input" id="bulkSelectAll" title="Pilih semua di halaman ini"></th>
                                 <th>No</th>
                                 <th>Name</th>
+                                <th>Cabang</th>
                                 <th>Type</th>
                                 <th>Class</th>
                                 <th>Level</th>
@@ -71,10 +121,19 @@
                         @forelse ($data as $index => $item)
 
                             <tr>
+                                <td><input type="checkbox" class="form-check-input bulk-row" name="ids[]" value="{{ $item->id }}" form="bulkForm"></td>
                                 <td>{{ $data->firstItem() + $index }}</td>
 
                                 <td class="fw-bold">
                                     {{ $item->name }}
+                                </td>
+
+                                <td>
+                                    @if ($item->branch)
+                                        {{ $item->branch->name }}
+                                    @else
+                                        <span class="badge bg-warning text-dark">Belum ada cabang</span>
+                                    @endif
                                 </td>
 
                                 <td>{{ optional($item->type)->name ?? '-' }}</td>
@@ -139,7 +198,7 @@
                         @empty
 
                             <tr>
-                                <td colspan="11" class="text-center">
+                                <td colspan="13" class="text-center">
                                     No data.
                                 </td>
                             </tr>
@@ -153,6 +212,50 @@
                 <div class="mt-4">
                     {{ $data->links('pagination::bootstrap-5') }}
                 </div>
+
+                <script>
+                (function () {
+                    var form = document.getElementById('bulkForm');
+                    var all = document.getElementById('bulkSelectAll');
+                    var rows = Array.prototype.slice.call(document.querySelectorAll('.bulk-row'));
+                    var count = document.getElementById('bulkCount');
+                    var allFiltered = document.getElementById('bulkAllFiltered');
+                    var selectFiltered = document.getElementById('bulkSelectFiltered');
+
+                    function refresh() {
+                        var checked = rows.filter(function (row) { return row.checked; }).length;
+                        if (allFiltered.value !== '1') {
+                            count.textContent = checked + ' paket dipilih';
+                        }
+                        form.hidden = checked === 0 && allFiltered.value !== '1';
+                        all.checked = checked > 0 && checked === rows.length;
+                    }
+
+                    all.addEventListener('change', function () {
+                        rows.forEach(function (row) { row.checked = all.checked; });
+                        if (!all.checked) { allFiltered.value = '0'; }
+                        refresh();
+                    });
+                    rows.forEach(function (row) {
+                        row.addEventListener('change', function () { allFiltered.value = '0'; refresh(); });
+                    });
+                    if (selectFiltered) {
+                        selectFiltered.addEventListener('click', function () {
+                            allFiltered.value = '1';
+                            rows.forEach(function (row) { row.checked = true; });
+                            count.textContent = 'Semua {{ $data->total() }} paket di filter ini dipilih';
+                            refresh();
+                        });
+                    }
+                    form.addEventListener('submit', function (event) {
+                        var action = form.elements.action.selectedOptions[0].textContent.toLowerCase();
+                        var branch = form.elements.target_branch_id.selectedOptions[0].textContent;
+                        if (!confirm(count.textContent + ' akan di-' + action.replace(' ke cabang', '') + ' ke cabang ' + branch + '. Lanjutkan?')) {
+                            event.preventDefault();
+                        }
+                    });
+                })();
+                </script>
 
             </div>
         </div>

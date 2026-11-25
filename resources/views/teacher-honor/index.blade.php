@@ -9,7 +9,13 @@
 <div class="middle-content container-xxl p-0">
 
     {{-- Judul halaman sudah tampil di breadcrumb layout (Dashboard / Honor Pengajar). --}}
-    <p class="text-muted mb-3">Buat periode per cabang, honor pengajar akan terhitung otomatis dari kelas yang mereka ajar.</p>
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <p class="text-muted mb-0">Buat periode per cabang, honor pengajar akan terhitung otomatis dari kelas yang mereka ajar.</p>
+        <div class="d-flex gap-2">
+            <a href="{{ route('teacher-honor.combined') }}" class="btn btn-outline-primary btn-sm">Rekap Gabungan Semua Cabang</a>
+            <a href="{{ route('teacher-honor.rates') }}" class="btn btn-primary btn-sm">Tarif Pengajar</a>
+        </div>
+    </div>
 
     @if (session('success'))
         <div class="alert alert-success alert-dismissible fade show" role="alert">

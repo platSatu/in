@@ -17,6 +17,24 @@
     </div>
 
     {{-- Honor saya -- lihat TeacherHonorService (1 kelas = 1 credit x fee Course Class). --}}
+    @if ($runningHonors->count() > 1)
+        {{-- Mengajar di beberapa cabang: total gabungan periode yang sedang berjalan (25 November 2026). --}}
+        <div class="widget-content widget-content-area br-8 mb-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <h6 class="mb-1">Total sementara dari {{ $runningHonors->count() }} cabang</h6>
+                <p class="text-muted small mb-0">
+                    @foreach ($runningHonors as $item)
+                        {{ optional($item['period']->branch)->name }} Rp {{ number_format((float) $item['row']['honor_amount'], 0, ',', '.') }}@if (! $loop->last) + @endif
+                    @endforeach
+                </p>
+            </div>
+            <div class="text-end">
+                <h5 class="mb-0">Rp {{ number_format((float) $runningHonors->sum(fn ($item) => $item['row']['honor_amount']), 0, ',', '.') }}</h5>
+                <div class="small">{{ \App\Models\ClassSession::hoursLabel((float) $runningHonors->sum(fn ($item) => $item['row']['teaching_hours'])) }} mengajar</div>
+            </div>
+        </div>
+    @endif
+
     @foreach ($runningHonors as $item)
         <div class="widget-content widget-content-area br-8 mb-3">
             <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">

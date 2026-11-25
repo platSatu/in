@@ -97,6 +97,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [FrontendController::class, 'index'])->name('home');
 Route::get('/kelas-mandarin', [FrontendController::class, 'inayuleClasses'])->name('frontend.inayule.classes');
+// Halaman 1 cabang InaYule (25 November 2026), mis. /kelas-mandarin/pluit.
+Route::get('/kelas-mandarin/{branch}', [FrontendController::class, 'inayuleBranch'])->name('frontend.inayule.branch');
 
 Route::get('/frontend/universities-by-city/{city}', [FrontendController::class, 'universitiesByCity'])
     ->name('frontend.universities-by-city');
@@ -359,9 +361,13 @@ Route::middleware(['auth', 'permission:class-session,edit'])->prefix('dashboard/
 Route::middleware(['auth', 'permission:teacher-honor'])->prefix('dashboard/teacher-honor')->group(function () {
     Route::get('/', [TeacherHonorController::class, 'index'])->name('teacher-honor.index');
     Route::get('/period/{id}', [TeacherHonorController::class, 'show'])->name('teacher-honor.show');
+    // Rekap gabungan semua cabang & Tarif Pengajar (25 November 2026).
+    Route::get('/combined', [TeacherHonorController::class, 'combined'])->name('teacher-honor.combined');
+    Route::get('/rates', [TeacherHonorController::class, 'rates'])->name('teacher-honor.rates');
 });
 Route::middleware(['auth', 'permission:teacher-honor,edit'])->prefix('dashboard/teacher-honor')->group(function () {
     Route::post('/period', [TeacherHonorController::class, 'store'])->name('teacher-honor.store');
+    Route::put('/rates', [TeacherHonorController::class, 'saveRates'])->name('teacher-honor.rates.save');
     Route::post('/period/{id}/close', [TeacherHonorController::class, 'close'])->name('teacher-honor.close');
     Route::delete('/period/{id}', [TeacherHonorController::class, 'destroy'])->name('teacher-honor.destroy');
     Route::post('/{id}/approve-payout', [TeacherHonorController::class, 'approvePayout'])->name('teacher-honor.approve-payout');
@@ -1188,6 +1194,7 @@ Route::middleware(['auth', 'permission:course.package,edit'])->prefix('dashboard
     Route::put('/{id}', [CoursePackageController::class, 'update'])->name('course.package.update');
     Route::delete('/{id}', [CoursePackageController::class, 'destroy'])->name('course.package.destroy');
     Route::post('/{id}/copy', [CoursePackageController::class, 'copy'])->name('course.package.copy');
+    Route::post('/bulk', [CoursePackageController::class, 'bulk'])->name('course.package.bulk');
 });
 
 // FIX (16 September 2026, permintaan user -- "buatkan 1 menu baru di dalam

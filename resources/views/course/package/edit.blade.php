@@ -175,6 +175,22 @@
                     @enderror
                 </div>
             </div>
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label class="form-label">Cabang <span class="text-muted small">(tempat paket ini dijual)</span></label>
+                    <select name="branch_id" class="form-select @error('branch_id') is-invalid @enderror">
+                        <option value="">-- Belum ada cabang (tidak tampil di website) --</option>
+                        @foreach ($branches as $branch)
+                            <option value="{{ $branch->id }}" @selected(old('branch_id', $data->branch_id) === $branch->id)>{{ $branch->name }}</option>
+                        @endforeach
+                    </select>
+                    <div class="form-text">Paket yang sama untuk cabang lain? Simpan dulu, lalu pakai Pilih Semua &rarr; Copy ke cabang di daftar Course Package.</div>
+                    @error('branch_id')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
+
 
             <div class="row">
                 <div class="col-md-4 mb-3">

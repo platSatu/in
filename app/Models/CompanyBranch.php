@@ -26,8 +26,27 @@ class CompanyBranch extends Model
         'address',
         'handphone',
         'email',
+        'placement_test_url',
         'status',
     ];
+
+    /** Paket kursus InaYule yang dijual di cabang ini (25 November 2026). */
+    public function coursePackages()
+    {
+        return $this->hasMany(CoursePackage::class, 'branch_id');
+    }
+
+    /** Alamat halaman cabang di website, mis. "mall-of-indonesia" -> /kelas-mandarin/mall-of-indonesia. */
+    public function slug(): string
+    {
+        return \Illuminate\Support\Str::slug($this->name);
+    }
+
+    /** Cabang Online ditandai dari namanya, supaya ikon & kalimat di website menyesuaikan. */
+    public function isOnline(): bool
+    {
+        return \Illuminate\Support\Str::contains(\Illuminate\Support\Str::lower($this->name), 'online');
+    }
 
     /**
      * Relasi ke user (pemilik / admin yang membuat data branch)

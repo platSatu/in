@@ -78,8 +78,13 @@ class InaYulePackageController extends Controller
         $classId = $request->query('course_class_id');
         $levelId = $request->query('course_level_id');
 
+        // Paket per cabang (25 November 2026): siswa melihat paket cabangnya sendiri
+        // (+ paket lama yang belum punya cabang). Siswa tanpa cabang melihat semua.
+        $studentBranchId = \App\Models\Student::where('user_id', $request->user()->id)->value('branch_id');
+
         $packages = CoursePackage::query()
             ->where('status', 'active')
+            ->when($studentBranchId, fn (Builder $q) => $q->where(fn (Builder $q) => $q->where('branch_id', $studentBranchId)->orWhereNull('branch_id')))
             ->with(['type', 'courseClass', 'level'])
             ->when($search, fn (Builder $q) => $q->where('name', 'like', "%{$search}%"))
             ->when($typeId, fn (Builder $q) => $q->where('course_type_id', $typeId))

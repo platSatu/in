@@ -5,13 +5,19 @@ namespace App\Http\Controllers\TeacherHonor;
 use App\Http\Controllers\Concerns\ScopesToVisibleBranches;
 use App\Http\Controllers\Controller;
 use App\Models\CompanyBranch;
+use App\Models\CourseClass;
+use App\Models\Role;
 use App\Models\TeacherHonor;
 use App\Models\TeacherHonorPeriod;
+use App\Models\TeacherRate;
+use App\Models\User;
 use App\Services\TeacherHonor\InvalidTeacherHonorStateException;
 use App\Services\TeacherHonor\TeacherHonorService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 /**
@@ -177,5 +183,95 @@ class TeacherHonorController extends Controller
         $this->abortUnlessBranchVisible($request, $honor->period?->branch_id);
 
         return $honor;
+    }
+
+    /**
+     * Rekap Gabungan (25 November 2026): honor & jam mengajar tiap pengajar
+     * di semua cabang dalam 1 bulan (periode 26 -> 25, dikelompokkan menurut
+     * bulan tanggal tutupnya), lalu totalnya.
+     */
+    public function combined(Request $request): View
+    {
+        $periods = TeacherHonorPeriod::query()
+            ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
+            ->with('branch:id,name')
+            ->orderByDesc('end_date')
+            ->get();
+
+        $months = $periods->groupBy(fn (TeacherHonorPeriod $period) => $period->end_date->format('Y-m'));
+        $month = $request->query('month');
+        $month = $months->has($month) ? $month : $months->keys()->first();
+        $monthPeriods = $months->get($month, collect());
+
+        return view('teacher-honor.combined', [
+            'months' => $months->keys(),
+            'month' => $month,
+            'branches' => $monthPeriods->map(fn (TeacherHonorPeriod $period) => $period->branch)->filter()->unique('id')->sortBy('name')->values(),
+            'rows' => $this->honorService->combinedRecap($monthPeriods),
+        ]);
+    }
+
+    /** Tarif Pengajar: daftar aturan fee, diedit baris per baris (+ Tambah Baris). */
+    public function rates(Request $request): View
+    {
+        return view('teacher-honor.rates', [
+            'rows' => old('rows', $this->visibleRates($request)->map(fn (TeacherRate $rate) => [
+                'teacher_user_id' => $rate->teacher_user_id,
+                'branch_id' => $rate->branch_id,
+                'course_class_id' => $rate->course_class_id,
+                'honor_mode' => $rate->honor_mode,
+                'fee' => (float) $rate->fee,
+            ])->all()),
+            'teachers' => User::whereHas('roles', fn ($query) => $query->where('slug', 'teacher')->where('roles.status', Role::STATUS_ACTIVE))
+                ->orderBy('name')->get(['id', 'name']),
+            'branches' => $this->scopeToVisibleBranches(CompanyBranch::query(), $request, 'id')->orderBy('name')->get(['id', 'name']),
+            'classes' => CourseClass::orderBy('name')->get(['id', 'name', 'teacher_fee', 'honor_mode']),
+            // Admin cabang tidak boleh membuat aturan "semua cabang" (berlaku juga ke cabang lain).
+            'canUseAllBranches' => $this->visibleBranches($request) === null,
+        ]);
+    }
+
+    /** Simpan semua baris sekaligus: aturan di cakupan admin ini diganti isi form. */
+    public function saveRates(Request $request): RedirectResponse
+    {
+        $branchIds = $this->visibleBranches($request);
+
+        $validated = $request->validate([
+            'rows' => ['nullable', 'array'],
+            'rows.*.teacher_user_id' => ['nullable', 'string', 'exists:users,id'],
+            'rows.*.branch_id' => [$branchIds === null ? 'nullable' : 'required', 'uuid', $branchIds === null ? 'exists:company_branch,id' : Rule::in($branchIds)],
+            'rows.*.course_class_id' => ['nullable', 'uuid', 'exists:course_class,id'],
+            'rows.*.honor_mode' => ['required', Rule::in(array_keys(CourseClass::HONOR_MODES))],
+            'rows.*.fee' => ['required', 'numeric', 'min:0', 'max:999999999'],
+        ], [
+            'rows.*.branch_id.required' => 'Pilih cabang di setiap baris.',
+            'rows.*.fee.required' => 'Isi fee di setiap baris.',
+        ]);
+
+        DB::transaction(function () use ($request, $validated) {
+            $this->visibleRates($request)->each->delete();
+
+            foreach ($validated['rows'] ?? [] as $row) {
+                TeacherRate::create([
+                    'teacher_user_id' => ($row['teacher_user_id'] ?? null) ?: null,
+                    'branch_id' => ($row['branch_id'] ?? null) ?: null,
+                    'course_class_id' => ($row['course_class_id'] ?? null) ?: null,
+                    'honor_mode' => $row['honor_mode'],
+                    'fee' => $row['fee'],
+                ]);
+            }
+        });
+
+        return redirect()->route('teacher-honor.rates')
+            ->with('success', 'Tarif pengajar disimpan. Rekap periode yang masih berjalan langsung memakai tarif ini; periode yang sudah ditutup tidak berubah.');
+    }
+
+    /** Aturan yang boleh dilihat & diubah admin ini (admin cabang: hanya cabangnya). */
+    private function visibleRates(Request $request)
+    {
+        return TeacherRate::query()
+            ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request))
+            ->orderByRaw('teacher_user_id IS NULL, course_class_id IS NULL, branch_id IS NULL')
+            ->get();
     }
 }

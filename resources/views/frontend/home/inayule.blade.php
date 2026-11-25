@@ -17,11 +17,12 @@
             <div>
                 <span class="eyebrow">InaYule &middot; Kursus Mandarin</span>
                 <h2 class="section-title">Learning <em>Chinese</em></h2>
-                <p class="section-lead">Pilih kelas sesuai level dan waktumu, belajar langsung bersama pengajar InaYule.</p>
+                <p class="section-lead">Mulai dari tempat yang paling nyaman untukmu. Pilih lokasi belajar, lalu temukan kelas sesuai level dan waktumu bersama pengajar InaYule.</p>
             </div>
             <a href="{{ route('frontend.inayule.classes') }}" class="link-arrow">Lihat semua kelas</a>
         </div>
 
-        @include('frontend.home._packages', ['packages' => $packages, 'limit' => 8])
+        {{-- 25 November 2026: langkah pertama = pilih lokasi; katalog kelas ada di halaman tiap cabang. --}}
+        @include('frontend.home._branches', ['branches' => $branches])
     </div>
 </section>

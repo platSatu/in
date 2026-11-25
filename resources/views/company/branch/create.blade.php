@@ -121,6 +121,20 @@
                 </div>
             </div>
 
+
+            {{-- Link Placement Test cabang ini (25 November 2026): salin link quiz dari menu Quiz lalu tempel di sini. --}}
+            <div class="row mb-4">
+                <div class="col-sm-12">
+                    <label for="placement_test_url" class="form-label">Link Placement Test <span class="text-muted small">(opsional)</span></label>
+                    <input type="url" class="form-control @error('placement_test_url') is-invalid @enderror" id="placement_test_url"
+                        name="placement_test_url" value="{{ old('placement_test_url') }}" placeholder="https://...">
+                    <div class="form-text">Salin link quiz Placement Test milik cabang ini dari menu Quiz, lalu tempel di sini. Kosong = tombol Placement Test tidak tampil di halaman cabang.</div>
+                    @error('placement_test_url')
+                        <div class="invalid-feedback">{{ $message }}</div>
+                    @enderror
+                </div>
+            </div>
+
             <button type="submit" class="btn btn-success">Save</button>
             <a href="{{ route('company.branch.index') }}" class="btn btn-outline-secondary">Cancel</a>
 

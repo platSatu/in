@@ -67,6 +67,7 @@ namespace App\Http\Controllers;
 
 use App\Models\City;
 use App\Models\ClassSchedule;
+use App\Models\CompanyBranch;
 use App\Models\CoursePackage;
 use App\Models\Form;
 use App\Models\FormAnswer;
@@ -111,25 +112,49 @@ class FrontendController extends Controller
 
     public function index()
     {
-        // Semua kelas aktif dikirim supaya filter di section InaYule mencari ke seluruh kelas;
-        // yang tampil tetap maksimal 8 (2 baris x 4), lihat _packages.blade.php.
         return view('frontend.home.index', [
-            'packages' => $this->publicPackages()->get(),
+            // Section InaYule (25 November 2026): pengunjung memilih lokasi belajar dulu,
+            // katalog kelasnya ada di halaman tiap cabang (inayuleBranch()).
+            'branches' => $this->publicBranches(),
             // Kampus partner yang bergiliran tampil di section InaStudy (sama dengan katalog: status active), beserta nama kotanya.
             'universities' => University::where('status', 'active')->with('city:id,name')->orderBy('name')->get(['id', 'name', 'logo', 'city']),
         ]);
     }
 
-    /** Halaman publik semua kelas InaYule (tombol "Lihat semua kelas" di halaman depan). */
+    /** Halaman publik "Semua kelas InaYule": pilih lokasi belajar (tombol "Lihat semua kelas" di beranda). */
     public function inayuleClasses()
     {
-        return view('frontend.home.classes', ['packages' => $this->publicPackages()->get()]);
+        return view('frontend.home.classes', ['branches' => $this->publicBranches()]);
     }
 
-    /** Paket kursus aktif yang boleh tampil di halaman publik, urutan sama dengan katalog di portal siswa. */
-    private function publicPackages()
+    /**
+     * Halaman 1 cabang, mis. /kelas-mandarin/pluit: Course Type -> Course Class ->
+     * katalog kelas + Placement Test milik cabang itu. Alamat memakai slug nama cabang.
+     */
+    public function inayuleBranch(string $branch)
     {
-        return CoursePackage::where('status', 'active')->with(['type', 'courseClass', 'level'])->orderBy('name');
+        $branches = $this->publicBranches();
+        $current = $branches->first(fn (CompanyBranch $item) => $item->slug() === $branch);
+
+        abort_unless($current, 404);
+
+        return view('frontend.home.branch', [
+            'branch' => $current,
+            'packages' => $current->coursePackages,
+            'otherBranches' => $branches->reject(fn (CompanyBranch $item) => $item->is($current))->values(),
+        ]);
+    }
+
+    /** Cabang aktif yang punya paket aktif, beserta paketnya (urutan sama dengan katalog di portal siswa). */
+    private function publicBranches()
+    {
+        $activePackages = fn ($query) => $query->where('status', 'active');
+
+        return CompanyBranch::where(fn ($query) => $query->whereNull('status')->orWhere('status', '!=', 'inactive'))
+            ->whereHas('coursePackages', $activePackages)
+            ->with(['coursePackages' => fn ($query) => $activePackages($query)->with(['type', 'courseClass', 'level'])->orderBy('name')])
+            ->orderBy('name')
+            ->get();
     }
 
     public function universitiesByCity(Request $request, string $city)

@@ -23,6 +23,7 @@ class CoursePackage extends Model
 
     protected $fillable = [
         'user_id',
+        'branch_id',
         'name',
         'course_type_id',
         'course_class_id',
@@ -91,6 +92,12 @@ class CoursePackage extends Model
             $this->courseClass?->name,
             $this->level?->name,
         ]));
+    }
+
+    /** Cabang tempat paket ini dijual (25 November 2026). */
+    public function branch()
+    {
+        return $this->belongsTo(CompanyBranch::class, 'branch_id');
     }
 
     public function user()
