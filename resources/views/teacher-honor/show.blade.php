@@ -99,7 +99,7 @@
     </div>
 
     {{-- Filter cabang & pengajar + Export Excel (25 November 2026). --}}
-    <form method="GET" class="widget-content widget-content-area br-8 mb-3 d-flex flex-wrap align-items-end gap-2">
+    <form method="GET" class="widget-content widget-content-area br-8 mb-3 d-flex flex-wrap gap-2">
         <div>
             <label class="form-label small text-muted mb-1">Cabang</label>
             <select class="form-select" onchange="if (this.value) window.location = this.value">
@@ -121,9 +121,14 @@
             <label class="form-label small text-muted mb-1">Cari pengajar</label>
             <input type="search" class="form-control" placeholder="Ketik nama pengajar..." id="honorSearch" autocomplete="off">
         </div>
-        <a href="{{ route('teacher-honor.export', ['id' => $period->id, 'teacher' => $teacherFilter]) }}" class="btn btn-success">
-            Export Excel
-        </a>
+        {{-- Label kosong + flex-grow supaya tinggi tombol sama persis dengan kolom di sebelahnya. --}}
+        <div class="d-flex flex-column">
+            <label class="form-label small mb-1 invisible" aria-hidden="true">Export</label>
+            <a href="{{ route('teacher-honor.export', ['id' => $period->id, 'teacher' => $teacherFilter]) }}"
+                class="btn btn-success flex-grow-1 d-flex align-items-center justify-content-center px-4">
+                Export Excel
+            </a>
+        </div>
     </form>
 
     {{--
