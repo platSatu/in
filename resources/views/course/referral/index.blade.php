@@ -34,8 +34,9 @@
     @endif
 
     <div class="row">
-        <div class="col-xl-5 layout-spacing">
-            <div class="widget-content widget-content-area br-8 h-100">
+        {{-- Disusun atas-bawah: Pengaturan, lalu ringkasan, lalu riwayat. --}}
+        <div class="col-12 layout-spacing">
+            <div class="widget-content widget-content-area br-8">
                 <h6 class="mb-3">Pengaturan</h6>
                 <form method="POST" action="{{ route('course.referral.settings') }}">
                     @csrf
@@ -49,12 +50,12 @@
                     </div>
 
                     <div class="row g-3 mb-3">
-                        <div class="col-6">
+                        <div class="col-md-4 col-lg-3">
                             <label class="form-label">Diskon pembeli baru (%)</label>
                             <input type="number" name="buyer_discount_percent" class="form-control" min="0" max="90" step="0.5"
                                 value="{{ old('buyer_discount_percent', $pct($setting->buyer_discount_percent)) }}" @disabled(! $canEdit) required>
                         </div>
-                        <div class="col-6">
+                        <div class="col-md-4 col-lg-3">
                             <label class="form-label">Komisi pemberi kode (%)</label>
                             <input type="number" name="referrer_commission_percent" class="form-control" min="0" max="90" step="0.5"
                                 value="{{ old('referrer_commission_percent', $pct($setting->referrer_commission_percent)) }}" @disabled(! $canEdit) required>
@@ -80,7 +81,7 @@
             </div>
         </div>
 
-        <div class="col-xl-7 layout-spacing">
+        <div class="col-12 layout-spacing">
             <div class="row g-3 mb-3">
                 <div class="col-md-4">
                     <div class="widget-content widget-content-area br-8">
