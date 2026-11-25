@@ -280,13 +280,37 @@
         }
         .quiz-nav-btn:hover { border-color: var(--brand); color: var(--brand); }
         .quiz-nav-btn.is-answered { background: var(--brand); border-color: var(--brand); color: #fff; }
-        .quiz-nav-btn.is-current { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--brand); }
         .quiz-nav-btn.is-error { background: #fdecec; border-color: #dc3545; color: #dc3545; }
         .quiz-nav-legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 11.5px; color: #6c757d; margin-top: 12px; }
         .quiz-nav-legend span { display: inline-flex; align-items: center; gap: 5px; }
         .quiz-nav-legend i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1px solid #d5dbe7; background: #fff; }
         .quiz-nav-legend i.done { background: var(--brand); border-color: var(--brand); }
+        .quiz-nav-legend i.now { border: 2px solid var(--brand); box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 25%, transparent); }
         .question-card.quiz-nav-flash { box-shadow: 0 0 0 3px var(--brand); transition: box-shadow .3s; }
+
+        /* 25 November 2026: nomor di kartu soal ikut bercerita (hanya kalau navigasi nomor soal aktif).
+           Belum dijawab = abu-abu, sudah dijawab = merah brand, sedang diisi = menyala (berdenyut). */
+        .quiz-nav-layout .question-card > div > .question-number {
+            background: #fff; color: #888ea8; border: 2px solid #d5dbe7; transition: all .2s;
+        }
+        .quiz-nav-layout .question-card.is-answered > div > .question-number {
+            background: var(--brand); border-color: var(--brand); color: #fff;
+        }
+        .quiz-nav-layout .question-card.is-current > div > .question-number,
+        .quiz-nav-btn.is-current {
+            border-color: var(--brand);
+            animation: quizNavGlow 1.4s ease-in-out infinite;
+        }
+        .quiz-nav-layout .question-card.is-current:not(.is-answered) > div > .question-number,
+        .quiz-nav-btn.is-current:not(.is-answered) { color: var(--brand); }
+        @keyframes quizNavGlow {
+            0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand) 45%, transparent); }
+            50% { box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand) 15%, transparent); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .quiz-nav-layout .question-card.is-current > div > .question-number,
+            .quiz-nav-btn.is-current { animation: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 35%, transparent); }
+        }
         @media (max-width: 991px) {
             .quiz-nav-layout { flex-direction: column-reverse; }
             .quiz-nav-panel { position: static; width: 100%; flex-basis: auto; max-height: none; }
@@ -1050,6 +1074,7 @@
                             <div class="quiz-nav-legend">
                                 <span><i class="done"></i> Sudah dijawab</span>
                                 <span><i></i> Belum</span>
+                                <span><i class="now"></i> Sedang diisi</span>
                             </div>
                         </aside>
                         </div>{{-- /.quiz-nav-layout --}}
@@ -1325,6 +1350,12 @@
 
     function refreshQuestionNav() {
         if (!questionNavEnabled || !questionNavItems.length) return;
+
+        // Nomor di kartu soal (termasuk soal bercabang) ikut berwarna merah kalau sudah dijawab.
+        document.querySelectorAll('#step-questions .question-card').forEach(function (card) {
+            card.classList.toggle('is-answered', isQuestionAnswered(card));
+        });
+
         let answered = 0;
         questionNavItems.forEach(function (item) {
             const done = isQuestionAnswered(item.card);
@@ -1336,10 +1367,29 @@
         if (summary) summary.textContent = answered + ' dari ' + questionNavItems.length + ' soal sudah dijawab';
     }
 
+    // Soal yang sedang diisi peserta "menyala": nomor di kartunya dan nomor di panel.
+    // Soal bercabang menyalakan nomornya sendiri di kartu, dan nomor soal induknya di panel.
     function setCurrentQuestionNav(card) {
-        questionNavItems.forEach(function (item) {
-            item.button.classList.toggle('is-current', item.card === card);
+        if (!card) return;
+        document.querySelectorAll('#step-questions .question-card.is-current').forEach(function (el) {
+            el.classList.remove('is-current');
         });
+        card.classList.add('is-current');
+
+        const mainCard = card.matches('[data-depth="0"]') ? card : findParentMainCard(card);
+        questionNavItems.forEach(function (item) {
+            item.button.classList.toggle('is-current', item.card === mainCard);
+        });
+    }
+
+    // Kartu soal bercabang tidak selalu berada di dalam kartu induknya, jadi cari kartu utama terdekat di atasnya.
+    function findParentMainCard(card) {
+        let el = card.previousElementSibling;
+        while (el) {
+            if (el.matches && el.matches('.question-card[data-depth="0"]')) return el;
+            el = el.previousElementSibling;
+        }
+        return card.closest('.question-card[data-depth="0"]');
     }
 
     function goToQuestion(card, groupIndex) {
@@ -1382,9 +1432,12 @@
             ['change', 'input'].forEach(function (evt) {
                 questionsStepEl.addEventListener(evt, function () { refreshQuestionNav(); });
             });
-            questionsStepEl.addEventListener('focusin', function (e) {
-                const card = e.target.closest('.question-card[data-depth="0"]');
-                if (card) setCurrentQuestionNav(card);
+            // focusin untuk ketik/keyboard; pointerdown karena Safari tidak memberi fokus saat radio/checkbox diklik.
+            ['focusin', 'pointerdown'].forEach(function (evt) {
+                questionsStepEl.addEventListener(evt, function (e) {
+                    const card = e.target.closest('.question-card');
+                    if (card) setCurrentQuestionNav(card);
+                });
             });
         }
         document.addEventListener('DOMContentLoaded', buildQuestionNav);
