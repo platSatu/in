@@ -94,13 +94,7 @@ class ClassSessionWorkflowService
         return DB::transaction(function () use ($student, $teacher, $package, $creditAmountRequested, $classStartAt, $branch, $notes) {
             User::whereKey($teacher->id)->lockForUpdate()->first();
 
-            // Credit terpisah per paket: sisa paket ini dikurangi pengajuan lain yang belum selesai.
-            $purchases = CoursePackagePurchase::where('student_id', $student->id)->where('course_package_id', $package->id)->get();
-            $reserved = (float) ClassSession::where('student_id', $student->id)
-                ->where('course_package_id', $package->id)
-                ->whereIn('status', [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN])
-                ->sum('credit_amount_requested');
-            $available = array_sum($this->debitService->remainingByPurchase($purchases)) - $reserved;
+            $available = $this->creditAvailable($student, $package);
 
             if ($available + 0.000001 < $creditAmountRequested) {
                 throw new InvalidArgumentException('Sisa credit paket "'.$package->name.'" tidak cukup (tersedia '.max(0, $available).' credit, termasuk yang sedang diajukan).');
@@ -121,6 +115,91 @@ class ClassSessionWorkflowService
                 'class_end_at' => $this->classEnd($classStartAt, $creditAmountRequested),
             ]);
         });
+    }
+
+    /**
+     * Jadwal berulang (25 November 2026): hari & jam yang sama setiap minggu, mulai dari jadwal pertama
+     * sampai akhir periode (tanggal 25, lihat TeacherHonorService::cycleFor()). Setiap tanggal dicek
+     * dengan aturan yang sama persis seperti 1 pengajuan; yang tidak tersedia ditampilkan alasannya.
+     *
+     * @return array<int, array{start: string, label: string, ok: bool, reason: ?string}>
+     */
+    public function previewRecurring(Student $student, User $teacher, CoursePackage $package, Carbon $firstStart, float $credit): array
+    {
+        $creditLeft = $this->creditAvailable($student, $package);
+        $rows = [];
+
+        foreach ($this->weeklyStartsInPeriod($firstStart) as $start) {
+            $options = $this->scheduleOptions($student, $teacher, $package, $start, $credit);
+            $offered = collect($options['join'])->merge($options['new'])->pluck('start')->contains($start->format('Y-m-d H:i'));
+
+            $reason = match (true) {
+                ! $offered => 'jam ini penuh, bentrok, atau di luar jam buka pengajar',
+                $creditLeft + 0.000001 < $credit => 'credit tidak cukup',
+                default => null,
+            };
+
+            if ($reason === null) {
+                $creditLeft -= $credit;
+            }
+
+            $rows[] = [
+                'start' => $start->format('Y-m-d H:i'),
+                'label' => $start->translatedFormat('D, d M Y').' · '.$start->format('H:i').' - '.$this->classEnd($start, $credit)->format('H:i'),
+                'ok' => $reason === null,
+                'reason' => $reason,
+            ];
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Ajukan semua tanggal berulang sekaligus. Tiap tanggal tetap lewat requestUsage() (dicek ulang di dalam
+     * lock), jadi hasilnya sama aman dengan mengajukan satu per satu. Tanggal yang gagal dilewati saja.
+     *
+     * @return array{created: int, skipped: array<int, string>}
+     */
+    public function requestRecurring(Student $student, User $teacher, CoursePackage $package, float $credit, Carbon $firstStart, ?CompanyBranch $branch = null, ?string $notes = null): array
+    {
+        $created = 0;
+        $skipped = [];
+
+        foreach ($this->weeklyStartsInPeriod($firstStart) as $start) {
+            try {
+                $this->requestUsage($student, $teacher, $package, $credit, $start, $branch, $notes);
+                $created++;
+            } catch (InvalidArgumentException $e) {
+                $skipped[] = $start->translatedFormat('D, d M').' ('.(str_contains($e->getMessage(), 'credit') ? 'credit tidak cukup' : 'jam tidak tersedia').')';
+            }
+        }
+
+        return ['created' => $created, 'skipped' => $skipped];
+    }
+
+    /** Jadwal pertama + minggu-minggu berikutnya di hari & jam yang sama, sampai akhir periodenya (tanggal 25). */
+    public function weeklyStartsInPeriod(Carbon $firstStart): array
+    {
+        $periodEnd = Carbon::parse((new \App\Services\TeacherHonor\TeacherHonorService())->cycleFor($firstStart->copy())['end'])->endOfDay();
+        $starts = [];
+
+        for ($start = $firstStart->copy(); $start->lte($periodEnd); $start = $start->copy()->addWeek()) {
+            $starts[] = $start;
+        }
+
+        return $starts;
+    }
+
+    /** Sisa credit paket ini dikurangi pengajuan yang belum selesai (credit terpisah per paket). */
+    private function creditAvailable(Student $student, CoursePackage $package): float
+    {
+        $purchases = CoursePackagePurchase::where('student_id', $student->id)->where('course_package_id', $package->id)->get();
+        $reserved = (float) ClassSession::where('student_id', $student->id)
+            ->where('course_package_id', $package->id)
+            ->whereIn('status', [ClassSession::STATUS_WAITING_TEACHER, ClassSession::STATUS_WAITING_ADMIN])
+            ->sum('credit_amount_requested');
+
+        return array_sum($this->debitService->remainingByPurchase($purchases)) - $reserved;
     }
 
     /**

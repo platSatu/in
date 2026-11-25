@@ -128,6 +128,37 @@ class ClassSessionController extends Controller
     }
 
     /**
+     * Pratinjau jadwal berulang (25 November 2026): tanggal-tanggal mingguan sampai akhir periode beserta
+     * statusnya, supaya siswa tahu tanggal mana yang akan dibuat sebelum menekan Ajukan.
+     */
+    public function recurringPreview(Request $request): JsonResponse
+    {
+        $student = Student::where('user_id', $request->user()->id)->firstOrFail();
+
+        $validated = $request->validate([
+            'teacher_user_id' => ['required', 'string'],
+            'course_package_id' => ['required', 'string'],
+            'credit_amount' => ['required', 'numeric', 'in:1,1.5,2'],
+            'class_start_at' => ['required', 'date_format:Y-m-d H:i'],
+        ]);
+
+        $teacher = User::find($validated['teacher_user_id']);
+        $package = CoursePackage::find($validated['course_package_id']);
+
+        if (! $teacher || ! $package || ! $this->studentOwnsPackage($student, $package)) {
+            return response()->json(['dates' => []]);
+        }
+
+        return response()->json(['dates' => $this->workflowService->previewRecurring(
+            $student,
+            $teacher,
+            $package,
+            Carbon::createFromFormat('Y-m-d H:i', $validated['class_start_at']),
+            (float) $validated['credit_amount']
+        )]);
+    }
+
+    /**
      * Kelas dikunci per paket: siswa hanya bisa memakai paket yang ia beli.
      * Mau ikut kelas paket lain? Upgrade dulu lewat fitur Upgrade yang sudah ada.
      */
@@ -156,6 +187,8 @@ class ClassSessionController extends Controller
             'credit_amount' => ['required', 'numeric', 'in:1,1.5,2'],
             // Jam kelas yang dipilih siswa (25 November 2026), mis. "2026-12-02 19:00".
             'class_start_at' => ['required', 'date_format:Y-m-d H:i'],
+            // Jadwal berulang (25 November 2026): hari & jam yang sama setiap minggu sampai akhir periode.
+            'repeat_weekly' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:500'],
         ], [
             'class_start_at.required' => 'Pilih jam kelas terlebih dahulu.',
@@ -173,13 +206,38 @@ class ClassSessionController extends Controller
             return back()->withInput()->with('error', 'Paket ini belum Anda miliki. Untuk ikut kelas paket lain, silakan upgrade paket Anda terlebih dahulu.');
         }
 
+        $classStartAt = Carbon::createFromFormat('Y-m-d H:i', $validated['class_start_at']);
+
+        if ($request->boolean('repeat_weekly')) {
+            $result = $this->workflowService->requestRecurring(
+                $student,
+                $teacher,
+                $package,
+                (float) $validated['credit_amount'],
+                $classStartAt,
+                $student->companyBranch,
+                $validated['notes'] ?? null
+            );
+
+            if ($result['created'] === 0) {
+                return back()->withInput()->with('error', 'Belum ada jadwal yang bisa dibuat: '.implode(', ', $result['skipped']).'. Silakan pilih jam lain.');
+            }
+
+            $message = $result['created'].' jadwal berulang berhasil diajukan, menunggu approval pengajar.';
+            if ($result['skipped']) {
+                $message .= ' Dilewati: '.implode(', ', $result['skipped']).'.';
+            }
+
+            return redirect()->to(route('inayule.index').'#kelas')->with('success', $message);
+        }
+
         try {
             $this->workflowService->requestUsage(
                 $student,
                 $teacher,
                 $package,
                 (float) $validated['credit_amount'],
-                Carbon::createFromFormat('Y-m-d H:i', $validated['class_start_at']),
+                $classStartAt,
                 $student->companyBranch,
                 $validated['notes'] ?? null
             );

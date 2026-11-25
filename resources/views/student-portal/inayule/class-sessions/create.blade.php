@@ -94,6 +94,16 @@
                     <div id="slotArea" class="iy-slot-area">
                         <p class="text-muted mb-0">Lengkapi pilihan di atas, lalu pilih tanggal untuk melihat jam yang tersedia.</p>
                     </div>
+
+                    {{-- Jadwal berulang (25 November 2026): hari & jam yang sama setiap minggu sampai akhir periode. --}}
+                    <label class="iy-repeat mt-3">
+                        <input type="checkbox" name="repeat_weekly" value="1" id="repeatWeekly" @checked(old('repeat_weekly'))>
+                        <span>
+                            <strong>Ulangi setiap minggu sampai akhir periode</strong>
+                            <small>Hari &amp; jam yang sama tiap minggu sampai tanggal 25. Setiap jadwal tetap disetujui pengajar &amp; admin.</small>
+                        </span>
+                    </label>
+                    <div id="repeatPreview" class="iy-repeat-list" hidden></div>
                 </div>
 
                 <div class="mb-3">
@@ -129,6 +139,14 @@
     .inayule-sub .iy-slot { border: 1px solid #e0e6ed; border-radius: 12px; padding: 8px 12px; background: #fff; text-align: left; line-height: 1.3; }
     .inayule-sub .iy-slot small { display: block; color: #888ea8; }
     .inayule-sub .iy-slot.is-selected { border-color: var(--ina-red); background: #fff1f1; color: var(--ina-red); }
+    .inayule-sub .iy-repeat { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px dashed #e0e6ed; border-radius: 12px; cursor: pointer; margin-bottom: 0; }
+    .inayule-sub .iy-repeat input { margin-top: 4px; accent-color: var(--ina-red); }
+    .inayule-sub .iy-repeat span { display: flex; flex-direction: column; }
+    .inayule-sub .iy-repeat small { color: #888ea8; }
+    .inayule-sub .iy-repeat-list { margin-top: 10px; border-radius: 12px; background: #fafafa; border: 1px solid #eef0f4; padding: 10px 14px; }
+    .inayule-sub .iy-repeat-list li { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 14px; }
+    .inayule-sub .iy-repeat-list .is-skip { color: #888ea8; text-decoration: line-through; }
+    .inayule-sub .iy-repeat-list .is-skip em { text-decoration: none; font-style: normal; font-size: 12px; }
 </style>
 
 <script>
@@ -140,6 +158,9 @@
     var submitButton = document.getElementById('submitBooking');
     var summary = document.getElementById('bookingSummary');
     var optionsUrl = @json(route('inayule.class-sessions.schedule-options'));
+    var repeatUrl = @json(route('inayule.class-sessions.recurring-preview'));
+    var repeatBox = document.getElementById('repeatWeekly');
+    var repeatPreview = document.getElementById('repeatPreview');
     var preselected = startInput.value;
 
     function value(name) {
@@ -158,7 +179,50 @@
         submitButton.disabled = false;
         summary.hidden = false;
         summary.textContent = description;
+        loadRepeat();
     }
+
+    // Daftar tanggal berulang: siswa melihat dulu tanggal mana yang akan dibuat & yang dilewati.
+    function loadRepeat() {
+        submitButton.textContent = 'Ajukan';
+        if (!repeatBox.checked || !startInput.value) {
+            repeatPreview.hidden = true;
+            return;
+        }
+        repeatPreview.hidden = false;
+        repeatPreview.innerHTML = '<small class="text-muted">Menyiapkan daftar tanggal...</small>';
+
+        var params = new URLSearchParams({
+            teacher_user_id: value('teacher_user_id'),
+            course_package_id: value('course_package_id'),
+            credit_amount: value('credit_amount'),
+            class_start_at: startInput.value
+        });
+
+        fetch(repeatUrl + '?' + params, { headers: { 'Accept': 'application/json' } })
+            .then(function (response) { return response.json(); })
+            .then(function (data) {
+                var dates = data.dates || [];
+                var ok = dates.filter(function (row) { return row.ok; }).length;
+                var list = document.createElement('ul');
+                list.className = 'list-unstyled mb-0';
+                dates.forEach(function (row) {
+                    var item = document.createElement('li');
+                    if (!row.ok) { item.className = 'is-skip'; }
+                    item.innerHTML = '<span></span><em></em>';
+                    item.firstChild.textContent = (row.ok ? '✓ ' : '✕ ') + row.label;
+                    item.lastChild.textContent = row.ok ? '' : row.reason;
+                    list.appendChild(item);
+                });
+                repeatPreview.innerHTML = '<strong class="d-block mb-1">' + ok + ' dari ' + dates.length + ' jadwal bisa dibuat</strong>';
+                repeatPreview.appendChild(list);
+                submitButton.textContent = ok > 1 ? 'Ajukan ' + ok + ' jadwal' : 'Ajukan';
+                submitButton.disabled = ok === 0;
+            })
+            .catch(function () { repeatPreview.innerHTML = '<small class="text-danger">Daftar tanggal belum bisa dimuat, coba lagi.</small>'; });
+    }
+
+    repeatBox.addEventListener('change', loadRepeat);
 
     function slotButton(start, title, note, description) {
         var button = document.createElement('button');
@@ -186,6 +250,8 @@
         startInput.value = '';
         submitButton.disabled = true;
         summary.hidden = true;
+        repeatPreview.hidden = true;
+        submitButton.textContent = 'Ajukan';
 
         var params = {
             teacher_user_id: value('teacher_user_id'),

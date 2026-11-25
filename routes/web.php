@@ -322,6 +322,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/inayule/class-sessions', [ClassSessionController::class, 'index'])->name('inayule.class-sessions.index');
     Route::get('/inayule/class-sessions/create', [ClassSessionController::class, 'create'])->name('inayule.class-sessions.create');
     Route::get('/inayule/class-sessions/schedule-options', [ClassSessionController::class, 'scheduleOptions'])->name('inayule.class-sessions.schedule-options');
+    Route::get('/inayule/class-sessions/recurring-preview', [ClassSessionController::class, 'recurringPreview'])->name('inayule.class-sessions.recurring-preview');
     Route::post('/inayule/class-sessions', [ClassSessionController::class, 'store'])->name('inayule.class-sessions.store');
     // Siswa membatalkan pengajuan yang belum disetujui pengajar (14 Oktober 2026).
     Route::post('/inayule/class-sessions/{id}/cancel', [ClassSessionController::class, 'cancel'])->name('inayule.class-sessions.cancel');
