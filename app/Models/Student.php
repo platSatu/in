@@ -37,11 +37,14 @@ class Student extends Model
         // Voucher Paket InaYule (20 November 2026): tanggal join dari data lama (import Excel) & switch "Bisa pakai voucher".
         'join_by_date',
         'voucher_eligible',
+        // Didaftarkan sebagai murid INA YULE oleh admin (25 November 2026).
+        'inayule_registered_at',
     ];
 
     protected $casts = [
         'join_by_date' => 'date',
         'voucher_eligible' => 'boolean',
+        'inayule_registered_at' => 'datetime',
     ];
 
     /*

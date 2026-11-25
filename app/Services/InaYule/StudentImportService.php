@@ -260,6 +260,8 @@ class StudentImportService
                         $student->voucher_eligible = true;
                         $summary['join']++;
                     }
+                    // Tanda murid INA YULE (25 November 2026): langsung tampil di Student INA YULE walau belum punya paket.
+                    $student->inayule_registered_at ??= now();
                     $student->save();
 
                     // Baris ledger 1 murid diberi jeda 1 detik supaya urutan "baris terakhir = saldo terkini" tetap pasti.
@@ -305,6 +307,30 @@ class StudentImportService
         Log::info('[INAYULE-IMPORT] Selesai', $summary + ['admin_id' => $adminId]);
 
         return $summary;
+    }
+
+    /**
+     * Tambah 1 murid dari tombol "Tambah Student" (25 November 2026). Memakai jalur yang sama dengan import Excel,
+     * jadi aturannya identik: akun login dibuat (status inactive, murid aktifkan lewat "Lupa Password"), email yang
+     * sudah ada dipakai/ditautkan tanpa menimpa data, email staf/pengajar ditolak.
+     *
+     * @return array{student: ?Student, error: ?string, existing: bool}
+     */
+    public function addOne(string $name, string $email, ?string $phone, ?string $teacherId, ?string $branchId, string $adminId): array
+    {
+        $email = mb_strtolower(trim($email));
+        $before = $this->existing($email, []);
+
+        $summary = $this->import([$email => [
+            'email' => $email, 'name' => trim($name), 'phone' => $phone ? $this->phone($phone) : null,
+            'teacher_id' => $teacherId, 'packages' => [], 'saldo' => 0.0, 'join_by_date' => null, 'lines' => [],
+        ]], $branchId, $adminId);
+
+        if ($summary['failed']) {
+            return ['student' => null, 'error' => preg_replace('/^[^:]+:\s*/', '', $summary['failed'][0]), 'existing' => false];
+        }
+
+        return ['student' => $this->existing($email, [])['student'], 'error' => null, 'existing' => (bool) ($before['user'] || $before['student'])];
     }
 
     /** Contoh Excel: sheet isian + daftar paket & pengajar dari sistem supaya nama yang ditulis pasti cocok. */

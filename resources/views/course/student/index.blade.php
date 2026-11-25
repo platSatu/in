@@ -13,7 +13,8 @@
         @if ($canEdit)
             <div class="d-flex gap-2">
                 <a href="{{ route('course.student.import.template') }}" class="btn btn-sm btn-outline-secondary">Unduh Contoh Excel</a>
-                <button type="button" class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#inayule-import">Import Excel</button>
+                <button type="button" class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#inayule-import">Import Excel</button>
+                <a href="{{ route('course.student.create') }}" class="btn btn-sm btn-primary">+ Tambah Student</a>
             </div>
         @endif
     </div>

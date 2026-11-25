@@ -153,6 +153,46 @@ class CourseStudentController extends Controller
             : "{$name} tidak bisa memakai voucher paket (khusus voucher murid yang diizinkan).");
     }
 
+    /** Form Tambah Student INA YULE (25 November 2026). */
+    public function create(Request $request): View
+    {
+        return view('course.student.create', [
+            'branches' => $this->branches($request),
+            'teachers' => $this->teachers(),
+        ]);
+    }
+
+    /**
+     * Simpan murid baru: 1 data murid yang sama tampil di Student INA YULE dan di menu Students.
+     * Aturan akun & email sama dengan Import Excel (StudentImportService::addOne()).
+     */
+    public function store(Request $request, StudentImportService $import): RedirectResponse
+    {
+        $branches = $this->branches($request);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:150'],
+            'email' => ['required', 'email', 'max:255'],
+            'handphone' => ['nullable', 'string', 'max:20'],
+            // Admin cabang wajib memilih cabangnya supaya murid terlihat di daftarnya.
+            'branch_id' => [$this->visibleBranches($request) === null ? 'nullable' : 'required', Rule::in($branches->pluck('id'))],
+            'teacher_user_id' => ['nullable', Rule::in($this->teachers()->pluck('id'))],
+        ], [
+            'name.required' => 'Isi nama murid.',
+            'email.required' => 'Isi email murid, dipakai untuk login.',
+            'branch_id.required' => 'Pilih cabang murid.',
+        ]);
+
+        $result = $import->addOne($data['name'], $data['email'], $data['handphone'] ?? null, $data['teacher_user_id'] ?? null, $data['branch_id'] ?? null, $request->user()->id);
+
+        if ($result['error'] || ! $result['student']) {
+            return back()->withInput()->with('error', $result['error'] ?: 'Murid gagal disimpan, coba lagi.');
+        }
+
+        return redirect()->route('course.student.show', $result['student']->id)->with('success', $result['existing']
+            ? 'Email ini sudah terdaftar, jadi data murid yang lama dipakai (tidak dibuat ganda) dan sekarang tampil di Student INA YULE.'
+            : 'Murid baru berhasil ditambahkan. Murid bisa login dengan email ini lewat "Lupa Password" untuk membuat password.');
+    }
+
     /** Contoh Excel import (berisi daftar paket & pengajar dari sistem). */
     public function importTemplate(StudentImportService $import): StreamedResponse
     {
@@ -224,7 +264,9 @@ class CourseStudentController extends Controller
     private function students(Request $request): Builder
     {
         return Student::where(fn (Builder $q) => $q->whereIn('students.id', CoursePackagePurchase::select('student_id'))
-                ->orWhereNotNull('students.join_by_date'))
+                ->orWhereNotNull('students.join_by_date')
+                // Ditambahkan admin lewat "Tambah Student" / Import Excel (25 November 2026).
+                ->orWhereNotNull('students.inayule_registered_at'))
             ->tap(fn ($query) => $this->scopeToVisibleBranches($query, $request, 'students.branch_id'));
     }
 
