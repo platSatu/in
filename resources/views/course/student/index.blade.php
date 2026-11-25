@@ -103,6 +103,7 @@
                                 <th class="text-end">Sisa Saldo</th>
                                 <th>Aktivitas Terakhir</th>
                                 <th>Join</th>
+                                <th>Akun Aktif</th>
                                 <th>Bisa Pakai Voucher</th>
                                 <th class="text-end">Aksi</th>
                             </tr>
@@ -132,6 +133,24 @@
                                     <td class="text-nowrap small">{{ $student->last_activity ? \Illuminate\Support\Carbon::parse($student->last_activity)->translatedFormat('d M Y, H:i') : '-' }}</td>
                                     <td class="text-nowrap small">{{ $student->join_by_date?->translatedFormat('d M Y') ?? '-' }}</td>
                                     <td>
+                                        {{-- Switch akun (25 November 2026): ON = bisa login, OFF = dinonaktifkan. Langsung tersimpan. --}}
+                                        @if ($student->user)
+                                            @php $accountActive = $student->user->isActive(); @endphp
+                                            <form method="POST" action="{{ route('course.student.account', $student->id) }}" class="m-0">
+                                                @csrf
+                                                @method('PUT')
+                                                <input type="hidden" name="active" value="0">
+                                                <div class="form-check form-switch mb-0" title="{{ $accountActive ? 'Aktif, bisa login' : ($student->user->hasVerifiedEmail() ? 'Dinonaktifkan' : 'Belum aktif (menunggu murid membuat password)') }}">
+                                                    <input class="form-check-input" type="checkbox" role="switch" name="active" value="1"
+                                                        @checked($accountActive) @disabled(! $canEdit)
+                                                        onchange="if (confirm(this.checked ? 'Aktifkan akun murid ini? Murid bisa login.' : 'Nonaktifkan akun murid ini? Murid tidak bisa login.')) { this.form.submit(); } else { this.checked = ! this.checked; }">
+                                                </div>
+                                            </form>
+                                        @else
+                                            <span class="text-muted small" title="Murid ini belum punya akun login">-</span>
+                                        @endif
+                                    </td>
+                                    <td>
                                         {{-- Switch voucher (20 November 2026): langsung tersimpan saat diklik. --}}
                                         <form method="POST" action="{{ route('course.student.voucher', $student->id) }}" class="m-0">
                                             @csrf
@@ -148,7 +167,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="10" class="text-center text-muted py-4">
+                                    <td colspan="11" class="text-center text-muted py-4">
                                         {{ array_filter($filters) ? 'Tidak ada murid yang cocok dengan filter.' : 'Belum ada murid yang punya paket InaYule.' }}
                                     </td>
                                 </tr>

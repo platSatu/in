@@ -1227,6 +1227,7 @@ Route::middleware(['auth', 'permission:course.student,edit'])->prefix('dashboard
     Route::put('/{id}/teacher', [CourseStudentController::class, 'updateTeacher'])->whereUuid('id')->name('course.student.teacher');
     // Switch "Bisa pakai voucher" per murid (20 November 2026).
     Route::put('/{id}/voucher', [CourseStudentController::class, 'updateVoucherEligible'])->whereUuid('id')->name('course.student.voucher');
+    Route::put('/{id}/account', [CourseStudentController::class, 'updateAccountStatus'])->whereUuid('id')->name('course.student.account');
     // Import murid dari sistem lama: contoh Excel -> pratinjau -> simpan.
     // Tambah Student INA YULE (25 November 2026).
     Route::get('/create', [CourseStudentController::class, 'create'])->name('course.student.create');

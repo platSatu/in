@@ -10,6 +10,7 @@ use App\Models\CourseCredit;
 use App\Models\CoursePackagePurchase;
 use App\Models\Deposit;
 use App\Models\Student;
+use App\Models\User;
 use App\Services\CourseCredit\CourseCreditDebitService;
 use App\Services\InaYule\StudentImportService;
 use Illuminate\Database\Eloquent\Builder;
@@ -48,7 +49,7 @@ class CourseStudentController extends Controller
         $search = trim((string) ($filters['search'] ?? ''));
 
         $students = $this->students($request)
-            ->with('teacher:id,name')
+            ->with(['teacher:id,name', 'user:id,status,email_verified_at'])
             ->select('students.*')
             ->addSelect(['credit_balance' => $this->latestCreditBalance()])
             ->addSelect(['last_activity' => CourseCredit::selectRaw('MAX(created_at)')->whereColumn('student_id', 'students.id')])
@@ -151,6 +152,38 @@ class CourseStudentController extends Controller
         return back()->with('success', $student->voucher_eligible
             ? "{$name} sekarang bisa memakai voucher paket."
             : "{$name} tidak bisa memakai voucher paket (khusus voucher murid yang diizinkan).");
+    }
+
+    /**
+     * Switch "Akun Aktif" per murid (25 November 2026), aturannya sama dengan menu Users:
+     *  - ON : akun aktif & email dianggap terverifikasi, murid bisa login (password dibuat lewat "Lupa Password").
+     *  - OFF: akun dinonaktifkan, murid tidak bisa login dan langsung keluar dari semua perangkat.
+     *         Email ditandai terverifikasi supaya "Lupa Password" tidak mengaktifkannya kembali
+     *         (lihat User::isSuspended() & NewPasswordController).
+     */
+    public function updateAccountStatus(Request $request, string $id): RedirectResponse
+    {
+        $student = $this->students($request)->with('user')->findOrFail($id);
+        $user = $student->user;
+        $name = trim($student->first_name.' '.$student->last_name);
+
+        if (! $user) {
+            return back()->with('error', "{$name} belum punya akun login.");
+        }
+
+        $active = $request->boolean('active');
+        $wasActive = $user->isActive();
+
+        $user->markEmailAsVerified();
+        $user->forceFill(['status' => $active ? User::STATUS_ACTIVE : User::STATUS_INACTIVE])->save();
+
+        if ($wasActive && ! $active) {
+            $user->logoutEverywhere();
+        }
+
+        return back()->with('success', $active
+            ? "Akun {$name} sekarang aktif dan bisa login."
+            : "Akun {$name} dinonaktifkan. Murid tidak bisa login sampai diaktifkan lagi.");
     }
 
     /** Form Tambah Student INA YULE (25 November 2026). */
