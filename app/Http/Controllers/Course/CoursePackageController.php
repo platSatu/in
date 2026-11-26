@@ -10,6 +10,7 @@ use App\Models\CourseLevel;
 use App\Models\CoursePackage;
 use App\Models\CourseType;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -141,11 +142,33 @@ class CoursePackageController extends Controller
 
     public function destroy(string $id)
     {
-        AdminCrud::delete(CoursePackage::class, $id);
+        $package = AdminCrud::findOrFail(CoursePackage::class, $id);
+
+        // Paket yang sudah dipakai tidak bisa dihapus (dikunci database), beri pesan jelas alih-alih error 500.
+        if ($this->usedPackageIds([$package->id])->isNotEmpty()) {
+            return redirect()
+                ->route('course.package.index')
+                ->with('error', 'Course Package "'.$package->name.'" tidak bisa dihapus karena sudah pernah dibeli, dibayar, atau dipakai jadwal kelas. Ubah status-nya jadi Inactive supaya tidak dijual lagi.');
+        }
+
+        $package->delete();
 
         return redirect()
             ->route('course.package.index')
             ->with('success', 'Course Package berhasil dihapus.');
+    }
+
+    /**
+     * Paket yang sudah dipakai data lain (26 November 2026): pembelian, transaksi pembayaran, atau jadwal kelas.
+     * Ketiganya memakai restrictOnDelete di database, jadi paket ini memang tidak boleh dihapus -- cukup dinonaktifkan.
+     * Voucher & referral hanya menyimpan ID sebagai riwayat (tanpa foreign key), jadi tidak menghalangi.
+     */
+    private function usedPackageIds(array $ids)
+    {
+        return collect(['course_package_purchases', 'course_package_payments', 'class_sessions'])
+            ->flatMap(fn (string $table) => DB::table($table)->whereIn('course_package_id', $ids)->distinct()->pluck('course_package_id'))
+            ->unique()
+            ->values();
     }
 
     /**
@@ -212,21 +235,28 @@ class CoursePackageController extends Controller
             'branch' => ['nullable', 'string'],
             'ids' => ['required_without:all_filtered', 'array'],
             'ids.*' => ['uuid'],
-            'action' => ['required', Rule::in(['copy', 'move'])],
-            'target_branch_id' => ['required', 'uuid', Rule::exists('company_branch', 'id')],
+            'action' => ['required', Rule::in(['copy', 'move', 'delete'])],
+            // Hapus (26 November 2026) tidak butuh cabang tujuan.
+            'target_branch_id' => ['exclude_if:action,delete', 'required', 'uuid', Rule::exists('company_branch', 'id')],
         ], [
             'ids.required' => 'Centang dulu paket yang mau diproses.',
+            'ids.required_without' => 'Centang dulu paket yang mau diproses.',
             'target_branch_id.required' => 'Pilih cabang tujuan.',
         ]);
 
-        $branch = CompanyBranch::findOrFail($validated['target_branch_id']);
         $packages = $request->boolean('all_filtered')
             ? $this->filtered($validated['search'] ?? null, $validated['branch'] ?? null)->get()
-            : CoursePackage::whereIn('id', $validated['ids'])->get();
+            : CoursePackage::whereIn('id', $validated['ids'] ?? [])->get();
 
         if ($packages->isEmpty()) {
             return back()->with('error', 'Tidak ada paket yang diproses.');
         }
+
+        if ($validated['action'] === 'delete') {
+            return $this->bulkDelete($packages, $validated);
+        }
+
+        $branch = CompanyBranch::findOrFail($validated['target_branch_id']);
         $userId = Auth::id();
 
         DB::transaction(function () use ($packages, $validated, $branch, $userId) {
@@ -249,6 +279,39 @@ class CoursePackageController extends Controller
         return redirect()
             ->route('course.package.index', ['branch' => $branch->id])
             ->with('success', $packages->count().' paket berhasil '.$verb.' cabang '.$branch->name.'. Silakan cek harga & paket yang tidak dijual di cabang ini.');
+    }
+
+    /**
+     * Hapus banyak paket sekaligus (26 November 2026), lewat form Pilih Semua yang sama dengan Copy/Pindahkan.
+     * Paket yang sudah dibeli/dibayar/dipakai jadwal kelas DILEWATI (tidak dihapus) dan disebutkan namanya;
+     * sisanya dihapus dalam satu transaksi -- kalau ada yang gagal di tengah jalan, tidak ada yang terhapus.
+     */
+    private function bulkDelete($packages, array $validated)
+    {
+        $used = $this->usedPackageIds($packages->modelKeys());
+        [$skipped, $deletable] = $packages->partition(fn (CoursePackage $package) => $used->contains($package->id));
+
+        try {
+            DB::transaction(fn () => $deletable->each(fn (CoursePackage $package) => $package->delete()));
+        } catch (QueryException $e) {
+            // Mis. ada siswa yang baru saja membeli salah satu paket saat proses berjalan.
+            return back()->with('error', 'Hapus dibatalkan, tidak ada paket yang terhapus: salah satu paket baru saja dipakai data lain. Silakan coba lagi.');
+        }
+
+        $redirect = redirect()->route('course.package.index', array_filter([
+            'search' => $validated['search'] ?? null,
+            'branch' => $validated['branch'] ?? null,
+        ]));
+
+        if ($skipped->isNotEmpty()) {
+            $names = $skipped->take(5)->pluck('name')->implode(', ').($skipped->count() > 5 ? ', dan '.($skipped->count() - 5).' lainnya' : '');
+            $redirect->with('error', $skipped->count().' paket tidak dihapus karena sudah pernah dibeli, dibayar, atau dipakai jadwal kelas: '
+                .$names.'. Ubah status-nya jadi Inactive supaya tidak dijual lagi.');
+        }
+
+        return $deletable->isNotEmpty()
+            ? $redirect->with('success', $deletable->count().' paket berhasil dihapus.')
+            : $redirect;
     }
 
     /** Pencarian & filter cabang yang sama untuk daftar dan aksi Pilih Semua. */

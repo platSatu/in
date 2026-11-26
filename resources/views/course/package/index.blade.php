@@ -25,6 +25,14 @@
         </div>
     @endif
 
+    {{-- Pesan validasi form Pilih Semua (mis. belum pilih cabang tujuan), sebelumnya tidak pernah tampil. --}}
+    @if($errors->any())
+        <div class="alert alert-danger alert-dismissible fade show">
+            {{ $errors->first() }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    @endif
+
     <div class="row layout-top-spacing">
         <div class="col-xl-12 layout-spacing">
             <div class="widget-content widget-content-area br-8">
@@ -81,19 +89,21 @@
                             </button>
                         @endif
                         <span class="ms-md-auto"></span>
-                        <select name="action" class="form-select form-select-sm w-auto" required>
+                        <select name="action" class="form-select form-select-sm w-auto" required id="bulkAction">
                             <option value="copy">Copy ke cabang</option>
                             <option value="move">Pindahkan ke cabang</option>
+                            {{-- Hapus banyak paket (26 November 2026): paket yang sudah dibeli/dibayar/dipakai kelas otomatis dilewati. --}}
+                            <option value="delete">Hapus</option>
                         </select>
-                        <select name="target_branch_id" class="form-select form-select-sm w-auto" required>
+                        <select name="target_branch_id" class="form-select form-select-sm w-auto" required id="bulkBranch">
                             <option value="">-- Pilih cabang --</option>
                             @foreach ($branches as $branch)
                                 <option value="{{ $branch->id }}">{{ $branch->name }}</option>
                             @endforeach
                         </select>
-                        <button type="submit" class="btn btn-primary btn-sm">Proses</button>
+                        <button type="submit" class="btn btn-primary btn-sm" id="bulkSubmit">Proses</button>
                     </div>
-                    <small class="text-muted d-block mt-2">Copy = paket digandakan ke cabang tujuan (nama tetap sama). Pindahkan = cabang paket diganti.</small>
+                    <small class="text-muted d-block mt-2">Copy = paket digandakan ke cabang tujuan (nama tetap sama). Pindahkan = cabang paket diganti. Hapus = paket dihapus permanen; paket yang sudah pernah dibeli, dibayar, atau dipakai jadwal kelas otomatis dilewati (nonaktifkan saja).</small>
                 </form>
 
                 <div class="table-responsive">
@@ -247,10 +257,30 @@
                             refresh();
                         });
                     }
+                    // Hapus tidak butuh cabang tujuan: sembunyikan & lepas "required" (26 November 2026).
+                    var actionSelect = document.getElementById('bulkAction');
+                    var branchSelect = document.getElementById('bulkBranch');
+                    var submitButton = document.getElementById('bulkSubmit');
+                    function syncAction() {
+                        var isDelete = actionSelect.value === 'delete';
+                        branchSelect.hidden = isDelete;
+                        branchSelect.required = !isDelete;
+                        submitButton.className = 'btn btn-sm ' + (isDelete ? 'btn-danger' : 'btn-primary');
+                        submitButton.textContent = isDelete ? 'Hapus' : 'Proses';
+                    }
+                    actionSelect.addEventListener('change', syncAction);
+                    syncAction();
+
                     form.addEventListener('submit', function (event) {
-                        var action = form.elements.action.selectedOptions[0].textContent.toLowerCase();
-                        var branch = form.elements.target_branch_id.selectedOptions[0].textContent;
-                        if (!confirm(count.textContent + ' akan di-' + action.replace(' ke cabang', '') + ' ke cabang ' + branch + '. Lanjutkan?')) {
+                        var message;
+                        if (actionSelect.value === 'delete') {
+                            message = count.textContent + ' akan DIHAPUS PERMANEN. Paket yang sudah pernah dibeli, dibayar, atau dipakai jadwal kelas otomatis dilewati. Lanjutkan?';
+                        } else {
+                            var action = actionSelect.selectedOptions[0].textContent.toLowerCase();
+                            var branch = branchSelect.selectedOptions[0].textContent;
+                            message = count.textContent + ' akan di-' + action.replace(' ke cabang', '') + ' ke cabang ' + branch + '. Lanjutkan?';
+                        }
+                        if (!confirm(message)) {
                             event.preventDefault();
                         }
                     });
