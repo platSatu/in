@@ -169,7 +169,7 @@ Route::get('/invoice/{token}', [InvoiceController::class, 'show'])->name('invoic
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/apply/{universityProfile}', [ApplyController::class, 'store'])->name('student-portal.apply.store');
-    // Cart "Pilihan Kampus" (12 November 2026): maksimal 3 kampus, checkout lalu bayar sekaligus.
+    // Cart "Pilihan Kampus" (12 November 2026): maksimal 2 kampus, checkout lalu bayar sekaligus.
     Route::get('/apply-cart', [ApplyController::class, 'cart'])->name('student-portal.apply.cart');
     Route::post('/apply-cart/checkout', [ApplyController::class, 'checkout'])->middleware('throttle:10,1')->name('student-portal.apply.cart.checkout');
     Route::delete('/apply-cart/{key}', [ApplyController::class, 'removeFromCart'])->name('student-portal.apply.cart.remove');

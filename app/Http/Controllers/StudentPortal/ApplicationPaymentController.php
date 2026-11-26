@@ -322,7 +322,7 @@ class ApplicationPaymentController extends Controller
             return collect([$application]);
         }
 
-        // Maksimal sebanyak isi cart (3 kampus), supaya aplikasi lama yang belum dibayar tidak ikut tertagih semua.
+        // Maksimal sebanyak isi cart (CART_MAX, 2 kampus), supaya aplikasi lama yang belum dibayar tidak ikut tertagih semua.
         return collect([$application])
             ->merge($application->registrationBundle()->reject(fn ($item) => $item->is($application)))
             ->take(ApplyController::CART_MAX);

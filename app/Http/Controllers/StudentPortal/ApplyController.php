@@ -143,9 +143,9 @@ class ApplyController extends Controller
         ]);
     }
 
-    /** Cart "Pilihan Kampus" (12 November 2026): disimpan di session, maksimal 3 kampus sekali bayar. */
+    /** Cart "Pilihan Kampus" (12 November 2026): disimpan di session, maksimal 2 kampus sekali bayar (26 November 2026: dari 3 jadi 2). */
     private const CART = 'apply_cart';
-    public const CART_MAX = 3;
+    public const CART_MAX = 2;
 
     /**
      * Submit form Apply -- jurusan yang dipilih masuk ke cart "Pilihan Kampus" (12 November 2026).

@@ -1,6 +1,6 @@
 {{--
     Popup "Add to InaStudy" / "Tambah Kampus" (18 November 2026): sama dengan "My University List" siswa
-    di depan -- pilih 1-3 kampus ke daftar, lihat biayanya (DP 50% per kampus kalau lebih dari 1), lalu
+    di depan -- pilih 1-2 kampus ke daftar, lihat biayanya (DP 50% per kampus kalau lebih dari 1), lalu
     pilih cara bayar. Server tetap memvalidasi semuanya (ManualApplicationRegistrar::registerMany).
 
     Dipakai di: index Student (siswa yang belum punya aplikasi) & detail Aplikasi Kuliah (Tambah Kampus).
