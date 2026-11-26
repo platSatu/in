@@ -100,6 +100,22 @@
             <div class="alert alert-info alert-heads-up">{{ session('status') }}</div>
         @endif
 
+        {{-- 26 November 2026: Registration Fee belum diatur admin / batas 2 kampus aktif. --}}
+        @if(session('apply_error'))
+            <div class="alert alert-danger alert-heads-up"><i class="bi bi-exclamation-octagon me-1"></i> {{ session('apply_error') }}</div>
+        @elseif($lockedCourseFeeMissing)
+            <div class="alert alert-danger alert-heads-up"><i class="bi bi-exclamation-octagon me-1"></i> {{ $feeMissingMessage }}</div>
+        @endif
+
+        @if($remainingSlots <= 0)
+            <div class="alert alert-warning alert-heads-up">
+                <i class="bi bi-info-circle me-1"></i>
+                You already have {{ \App\Http\Controllers\StudentPortal\ApplyController::CART_MAX }} active university applications, which is the maximum.
+                An unpaid application is cancelled automatically 1 hour after checkout, and you can apply again after that.
+                <a href="{{ route('inastudy.index') }}">See my applications</a>
+            </div>
+        @endif
+
         @if(session('apply_conflict'))
             <div class="alert alert-warning alert-heads-up d-flex align-items-center justify-content-between flex-wrap gap-2">
                 <span>{{ session('apply_conflict') }}</span>
@@ -231,11 +247,13 @@
                             <select id="degreeIntakeSelect" name="degree_intake_id" class="form-select @error('degree_intake_id') is-invalid @enderror" required>
                                 <option value="">Choose...</option>
                                 @foreach($degreeOptions as $degreeRow)
+                                    {{-- Registration Fee belum diatur admin (26 November 2026): belum bisa dipilih. --}}
                                     <option value="{{ $degreeRow->id }}"
                                         data-intake="{{ $degreeRow->intake }}"
                                         data-duration="{{ $degreeRow->duration }}"
+                                        {{ (int) $degreeRow->registration_fee_amount <= 0 ? 'disabled' : '' }}
                                         {{ old('degree_intake_id') === $degreeRow->id ? 'selected' : '' }}>
-                                        {{ $degreeRow->course_name ?: ($profile->field ?: 'Program') }}{{ $degreeRow->degree ? ' (' . $degreeRow->degree . ')' : '' }}
+                                        {{ $degreeRow->course_name ?: ($profile->field ?: 'Program') }}{{ $degreeRow->degree ? ' (' . $degreeRow->degree . ')' : '' }}{{ (int) $degreeRow->registration_fee_amount <= 0 ? ' - fee not set yet' : '' }}
                                     </option>
                                 @endforeach
                             </select>
@@ -308,9 +326,15 @@
                         @enderror
                     </div>
 
-                    <button type="submit" class="btn-submit">
-                        <i class="bi bi-bag-plus me-1"></i> Add to My University List
-                    </button>
+                    @if($lockedCourseFeeMissing || $remainingSlots <= 0)
+                        <button type="button" class="btn-submit" disabled style="opacity:.55;cursor:not-allowed;">
+                            <i class="bi bi-slash-circle me-1"></i> {{ $lockedCourseFeeMissing ? 'Registration Fee not set yet' : 'Maximum applications reached' }}
+                        </button>
+                    @else
+                        <button type="submit" class="btn-submit">
+                            <i class="bi bi-bag-plus me-1"></i> Add to My University List
+                        </button>
+                    @endif
                 </form>
             @endif
         </div>

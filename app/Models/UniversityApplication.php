@@ -84,6 +84,8 @@ class UniversityApplication extends Model
         'handled_by_user_id',
         'notes',
         'submitted_at',
+        // Batas bayar Registration Fee untuk aplikasi dari checkout siswa (26 November 2026), lihat cancelOverdue().
+        'payment_deadline_at',
     ];
 
     protected $casts = [
@@ -93,7 +95,77 @@ class UniversityApplication extends Model
         'registration_fee_paid_at' => 'date',
         'deposit_fee_china_amount' => 'integer',
         'submitted_at' => 'datetime',
+        'payment_deadline_at' => 'datetime',
     ];
+
+    /**
+     * Apply dari portal siswa (26 November 2026): Registration Fee harus dibayar dalam 1 jam setelah checkout.
+     * Kalau tidak, aplikasinya dianggap tidak jadi (dibatalkan otomatis) dan siswa bisa apply lagi kapan saja.
+     */
+    public const PAYMENT_WINDOW_MINUTES = 60;
+
+    public const AUTO_CANCEL_REASON = 'Dibatalkan otomatis oleh sistem: Registration Fee tidak dibayar dalam 1 jam setelah apply.';
+
+    /** Aplikasi yang tidak dihitung ke batas jumlah kampus aktif siswa (ApplyController::CART_MAX). */
+    public const NOT_ACTIVE_STATUSES = [self::STATUS_CANCELLED, self::STATUS_COMPLETED];
+
+    /** Aplikasi yang masih berjalan: dihitung ke batas 2 kampus (sudah bayar atau masih dalam batas waktu bayar). */
+    public function scopeActive($query)
+    {
+        return $query->whereNotIn('status', self::NOT_ACTIVE_STATUSES);
+    }
+
+    /**
+     * Lewat batas bayar: punya payment_deadline_at yang sudah lewat, belum ada Registration Fee lunas, dan tidak ada
+     * transaksi pending yang masih berjalan (siswa yang sedang bayar di menit-menit terakhir tidak dibatalkan).
+     */
+    public function scopeOverduePayment($query)
+    {
+        return $query->where('status', self::STATUS_SUBMITTED)
+            ->whereNotNull('payment_deadline_at')
+            ->where('payment_deadline_at', '<=', now())
+            ->whereDoesntHave('payments', fn ($payment) => $payment->where('purpose', ApplicationPayment::PURPOSE_REGISTRATION_FEE)
+                ->where('status', ApplicationPayment::STATUS_PAID))
+            ->whereDoesntHave('payments', fn ($payment) => $payment->where('status', ApplicationPayment::STATUS_PENDING)
+                ->where(fn ($expiry) => $expiry->whereNull('expires_at')->orWhere('expires_at', '>', now())));
+    }
+
+    /**
+     * Batalkan aplikasi yang lewat batas bayar (semua siswa, atau satu siswa saja). Dipanggil scheduler
+     * (payments:expire-stale, tiap 5 menit) dan saat siswa membuka halaman Apply/cart/bayar, supaya hasilnya
+     * langsung benar walau cron belum jalan. Tiap aplikasi dikunci & dicek ulang, jadi aman dari webhook yang
+     * masuk bersamaan. Transaksi pending miliknya ikut ditandai expired. Mengembalikan jumlah yang dibatalkan.
+     */
+    public static function cancelOverdue(?string $studentId = null): int
+    {
+        $ids = static::overduePayment()
+            ->when($studentId, fn ($query) => $query->where('student_id', $studentId))
+            ->pluck('id');
+
+        return $ids->filter(fn (string $id) => DB::transaction(function () use ($id) {
+            $application = static::whereKey($id)->lockForUpdate()->first();
+
+            if (! $application || ! static::whereKey($id)->overduePayment()->exists()) {
+                return false;
+            }
+
+            $application->payments()->where('status', ApplicationPayment::STATUS_PENDING)
+                ->update(['status' => ApplicationPayment::STATUS_EXPIRED]);
+
+            $application->update([
+                'status' => self::STATUS_CANCELLED,
+                'cancel_reason' => self::AUTO_CANCEL_REASON,
+            ]);
+
+            return true;
+        }))->count();
+    }
+
+    /** Dibatalkan sistem karena tidak bayar (bukan oleh admin) -- dibuka lagi kalau pembayarannya ternyata masuk. */
+    public function isAutoCancelledForNonPayment(): bool
+    {
+        return $this->isCancelled() && $this->cancel_reason === self::AUTO_CANCEL_REASON;
+    }
 
     // Tahap lanjut: kampus/jurusan tidak bisa diubah lagi (batalkan lalu apply baru).
     public const LOCKED_STATUSES = [

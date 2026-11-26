@@ -8,6 +8,7 @@ use App\Models\ApplicationPayment;
 use App\Models\PaymentGateway;
 use App\Models\UniversityApplication;
 use App\Services\Payment\PaymentGatewayFactory;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,6 +41,8 @@ use Throwable;
  */
 class ApplicationPaymentController extends Controller
 {
+    public const EXPIRED_MESSAGE = 'The 1-hour payment time for this application has passed, so it was cancelled automatically. You can apply again whenever you are ready.';
+
     private const PURPOSES = [
         ApplicationPayment::PURPOSE_REGISTRATION_FEE,
         ApplicationPayment::PURPOSE_DEPARTURE_FEE,
@@ -359,6 +362,19 @@ class ApplicationPaymentController extends Controller
         $ownsApplication = $application->student && $application->student->user_id === $user->id;
 
         abort_unless($ownsApplication, Response::HTTP_FORBIDDEN);
+
+        // Batas bayar 1 jam (26 November 2026): cek dulu saat dibuka, supaya hasilnya benar walau scheduler belum jalan.
+        if (UniversityApplication::cancelOverdue($application->student_id) > 0) {
+            $application->refresh();
+        }
+
+        // Dibatalkan sistem karena tidak dibayar: beri pesan jelas & arahkan untuk apply lagi (bukan 404).
+        if ($application->isAutoCancelledForNonPayment()) {
+            throw new HttpResponseException($request->expectsJson()
+                ? response()->json(['message' => self::EXPIRED_MESSAGE], 422)
+                : redirect()->route('student-portal.apply.cart')->with('cart_error', self::EXPIRED_MESSAGE));
+        }
+
         // Aplikasi yang dibatalkan admin tidak bisa dibuka/dibayar/diisi lagi.
         abort_if($application->isCancelled(), Response::HTTP_NOT_FOUND);
 

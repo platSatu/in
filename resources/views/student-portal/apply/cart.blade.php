@@ -81,19 +81,58 @@
             @endif
         @endforeach
 
+        {{-- 26 November 2026: notifikasi fee belum diatur & batas 2 kampus aktif (checkout ikut ditahan, lihat ApplyController). --}}
+        @if($hasMissingFee)
+            <div class="alert alert-danger" style="border-radius:14px;"><i class="bi bi-exclamation-octagon"></i> {{ $feeMissingMessage }} Remove the university marked "Fee not set yet" to continue.</div>
+        @endif
+        @if($overLimit)
+            <div class="alert alert-warning" style="border-radius:14px;">
+                <i class="bi bi-exclamation-triangle"></i>
+                You can apply to {{ $limit }} universities in total and you already have {{ $activeCount }} active application{{ $activeCount > 1 ? 's' : '' }},
+                so only {{ $max }} more can be checked out. Please remove {{ $items->count() - $max }} from your list.
+            </div>
+        @endif
+
+        @if($unpaid->isNotEmpty())
+            {{-- Aplikasi yang masih menunggu pembayaran: ikut ditagih sekaligus saat checkout, atau bayar langsung di sini. --}}
+            <div class="alert alert-info" style="border-radius:14px;">
+                <div class="fw-semibold mb-1"><i class="bi bi-hourglass-split"></i> Waiting for payment</div>
+                @foreach($unpaid as $application)
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 py-1">
+                        <span>
+                            {{ $application->university->name ?? '-' }} &middot; {{ $application->major_label }}
+                            @if($application->payment_deadline_at)
+                                <small class="text-muted">&middot; pay before {{ $application->payment_deadline_at->timezone('Asia/Jakarta')->format('H:i') }} WIB, otherwise it is cancelled automatically</small>
+                            @endif
+                        </span>
+                        <a href="{{ route('student-portal.applications.payment.show', [$application->id, 'registration_fee']) }}" class="btn btn-sm btn-danger">Pay now</a>
+                    </div>
+                @endforeach
+                @if($items->isNotEmpty())
+                    <small class="d-block mt-1">These will be paid together with the universities in your list when you check out.</small>
+                @endif
+            </div>
+        @endif
+
         <div class="row g-4">
             <div class="{{ $items->isEmpty() ? 'col-lg-8 mx-auto' : 'col-lg-7' }}">
                 <div class="card-box">
                     <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
                         <div>
                             <h1>My University List</h1>
-                            <p class="subtitle mb-0">Choose up to {{ $max }} universities and pay for all of them at once.</p>
+                            <p class="subtitle mb-0">
+                                Choose up to {{ $limit }} universities and pay for all of them at once.
+                                @if($activeCount > 0)
+                                    <br>You already have {{ $activeCount }} active application{{ $activeCount > 1 ? 's' : '' }}, so {{ $max }} more can be added.
+                                @endif
+                            </p>
                         </div>
+                        {{-- Slot dihitung bersama aplikasi yang masih aktif (26 November 2026). --}}
                         <div class="text-end">
                             <div class="slots" aria-hidden="true">
-                                @for($i = 0; $i < $max; $i++)<span @class(['is-on' => $i < $items->count()])></span>@endfor
+                                @for($i = 0; $i < $limit; $i++)<span @class(['is-on' => $i < $activeCount + $items->count()])></span>@endfor
                             </div>
-                            <small class="text-muted">{{ $items->count() }} / {{ $max }}</small>
+                            <small class="text-muted">{{ min($limit, $activeCount + $items->count()) }} / {{ $limit }}</small>
                         </div>
                     </div>
 
@@ -129,7 +168,7 @@
                                         <small>Registration Fee</small>
                                     @endif
                                 @else
-                                    <small>Fee will be confirmed by our team</small>
+                                    <small class="text-danger fw-semibold">Fee not set yet</small>
                                 @endif
                             </div>
                             <form method="POST" action="{{ route('student-portal.apply.cart.remove', $item['key']) }}" class="m-0">
@@ -150,13 +189,20 @@
 
             @if($items->isNotEmpty())
                 @php
-                    $total = $items->sum(fn ($item) => $isDeposit ? ceil((int) $item['course']->registration_fee_amount / 2) : (int) $item['course']->registration_fee_amount);
+                    $charge = fn ($fee) => $isDeposit ? ceil((int) $fee / 2) : (int) $fee;
+                    $total = $items->sum(fn ($item) => $charge($item['course']->registration_fee_amount));
+                    // Aplikasi yang menunggu bayar ikut ditagih di transaksi yang sama (26 November 2026), jadi total sama dengan halaman bayar.
+                    $unpaidTotal = $unpaid->sum(fn ($application) => $charge($application->registration_fee_amount));
+                    $blocked = $hasMissingFee || $overLimit;
                 @endphp
                 <div class="col-lg-5">
                     <div class="card-box summary">
                         <h6 class="fw-bold mb-3">Summary</h6>
                         <div class="row-line"><span>Universities</span><strong>{{ $items->count() }}</strong></div>
-                        <div class="row-line align-items-center"><span>Pay now</span><span class="total">Rp {{ number_format($total, 0, ',', '.') }}</span></div>
+                        @if($unpaid->isNotEmpty())
+                            <div class="row-line"><span>Waiting for payment</span><strong>{{ $unpaid->count() }} &middot; Rp {{ number_format($unpaidTotal, 0, ',', '.') }}</strong></div>
+                        @endif
+                        <div class="row-line align-items-center"><span>Pay now</span><span class="total">Rp {{ number_format($total + $unpaidTotal, 0, ',', '.') }}</span></div>
 
                         @if($isDeposit)
                             <div class="note mb-3"><i class="bi bi-info-circle"></i> Since you are applying to more than one university, you only pay a 50% deposit for each one now. Our team will send you the rest later.</div>
@@ -164,8 +210,9 @@
 
                         <form method="POST" action="{{ route('student-portal.apply.cart.checkout') }}" onsubmit="this.querySelector('button').disabled = true;">
                             @csrf
-                            <button type="submit" class="btn-brand"><i class="bi bi-lock-fill me-1"></i> Checkout &amp; Pay</button>
+                            <button type="submit" class="btn-brand" @disabled($blocked) @if($blocked) style="opacity:.55;cursor:not-allowed;" @endif><i class="bi bi-lock-fill me-1"></i> Checkout &amp; Pay</button>
                         </form>
+                        <div class="text-muted mt-2" style="font-size:12.5px;"><i class="bi bi-clock"></i> Please complete the payment within {{ $paymentWindow }} minutes after checkout, otherwise the application is cancelled automatically.</div>
 
                         <div class="d-grid gap-2 mt-2">
                             <a href="{{ route('frontend.university.catalog') }}" @class(['btn-soft', 'disabled' => $items->count() >= $max])>

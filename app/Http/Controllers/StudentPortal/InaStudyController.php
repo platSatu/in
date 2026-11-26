@@ -22,6 +22,11 @@ class InaStudyController extends Controller
     {
         $student = Student::where('user_id', Auth::id())->first();
 
+        // Batas bayar 1 jam (26 November 2026): yang lewat batas dibatalkan dulu, jadi tidak tampil sebagai aplikasi aktif.
+        if ($student) {
+            UniversityApplication::cancelOverdue($student->id);
+        }
+
         $myApplications = $student
             // Aplikasi yang sudah di-Cancel admin tidak ditampilkan ke siswa (20 Oktober 2026).
             ? $student->applications()->where('status', '!=', UniversityApplication::STATUS_CANCELLED)

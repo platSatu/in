@@ -507,6 +507,18 @@ class FormPaymentController extends Controller
             return;
         }
 
+        // Batas bayar 1 jam (26 November 2026): aplikasi yang dibatalkan SISTEM karena belum bayar, lalu ternyata
+        // pembayarannya tetap masuk (mis. callback gateway telat), dibuka lagi -- semua dipicu dari pembayaran.
+        // Yang dibatalkan admin tidak disentuh (tetap dicek manual seperti sebelumnya, lihat di bawah).
+        if ($payment->purpose === ApplicationPayment::PURPOSE_REGISTRATION_FEE && $application->isAutoCancelledForNonPayment()) {
+            $application->update(['status' => UniversityApplication::STATUS_SUBMITTED, 'cancel_reason' => null]);
+
+            Log::info('[PAYMENT] Aplikasi yang dibatalkan otomatis dibuka lagi karena pembayaran masuk', [
+                'application_id' => $application->id,
+                'order_id' => $payment->order_id,
+            ]);
+        }
+
         // Uang tetap tercatat lunas, tapi aplikasi yang sudah dibatalkan admin
         // tidak dibuka lagi -- admin cek di card Payment untuk refund/aktifkan manual.
         if ($application->isCancelled()) {

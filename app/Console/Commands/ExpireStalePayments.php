@@ -2,9 +2,11 @@
 
 namespace App\Console\Commands;
 
+use App\Models\ApplicationPayment;
 use App\Models\CoursePackagePayment;
 use App\Models\DepositPayment;
 use App\Models\FormPayment;
+use App\Models\UniversityApplication;
 use Illuminate\Console\Command;
 
 /**
@@ -69,6 +71,24 @@ class ExpireStalePayments extends Command
 
         if ($affectedCoursePackagePayments > 0) {
             $this->info("{$affectedCoursePackagePayments} transaksi checkout package ditandai expired.");
+        }
+
+        // Apply Kampus (26 November 2026): transaksi Registration/Departure Fee yang lewat batas waktu, lalu aplikasi
+        // dari checkout siswa yang tidak dibayar dalam 1 jam dibatalkan otomatis (UniversityApplication::cancelOverdue).
+        // Aplikasi lama & yang didaftarkan admin tidak punya payment_deadline_at, jadi tidak ikut dibatalkan.
+        $affectedApplicationPayments = ApplicationPayment::where('status', ApplicationPayment::STATUS_PENDING)
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now())
+            ->update(['status' => ApplicationPayment::STATUS_EXPIRED]);
+
+        if ($affectedApplicationPayments > 0) {
+            $this->info("{$affectedApplicationPayments} transaksi Apply Kampus ditandai expired.");
+        }
+
+        $cancelledApplications = UniversityApplication::cancelOverdue();
+
+        if ($cancelledApplications > 0) {
+            $this->info("{$cancelledApplications} aplikasi kuliah dibatalkan otomatis (Registration Fee tidak dibayar dalam 1 jam).");
         }
 
         return self::SUCCESS;
