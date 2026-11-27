@@ -120,7 +120,9 @@
                 if (auth()->check() && \App\Models\Student::where('user_id', auth()->id())->exists()) {
                     $studentMenuGroups = collect([
                         [
-                            'label' => 'InaStudy',
+                            // 27 November 2026 (permintaan user): judul grup diganti
+                            // "InaStudy" -> "Menu" supaya tidak dobel dengan submenu InaStudy.
+                            'label' => 'Menu',
                             'items' => [
                                 ['label' => 'InaYule', 'route' => 'inayule.index'],
                                 ['label' => 'InaStudy', 'route' => 'inastudy.index'],
